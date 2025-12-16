@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+{% block title %}Nuevo empleado{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <div class="flex items-start justify-between gap-3">
+        <div>
+            <h1 id="titulo-empleado" class="text-2xl font-bold text-gray-900">Nuevo empleado</h1>
+            <p class="mt-1 text-sm text-gray-600">Alta y edición de empleados en modo dummy (localStorage).</p>
+        </div>
+        <a href="{{ url_for('employees.index') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+            <i class="fas fa-arrow-left mr-2"></i> Volver al listado
+        </a>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow border border-gray-200">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Datos del empleado</h2>
+            <p class="text-xs text-gray-500">Separado por obligatorios y complementarios para carga rápida.</p>
+        </div>
+        <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700">Simulado</span>
+    </div>
+
+    <div class="p-4 space-y-4">
+        <input id="employee-id" type="hidden" value="">
+
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+            <div class="md:col-span-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+                <input id="employee-first-name" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Apellido</label>
+                <input id="employee-last-name" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de incorporación</label>
+                <input id="employee-hire-date" type="date" class="w-full px-3 py-2 text-sm border rounded-md" value="{{ today }}">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Forma de pago habitual</label>
+                <select id="employee-payment" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                    <option>Efectivo</option>
+                    <option>Transferencia</option>
+                    <option>Débito</option>
+                    <option>Crédito</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+            <div class="md:col-span-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Tipo de contratación</label>
+                <select id="employee-contract" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                    <option>Fijo</option>
+                    <option>Eventual</option>
+                    <option>Freelance / por horas</option>
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>
+                <select id="employee-status" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                    <option value="Active">Activo</option>
+                    <option value="Inactive">Inactivo</option>
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Puesto / rol</label>
+                <input id="employee-role" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Vendedor, Operario">
+            </div>
+        </div>
+
+        <div>
+            <button id="btn-toggle-employee-extra" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">Datos complementarios</button>
+        </div>
+
+        <div id="employee-extra" class="hidden border rounded-lg p-4 bg-gray-50 space-y-3">
+            <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de nacimiento</label>
+                    <input id="employee-birth" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Documento / ID</label>
+                    <input id="employee-doc" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Teléfono</label>
+                    <input id="employee-phone" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                    <input id="employee-email" type="email" class="w-full px-3 py-2 text-sm border rounded-md">
+                </div>
+                <div class="md:col-span-4">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Dirección</label>
+                    <input id="employee-address" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Salario de referencia</label>
+                    <input id="employee-salary" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md">
+                </div>
+                <div class="md:col-span-4">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Notas internas</label>
+                    <input id="employee-notes" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row gap-2 justify-end pt-2">
+            <a href="{{ url_for('employees.index') }}" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-center">Cancelar</a>
+            <button id="btn-save-employee" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Guardar empleado (dummy)</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const baseListUrl = "{{ url_for('employees.index') }}";
+
+    const titulo = document.getElementById('titulo-empleado');
+    const inputId = document.getElementById('employee-id');
+
+    const firstName = document.getElementById('employee-first-name');
+    const lastName = document.getElementById('employee-last-name');
+    const hireDate = document.getElementById('employee-hire-date');
+    const payment = document.getElementById('employee-payment');
+    const contract = document.getElementById('employee-contract');
+    const status = document.getElementById('employee-status');
+    const role = document.getElementById('employee-role');
+
+    const btnToggle = document.getElementById('btn-toggle-employee-extra');
+    const panelExtra = document.getElementById('employee-extra');
+
+    const birth = document.getElementById('employee-birth');
+    const doc = document.getElementById('employee-doc');
+    const phone = document.getElementById('employee-phone');
+    const email = document.getElementById('employee-email');
+    const address = document.getElementById('employee-address');
+    const salary = document.getElementById('employee-salary');
+    const notes = document.getElementById('employee-notes');
+
+    const btnSave = document.getElementById('btn-save-employee');
+
+    function parseNumeroSeguro(v) {
+        const n = parseFloat(String(v || '').replace(',', '.'));
+        return isNaN(n) ? 0 : n;
+    }
+
+    function leerEmpleados() {
+        try {
+            const raw = window.localStorage.getItem('empleados_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function guardarEmpleados(arr) {
+        try {
+            window.localStorage.setItem('empleados_dummy', JSON.stringify(arr));
+        } catch (e) {
+            // noop
+        }
+    }
+
+    function cargarDesdeId(id) {
+        const list = leerEmpleados();
+        const found = list.find(e => String(e?.id) === String(id));
+        if (!found) return;
+
+        if (titulo) titulo.textContent = 'Editar empleado';
+        if (inputId) inputId.value = String(found.id);
+
+        if (firstName) firstName.value = found.first_name || '';
+        if (lastName) lastName.value = found.last_name || '';
+        if (hireDate) hireDate.value = found.hire_date || '';
+        if (payment) payment.value = found.default_payment_method || 'Efectivo';
+        if (contract) contract.value = found.contract_type || 'Fijo';
+        if (status) status.value = found.status || 'Active';
+        if (role) role.value = found.role || '';
+
+        if (birth) birth.value = found.birth_date || '';
+        if (doc) doc.value = found.document_id || '';
+        if (phone) phone.value = found.phone || '';
+        if (email) email.value = found.email || '';
+        if (address) address.value = found.address || '';
+        if (salary) salary.value = String(parseNumeroSeguro(found.reference_salary));
+        if (notes) notes.value = found.notes || '';
+    }
+
+    function validar() {
+        const f = (firstName?.value || '').trim();
+        const l = (lastName?.value || '').trim();
+        const h = (hireDate?.value || '').trim();
+        const pm = (payment?.value || '').trim();
+        const ct = (contract?.value || '').trim();
+        if (!f || !l || !h || !pm || !ct) return false;
+        return true;
+    }
+
+    function guardar() {
+        if (!validar()) {
+            alert('Completá los campos obligatorios: Nombre, Apellido, Fecha de incorporación, Forma de pago habitual y Tipo de contratación.');
+            return;
+        }
+
+        const id = (inputId?.value || '').trim() || String(Date.now());
+        const payload = {
+            id,
+            first_name: (firstName?.value || '').trim(),
+            last_name: (lastName?.value || '').trim(),
+            hire_date: (hireDate?.value || '').trim(),
+            default_payment_method: (payment?.value || '').trim(),
+            contract_type: (contract?.value || '').trim(),
+            status: (status?.value || 'Active').trim(),
+            role: (role?.value || '').trim(),
+            birth_date: (birth?.value || '').trim(),
+            document_id: (doc?.value || '').trim(),
+            phone: (phone?.value || '').trim(),
+            email: (email?.value || '').trim(),
+            address: (address?.value || '').trim(),
+            reference_salary: parseNumeroSeguro(salary?.value),
+            notes: (notes?.value || '').trim()
+        };
+
+        const list = leerEmpleados();
+        const idx = list.findIndex(e => String(e?.id) === String(id));
+        if (idx >= 0) list[idx] = payload;
+        else list.push(payload);
+
+        guardarEmpleados(list);
+        window.location.href = baseListUrl;
+    }
+
+    if (btnToggle && panelExtra) {
+        btnToggle.addEventListener('click', function () {
+            panelExtra.classList.toggle('hidden');
+        });
+    }
+
+    if (btnSave) {
+        btnSave.addEventListener('click', function () {
+            guardar();
+        });
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    if (id) {
+        cargarDesdeId(id);
+    }
+});
+</script>
+{% endblock %}

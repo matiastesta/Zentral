@@ -1,0 +1,22 @@
+# Dependencias principales
+Flask==2.3.3
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.5
+Flask-Login==0.6.2
+Flask-WTF==1.2.1
+Flask-Bootstrap==3.3.7.1
+Flask-Moment==1.0.1
+python-dotenv==1.0.0
+Werkzeug==2.3.7
+Flask-Babel==3.1.0
+
+# Base de datos
+SQLAlchemy==2.0.36
+
+# Formularios
+WTForms==3.0.1
+email-validator==2.0.0.post2
+
+# Utilidades
+python-dateutil==2.8.2
+pytz==2023.3

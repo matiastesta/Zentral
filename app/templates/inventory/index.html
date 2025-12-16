@@ -1,0 +1,1306 @@
+{% extends 'base.html' %}
+{% block title %}Inventario{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Inventario</h1>
+            <p class="mt-1 text-sm text-gray-600">Inventario es el único punto de entrada de stock. Cada alta de lote genera un egreso automático.</p>
+        </div>
+        <div class="flex gap-2 justify-end">
+            <button id="btn-export-inv" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100">
+                <i class="fas fa-file-export mr-2"></i> Exportar
+            </button>
+            <button id="btn-create-inv" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">
+                <i class="fas fa-plus mr-2"></i> Crear ítem
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-5">
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">💰 Valor total del stock</p>
+        <p id="kpi-stock-value" class="mt-2 text-2xl font-semibold text-gray-900">$0,00</p>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">📦 Productos</p>
+        <p id="kpi-products" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">⏰ Lotes próximos a vencer</p>
+        <p id="kpi-expire" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+        <p class="text-[11px] text-gray-500 mt-1">en 30 días</p>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">⚠️ Alertas activas</p>
+        <p id="kpi-alerts" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+        <p class="text-[11px] text-gray-500 mt-1">stock bajo + vencimientos</p>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">🔄 Rotación promedio</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">—</p>
+        <p class="text-[11px] text-gray-500 mt-1">(fase 2)</p>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+        <div class="md:col-span-5">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Buscar producto</label>
+            <div class="relative">
+                <input id="inv-q" type="text" class="w-full pl-9 pr-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Nombre del producto">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><i class="fas fa-search"></i></span>
+            </div>
+        </div>
+        <div class="md:col-span-3">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Categoría</label>
+            <select id="inv-cat" class="w-full px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="">Todas</option>
+            </select>
+        </div>
+        <div class="md:col-span-2">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor</label>
+            <select id="inv-sup" class="w-full px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="">Todos</option>
+            </select>
+        </div>
+        <div class="md:col-span-2">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>
+            <select id="inv-status" class="w-full px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="">Todos</option>
+                <option value="OK">OK</option>
+                <option value="Bajo">Bajo</option>
+                <option value="Crítico">Crítico</option>
+            </select>
+        </div>
+    </div>
+    <div class="mt-3 flex items-center justify-between gap-3">
+        <p class="text-[11px] text-gray-500">Las ventas descuentan stock según la metodología configurada. En el resumen se muestra costo promedio.</p>
+        <button id="btn-clear-inv" type="button" class="px-3 py-2 text-xs font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700">Limpiar filtros</button>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div class="inline-flex gap-1 rounded-lg bg-gray-50 p-1 border border-gray-100">
+            <button id="tab-current" type="button" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white shadow-sm text-gray-900">Stock actual</button>
+            <button id="tab-lots" type="button" class="px-3 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:text-gray-900">Stock total (lotes)</button>
+            <button id="tab-specific" type="button" class="px-3 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:text-gray-900">Stock específico</button>
+            <button id="tab-history" type="button" class="px-3 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:text-gray-900">Historial producto</button>
+        </div>
+        <div class="text-[11px] text-gray-500">Vista dummy con localStorage</div>
+    </div>
+
+    <div id="panel-current">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Producto</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Stock</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Unidad</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Costo prom.</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Valor total</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">Estado</th>
+                    <th class="px-4 py-3"></th>
+                </tr>
+            </thead>
+            <tbody id="inv-tbody-current" class="bg-white divide-y divide-gray-200">
+                <tr>
+                    <td colspan="8" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay productos. Usá “Crear ítem” para comenzar.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="panel-lots" class="hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Producto</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Lote</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Ingreso</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Proveedor</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">CU</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Disponible</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">CT</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Vencimiento</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">Estado</th>
+                    <th class="px-4 py-3"></th>
+                </tr>
+            </thead>
+            <tbody id="inv-tbody-lots" class="bg-white divide-y divide-gray-200">
+                <tr>
+                    <td colspan="10" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay lotes cargados.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="panel-specific" class="hidden">
+        <div class="p-4 border-b border-gray-100 bg-white">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Producto</label>
+                    <select id="inv-specific-product" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                        <option value="">— Seleccionar —</option>
+                    </select>
+                </div>
+                <div class="text-[11px] text-gray-500">Lotes disponibles del producto seleccionado.</div>
+            </div>
+        </div>
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Lote</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Ingreso</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Proveedor</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">CU</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Disponible</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Vencimiento</th>
+                </tr>
+            </thead>
+            <tbody id="inv-tbody-specific" class="bg-white divide-y divide-gray-200">
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Seleccioná un producto para ver su stock específico.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="panel-history" class="hidden">
+        <div class="p-4 border-b border-gray-100 bg-white">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Producto</label>
+                    <select id="inv-history-product" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                        <option value="">— Seleccionar —</option>
+                    </select>
+                </div>
+                <div class="text-[11px] text-gray-500">Movimientos (ventas/consumos) desde <code>inventory_movements_dummy</code>.</div>
+            </div>
+        </div>
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Tipo</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Ref</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Cantidad</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Costo</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Detalle</th>
+                </tr>
+            </thead>
+            <tbody id="inv-tbody-history" class="bg-white divide-y divide-gray-200">
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Seleccioná un producto para ver su historial.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="modal-create-inv" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Crear ítem</h3>
+                    <p class="text-xs text-gray-500">¿Qué deseas hacer?</p>
+                </div>
+                <button id="btn-close-create-inv" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div id="create-choice" class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button id="btn-choice-product" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                    <div class="text-2xl">🆕</div>
+                    <div class="mt-2 font-semibold text-gray-900">Crear producto nuevo</div>
+                    <div class="text-xs text-gray-500">Definí el ítem consolidado y su configuración.</div>
+                </button>
+                <button id="btn-choice-lot" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                    <div class="text-2xl">➕</div>
+                    <div class="mt-2 font-semibold text-gray-900">Agregar lote a producto existente</div>
+                    <div class="text-xs text-gray-500">Ingresá stock real con costo y vencimiento.</div>
+                </button>
+            </div>
+
+            <div id="form-product" class="hidden p-5">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div class="md:col-span-6">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+                        <input id="prod-name" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Café en grano 1kg">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Categoría</label>
+                        <input id="prod-cat" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Alimentos">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Unidad</label>
+                        <select id="prod-unit" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="Unidad">Unidad</option>
+                            <option value="Kg">Kg</option>
+                            <option value="L">L</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div id="wrap-prod-unit" class="md:col-span-3 hidden">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Unidad (otro)</label>
+                        <input id="prod-unit-other" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: caja">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Maneja lotes</label>
+                        <select id="prod-lots" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="Yes">Sí</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Metodología</label>
+                        <select id="prod-method" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="FIFO">FIFO</option>
+                            <option value="UEPS">UEPS</option>
+                            <option value="Average">Costo promedio</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Stock mínimo</label>
+                        <input id="prod-min" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
+                    </div>
+                    <div class="md:col-span-12">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Descripción (opcional)</label>
+                        <input id="prod-desc" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Descripción corta">
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button id="btn-back-1" type="button" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50">Volver</button>
+                    <button id="btn-save-product" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white" style="background-color:#0d1067;">Guardar producto</button>
+                </div>
+            </div>
+
+            <div id="form-lot" class="hidden p-5">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div class="md:col-span-6">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Producto</label>
+                        <select id="lot-product" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="">— Seleccionar —</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de ingreso</label>
+                        <input id="lot-date" type="date" class="w-full px-3 py-2 text-sm border rounded-md" value="{{ now.strftime('%Y-%m-%d') }}">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor</label>
+                        <input id="lot-supplier" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Proveedor">
+                    </div>
+
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Costo unitario</label>
+                        <input id="lot-cu" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
+                        <input id="lot-qty" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Costo total</label>
+                        <input id="lot-ct" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" value="$0,00" readonly>
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Vencimiento</label>
+                        <input id="lot-exp" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
+                        <label class="mt-2 inline-flex items-center text-xs text-gray-600"><input id="lot-no-exp" type="checkbox" class="rounded border-gray-300 mr-2"> No corresponde</label>
+                    </div>
+
+                    <div class="md:col-span-12">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Nota</label>
+                        <input id="lot-note" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button id="btn-back-2" type="button" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50">Volver</button>
+                    <button id="btn-save-lot" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white" style="background-color:#0d1067;">Guardar lote</button>
+                </div>
+            </div>
+
+            <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-between">
+                <div class="text-[11px] text-gray-500">Al guardar un lote se crea un egreso automático en Gastos (“Desde Inventario”).</div>
+                <button id="btn-cancel-create-inv" type="button" class="text-sm font-medium text-gray-700 hover:text-gray-900">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-export-inv" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Exportar inventario</h3>
+                    <p class="text-xs text-gray-500">Se exporta la tab activa con filtros aplicados.</p>
+                </div>
+                <button id="btn-close-export-inv" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button id="btn-export-inv-pdf" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                    <div class="text-2xl">📄</div>
+                    <div class="mt-2 font-semibold text-gray-900">Exportar a PDF</div>
+                    <div class="text-xs text-gray-500">Ideal para imprimir o enviar.</div>
+                </button>
+                <button id="btn-export-inv-xls" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                    <div class="text-2xl">📊</div>
+                    <div class="mt-2 font-semibold text-gray-900">Exportar a Excel</div>
+                    <div class="text-xs text-gray-500">Descarga un CSV compatible con Excel.</div>
+                </button>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end">
+                <button id="btn-cancel-export-inv" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const KEY_PRODUCTS = 'inventory_products_dummy';
+    const KEY_LOTS = 'inventory_lots_dummy';
+    const KEY_EGRESOS = 'egresos_dummy';
+    const KEY_MOVEMENTS = 'inventory_movements_dummy';
+
+    const btnCreate = document.getElementById('btn-create-inv');
+    const btnExport = document.getElementById('btn-export-inv');
+    const btnClear = document.getElementById('btn-clear-inv');
+    const tabCurrent = document.getElementById('tab-current');
+    const tabLots = document.getElementById('tab-lots');
+    const tabSpecific = document.getElementById('tab-specific');
+    const tabHistory = document.getElementById('tab-history');
+    const panelCurrent = document.getElementById('panel-current');
+    const panelLots = document.getElementById('panel-lots');
+    const panelSpecific = document.getElementById('panel-specific');
+    const panelHistory = document.getElementById('panel-history');
+
+    const tbodyCurrent = document.getElementById('inv-tbody-current');
+    const tbodyLots = document.getElementById('inv-tbody-lots');
+    const tbodySpecific = document.getElementById('inv-tbody-specific');
+    const tbodyHistory = document.getElementById('inv-tbody-history');
+
+    const selectSpecificProduct = document.getElementById('inv-specific-product');
+    const selectHistoryProduct = document.getElementById('inv-history-product');
+
+    const filterQ = document.getElementById('inv-q');
+    const filterCat = document.getElementById('inv-cat');
+    const filterSup = document.getElementById('inv-sup');
+    const filterStatus = document.getElementById('inv-status');
+
+    const kpiStockValue = document.getElementById('kpi-stock-value');
+    const kpiProducts = document.getElementById('kpi-products');
+    const kpiExpire = document.getElementById('kpi-expire');
+    const kpiAlerts = document.getElementById('kpi-alerts');
+
+    const modalCreate = document.getElementById('modal-create-inv');
+    const btnCloseCreate = document.getElementById('btn-close-create-inv');
+    const btnCancelCreate = document.getElementById('btn-cancel-create-inv');
+    const choiceWrap = document.getElementById('create-choice');
+    const formProduct = document.getElementById('form-product');
+    const formLot = document.getElementById('form-lot');
+    const btnChoiceProduct = document.getElementById('btn-choice-product');
+    const btnChoiceLot = document.getElementById('btn-choice-lot');
+    const btnBack1 = document.getElementById('btn-back-1');
+    const btnBack2 = document.getElementById('btn-back-2');
+
+    const prodName = document.getElementById('prod-name');
+    const prodCat = document.getElementById('prod-cat');
+    const prodUnit = document.getElementById('prod-unit');
+    const wrapProdUnit = document.getElementById('wrap-prod-unit');
+    const prodUnitOther = document.getElementById('prod-unit-other');
+    const prodLots = document.getElementById('prod-lots');
+    const prodMethod = document.getElementById('prod-method');
+    const prodMin = document.getElementById('prod-min');
+    const prodDesc = document.getElementById('prod-desc');
+    const btnSaveProduct = document.getElementById('btn-save-product');
+
+    const lotProduct = document.getElementById('lot-product');
+    const lotDate = document.getElementById('lot-date');
+    const lotSupplier = document.getElementById('lot-supplier');
+    const lotCu = document.getElementById('lot-cu');
+    const lotQty = document.getElementById('lot-qty');
+    const lotCt = document.getElementById('lot-ct');
+    const lotExp = document.getElementById('lot-exp');
+    const lotNoExp = document.getElementById('lot-no-exp');
+    const lotNote = document.getElementById('lot-note');
+    const btnSaveLot = document.getElementById('btn-save-lot');
+
+    const modalExport = document.getElementById('modal-export-inv');
+    const btnCloseExport = document.getElementById('btn-close-export-inv');
+    const btnCancelExport = document.getElementById('btn-cancel-export-inv');
+    const btnExportPdf = document.getElementById('btn-export-inv-pdf');
+    const btnExportXls = document.getElementById('btn-export-inv-xls');
+
+    let activeTab = 'current';
+
+    let cacheProducts = [];
+    let cacheLots = [];
+    let cacheMovements = [];
+
+    function parseNumeroSeguro(v) {
+        const n = parseFloat(String(v ?? '').replace(',', '.'));
+        return isNaN(n) ? 0 : n;
+    }
+
+    function formatMoney(n) {
+        const val = isNaN(n) ? 0 : n;
+        return '$' + val.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function leerJson(key) {
+        try {
+            if (key === KEY_PRODUCTS && window.StorageService && typeof window.StorageService.getInventoryProducts === 'function') {
+                return window.StorageService.getInventoryProducts();
+            }
+            if (key === KEY_LOTS && window.StorageService && typeof window.StorageService.getInventoryLots === 'function') {
+                return window.StorageService.getInventoryLots();
+            }
+            if (key === KEY_MOVEMENTS && window.StorageService && typeof window.StorageService.getInventoryMovements === 'function') {
+                return window.StorageService.getInventoryMovements();
+            }
+            if (key === KEY_EGRESOS && window.StorageService && typeof window.StorageService.getExpenses === 'function') {
+                return window.StorageService.getExpenses();
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            const raw = window.localStorage.getItem(key);
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function guardarJson(key, arr) {
+        try {
+            if (key === KEY_PRODUCTS && window.StorageService && typeof window.StorageService.saveInventoryProducts === 'function') {
+                return window.StorageService.saveInventoryProducts(Array.isArray(arr) ? arr : []);
+            }
+            if (key === KEY_LOTS && window.StorageService && typeof window.StorageService.saveInventoryLots === 'function') {
+                return window.StorageService.saveInventoryLots(Array.isArray(arr) ? arr : []);
+            }
+            if (key === KEY_EGRESOS && window.StorageService && typeof window.StorageService.saveExpenses === 'function') {
+                return window.StorageService.saveExpenses(Array.isArray(arr) ? arr : []);
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            window.localStorage.setItem(key, JSON.stringify(arr));
+        } catch (e) {
+            // noop
+        }
+    }
+
+    function isPromise(x) {
+        return !!x && typeof x.then === 'function';
+    }
+
+    function loadProductsLots(cb) {
+        const pRes = leerJson(KEY_PRODUCTS);
+        const lRes = leerJson(KEY_LOTS);
+
+        const mRes = leerJson(KEY_MOVEMENTS);
+
+        if (isPromise(pRes) || isPromise(lRes) || isPromise(mRes)) {
+            return Promise.all([Promise.resolve(pRes), Promise.resolve(lRes), Promise.resolve(mRes)]).then(function (vals) {
+                const products = Array.isArray(vals[0]) ? vals[0] : [];
+                const lots = Array.isArray(vals[1]) ? vals[1] : [];
+                const movements = Array.isArray(vals[2]) ? vals[2] : [];
+                cacheProducts = products;
+                cacheLots = lots;
+                cacheMovements = movements;
+                if (typeof cb === 'function') cb(products, lots, movements);
+            });
+        }
+
+        const products = Array.isArray(pRes) ? pRes : [];
+        const lots = Array.isArray(lRes) ? lRes : [];
+        const movements = Array.isArray(mRes) ? mRes : [];
+        cacheProducts = products;
+        cacheLots = lots;
+        cacheMovements = movements;
+        if (typeof cb === 'function') cb(products, lots, movements);
+        return null;
+    }
+
+    function badgeStatus(st) {
+        if (st === 'Crítico') return '<span class="px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">Crítico</span>';
+        if (st === 'Bajo') return '<span class="px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 text-[11px] font-medium">Bajo</span>';
+        return '<span class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[11px] font-medium">OK</span>';
+    }
+
+    function getStatus(stock, min) {
+        const s = parseNumeroSeguro(stock);
+        const m = parseNumeroSeguro(min);
+        if (m <= 0) return 'OK';
+        if (s <= 0) return 'Crítico';
+        if (s < m) return 'Bajo';
+        return 'OK';
+    }
+
+    function abrirModal(el, open) {
+        if (!el) return;
+        el.classList.toggle('hidden', !open);
+    }
+
+    function resetCreateModal() {
+        if (choiceWrap) choiceWrap.classList.remove('hidden');
+        if (formProduct) formProduct.classList.add('hidden');
+        if (formLot) formLot.classList.add('hidden');
+    }
+
+    function openCreate() {
+        resetCreateModal();
+        abrirModal(modalCreate, true);
+    }
+
+    function closeCreate() {
+        abrirModal(modalCreate, false);
+    }
+
+    function openExport() {
+        abrirModal(modalExport, true);
+    }
+
+    function closeExport() {
+        abrirModal(modalExport, false);
+    }
+
+    function switchTab(tab) {
+        activeTab = tab;
+        if (panelCurrent) panelCurrent.classList.toggle('hidden', tab !== 'current');
+        if (panelLots) panelLots.classList.toggle('hidden', tab !== 'lots');
+        if (panelSpecific) panelSpecific.classList.toggle('hidden', tab !== 'specific');
+        if (panelHistory) panelHistory.classList.toggle('hidden', tab !== 'history');
+        if (tabCurrent) tabCurrent.classList.toggle('bg-white', tab === 'current');
+        if (tabCurrent) tabCurrent.classList.toggle('shadow-sm', tab === 'current');
+        if (tabCurrent) tabCurrent.classList.toggle('text-gray-900', tab === 'current');
+        if (tabLots) tabLots.classList.toggle('bg-white', tab === 'lots');
+        if (tabLots) tabLots.classList.toggle('shadow-sm', tab === 'lots');
+        if (tabLots) tabLots.classList.toggle('text-gray-900', tab === 'lots');
+        if (tabLots) tabLots.classList.toggle('text-gray-600', tab !== 'lots');
+        if (tabCurrent) tabCurrent.classList.toggle('text-gray-600', tab !== 'current');
+
+        if (tabSpecific) tabSpecific.classList.toggle('bg-white', tab === 'specific');
+        if (tabSpecific) tabSpecific.classList.toggle('shadow-sm', tab === 'specific');
+        if (tabSpecific) tabSpecific.classList.toggle('text-gray-900', tab === 'specific');
+        if (tabSpecific) tabSpecific.classList.toggle('text-gray-600', tab !== 'specific');
+
+        if (tabHistory) tabHistory.classList.toggle('bg-white', tab === 'history');
+        if (tabHistory) tabHistory.classList.toggle('shadow-sm', tab === 'history');
+        if (tabHistory) tabHistory.classList.toggle('text-gray-900', tab === 'history');
+        if (tabHistory) tabHistory.classList.toggle('text-gray-600', tab !== 'history');
+        renderAll();
+    }
+
+    function poblarProductoSelects() {
+        const products = Array.isArray(cacheProducts) ? cacheProducts : [];
+        const writeSelect = function (sel) {
+            if (!sel) return;
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">— Seleccionar —</option>';
+            products.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = String(p.id);
+                opt.textContent = String(p.name || 'Producto');
+                sel.appendChild(opt);
+            });
+            sel.value = cur;
+        };
+        writeSelect(selectSpecificProduct);
+        writeSelect(selectHistoryProduct);
+    }
+
+    function renderSpecific() {
+        if (!tbodySpecific) return;
+        const productId = String(selectSpecificProduct?.value || '').trim();
+        if (!productId) {
+            tbodySpecific.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Seleccioná un producto para ver su stock específico.</td></tr>';
+            return;
+        }
+        const lots = (Array.isArray(cacheLots) ? cacheLots : [])
+            .filter(l => String(l?.product_id) === productId)
+            .filter(l => (parseNumeroSeguro(l?.qty_available) || 0) > 0)
+            .slice();
+
+        if (!lots.length) {
+            tbodySpecific.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Este producto no tiene lotes disponibles.</td></tr>';
+            return;
+        }
+
+        lots.sort((a, b) => String(a?.entry_date || '').localeCompare(String(b?.entry_date || '')));
+        tbodySpecific.innerHTML = '';
+        lots.forEach(l => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+            tr.innerHTML = ''
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l?.lot_code || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l?.entry_date || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l?.supplier || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(parseNumeroSeguro(l?.unit_cost)) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(parseNumeroSeguro(l?.qty_available).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + (l?.expiration ? String(l.expiration) : '—') + '</td>';
+            tbodySpecific.appendChild(tr);
+        });
+    }
+
+    function fmtMovDate(m) {
+        const dt = m?.created_at;
+        if (typeof dt === 'number' && isFinite(dt)) {
+            const d = new Date(dt);
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yy = String(d.getFullYear());
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mi = String(d.getMinutes()).padStart(2, '0');
+            return dd + '/' + mm + '/' + yy + ' ' + hh + ':' + mi;
+        }
+        return String(m?.date || m?.fecha || '');
+    }
+
+    function renderHistory() {
+        if (!tbodyHistory) return;
+        const productId = String(selectHistoryProduct?.value || '').trim();
+        if (!productId) {
+            tbodyHistory.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Seleccioná un producto para ver su historial.</td></tr>';
+            return;
+        }
+
+        const movements = (Array.isArray(cacheMovements) ? cacheMovements : [])
+            .filter(m => String(m?.product_id || '') === productId);
+
+        if (!movements.length) {
+            tbodyHistory.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay movimientos para este producto.</td></tr>';
+            return;
+        }
+
+        movements.sort((a, b) => {
+            const ta = (typeof a?.created_at === 'number') ? a.created_at : 0;
+            const tb = (typeof b?.created_at === 'number') ? b.created_at : 0;
+            return tb - ta;
+        });
+
+        tbodyHistory.innerHTML = '';
+        movements.forEach(m => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+            const qty = parseNumeroSeguro(m?.qty || m?.quantity);
+            const cost = parseNumeroSeguro(m?.cost_total || m?.total_cost);
+            const ref = String(m?.origin_ref || m?.sale_id || m?.ticket_id || m?.ref || '');
+            const detail = String(m?.note || m?.details || '');
+            tr.innerHTML = ''
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtMovDate(m) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(m?.type || 'consumption') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + (ref || '—') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(qty.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(cost) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + (detail || '—') + '</td>';
+            tbodyHistory.appendChild(tr);
+        });
+    }
+
+    function getVisibleRowsData() {
+        const products = Array.isArray(cacheProducts) ? cacheProducts : [];
+        const lots = Array.isArray(cacheLots) ? cacheLots : [];
+        const q = String(filterQ?.value || '').trim().toLowerCase();
+        const cat = String(filterCat?.value || '').trim();
+        const sup = String(filterSup?.value || '').trim();
+        const st = String(filterStatus?.value || '').trim();
+
+        const compute = (p) => {
+            const rel = lots.filter(l => String(l.product_id) === String(p.id));
+            const stock = rel.reduce((acc, l) => acc + parseNumeroSeguro(l.qty_available), 0);
+            const costSum = rel.reduce((acc, l) => acc + (parseNumeroSeguro(l.qty_available) * parseNumeroSeguro(l.unit_cost)), 0);
+            const avg = stock > 0 ? (costSum / stock) : 0;
+            const status = getStatus(stock, p.min_stock);
+            const total = stock * avg;
+            return { stock, avg, total, status };
+        };
+
+        const filteredProducts = products
+            .filter(p => {
+                if (q && !String(p.name || '').toLowerCase().includes(q)) return false;
+                if (cat && String(p.category || '') !== cat) return false;
+                const metrics = compute(p);
+                if (st && metrics.status !== st) return false;
+                return true;
+            })
+            .map(p => ({ p, m: compute(p) }));
+
+        const filteredLots = lots
+            .filter(l => {
+                const p = products.find(x => String(x.id) === String(l.product_id));
+                if (!p) return false;
+                if (q && !String(p.name || '').toLowerCase().includes(q)) return false;
+                if (cat && String(p.category || '') !== cat) return false;
+                if (sup && String(l.supplier || '') !== sup) return false;
+                const status = getStatus(parseNumeroSeguro(l.qty_available), 0);
+                if (st && status !== st && st !== 'OK') return false;
+                return true;
+            })
+            .map(l => {
+                const p = products.find(x => String(x.id) === String(l.product_id));
+                return { l, p };
+            });
+
+        return { filteredProducts, filteredLots, products, lots };
+    }
+
+    function updateFilterOptions(products, lots) {
+        if (filterCat) {
+            const current = filterCat.value;
+            const cats = Array.from(new Set(products.map(p => String(p.category || '').trim()).filter(Boolean))).sort();
+            filterCat.innerHTML = '<option value="">Todas</option>';
+            cats.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                filterCat.appendChild(opt);
+            });
+            filterCat.value = current;
+        }
+        if (filterSup) {
+            const current = filterSup.value;
+            const sups = Array.from(new Set(lots.map(l => String(l.supplier || '').trim()).filter(Boolean))).sort();
+            filterSup.innerHTML = '<option value="">Todos</option>';
+            sups.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.textContent = s;
+                filterSup.appendChild(opt);
+            });
+            filterSup.value = current;
+        }
+    }
+
+    function renderKPIs(products, lots) {
+        const days30 = 30 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        const expSoon = lots.filter(l => {
+            const exp = String(l.expiration || '').trim();
+            if (!exp) return false;
+            const t = new Date(exp).getTime();
+            if (!t) return false;
+            return t >= now && t <= (now + days30) && parseNumeroSeguro(l.qty_available) > 0;
+        }).length;
+
+        let totalValue = 0;
+        let alerts = 0;
+        products.forEach(p => {
+            const rel = lots.filter(l => String(l.product_id) === String(p.id));
+            const stock = rel.reduce((acc, l) => acc + parseNumeroSeguro(l.qty_available), 0);
+            const costSum = rel.reduce((acc, l) => acc + (parseNumeroSeguro(l.qty_available) * parseNumeroSeguro(l.unit_cost)), 0);
+            const avg = stock > 0 ? (costSum / stock) : 0;
+            totalValue += stock * avg;
+            const st = getStatus(stock, p.min_stock);
+            if (st !== 'OK') alerts += 1;
+        });
+        alerts += expSoon;
+
+        if (kpiStockValue) kpiStockValue.textContent = formatMoney(totalValue);
+        if (kpiProducts) kpiProducts.textContent = String(products.length);
+        if (kpiExpire) kpiExpire.textContent = String(expSoon);
+        if (kpiAlerts) kpiAlerts.textContent = String(alerts);
+    }
+
+    function renderCurrent(filteredProducts) {
+        if (!tbodyCurrent) return;
+        if (!filteredProducts.length) {
+            tbodyCurrent.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados para los filtros actuales.</td></tr>';
+            return;
+        }
+        tbodyCurrent.innerHTML = '';
+        filteredProducts.forEach(({ p, m }) => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+            tr.innerHTML = ''
+                + '<td class="px-4 py-3 text-sm text-gray-900">' + String(p.name || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(p.category || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(m.stock.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(p.unit || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(m.avg) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(m.total) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-center">' + badgeStatus(m.status) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right">'
+                + '  <button type="button" class="btn-add-lot text-xs font-medium text-indigo-700 hover:text-indigo-900" data-product-id="' + String(p.id) + '">Agregar lote</button>'
+                + '</td>';
+            tbodyCurrent.appendChild(tr);
+        });
+        Array.from(tbodyCurrent.querySelectorAll('.btn-add-lot')).forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.getAttribute('data-product-id') || '';
+                openCreate();
+                if (choiceWrap) choiceWrap.classList.add('hidden');
+                if (formLot) formLot.classList.remove('hidden');
+                poblarProductosSelect();
+                if (lotProduct) lotProduct.value = String(id);
+            });
+        });
+    }
+
+    function renderLots(filteredLots) {
+        if (!tbodyLots) return;
+        if (!filteredLots.length) {
+            tbodyLots.innerHTML = '<tr><td colspan="10" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados para los filtros actuales.</td></tr>';
+            return;
+        }
+        tbodyLots.innerHTML = '';
+        filteredLots.forEach(({ l, p }) => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+            const ct = parseNumeroSeguro(l.qty_available) * parseNumeroSeguro(l.unit_cost);
+            const status = getStatus(parseNumeroSeguro(l.qty_available), 0);
+            tr.innerHTML = ''
+                + '<td class="px-4 py-3 text-sm text-gray-900">' + String(p?.name || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l.lot_code || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l.entry_date || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l.supplier || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(parseNumeroSeguro(l.unit_cost)) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(parseNumeroSeguro(l.qty_available).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(ct) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + (l.expiration ? String(l.expiration) : '—') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-center">' + badgeStatus(status) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right">'
+                + '  <button type="button" class="btn-del-lot text-xs font-medium text-red-600 hover:text-red-800" data-lot-id="' + String(l.id) + '">Eliminar</button>'
+                + '</td>';
+            tbodyLots.appendChild(tr);
+        });
+        Array.from(tbodyLots.querySelectorAll('.btn-del-lot')).forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.getAttribute('data-lot-id') || '';
+                const res = leerJson(KEY_LOTS);
+                const apply = function (lots) {
+                    const next = (Array.isArray(lots) ? lots : []).filter(x => String(x.id) !== String(id));
+                    const saveRes = guardarJson(KEY_LOTS, next);
+                    if (isPromise(saveRes)) return saveRes.then(function () { renderAll(); });
+                    renderAll();
+                    return null;
+                };
+                if (isPromise(res)) {
+                    res.then(apply);
+                } else {
+                    apply(res);
+                }
+            });
+        });
+    }
+
+    function renderAll() {
+        loadProductsLots(function (products, lots, movements) {
+            updateFilterOptions(products, lots);
+            renderKPIs(products, lots);
+            poblarProductoSelects();
+            const vis = getVisibleRowsData();
+            if (activeTab === 'current') renderCurrent(vis.filteredProducts);
+            if (activeTab === 'lots') renderLots(vis.filteredLots);
+            if (activeTab === 'specific') renderSpecific();
+            if (activeTab === 'history') renderHistory();
+        });
+    }
+
+    function poblarProductosSelect() {
+        if (!lotProduct) return;
+        const products = Array.isArray(cacheProducts) ? cacheProducts : [];
+        const current = lotProduct.value;
+        lotProduct.innerHTML = '<option value="">— Seleccionar —</option>';
+        products.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = String(p.id);
+            opt.textContent = String(p.name || 'Producto');
+            lotProduct.appendChild(opt);
+        });
+        lotProduct.value = current;
+    }
+
+    function updateLotCt() {
+        const cu = parseNumeroSeguro(lotCu?.value);
+        const qty = parseNumeroSeguro(lotQty?.value);
+        const ct = cu * qty;
+        if (lotCt) lotCt.value = formatMoney(ct);
+    }
+
+    function crearEgresoDesdeInventario({ fecha, proveedor, valor, nota }) {
+        try {
+            if (window.StorageService && typeof window.StorageService.addExpenseFromInventory === 'function') {
+                return window.StorageService.addExpenseFromInventory({
+                    id: String(Date.now()),
+                    fecha: String(fecha || ''),
+                    categoria: 'Inventario',
+                    valor: parseNumeroSeguro(valor),
+                    nota: String(nota || ''),
+                    forma_pago: 'Transferencia',
+                    tipo_gasto: 'Variable',
+                    frecuencia: 'Único',
+                    comprobante: [],
+                    custom_fields: [],
+                    proveedor: String(proveedor || ''),
+                    supplier_id: '',
+                    supplier_name: String(proveedor || '')
+                });
+            }
+        } catch (e) {
+            // fallback
+        }
+        const egresos = Array.isArray(leerJson(KEY_EGRESOS)) ? leerJson(KEY_EGRESOS) : [];
+        egresos.push({
+            id: String(Date.now()),
+            fecha: String(fecha || ''),
+            categoria: 'Inventario',
+            valor: parseNumeroSeguro(valor),
+            nota: String(nota || ''),
+            forma_pago: 'Transferencia',
+            tipo_gasto: 'Variable',
+            frecuencia: 'Único',
+            comprobante: [],
+            custom_fields: [],
+            proveedor: String(proveedor || ''),
+            supplier_id: '',
+            supplier_name: String(proveedor || ''),
+            origin: 'Inventory'
+        });
+        guardarJson(KEY_EGRESOS, egresos);
+    }
+
+    function exportCsv() {
+        const { filteredProducts, filteredLots } = getVisibleRowsData();
+        let rows = [];
+        if (activeTab === 'current') {
+            rows.push(['Producto','Categoría','Stock','Unidad','Costo prom.','Valor total','Estado']);
+            filteredProducts.forEach(({ p, m }) => {
+                rows.push([
+                    String(p.name || ''),
+                    String(p.category || ''),
+                    String(m.stock),
+                    String(p.unit || ''),
+                    String(m.avg),
+                    String(m.total),
+                    String(m.status)
+                ]);
+            });
+        } else {
+            rows.push(['Producto','Lote','Ingreso','Proveedor','CU','Disponible','CT','Vencimiento']);
+            filteredLots.forEach(({ l, p }) => {
+                const ct = parseNumeroSeguro(l.qty_available) * parseNumeroSeguro(l.unit_cost);
+                rows.push([
+                    String(p?.name || ''),
+                    String(l.lot_code || ''),
+                    String(l.entry_date || ''),
+                    String(l.supplier || ''),
+                    String(parseNumeroSeguro(l.unit_cost)),
+                    String(parseNumeroSeguro(l.qty_available)),
+                    String(ct),
+                    String(l.expiration || '')
+                ]);
+            });
+        }
+        const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = (activeTab === 'current' ? 'inventario_stock_actual.csv' : 'inventario_lotes.csv');
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    function exportPdfPrint() {
+        const { filteredProducts, filteredLots } = getVisibleRowsData();
+        const title = (activeTab === 'current') ? 'Inventario - Stock actual' : 'Inventario - Stock total (lotes)';
+        let head = '';
+        let body = '';
+        if (activeTab === 'current') {
+            head = '<tr>'
+                + '<th>Producto</th><th>Categoría</th><th style="text-align:right">Stock</th><th>Unidad</th><th style="text-align:right">Costo prom.</th><th style="text-align:right">Valor total</th><th>Estado</th>'
+                + '</tr>';
+            filteredProducts.forEach(({ p, m }) => {
+                body += '<tr>'
+                    + '<td>' + String(p.name || '') + '</td>'
+                    + '<td>' + String(p.category || '') + '</td>'
+                    + '<td style="text-align:right">' + String(m.stock.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
+                    + '<td>' + String(p.unit || '') + '</td>'
+                    + '<td style="text-align:right">' + formatMoney(m.avg) + '</td>'
+                    + '<td style="text-align:right">' + formatMoney(m.total) + '</td>'
+                    + '<td>' + String(m.status) + '</td>'
+                    + '</tr>';
+            });
+        } else {
+            head = '<tr>'
+                + '<th>Producto</th><th>Lote</th><th>Ingreso</th><th>Proveedor</th><th style="text-align:right">CU</th><th style="text-align:right">Disponible</th><th style="text-align:right">CT</th><th>Vencimiento</th>'
+                + '</tr>';
+            filteredLots.forEach(({ l, p }) => {
+                const ct = parseNumeroSeguro(l.qty_available) * parseNumeroSeguro(l.unit_cost);
+                body += '<tr>'
+                    + '<td>' + String(p?.name || '') + '</td>'
+                    + '<td>' + String(l.lot_code || '') + '</td>'
+                    + '<td>' + String(l.entry_date || '') + '</td>'
+                    + '<td>' + String(l.supplier || '') + '</td>'
+                    + '<td style="text-align:right">' + formatMoney(parseNumeroSeguro(l.unit_cost)) + '</td>'
+                    + '<td style="text-align:right">' + String(parseNumeroSeguro(l.qty_available).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
+                    + '<td style="text-align:right">' + formatMoney(ct) + '</td>'
+                    + '<td>' + (l.expiration ? String(l.expiration) : '—') + '</td>'
+                    + '</tr>';
+            });
+        }
+
+        const html = ''
+            + '<html><head><title>' + title + '</title>'
+            + '<style>'
+            + 'body{font-family:Arial, sans-serif; padding:18px; color:#111827;}'
+            + 'h1{font-size:16px;margin:0 0 10px 0;}'
+            + 'table{width:100%; border-collapse:collapse; font-size:12px;}'
+            + 'th,td{border:1px solid #e5e7eb; padding:8px;}'
+            + 'th{background:#f9fafb; text-align:left;}'
+            + '</style></head><body>'
+            + '<h1>' + title + '</h1>'
+            + '<table><thead>' + head + '</thead><tbody>' + body + '</tbody></table>'
+            + '<script>window.onload=function(){window.print();};<\/script>'
+            + '</body></html>';
+        const w = window.open('', '_blank');
+        if (!w) return;
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+    }
+
+    if (btnCreate) btnCreate.addEventListener('click', openCreate);
+    if (btnCloseCreate) btnCloseCreate.addEventListener('click', closeCreate);
+    if (btnCancelCreate) btnCancelCreate.addEventListener('click', closeCreate);
+
+    if (btnExport) btnExport.addEventListener('click', openExport);
+    if (btnCloseExport) btnCloseExport.addEventListener('click', closeExport);
+    if (btnCancelExport) btnCancelExport.addEventListener('click', closeExport);
+    if (btnExportXls) btnExportXls.addEventListener('click', function () { exportCsv(); closeExport(); });
+    if (btnExportPdf) btnExportPdf.addEventListener('click', function () { exportPdfPrint(); closeExport(); });
+
+    if (tabCurrent) tabCurrent.addEventListener('click', function () { switchTab('current'); });
+    if (tabLots) tabLots.addEventListener('click', function () { switchTab('lots'); });
+    if (tabSpecific) tabSpecific.addEventListener('click', function () { switchTab('specific'); });
+    if (tabHistory) tabHistory.addEventListener('click', function () { switchTab('history'); });
+
+    if (selectSpecificProduct) {
+        selectSpecificProduct.addEventListener('change', function () {
+            if (activeTab === 'specific') renderSpecific();
+        });
+    }
+    if (selectHistoryProduct) {
+        selectHistoryProduct.addEventListener('change', function () {
+            if (activeTab === 'history') renderHistory();
+        });
+    }
+
+    if (btnChoiceProduct) btnChoiceProduct.addEventListener('click', function () {
+        if (choiceWrap) choiceWrap.classList.add('hidden');
+        if (formProduct) formProduct.classList.remove('hidden');
+    });
+    if (btnChoiceLot) btnChoiceLot.addEventListener('click', function () {
+        if (choiceWrap) choiceWrap.classList.add('hidden');
+        if (formLot) formLot.classList.remove('hidden');
+        poblarProductosSelect();
+    });
+    if (btnBack1) btnBack1.addEventListener('click', resetCreateModal);
+    if (btnBack2) btnBack2.addEventListener('click', resetCreateModal);
+
+    if (prodUnit) {
+        prodUnit.addEventListener('change', function () {
+            const esOtro = String(prodUnit.value) === 'Otro';
+            if (wrapProdUnit) wrapProdUnit.classList.toggle('hidden', !esOtro);
+        });
+    }
+
+    if (lotNoExp) {
+        lotNoExp.addEventListener('change', function () {
+            const no = !!lotNoExp.checked;
+            if (lotExp) {
+                lotExp.value = '';
+                lotExp.disabled = no;
+                lotExp.classList.toggle('bg-gray-50', no);
+            }
+        });
+    }
+
+    if (lotCu) lotCu.addEventListener('input', updateLotCt);
+    if (lotQty) lotQty.addEventListener('input', updateLotCt);
+
+    if (btnSaveProduct) {
+        btnSaveProduct.addEventListener('click', function () {
+            const name = String(prodName?.value || '').trim();
+            const category = String(prodCat?.value || '').trim();
+            const unitBase = String(prodUnit?.value || '').trim();
+            const unitOther = String(prodUnitOther?.value || '').trim();
+            const unit = (unitBase === 'Otro') ? unitOther : unitBase;
+            const manageLots = String(prodLots?.value || 'Yes').trim();
+            const method = String(prodMethod?.value || 'FIFO').trim();
+            const min = parseNumeroSeguro(prodMin?.value);
+            const desc = String(prodDesc?.value || '').trim();
+
+            if (!name) { alert('Completá el nombre del producto.'); return; }
+            if (!category) { alert('Completá la categoría del producto.'); return; }
+            if (!unit) { alert('Completá la unidad.'); return; }
+
+            const payload = {
+                id: String(Date.now()),
+                name,
+                category,
+                unit,
+                manage_lots: manageLots,
+                method,
+                min_stock: min,
+                description: desc
+            };
+
+            try {
+                if (window.StorageService && typeof window.StorageService.addInventoryProduct === 'function') {
+                    const r = window.StorageService.addInventoryProduct(payload);
+                    if (isPromise(r)) {
+                        r.then(function () {
+                            closeCreate();
+                            renderAll();
+                        });
+                        return;
+                    }
+                    closeCreate();
+                    renderAll();
+                    return;
+                }
+            } catch (e) {
+                // fallback
+            }
+
+            const products = Array.isArray(leerJson(KEY_PRODUCTS)) ? leerJson(KEY_PRODUCTS) : [];
+            products.push(payload);
+            const saveRes = guardarJson(KEY_PRODUCTS, products);
+            if (isPromise(saveRes)) {
+                saveRes.then(function () { closeCreate(); renderAll(); });
+                return;
+            }
+            closeCreate();
+            renderAll();
+        });
+    }
+
+    if (btnSaveLot) {
+        btnSaveLot.addEventListener('click', function () {
+            const productId = String(lotProduct?.value || '').trim();
+            const entryDate = String(lotDate?.value || '').trim();
+            const supplier = String(lotSupplier?.value || '').trim();
+            const cu = parseNumeroSeguro(lotCu?.value);
+            const qty = parseNumeroSeguro(lotQty?.value);
+            const expiration = (lotNoExp?.checked) ? '' : String(lotExp?.value || '').trim();
+            const note = String(lotNote?.value || '').trim();
+
+            if (!productId) { alert('Seleccioná un producto.'); return; }
+            if (!entryDate) { alert('Completá la fecha de ingreso.'); return; }
+            if (!supplier) { alert('Completá el proveedor.'); return; }
+            if (!(cu > 0)) { alert('El costo unitario debe ser mayor a 0.'); return; }
+            if (!(qty > 0)) { alert('La cantidad debe ser mayor a 0.'); return; }
+
+            const prod = (Array.isArray(cacheProducts) ? cacheProducts : []).find(p => String(p.id) === String(productId));
+            if (!prod) { alert('Producto inválido.'); return; }
+
+            const lotId = String(Date.now());
+            const lotCode = 'L-' + lotId.slice(-6);
+            const lotPayload = {
+                id: lotId,
+                product_id: productId,
+                lot_code: lotCode,
+                entry_date: entryDate,
+                supplier,
+                unit_cost: cu,
+                qty_available: qty,
+                expiration,
+                note
+            };
+
+            const total = cu * qty;
+            const expensePayload = {
+                id: String(Date.now()),
+                fecha: entryDate,
+                categoria: 'Inventario',
+                valor: total,
+                nota: 'Desde Inventario - ' + String(prod.name || '') + ' (' + lotCode + ')',
+                forma_pago: 'Transferencia',
+                tipo_gasto: 'Variable',
+                frecuencia: 'Único',
+                comprobante: [],
+                custom_fields: [],
+                proveedor: String(supplier || ''),
+                supplier_id: '',
+                supplier_name: String(supplier || '')
+            };
+
+            try {
+                if (window.StorageService && typeof window.StorageService.addInventoryLot === 'function') {
+                    const r = window.StorageService.addInventoryLot(lotPayload, expensePayload);
+                    if (isPromise(r)) {
+                        r.then(function () {
+                            closeCreate();
+                            renderAll();
+                        });
+                        return;
+                    }
+                    closeCreate();
+                    renderAll();
+                    return;
+                }
+            } catch (e) {
+                // fallback
+            }
+
+            const lots = Array.isArray(leerJson(KEY_LOTS)) ? leerJson(KEY_LOTS) : [];
+            lots.push(lotPayload);
+            const saveRes = guardarJson(KEY_LOTS, lots);
+            if (isPromise(saveRes)) {
+                saveRes.then(function () {
+                    const maybeExp = crearEgresoDesdeInventario({ fecha: entryDate, proveedor: supplier, valor: total, nota: expensePayload.nota });
+                    if (isPromise(maybeExp)) {
+                        maybeExp.then(function () { closeCreate(); renderAll(); });
+                    } else {
+                        closeCreate();
+                        renderAll();
+                    }
+                });
+                return;
+            }
+            crearEgresoDesdeInventario({ fecha: entryDate, proveedor: supplier, valor: total, nota: expensePayload.nota });
+            closeCreate();
+            renderAll();
+        });
+    }
+
+    [filterQ, filterCat, filterSup, filterStatus].forEach(el => {
+        if (!el) return;
+        el.addEventListener('input', renderAll);
+        el.addEventListener('change', renderAll);
+    });
+
+    if (btnClear) {
+        btnClear.addEventListener('click', function () {
+            if (filterQ) filterQ.value = '';
+            if (filterCat) filterCat.value = '';
+            if (filterSup) filterSup.value = '';
+            if (filterStatus) filterStatus.value = '';
+            renderAll();
+        });
+    }
+
+    switchTab('current');
+});
+</script>
+{% endblock %}

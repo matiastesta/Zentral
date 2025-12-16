@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Productos{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Productos y Servicios</h1>
+    <p class="mt-1 text-sm text-gray-600">Administra tu catálogo de ítems para venta: productos físicos, servicios, combos, etc.</p>
+</div>
+
+<!-- Resumen rápido -->
+<div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
+    <div class="p-4 bg-white rounded-lg shadow">
+        <p class="text-sm font-medium text-gray-500">Total de ítems</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">{{ products|length }}</p>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow">
+        <p class="text-sm font-medium text-gray-500">Con stock bajo</p>
+        <p class="mt-2 text-2xl font-semibold text-yellow-600">0</p>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow">
+        <p class="text-sm font-medium text-gray-500">Inactivos</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+    </div>
+</div>
+
+<!-- Filtros y acciones -->
+<div class="flex flex-col justify-between gap-2 mb-4 md:flex-row md:items-center">
+    <div class="flex-1 flex gap-2">
+        <input type="text" placeholder="Buscar por nombre o SKU" class="flex-1 px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        <select class="px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option>Categoría</option>
+        </select>
+    </div>
+    <div class="flex gap-2 justify-end">
+        <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
+            <i class="fas fa-file-export mr-2"></i> Exportar
+        </button>
+        <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+            <i class="fas fa-plus mr-2"></i> Nuevo producto
+        </button>
+    </div>
+</div>
+
+<!-- Tabla de productos -->
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nombre</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">SKU</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Precio</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Stock</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">Estado</th>
+                <th class="px-4 py-3"></th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for product in products %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 text-sm text-gray-900">{{ product.name }}</td>
+                <td class="px-4 py-3 text-sm text-gray-500">{{ product.sku or '—' }}</td>
+                <td class="px-4 py-3 text-sm text-right text-gray-900">${{ '%.2f'|format(product.price) }}</td>
+                <td class="px-4 py-3 text-sm text-right text-gray-500">{{ product.stock }}</td>
+                <td class="px-4 py-3 text-sm text-center">
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Activo</span>
+                </td>
+                <td class="px-4 py-3 text-sm text-right space-x-2">
+                    <button class="text-blue-600 hover:text-blue-800 text-xs font-medium">Editar</button>
+                    <button class="text-red-600 hover:text-red-800 text-xs font-medium">Eliminar</button>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay productos cargados. Crea tu primer producto con el botón "Nuevo producto".</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

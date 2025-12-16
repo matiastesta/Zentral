@@ -1,0 +1,476 @@
+{% extends 'base.html' %}
+{% block title %}Movimientos{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Movimientos</h1>
+    <p class="mt-1 text-sm text-gray-600">Consulta el historial de ventas y egresos con filtros avanzados.</p>
+</div>
+
+<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <div class="border-b border-gray-200">
+        <nav class="flex -mb-px" aria-label="Tabs">
+            <button id="tab-mov-ventas" type="button" class="px-4 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-600">Ventas</button>
+            <button id="tab-mov-egresos" type="button" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Egresos</button>
+            <button id="tab-mov-arqueo" type="button" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Arqueo</button>
+            <div class="flex-1"></div>
+            <button id="btn-export-mov" type="button" class="m-2 inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
+                <i class="fas fa-file-export mr-2"></i> Exportar
+            </button>
+        </nav>
+    </div>
+
+    <div class="p-4">
+        <div id="panel-mov-ventas" class="space-y-3">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <input id="mov-ventas-q" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Buscar por ticket o nota">
+                <input id="mov-ventas-range" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="📅 Período" readonly>
+                <select id="mov-ventas-pago" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                    <option value="">Pago (todas)</option>
+                    <option>Efectivo</option>
+                    <option>Transferencia</option>
+                    <option>Débito</option>
+                    <option>Crédito</option>
+                </select>
+            </div>
+            <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Ticket</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Total</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">Pago</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Notas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mov-ventas-tbody" class="bg-white divide-y divide-gray-200">
+                        <tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="panel-mov-egresos" class="space-y-3 hidden">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <input id="mov-egresos-q" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Buscar por categoría o nota">
+                <input id="mov-egresos-range" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="📅 Período" readonly>
+                <select id="mov-egresos-origin" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                    <option value="">Origen (todos)</option>
+                    <option value="manual">✍️ Manual</option>
+                    <option value="inventory">📦 Inventario</option>
+                </select>
+            </div>
+            <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Valor</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Origen</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nota</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mov-egresos-tbody" class="bg-white divide-y divide-gray-200">
+                        <tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="panel-mov-arqueo" class="space-y-3 hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <input id="mov-arqueo-range" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="📅 Período" readonly>
+                <div class="text-sm text-gray-600 flex items-center">Arqueos guardados desde Ventas.</div>
+            </div>
+            <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Apertura</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Efectivo del día</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Cierre</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mov-arqueo-tbody" class="bg-white divide-y divide-gray-200">
+                        <tr><td colspan="4" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-export-mov" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Exportar movimientos</h3>
+                    <p class="text-xs text-gray-500">Se exporta exactamente lo visible (según tab y filtros).</p>
+                </div>
+                <button id="btn-close-export-mov" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button id="btn-export-mov-pdf" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                    <div class="text-2xl">📄</div>
+                    <div class="mt-2 font-semibold text-gray-900">Exportar a PDF</div>
+                    <div class="text-xs text-gray-500">Ideal para imprimir o enviar.</div>
+                </button>
+                <button id="btn-export-mov-xls" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                    <div class="text-2xl">📊</div>
+                    <div class="mt-2 font-semibold text-gray-900">Exportar a Excel</div>
+                    <div class="text-xs text-gray-500">Descarga un CSV compatible.</div>
+                </button>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end">
+                <button id="btn-cancel-export-mov" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tabVentas = document.getElementById('tab-mov-ventas');
+    const tabEgresos = document.getElementById('tab-mov-egresos');
+    const tabArqueo = document.getElementById('tab-mov-arqueo');
+    const panelVentas = document.getElementById('panel-mov-ventas');
+    const panelEgresos = document.getElementById('panel-mov-egresos');
+    const panelArqueo = document.getElementById('panel-mov-arqueo');
+    const tbodyVentas = document.getElementById('mov-ventas-tbody');
+    const tbodyEgresos = document.getElementById('mov-egresos-tbody');
+    const tbodyArqueo = document.getElementById('mov-arqueo-tbody');
+
+    const fVentasQ = document.getElementById('mov-ventas-q');
+    const fVentasRange = document.getElementById('mov-ventas-range');
+    const fVentasPago = document.getElementById('mov-ventas-pago');
+    const fEgresosQ = document.getElementById('mov-egresos-q');
+    const fEgresosRange = document.getElementById('mov-egresos-range');
+    const fEgresosOrigin = document.getElementById('mov-egresos-origin');
+    const fArqueoRange = document.getElementById('mov-arqueo-range');
+
+    const btnExport = document.getElementById('btn-export-mov');
+    const modalExport = document.getElementById('modal-export-mov');
+    const btnCloseExport = document.getElementById('btn-close-export-mov');
+    const btnCancelExport = document.getElementById('btn-cancel-export-mov');
+    const btnExportPdf = document.getElementById('btn-export-mov-pdf');
+    const btnExportXls = document.getElementById('btn-export-mov-xls');
+
+    let activeTab = 'ventas';
+    let lastRendered = [];
+
+    function isPromise(x) { return !!x && typeof x.then === 'function'; }
+
+    function formatearMoneda(valor) {
+        const numero = isNaN(valor) ? 0 : valor;
+        return '$' + numero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function parseNumeroSeguro(v) {
+        const n = parseFloat(String(v || '').replace(',', '.'));
+        return isNaN(n) ? 0 : n;
+    }
+
+    function parseFecha(raw) {
+        const v = String(raw || '').trim();
+        if (!v) return null;
+        const dt = new Date(v);
+        return isNaN(dt.getTime()) ? null : dt;
+    }
+
+    function parseRangoFechas(raw) {
+        const txt = String(raw || '').trim();
+        const normalized = txt.replace(/\s+a\s+/i, ' - ').replace(/\s+to\s+/i, ' - ');
+        const parts = normalized.split(' - ').map(p => p.trim()).filter(Boolean);
+        if (parts.length !== 2) return null;
+        const a = parseFecha(parts[0]);
+        const b = parseFecha(parts[1]);
+        if (!a || !b) return null;
+        a.setHours(0,0,0,0);
+        b.setHours(23,59,59,999);
+        return { from: a, to: b };
+    }
+
+    function openExport() { if (modalExport) modalExport.classList.remove('hidden'); }
+    function closeExport() { if (modalExport) modalExport.classList.add('hidden'); }
+
+    function escapeCsvCell(v) {
+        const s = String(v ?? '');
+        if (/[\n\r",;]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+        return s;
+    }
+
+    function exportCsv() {
+        const rows = lastRendered || [];
+        if (!rows.length) return;
+        const header = Object.keys(rows[0]);
+        const lines = [header.map(escapeCsvCell).join(';')];
+        rows.forEach(r => {
+            lines.push(header.map(k => escapeCsvCell(r?.[k])).join(';'));
+        });
+        const blob = new Blob(["\ufeff" + lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'movimientos_' + activeTab + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(a.href); }, 500);
+    }
+
+    function exportPdfPrint() {
+        const rows = lastRendered || [];
+        const w = window.open('', '_blank');
+        if (!w) return;
+        const header = rows.length ? Object.keys(rows[0]) : [];
+        const headHtml = header.map(h => '<th>' + String(h) + '</th>').join('');
+        const bodyHtml = rows.map(r => '<tr>' + header.map(h => '<td>' + String(r?.[h] ?? '') + '</td>').join('') + '</tr>').join('');
+        const html = ''
+            + '<!doctype html><html lang="es"><head><meta charset="utf-8" />'
+            + '<title>Exportar movimientos</title>'
+            + '<style>body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:#111}h1{font-size:18px;margin:0 0 6px 0}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;vertical-align:top}th{background:#f9fafb}</style>'
+            + '</head><body>'
+            + '<h1>Movimientos (' + activeTab + ')</h1>'
+            + '<table><thead><tr>' + headHtml + '</tr></thead><tbody>' + bodyHtml + '</tbody></table>'
+            + '<script>window.onload=function(){window.print();}<\/script>'
+            + '</body></html>';
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+    }
+
+    function getSales(cb) {
+        try {
+            if (window.StorageService && typeof window.StorageService.getSales === 'function') {
+                const res = window.StorageService.getSales();
+                if (isPromise(res)) return res.then(x => cb(Array.isArray(x) ? x : []));
+                return cb(Array.isArray(res) ? res : []);
+            }
+        } catch (e) {
+        }
+        cb([]);
+    }
+
+    function getExpenses(cb) {
+        try {
+            if (window.StorageService && typeof window.StorageService.getExpenses === 'function') {
+                const res = window.StorageService.getExpenses();
+                if (isPromise(res)) return res.then(x => cb(Array.isArray(x) ? x : []));
+                return cb(Array.isArray(res) ? res : []);
+            }
+        } catch (e) {
+        }
+        cb([]);
+    }
+
+    function getArqueos() {
+        try {
+            const raw = window.localStorage.getItem('arqueo_dummy_hist');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function renderVentas() {
+        if (!tbodyVentas) return;
+        getSales(function (sales) {
+            const q = String(fVentasQ?.value || '').trim().toLowerCase();
+            const rango = parseRangoFechas(fVentasRange?.value);
+            const pago = String(fVentasPago?.value || '').trim();
+
+            let list = Array.isArray(sales) ? sales.slice() : [];
+            list = list.filter(s => {
+                const txt = (String(s?.ticket || '') + ' ' + String(s?.notes || '')).toLowerCase();
+                if (q && !txt.includes(q)) return false;
+                if (pago && String(s?.payment_method || '') !== pago) return false;
+                const dt = parseFecha(s?.fecha || s?.date || '');
+                if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
+                return true;
+            });
+            list.sort((a, b) => String(b?.fecha || '').localeCompare(String(a?.fecha || '')));
+
+            lastRendered = list.map(s => ({
+                Ticket: s?.ticket || '',
+                Fecha: s?.fecha || '',
+                Total: formatearMoneda(parseFloat(s?.total || 0) || 0),
+                Pago: s?.payment_method || '',
+                Notas: s?.notes || ''
+            }));
+
+            tbodyVentas.innerHTML = '';
+            if (!list.length) {
+                tbodyVentas.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+                return;
+            }
+            list.forEach(s => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+                tr.innerHTML = ''
+                    + '<td class="px-4 py-3 text-sm text-gray-900">' + String(s?.ticket || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(s?.fecha || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(s?.payment_method || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(s?.notes || '') + '</td>';
+                tbodyVentas.appendChild(tr);
+            });
+        });
+    }
+
+    function renderEgresos() {
+        if (!tbodyEgresos) return;
+        getExpenses(function (egresos) {
+            const q = String(fEgresosQ?.value || '').trim().toLowerCase();
+            const rango = parseRangoFechas(fEgresosRange?.value);
+            const origin = String(fEgresosOrigin?.value || '').trim();
+
+            let list = Array.isArray(egresos) ? egresos.slice() : [];
+            list = list.filter(e => {
+                const txt = (String(e?.categoria || '') + ' ' + String(e?.nota || '')).toLowerCase();
+                if (q && !txt.includes(q)) return false;
+                if (origin && String(e?.origin || '') !== origin) return false;
+                const dt = parseFecha(e?.fecha || '');
+                if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
+                return true;
+            });
+            list.sort((a, b) => String(b?.fecha || '').localeCompare(String(a?.fecha || '')));
+
+            lastRendered = list.map(e => ({
+                Fecha: e?.fecha || '',
+                Categoría: e?.categoria || '',
+                Valor: formatearMoneda(parseFloat(e?.valor || 0) || 0),
+                Origen: e?.origin || '',
+                Nota: e?.nota || ''
+            }));
+
+            tbodyEgresos.innerHTML = '';
+            if (!list.length) {
+                tbodyEgresos.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+                return;
+            }
+            list.forEach(e => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+                tr.innerHTML = ''
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.fecha || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-900">' + String(e?.categoria || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(e?.valor || 0) || 0) + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.origin || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.nota || '') + '</td>';
+                tbodyEgresos.appendChild(tr);
+            });
+        });
+    }
+
+    function renderArqueo() {
+        if (!tbodyArqueo) return;
+        const rango = parseRangoFechas(fArqueoRange?.value);
+        let historico = getArqueos();
+        historico.sort((a, b) => String(b?.fecha || '').localeCompare(String(a?.fecha || '')));
+        if (rango) {
+            historico = historico.filter(r => {
+                const dt = parseFecha(r?.fecha || '');
+                if (!dt) return true;
+                return dt >= rango.from && dt <= rango.to;
+            });
+        }
+
+        lastRendered = historico.map(r => ({
+            Fecha: r?.fecha || '',
+            Apertura: formatearMoneda(parseNumeroSeguro(r?.apertura)),
+            Efectivo_dia: formatearMoneda(parseNumeroSeguro(r?.efectivo_dia)),
+            Cierre: formatearMoneda(parseNumeroSeguro(r?.cierre))
+        }));
+
+        tbodyArqueo.innerHTML = '';
+        if (!historico.length) {
+            tbodyArqueo.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+            return;
+        }
+        historico.forEach(r => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+            tr.innerHTML = ''
+                + '<td class="px-4 py-3 text-sm text-gray-700">' + String(r?.fecha || '-') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.apertura)) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.efectivo_dia)) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.cierre)) + '</td>';
+            tbodyArqueo.appendChild(tr);
+        });
+    }
+
+    function setTab(tab) {
+        activeTab = tab;
+        if (panelVentas) panelVentas.classList.toggle('hidden', tab !== 'ventas');
+        if (panelEgresos) panelEgresos.classList.toggle('hidden', tab !== 'egresos');
+        if (panelArqueo) panelArqueo.classList.toggle('hidden', tab !== 'arqueo');
+
+        const setBtn = function (btn, on) {
+            if (!btn) return;
+            btn.classList.toggle('border-blue-500', on);
+            btn.classList.toggle('text-blue-600', on);
+            btn.classList.toggle('border-transparent', !on);
+            btn.classList.toggle('text-gray-500', !on);
+        };
+        setBtn(tabVentas, tab === 'ventas');
+        setBtn(tabEgresos, tab === 'egresos');
+        setBtn(tabArqueo, tab === 'arqueo');
+
+        if (tab === 'ventas') renderVentas();
+        if (tab === 'egresos') renderEgresos();
+        if (tab === 'arqueo') renderArqueo();
+    }
+
+    if (tabVentas) tabVentas.addEventListener('click', function () { setTab('ventas'); });
+    if (tabEgresos) tabEgresos.addEventListener('click', function () { setTab('egresos'); });
+    if (tabArqueo) tabArqueo.addEventListener('click', function () { setTab('arqueo'); });
+
+    [fVentasQ, fVentasPago].forEach(el => { if (el) el.addEventListener('input', renderVentas); if (el) el.addEventListener('change', renderVentas); });
+    [fEgresosQ, fEgresosOrigin].forEach(el => { if (el) el.addEventListener('input', renderEgresos); if (el) el.addEventListener('change', renderEgresos); });
+
+    if (fVentasRange && window.flatpickr) {
+        flatpickr(fVentasRange, { mode: 'range', dateFormat: 'd/m/Y', locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es', allowInput: false,
+            onChange: function (d) { if (Array.isArray(d) && d.length === 2) renderVentas(); },
+            onClose: function (d) { if (Array.isArray(d) && d.length === 2) renderVentas(); }
+        });
+    }
+    if (fEgresosRange && window.flatpickr) {
+        flatpickr(fEgresosRange, { mode: 'range', dateFormat: 'd/m/Y', locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es', allowInput: false,
+            onChange: function (d) { if (Array.isArray(d) && d.length === 2) renderEgresos(); },
+            onClose: function (d) { if (Array.isArray(d) && d.length === 2) renderEgresos(); }
+        });
+    }
+    if (fArqueoRange && window.flatpickr) {
+        flatpickr(fArqueoRange, { mode: 'range', dateFormat: 'd/m/Y', locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es', allowInput: false,
+            onChange: function (d) { if (Array.isArray(d) && d.length === 2) renderArqueo(); },
+            onClose: function (d) { if (Array.isArray(d) && d.length === 2) renderArqueo(); }
+        });
+    }
+
+    if (btnExport) btnExport.addEventListener('click', openExport);
+    if (btnCloseExport) btnCloseExport.addEventListener('click', closeExport);
+    if (btnCancelExport) btnCancelExport.addEventListener('click', closeExport);
+    if (btnExportXls) btnExportXls.addEventListener('click', function () { exportCsv(); closeExport(); });
+    if (btnExportPdf) btnExportPdf.addEventListener('click', function () { exportPdfPrint(); closeExport(); });
+    if (modalExport) {
+        modalExport.addEventListener('click', function (e) {
+            const target = e.target;
+            if (target && target === modalExport.firstElementChild) closeExport();
+        });
+    }
+
+    setTab('ventas');
+
+    return;
+});
+</script>
+{% endblock %}

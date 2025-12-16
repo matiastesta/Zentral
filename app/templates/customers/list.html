@@ -1,0 +1,76 @@
+ {% extends 'base.html' %}
+{% block title %}Clientes{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Clientes</h1>
+    <p class="mt-1 text-sm text-gray-600">Centraliza la información de tus clientes para mejorar el seguimiento y la fidelización.</p>
+</div>
+
+<!-- Resumen de clientes -->
+<div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">Total de clientes</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">{{ customers|length }}</p>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">Clientes recientes</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">Con compras en el último mes</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+    </div>
+</div>
+
+<!-- Filtros y acciones -->
+<div class="flex flex-col justify-between gap-2 mb-4 md:flex-row md:items-start">
+    <div class="flex-1">
+        <div class="flex flex-col gap-2">
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input type="text" placeholder="Buscar por nombre, email o teléfono" class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+        </div>
+    </div>
+    <div class="flex gap-2 justify-end">
+        <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
+            <i class="fas fa-file-export mr-2"></i> Exportar
+        </button>
+        <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+            <i class="fas fa-user-plus mr-2"></i> Nuevo cliente
+        </button>
+    </div>
+</div>
+
+<!-- Tabla de clientes -->
+<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nombre</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Email</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Teléfono</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Última compra</th>
+                <th class="px-4 py-3"></th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% for customer in customers %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 text-sm text-gray-900">{{ customer.first_name }}</td>
+                <td class="px-4 py-3 text-sm text-gray-500">{{ customer.email or '—' }}</td>
+                <td class="px-4 py-3 text-sm text-gray-500">{{ customer.phone or '—' }}</td>
+                <td class="px-4 py-3 text-sm text-gray-500">—</td>
+                <td class="px-4 py-3 text-sm text-right space-x-2">
+                    <button class="text-blue-600 hover:text-blue-800 text-xs font-medium">Ver ficha</button>
+                    <button class="text-red-600 hover:text-red-800 text-xs font-medium">Eliminar</button>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay clientes cargados. Agrega tu primer cliente con el botón "Nuevo cliente".</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

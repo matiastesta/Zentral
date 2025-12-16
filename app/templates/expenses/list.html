@@ -1,0 +1,738 @@
+{% extends 'base.html' %}
+{% block title %}Gastos{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Gastos y Egresos</h1>
+    <p class="mt-1 text-sm text-gray-600">Controla los costos fijos y variables de tu negocio.</p>
+</div>
+
+<!-- Filtros y acciones -->
+<div class="flex flex-col justify-between gap-2 mb-4 md:flex-row md:items-start">
+    <div class="flex-1"></div>
+    <div class="flex gap-2 justify-end">
+        <button id="btn-export-egresos" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
+            <i class="fas fa-file-export mr-2"></i> Exportar
+        </button>
+        <a href="{{ url_for('expenses.new') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+            <i class="fas fa-plus mr-2"></i> Nuevo gasto
+        </a>
+    </div>
+</div>
+
+<!-- Resumen de gastos -->
+<div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2">
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">Gastos de hoy</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">$0,00</p>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">Este mes</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">$0,00</p>
+    </div>
+</div>
+
+<!-- Tabla de gastos -->
+<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th id="th-sort-fecha" class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none">
+                    <span class="inline-flex items-center gap-1">
+                        <span>Fecha</span>
+                        <span id="sort-fecha" class="text-[10px] text-gray-400"></span>
+                    </span>
+                </th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
+                <th id="th-sort-valor" class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">
+                    <span class="inline-flex items-center gap-1 justify-end w-full">
+                        <span>Valor</span>
+                        <span id="sort-valor" class="text-[10px] text-gray-400"></span>
+                    </span>
+                </th>
+                <th id="th-sort-proveedor" class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none">
+                    <span class="inline-flex items-center gap-1">
+                        <span>Proveedor</span>
+                        <span id="sort-proveedor" class="text-[10px] text-gray-400"></span>
+                    </span>
+                </th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nota</th>
+                <th class="px-4 py-3"></th>
+            </tr>
+            <tr>
+                <th class="px-4 pb-3">
+                    <div class="relative">
+                        <input id="filtro-rango-egresos" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="📅 Período" readonly>
+                    </div>
+                </th>
+                <th class="px-4 pb-3">
+                    <select id="filtro-categoria-egresos" class="w-full px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">🗂️ Todas</option>
+                        <option value="Servicios públicos">💡 Servicios públicos</option>
+                        <option value="Gastos operativos">🧾 Gastos operativos</option>
+                        <option value="Arriendo">🏠 Arriendo</option>
+                        <option value="Nómina">🧑‍💼 Nómina</option>
+                        <option value="Transportes">🚚 Transportes</option>
+                        <option value="Mantenimiento y reparaciones">🛠️ Mantenimiento y reparaciones</option>
+                        <option value="Muebles, equipos o maquinarias">🪑 Muebles, equipos o maquinarias</option>
+                        <option value="Otro">🏷️ Otro</option>
+                    </select>
+                </th>
+                <th class="px-4 pb-3"></th>
+                <th class="px-4 pb-3">
+                    <div class="relative" id="wrap-filtro-proveedor-egresos">
+                        <input id="filtro-proveedor-egresos" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="🚚 Proveedor" autocomplete="off">
+                        <input id="filtro-proveedor-egresos-id" type="hidden" value="">
+                        <div id="filtro-proveedor-egresos-dd" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden"></div>
+                    </div>
+                </th>
+                <th class="px-4 pb-3"></th>
+                <th class="px-4 pb-3"></th>
+            </tr>
+        </thead>
+        <tbody id="egresos-tbody" class="bg-white divide-y divide-gray-200">
+            <tr>
+                <td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay gastos registrados. Usa el botón "Nuevo gasto" para cargarlos.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="mt-3 flex justify-end">
+    <div class="text-sm text-gray-600">
+        <span class="font-medium text-gray-800">Total del período mostrado:</span>
+        <span id="egresos-total-periodo" class="ml-1 font-semibold text-gray-900">$0,00</span>
+    </div>
+</div>
+
+<div id="modal-export-egresos" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Exportar historial</h3>
+                    <p class="text-xs text-gray-500">Se exporta exactamente lo que estás viendo (con filtros aplicados).</p>
+                </div>
+                <button id="btn-close-export-egresos" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button id="btn-export-egresos-pdf" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                    <div class="text-2xl">📄</div>
+                    <div class="mt-2 font-semibold text-gray-900">Exportar a PDF</div>
+                    <div class="text-xs text-gray-500">Ideal para imprimir o enviar.</div>
+                </button>
+                <button id="btn-export-egresos-xls" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                    <div class="text-2xl">📊</div>
+                    <div class="mt-2 font-semibold text-gray-900">Exportar a Excel</div>
+                    <div class="text-xs text-gray-500">Descarga un CSV compatible.</div>
+                </button>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end">
+                <button id="btn-cancel-export-egresos" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tbody = document.getElementById('egresos-tbody');
+    const elTotalPeriodo = document.getElementById('egresos-total-periodo');
+
+    const btnExport = document.getElementById('btn-export-egresos');
+    const modalExport = document.getElementById('modal-export-egresos');
+    const btnCloseExport = document.getElementById('btn-close-export-egresos');
+    const btnCancelExport = document.getElementById('btn-cancel-export-egresos');
+    const btnExportPdf = document.getElementById('btn-export-egresos-pdf');
+    const btnExportXls = document.getElementById('btn-export-egresos-xls');
+
+    const filtroRango = document.getElementById('filtro-rango-egresos');
+    const filtroCategoria = document.getElementById('filtro-categoria-egresos');
+    const filtroProveedor = document.getElementById('filtro-proveedor-egresos');
+    const filtroProveedorId = document.getElementById('filtro-proveedor-egresos-id');
+    const filtroProveedorDd = document.getElementById('filtro-proveedor-egresos-dd');
+
+    const newUrl = "{{ url_for('expenses.new') }}";
+    const suppliersNewUrl = "{{ url_for('suppliers.new') }}";
+
+    const thSortFecha = document.getElementById('th-sort-fecha');
+    const thSortValor = document.getElementById('th-sort-valor');
+    const thSortProveedor = document.getElementById('th-sort-proveedor');
+    const sortFecha = document.getElementById('sort-fecha');
+    const sortValor = document.getElementById('sort-valor');
+    const sortProveedor = document.getElementById('sort-proveedor');
+
+    const sortState = { key: 'fecha', dir: 'desc' };
+
+    let lastRendered = [];
+
+    function formatearMoneda(valor) {
+        const numero = isNaN(valor) ? 0 : valor;
+        return '$' + numero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function parseNumeroSeguro(v) {
+        const n = parseFloat(String(v || '').replace(',', '.'));
+        return isNaN(n) ? 0 : n;
+    }
+
+    function iconoCategoria(categoria) {
+        const c = String(categoria || '').toLowerCase();
+        if (c.includes('nómina') || c.includes('nomina')) return 'fa-user-tie';
+        if (c.includes('servicios')) return 'fa-bolt';
+        if (c.includes('gastos operativos')) return 'fa-receipt';
+        if (c.includes('arriendo')) return 'fa-house';
+        if (c.includes('transporte')) return 'fa-truck-fast';
+        if (c.includes('mantenimiento') || c.includes('reparaciones')) return 'fa-screwdriver-wrench';
+        if (c.includes('muebles') || c.includes('equipos') || c.includes('maquinarias')) return 'fa-industry';
+        if (c.includes('otro')) return 'fa-tag';
+        return 'fa-tag';
+    }
+
+    function leerEgresos() {
+        try {
+            if (window.StorageService && typeof window.StorageService.getExpenses === 'function') {
+                const res = window.StorageService.getExpenses();
+                return Array.isArray(res) ? res : [];
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            const raw = window.localStorage.getItem('egresos_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function guardarEgresos(arr) {
+        try {
+            if (window.StorageService && typeof window.StorageService.saveExpenses === 'function') {
+                window.StorageService.saveExpenses(Array.isArray(arr) ? arr : []);
+                return;
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            window.localStorage.setItem('egresos_dummy', JSON.stringify(arr));
+        } catch (e) {
+            // noop
+        }
+    }
+
+    function leerSuppliers() {
+        try {
+            if (window.StorageService && typeof window.StorageService.getSuppliers === 'function') {
+                const res = window.StorageService.getSuppliers();
+                return Array.isArray(res) ? res : [];
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            const raw = window.localStorage.getItem('suppliers_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function setProveedorFiltro(id, name) {
+        if (filtroProveedorId) filtroProveedorId.value = id ? String(id) : '';
+        if (filtroProveedor) filtroProveedor.value = name ? String(name) : '';
+    }
+
+    function hideProveedorDd() {
+        if (!filtroProveedorDd) return;
+        filtroProveedorDd.classList.add('hidden');
+        filtroProveedorDd.innerHTML = '';
+    }
+
+    function showProveedorDd(items, query) {
+        if (!filtroProveedorDd) return;
+        filtroProveedorDd.innerHTML = '';
+        const q = String(query || '').trim();
+
+        items.forEach(s => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'w-full text-left px-3 py-2 text-sm hover:bg-gray-50';
+            btn.textContent = String(s?.name || 'Proveedor');
+            btn.addEventListener('click', function () {
+                setProveedorFiltro(s?.id || '', s?.name || '');
+                hideProveedorDd();
+                renderTabla();
+            });
+            filtroProveedorDd.appendChild(btn);
+        });
+
+        if (q && !items.length) {
+            const empty = document.createElement('div');
+            empty.className = 'px-3 py-2 text-xs text-gray-500';
+            empty.textContent = 'Sin coincidencias.';
+            filtroProveedorDd.appendChild(empty);
+        }
+
+        if (q) {
+            const hr = document.createElement('div');
+            hr.className = 'h-px bg-gray-100';
+            filtroProveedorDd.appendChild(hr);
+
+            const btnCreate = document.createElement('button');
+            btnCreate.type = 'button';
+            btnCreate.className = 'w-full text-left px-3 py-2 text-sm text-blue-700 hover:bg-blue-50';
+            btnCreate.textContent = '+ Crear proveedor';
+            btnCreate.addEventListener('click', function () {
+                const returnTo = window.location.pathname + window.location.search;
+                window.location.href = suppliersNewUrl + '?return_to=' + encodeURIComponent(returnTo);
+            });
+            filtroProveedorDd.appendChild(btnCreate);
+        }
+
+        if (!items.length && !q) {
+            hideProveedorDd();
+            return;
+        }
+        filtroProveedorDd.classList.remove('hidden');
+    }
+
+    function actualizarProveedorDd() {
+        const q = (filtroProveedor?.value || '').trim().toLowerCase();
+        if (!q) {
+            hideProveedorDd();
+            return;
+        }
+        const items = leerSuppliers()
+            .filter(s => (s?.status || 'Active') !== 'Discontinued')
+            .filter(s => String(s?.name || '').toLowerCase().includes(q))
+            .slice(0, 10);
+        showProveedorDd(items, q);
+    }
+
+    function parseRangoFechas(raw) {
+        const txt = String(raw || '').trim();
+        const normalized = txt.replace(/\s+a\s+/i, ' - ').replace(/\s+to\s+/i, ' - ');
+        const parts = normalized.split(' - ').map(p => p.trim()).filter(Boolean);
+        if (parts.length !== 2) return null;
+        const [d1, m1, y1] = parts[0].split('/').map(x => parseInt(x, 10));
+        const [d2, m2, y2] = parts[1].split('/').map(x => parseInt(x, 10));
+        if (!d1 || !m1 || !y1 || !d2 || !m2 || !y2) return null;
+        const a = new Date(y1, m1 - 1, d1);
+        const b = new Date(y2, m2 - 1, d2);
+        if (isNaN(a.getTime()) || isNaN(b.getTime())) return null;
+        a.setHours(0, 0, 0, 0);
+        b.setHours(23, 59, 59, 999);
+        return { from: a, to: b };
+    }
+
+    function parseFechaEgreso(raw) {
+        const v = String(raw || '').trim();
+        if (!v) return null;
+        if (v.includes('/')) {
+            const [d, m, y] = v.split('/').map(x => parseInt(x, 10));
+            if (!d || !m || !y) return null;
+            const dt = new Date(y, m - 1, d);
+            return isNaN(dt.getTime()) ? null : dt;
+        }
+        const dt = new Date(v);
+        return isNaN(dt.getTime()) ? null : dt;
+    }
+
+    function formatFechaLabel(dt) {
+        if (!dt) return '-';
+        const d = String(dt.getDate()).padStart(2, '0');
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const y = String(dt.getFullYear());
+        return d + '/' + m + '/' + y;
+    }
+
+    function startOfDay(dt) {
+        const x = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+        x.setHours(0, 0, 0, 0);
+        return x;
+    }
+
+    function labelDia(dt) {
+        if (!dt) return '';
+        const today = startOfDay(new Date());
+        const d = startOfDay(dt);
+        const diff = Math.round((today.getTime() - d.getTime()) / 86400000);
+        if (diff === 0) return 'Hoy';
+        if (diff === 1) return 'Ayer';
+        return '';
+    }
+
+    function badgeEstadoPago(status) {
+        const s = String(status || '').trim();
+        if (!s) return '';
+        if (s === 'Pending' || s === 'Pendiente') {
+            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-yellow-50 text-yellow-700">⏳ Pendiente</span>';
+        }
+        if (s === 'Paid' || s === 'Pagado') {
+            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-50 text-green-700">✅ Pagado</span>';
+        }
+        return '';
+    }
+
+    function badgeOrigen(origin) {
+        const o = String(origin || '').trim();
+        if (!o || o === 'Manual' || o === 'manual') {
+            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700">✍️ Manual</span>';
+        }
+        if (o === 'Inventory' || o === 'inventory') {
+            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700">📦 Inventario</span>';
+        }
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700">🔗 ' + o + '</span>';
+    }
+
+    function escapeHtml(v) {
+        return String(v ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function buildTraceHint(e) {
+        const createdAt = String(e?.created_at || '').trim();
+        const originRef = String(e?.origin_ref || '').trim();
+        if (!createdAt && !originRef) return '';
+        const titleParts = [];
+        if (originRef) titleParts.push('Ref: ' + originRef);
+        if (createdAt) titleParts.push('Creado: ' + createdAt);
+        const title = escapeHtml(titleParts.join(' | '));
+        return '<span class="ml-2 text-gray-400" title="' + title + '">🧾</span>';
+    }
+
+    function countAdjuntos(e) {
+        const files = e?.comprobante;
+        return Array.isArray(files) ? files.length : 0;
+    }
+
+    function setSort(key) {
+        if (sortState.key === key) {
+            sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortState.key = key;
+            sortState.dir = key === 'fecha' ? 'desc' : 'asc';
+        }
+        renderTabla();
+    }
+
+    function renderSortIndicators() {
+        if (sortFecha) sortFecha.textContent = sortState.key === 'fecha' ? (sortState.dir === 'asc' ? '↑' : '↓') : '';
+        if (sortValor) sortValor.textContent = sortState.key === 'valor' ? (sortState.dir === 'asc' ? '↑' : '↓') : '';
+        if (sortProveedor) sortProveedor.textContent = sortState.key === 'proveedor' ? (sortState.dir === 'asc' ? '↑' : '↓') : '';
+    }
+
+    function renderTabla() {
+        if (!tbody) return;
+        let egresos = leerEgresos();
+
+        const rango = parseRangoFechas(filtroRango?.value);
+        if (rango) {
+            egresos = egresos.filter(e => {
+                const dt = parseFechaEgreso(e?.fecha);
+                if (!dt) return true;
+                return dt >= rango.from && dt <= rango.to;
+            });
+        }
+
+        const categoriaFiltro = (filtroCategoria?.value || '').trim();
+        if (categoriaFiltro) {
+            egresos = egresos.filter(e => String(e?.categoria || '') === categoriaFiltro);
+        }
+
+        const proveedorId = (filtroProveedorId?.value || '').trim();
+        const proveedorQ = (filtroProveedor?.value || '').trim().toLowerCase();
+        if (proveedorId) {
+            egresos = egresos.filter(e => String(e?.supplier_id || '') === proveedorId);
+        } else if (proveedorQ) {
+            egresos = egresos.filter(e => String(e?.supplier_name || e?.proveedor || '').toLowerCase().includes(proveedorQ));
+        }
+
+        const totalPeriodo = egresos.reduce((acc, e) => acc + parseNumeroSeguro(e?.valor), 0);
+        if (elTotalPeriodo) elTotalPeriodo.textContent = formatearMoneda(totalPeriodo);
+
+        const dirMul = sortState.dir === 'asc' ? 1 : -1;
+        egresos.sort((a, b) => {
+            if (sortState.key === 'valor') {
+                return (parseNumeroSeguro(a?.valor) - parseNumeroSeguro(b?.valor)) * dirMul;
+            }
+            if (sortState.key === 'proveedor') {
+                return String(a?.supplier_name || a?.proveedor || '').localeCompare(String(b?.supplier_name || b?.proveedor || '')) * dirMul;
+            }
+            const da = parseFechaEgreso(a?.fecha);
+            const db = parseFechaEgreso(b?.fecha);
+            const ta = da ? da.getTime() : 0;
+            const tb = db ? db.getTime() : 0;
+            return (ta - tb) * dirMul;
+        });
+
+        renderSortIndicators();
+
+        lastRendered = egresos.slice();
+
+        tbody.innerHTML = '';
+        if (!egresos.length) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay gastos registrados. Usa el botón "Nuevo gasto" para cargarlos.</td>';
+            tbody.appendChild(tr);
+            return;
+        }
+
+        let lastGroupKey = '';
+        egresos.forEach(e => {
+            const dt = parseFechaEgreso(e?.fecha);
+            const key = dt ? dt.toISOString().slice(0, 10) : 'sin-fecha';
+            if (key !== lastGroupKey) {
+                lastGroupKey = key;
+                const trGroup = document.createElement('tr');
+                trGroup.className = 'bg-gray-50';
+                const lblDia = dt ? labelDia(dt) : '';
+                const lblFecha = dt ? formatFechaLabel(dt) : '-';
+                const title = (lblDia ? (lblDia + ' – ') : '') + lblFecha;
+                trGroup.innerHTML = `<td colspan="6" class="px-4 py-2 text-xs font-semibold text-gray-700">📅 ${title}</td>`;
+                tbody.appendChild(trGroup);
+            }
+
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50 group';
+
+            const estado = badgeEstadoPago(e?.payment_status || e?.estado_pago || e?.estado || '');
+            const origen = badgeOrigen(e?.origin || '');
+            const adjCount = countAdjuntos(e);
+            const adjIcon = adjCount ? `<span class="ml-2 text-gray-400" title="${adjCount} archivo adjunto">📎</span>` : '';
+            const traceHint = buildTraceHint(e);
+            const badges = (estado || origen) ? `<div class="mt-1 flex flex-wrap gap-1">${estado || ''}${origen || ''}</div>` : '';
+            tr.innerHTML = `
+                <td class="px-4 py-3 text-sm text-gray-500">${e?.fecha || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-700">
+                    <span class="inline-flex items-center gap-2">
+                        <i class="fas ${iconoCategoria(e?.categoria)} text-gray-400"></i>
+                        <span>${e?.categoria || '-'}</span>${traceHint}
+                    </span>
+                    ${badges}
+                </td>
+                <td class="px-4 py-3 text-sm text-right text-gray-900">${formatearMoneda(parseNumeroSeguro(e?.valor))}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${e?.supplier_name || e?.proveedor || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-500">${(e?.nota || '')}${adjIcon}</td>
+                <td class="px-4 py-3 text-sm text-right">
+                    <div class="inline-flex gap-3 justify-end">
+                        <button type="button" class="btn-duplicar-egreso text-gray-600 hover:text-gray-900 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity" data-id="${e?.id}">Duplicar</button>
+                        <button type="button" class="btn-editar-egreso text-blue-600 hover:text-blue-800 text-xs font-medium" data-id="${e?.id}">Editar</button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    if (tbody) {
+        tbody.addEventListener('click', function(e) {
+            const btnEdit = e.target.closest('.btn-editar-egreso');
+            if (!btnEdit) return;
+            const id = btnEdit.getAttribute('data-id');
+            if (!id) return;
+            window.location.href = newUrl + '?id=' + encodeURIComponent(id);
+        });
+    }
+
+    if (tbody) {
+        tbody.addEventListener('click', function(e) {
+            const btnDup = e.target.closest('.btn-duplicar-egreso');
+            if (!btnDup) return;
+            const id = btnDup.getAttribute('data-id');
+            if (!id) return;
+            window.location.href = newUrl + '?duplicate_id=' + encodeURIComponent(id);
+        });
+    }
+
+    if (thSortFecha) thSortFecha.addEventListener('click', function () { setSort('fecha'); });
+    if (thSortValor) thSortValor.addEventListener('click', function () { setSort('valor'); });
+    if (thSortProveedor) thSortProveedor.addEventListener('click', function () { setSort('proveedor'); });
+
+    if (filtroCategoria) {
+        filtroCategoria.addEventListener('change', function() {
+            renderTabla();
+        });
+    }
+
+    if (filtroProveedor) {
+        filtroProveedor.addEventListener('input', function() {
+            if (filtroProveedorId) filtroProveedorId.value = '';
+            actualizarProveedorDd();
+            renderTabla();
+        });
+        filtroProveedor.addEventListener('focus', function () {
+            actualizarProveedorDd();
+        });
+        filtroProveedor.addEventListener('blur', function () {
+            window.setTimeout(function () {
+                hideProveedorDd();
+            }, 120);
+        });
+    }
+
+    document.addEventListener('click', function (ev) {
+        const wrap = document.getElementById('wrap-filtro-proveedor-egresos');
+        if (!wrap) return;
+        if (!wrap.contains(ev.target)) hideProveedorDd();
+    });
+
+    if (filtroRango && window.flatpickr) {
+        flatpickr(filtroRango, {
+            mode: 'range',
+            dateFormat: 'd/m/Y',
+            locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es',
+            allowInput: false,
+            onChange: function (selectedDates) {
+                if (Array.isArray(selectedDates) && selectedDates.length === 2) {
+                    renderTabla();
+                }
+            },
+            onClose: function (selectedDates) {
+                if (Array.isArray(selectedDates) && selectedDates.length === 2) {
+                    renderTabla();
+                }
+            }
+        });
+        filtroRango.addEventListener('change', function () {
+            renderTabla();
+        });
+    }
+
+    function openExport() {
+        if (!modalExport) return;
+        modalExport.classList.remove('hidden');
+    }
+    function closeExport() {
+        if (!modalExport) return;
+        modalExport.classList.add('hidden');
+    }
+
+    function getPeriodLabelSafe() {
+        const raw = String(filtroRango?.value || '').trim();
+        return raw ? raw : 'todo';
+    }
+
+    function escapeCsvCell(v) {
+        const s = String(v ?? '');
+        if (/[\n\r",;]/.test(s)) {
+            return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+    }
+
+    function exportCsv() {
+        const rows = lastRendered || [];
+        const header = ['Fecha','Categoría','Valor','Proveedor','Origen','Origin Ref','Creado','Nota'];
+        const lines = [header.map(escapeCsvCell).join(';')];
+        rows.forEach(e => {
+            lines.push([
+                e?.fecha || '',
+                e?.categoria || '',
+                String(parseNumeroSeguro(e?.valor)),
+                e?.supplier_name || e?.proveedor || '',
+                e?.origin || '',
+                e?.origin_ref || '',
+                e?.created_at || '',
+                e?.nota || ''
+            ].map(escapeCsvCell).join(';'));
+        });
+        const blob = new Blob(["\ufeff" + lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        const period = getPeriodLabelSafe().replace(/\s+/g, '_').replace(/\//g, '-');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'egresos_' + period + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(a.href); }, 500);
+    }
+
+    function exportPdfPrint() {
+        const rows = lastRendered || [];
+        const w = window.open('', '_blank');
+        if (!w) return;
+        const period = getPeriodLabelSafe();
+        const totalTxt = elTotalPeriodo ? (elTotalPeriodo.textContent || '') : '';
+
+        const rowsHtml = rows.map(function (e) {
+            return ''
+                + '<tr>'
+                + '<td>' + String(e?.fecha || '') + '</td>'
+                + '<td>' + String(e?.categoria || '') + '</td>'
+                + '<td class="num">' + String(formatearMoneda(parseNumeroSeguro(e?.valor)) || '') + '</td>'
+                + '<td>' + String(e?.supplier_name || e?.proveedor || '') + '</td>'
+                + '<td>' + String(e?.origin || '') + '</td>'
+                + '<td>' + String(e?.origin_ref || '') + '</td>'
+                + '<td>' + String(e?.created_at || '') + '</td>'
+                + '<td>' + String(e?.nota || '') + '</td>'
+                + '</tr>';
+        }).join('');
+
+        const html = `
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8" />
+<title>Exportar gastos</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:#111}
+h1{font-size:18px;margin:0 0 6px 0}
+p{margin:0 0 14px 0;color:#555;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;vertical-align:top}
+th{background:#f9fafb}
+td.num,th.num{text-align:right}
+.meta{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:12px}
+.pill{font-size:12px;color:#111}
+</style>
+</head><body>
+<div class="meta">
+  <div>
+    <h1>Historial de gastos</h1>
+    <p>Período: ${period}</p>
+  </div>
+  <div class="pill">Total del período mostrado: <strong>${totalTxt}</strong></div>
+</div>
+<table>
+  <thead><tr>
+    <th>Fecha</th><th>Categoría</th><th class="num">Valor</th><th>Proveedor</th><th>Origen</th><th>Ref</th><th>Creado</th><th>Nota</th>
+  </tr></thead>
+  <tbody>
+    ` + rowsHtml + `
+  </tbody>
+</table>
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+    }
+
+    if (btnExport) btnExport.addEventListener('click', function () { openExport(); });
+    if (btnCloseExport) btnCloseExport.addEventListener('click', function () { closeExport(); });
+    if (btnCancelExport) btnCancelExport.addEventListener('click', function () { closeExport(); });
+    if (modalExport) {
+        modalExport.addEventListener('click', function (e) {
+            const target = e.target;
+            if (target && target === modalExport.firstElementChild) closeExport();
+        });
+    }
+    if (btnExportXls) btnExportXls.addEventListener('click', function () { exportCsv(); closeExport(); });
+    if (btnExportPdf) btnExportPdf.addEventListener('click', function () { exportPdfPrint(); closeExport(); });
+
+    renderTabla();
+});
+</script>
+{% endblock %}

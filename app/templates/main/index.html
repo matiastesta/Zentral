@@ -1,0 +1,713 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-2xl font-bold text-gray-900">Panel de Control</h1>
+    <p class="mt-1 text-sm text-gray-600">Bienvenido de vuelta, {{ current_user.username }}. Aquí tienes un resumen de tu negocio.</p>
+</div>
+
+<div class="flex flex-col justify-between gap-2 mb-4 md:flex-row md:items-start">
+    <div class="flex-1"></div>
+    <div class="flex gap-2 justify-end">
+        <input id="dash-range" type="text" class="w-56 px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="📅 Período" readonly>
+        <button id="btn-export-dashboard" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
+            <i class="fas fa-file-export mr-2"></i> Exportar
+        </button>
+    </div>
+</div>
+
+<!-- KPIs -->
+<div id="dash-kpis" class="grid grid-cols-1 gap-4 mt-6 md:grid-cols-2 lg:grid-cols-3">
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('sales.index') }}" title="💰 Total monetario de ventas filtradas">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">💰</div>
+            <div class="min-w-0">
+                <div class="text-sm font-medium text-gray-500">Ventas del período</div>
+                <div id="kpi-total-sales" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                <div id="sk-kpi-total-sales" class="mt-2 h-4 w-32 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('expenses.index') }}" title="💸 Total de egresos filtrados">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">💸</div>
+            <div class="min-w-0">
+                <div class="text-sm font-medium text-gray-500">Gastos del período</div>
+                <div id="kpi-total-expenses" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                <div id="sk-kpi-total-expenses" class="mt-2 h-4 w-32 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200" title="📈 Ventas menos gastos del período">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">📈</div>
+            <div class="min-w-0">
+                <div class="text-sm font-medium text-gray-500">Resultado estimado</div>
+                <div id="kpi-estimated-result" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                <div id="sk-kpi-estimated-result" class="mt-2 h-4 w-28 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('inventory.index') }}" title="📦 Valor total del inventario actual usando costo promedio por producto">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">📦</div>
+            <div class="min-w-0">
+                <div class="text-sm font-medium text-gray-500">Stock valorizado</div>
+                <div id="kpi-inventory-value" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                <div id="sk-kpi-inventory-value" class="mt-2 h-4 w-36 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('inventory.index') }}" title="⚠️ Cantidad de productos con stock bajo o sin stock">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-full bg-yellow-50 text-yellow-700 flex items-center justify-center">⚠️</div>
+            <div class="min-w-0">
+                <div class="text-sm font-medium text-gray-500">Productos con alerta</div>
+                <div id="kpi-low-stock" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                <div id="sk-kpi-low-stock" class="mt-2 h-4 w-14 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('customers.index') }}" title="👤 Clientes con saldo pendiente (cuenta corriente)">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-full bg-gray-50 text-gray-700 flex items-center justify-center">👤</div>
+            <div class="min-w-0">
+                <div class="text-sm font-medium text-gray-500">Clientes deudores</div>
+                <div id="kpi-debtors" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                <div id="sk-kpi-debtors" class="mt-2 h-4 w-14 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="dash-empty" class="hidden mt-6 p-5 bg-white rounded-lg shadow border border-gray-200">
+    <div class="text-sm font-medium text-gray-900">No hay datos para el período seleccionado</div>
+    <div class="mt-1 text-xs text-gray-500">Probá ajustando el rango de fechas o cargando nuevas ventas/egresos.</div>
+</div>
+
+<!-- Charts -->
+<div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
+    <div class="p-5 bg-white rounded-lg shadow border border-gray-200">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-medium text-gray-900">Ventas vs Gastos por día</h2>
+            <div class="text-xs text-gray-500" id="chart-sales-expenses-subtitle">—</div>
+        </div>
+        <div class="h-64">
+            <canvas id="salesExpensesChart" class="w-full h-full"></canvas>
+        </div>
+    </div>
+    <div class="p-5 bg-white rounded-lg shadow border border-gray-200">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-medium text-gray-900">Top categorías de gasto</h2>
+            <div class="text-xs text-gray-500" id="chart-top-cats-subtitle">Top 5</div>
+        </div>
+        <div class="h-64">
+            <canvas id="topExpenseCategoriesChart" class="w-full h-full"></canvas>
+        </div>
+    </div>
+</div>
+
+<div id="modal-export-dashboard" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Exportar dashboard</h3>
+                    <p class="text-xs text-gray-500">Se exporta el resumen calculado para el período seleccionado.</p>
+                </div>
+                <button id="btn-close-export-dashboard" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button id="btn-export-dashboard-pdf" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                    <div class="text-2xl">📄</div>
+                    <div class="mt-2 font-semibold text-gray-900">Exportar a PDF</div>
+                    <div class="text-xs text-gray-500">Ideal para imprimir o enviar.</div>
+                </button>
+                <button id="btn-export-dashboard-xls" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                    <div class="text-2xl">📊</div>
+                    <div class="mt-2 font-semibold text-gray-900">Exportar a Excel</div>
+                    <div class="text-xs text-gray-500">Descarga un CSV compatible.</div>
+                </button>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end">
+                <button id="btn-cancel-export-dashboard" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const kpiTotalSales = document.getElementById('kpi-total-sales');
+    const kpiTotalExpenses = document.getElementById('kpi-total-expenses');
+    const kpiEstimatedResult = document.getElementById('kpi-estimated-result');
+    const kpiInventoryValue = document.getElementById('kpi-inventory-value');
+    const kpiLowStock = document.getElementById('kpi-low-stock');
+    const kpiDebtors = document.getElementById('kpi-debtors');
+    const emptyState = document.getElementById('dash-empty');
+    const kpiWrap = document.getElementById('dash-kpis');
+
+    const skKpiTotalSales = document.getElementById('sk-kpi-total-sales');
+    const skKpiTotalExpenses = document.getElementById('sk-kpi-total-expenses');
+    const skKpiEstimatedResult = document.getElementById('sk-kpi-estimated-result');
+    const skKpiInventoryValue = document.getElementById('sk-kpi-inventory-value');
+    const skKpiLowStock = document.getElementById('sk-kpi-low-stock');
+    const skKpiDebtors = document.getElementById('sk-kpi-debtors');
+
+    const chartSalesExpensesSubtitle = document.getElementById('chart-sales-expenses-subtitle');
+    const dashRange = document.getElementById('dash-range');
+
+    const btnExport = document.getElementById('btn-export-dashboard');
+    const modalExport = document.getElementById('modal-export-dashboard');
+    const btnCloseExport = document.getElementById('btn-close-export-dashboard');
+    const btnCancelExport = document.getElementById('btn-cancel-export-dashboard');
+    const btnExportPdf = document.getElementById('btn-export-dashboard-pdf');
+    const btnExportXls = document.getElementById('btn-export-dashboard-xls');
+
+    function isPromise(x) {
+        return !!x && typeof x.then === 'function';
+    }
+
+    function formatearMoneda(valor) {
+        const numero = isNaN(valor) ? 0 : valor;
+        return '$' + numero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function fmtDateYmd(d) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yy = String(d.getFullYear());
+        return yy + '-' + mm + '-' + dd;
+    }
+
+    function parseFecha(raw) {
+        if (typeof raw === 'number' && isFinite(raw)) {
+            const dtNum = new Date(raw);
+            return isNaN(dtNum.getTime()) ? null : dtNum;
+        }
+        const v = String(raw || '').trim();
+        if (!v) return null;
+        if (v.includes('/')) {
+            const [d, m, y] = v.split('/').map(x => parseInt(x, 10));
+            if (!d || !m || !y) return null;
+            const dt = new Date(y, m - 1, d);
+            return isNaN(dt.getTime()) ? null : dt;
+        }
+        const dt = new Date(v);
+        return isNaN(dt.getTime()) ? null : dt;
+    }
+
+    function parseRangoFechas(raw) {
+        const txt = String(raw || '').trim();
+        const normalized = txt.replace(/\s+a\s+/i, ' - ').replace(/\s+to\s+/i, ' - ');
+        const parts = normalized.split(' - ').map(p => p.trim()).filter(Boolean);
+        if (parts.length !== 2) return null;
+        const a = parseFecha(parts[0]);
+        const b = parseFecha(parts[1]);
+        if (!a || !b) return null;
+        a.setHours(0,0,0,0);
+        b.setHours(23,59,59,999);
+        return { from: a, to: b };
+    }
+
+    function setSkeleton(on) {
+        const sks = [skKpiTotalSales, skKpiTotalExpenses, skKpiEstimatedResult, skKpiInventoryValue, skKpiLowStock, skKpiDebtors];
+        sks.forEach(el => {
+            if (!el) return;
+            el.classList.toggle('hidden', !on);
+        });
+    }
+
+    function setEmpty(on) {
+        if (emptyState) emptyState.classList.toggle('hidden', !on);
+    }
+
+    function getRangeOrDefault() {
+        const r = parseRangoFechas(dashRange?.value);
+        if (r) return r;
+        const now = new Date();
+        const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        return { from, to, isDefault: true };
+    }
+
+    function normalizeSalesDate(sale) {
+        return parseFecha(sale?.fecha || sale?.sale_date || sale?.date || sale?.created_at || '');
+    }
+
+    function normalizeExpenseDate(exp) {
+        return parseFecha(exp?.fecha || exp?.date || exp?.created_at || '');
+    }
+
+    function sumSalesTotal(list) {
+        return (Array.isArray(list) ? list : []).reduce((acc, s) => acc + (parseFloat(s?.total || '0') || 0), 0);
+    }
+
+    function sumExpensesTotal(list) {
+        return (Array.isArray(list) ? list : []).reduce((acc, e) => acc + (parseFloat(e?.valor || '0') || 0), 0);
+    }
+
+    function calculateInventoryMetrics(products, lots) {
+        const ps = Array.isArray(products) ? products : [];
+        const ls = Array.isArray(lots) ? lots : [];
+        let inventoryValue = 0;
+        let lowStockProducts = 0;
+        ps.forEach(p => {
+            const rel = ls.filter(l => String(l?.product_id) === String(p?.id));
+            const stock = rel.reduce((acc, l) => acc + (parseFloat(l?.qty_available || '0') || 0), 0);
+            const costSum = rel.reduce((acc, l) => acc + ((parseFloat(l?.qty_available || '0') || 0) * (parseFloat(l?.unit_cost || '0') || 0)), 0);
+            const avg = stock > 0 ? (costSum / stock) : 0;
+            inventoryValue += stock * avg;
+            const min = (parseFloat(p?.min_stock || '0') || 0);
+            if (min > 0 && stock <= min) lowStockProducts += 1;
+            if (min <= 0 && stock <= 0) lowStockProducts += 1;
+        });
+        return { inventoryValue, lowStockProducts };
+    }
+
+    function calculateDebtorsFromSales(sales) {
+        const list = Array.isArray(sales) ? sales : [];
+        const map = new Map();
+        list.forEach(s => {
+            const due = (parseFloat(s?.due_amount || '0') || 0);
+            const onAccount = !!s?.on_account || String(s?.payment_method || s?.forma_pago || '') === 'Cuenta corriente';
+            if (!onAccount || due <= 0) return;
+            const cid = String(s?.customer_id || s?.customerId || s?.customer || s?.cliente || s?.customer_name || '').trim();
+            if (!cid) return;
+            map.set(cid, (map.get(cid) || 0) + due);
+        });
+        return { debtorsCount: map.size, debtorsMap: map };
+    }
+
+    function bucketByDay(from, to) {
+        const out = [];
+        const d = new Date(from.getTime());
+        d.setHours(0, 0, 0, 0);
+        const end = new Date(to.getTime());
+        end.setHours(0, 0, 0, 0);
+        while (d <= end) {
+            out.push(fmtDateYmd(d));
+            d.setDate(d.getDate() + 1);
+        }
+        return out;
+    }
+
+    function calculateChartsData(range, sales, expenses) {
+        const from = range.from;
+        const to = range.to;
+
+        function categoryWithEmoji(catRaw) {
+            const c = String(catRaw || '').trim();
+            if (!c) return 'Sin categoría';
+            if (/^[^A-Za-z0-9\s]/.test(c)) return c;
+            const map = {
+                'Servicios públicos': '💡 Servicios públicos',
+                'Gastos operativos': '🧾 Gastos operativos',
+                'Arriendo': '🏠 Arriendo',
+                'Nómina': '🧑‍💼 Nómina',
+                'Transportes': '🚚 Transportes',
+                'Mantenimiento y reparaciones': '🛠️ Mantenimiento y reparaciones',
+                'Muebles, equipos o maquinarias': '🪑 Muebles, equipos o maquinarias',
+                'Inventario': '📦 Inventario',
+                'Otro': '🏷️ Otro'
+            };
+            return map[c] || c;
+        }
+
+        const labels = bucketByDay(from, to);
+        const salesBy = {};
+        const expBy = {};
+        labels.forEach(k => {
+            salesBy[k] = 0;
+            expBy[k] = 0;
+        });
+
+        (Array.isArray(sales) ? sales : []).forEach(s => {
+            const dt = normalizeSalesDate(s);
+            if (!dt) return;
+            if (dt < from || dt > to) return;
+            const k = fmtDateYmd(dt);
+            if (!(k in salesBy)) return;
+            salesBy[k] += (parseFloat(s?.total || '0') || 0);
+        });
+
+        (Array.isArray(expenses) ? expenses : []).forEach(e => {
+            const dt = normalizeExpenseDate(e);
+            if (!dt) return;
+            if (dt < from || dt > to) return;
+            const k = fmtDateYmd(dt);
+            if (!(k in expBy)) return;
+            expBy[k] += (parseFloat(e?.valor || '0') || 0);
+        });
+
+        const salesSeries = labels.map(k => salesBy[k] || 0);
+        const expSeries = labels.map(k => expBy[k] || 0);
+
+        const catSum = {};
+        (Array.isArray(expenses) ? expenses : []).forEach(e => {
+            const dt = normalizeExpenseDate(e);
+            if (!dt) return;
+            if (dt < from || dt > to) return;
+            const cat = categoryWithEmoji(e?.categoria || e?.category || 'Sin categoría');
+            catSum[cat] = (catSum[cat] || 0) + (parseFloat(e?.valor || '0') || 0);
+        });
+        const topCats = Object.entries(catSum)
+            .sort((a, b) => (b[1] || 0) - (a[1] || 0))
+            .slice(0, 5);
+
+        return {
+            salesExpenses: { labels, salesSeries, expSeries },
+            topExpenseCats: topCats
+        };
+    }
+
+    function tryGetAllData() {
+        if (!window.StorageService) {
+            return Promise.resolve({ sales: [], expenses: [], products: [], lots: [], customers: [], suppliers: [] });
+        }
+        const s = (typeof window.StorageService.getSales === 'function') ? window.StorageService.getSales() : [];
+        const e = (typeof window.StorageService.getExpenses === 'function') ? window.StorageService.getExpenses() : [];
+        const p = (typeof window.StorageService.getInventoryProducts === 'function') ? window.StorageService.getInventoryProducts() : [];
+        const l = (typeof window.StorageService.getInventoryLots === 'function') ? window.StorageService.getInventoryLots() : [];
+        const c = (typeof window.StorageService.getCustomers === 'function') ? window.StorageService.getCustomers() : [];
+        const sup = (typeof window.StorageService.getSuppliers === 'function') ? window.StorageService.getSuppliers() : [];
+        return Promise.all([Promise.resolve(s), Promise.resolve(e), Promise.resolve(p), Promise.resolve(l), Promise.resolve(c), Promise.resolve(sup)]).then(function (vals) {
+            return {
+                sales: Array.isArray(vals[0]) ? vals[0] : [],
+                expenses: Array.isArray(vals[1]) ? vals[1] : [],
+                products: Array.isArray(vals[2]) ? vals[2] : [],
+                lots: Array.isArray(vals[3]) ? vals[3] : [],
+                customers: Array.isArray(vals[4]) ? vals[4] : [],
+                suppliers: Array.isArray(vals[5]) ? vals[5] : []
+            };
+        });
+    }
+
+    let lastSummary = null;
+    let _salesExpensesChart = null;
+    let _topExpenseCatsChart = null;
+
+    function destroyCharts() {
+        if (_salesExpensesChart && typeof _salesExpensesChart.destroy === 'function') _salesExpensesChart.destroy();
+        if (_topExpenseCatsChart && typeof _topExpenseCatsChart.destroy === 'function') _topExpenseCatsChart.destroy();
+        _salesExpensesChart = null;
+        _topExpenseCatsChart = null;
+    }
+
+    function renderCharts(chartsData) {
+        if (!window.Chart) {
+            console.warn('[Dashboard] Chart.js no está disponible, se omite la renderización de gráficos.');
+            return;
+        }
+
+        destroyCharts();
+
+        const salesExpensesCanvas = document.getElementById('salesExpensesChart');
+        const topCatsCanvas = document.getElementById('topExpenseCategoriesChart');
+
+        if (salesExpensesCanvas) {
+            const ctx = salesExpensesCanvas.getContext('2d');
+            _salesExpensesChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chartsData.salesExpenses.labels,
+                    datasets: [
+                        {
+                            label: 'Ventas',
+                            data: chartsData.salesExpenses.salesSeries,
+                            backgroundColor: 'rgba(59, 130, 246, 0.35)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Gastos',
+                            data: chartsData.salesExpenses.expSeries,
+                            backgroundColor: 'rgba(239, 68, 68, 0.25)',
+                            borderColor: 'rgba(239, 68, 68, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    const v = ctx.parsed?.y ?? 0;
+                                    return String(ctx.dataset.label || '') + ': ' + formatearMoneda(v);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function (value) { return '$' + Number(value || 0).toLocaleString('es-AR'); }
+                            }
+                        },
+                        x: {
+                            ticks: { maxRotation: 0, autoSkip: true }
+                        }
+                    }
+                }
+            });
+        }
+
+        if (topCatsCanvas) {
+            const ctx = topCatsCanvas.getContext('2d');
+            const labels = (chartsData.topExpenseCats || []).map(([k]) => k);
+            const values = (chartsData.topExpenseCats || []).map(([, v]) => v);
+            _topExpenseCatsChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.85)',
+                            'rgba(16, 185, 129, 0.85)',
+                            'rgba(245, 158, 11, 0.85)',
+                            'rgba(139, 92, 246, 0.85)',
+                            'rgba(156, 163, 175, 0.85)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    const v = ctx.parsed ?? 0;
+                                    return String(ctx.label || '') + ': ' + formatearMoneda(v);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    function calculateDashboardKPIs(payload, range) {
+        const sales = Array.isArray(payload?.sales) ? payload.sales : [];
+        const expenses = Array.isArray(payload?.expenses) ? payload.expenses : [];
+        const products = Array.isArray(payload?.products) ? payload.products : [];
+        const lots = Array.isArray(payload?.lots) ? payload.lots : [];
+
+        const salesInRange = sales.filter(s => {
+            const dt = normalizeSalesDate(s);
+            if (!dt) return false;
+            return dt >= range.from && dt <= range.to;
+        });
+        const expInRange = expenses.filter(e => {
+            const dt = normalizeExpenseDate(e);
+            if (!dt) return false;
+            return dt >= range.from && dt <= range.to;
+        });
+
+        const totalSales = sumSalesTotal(salesInRange);
+        const totalExpenses = sumExpensesTotal(expInRange);
+        const estimatedResult = totalSales - totalExpenses;
+        const inv = calculateInventoryMetrics(products, lots);
+        const debtors = calculateDebtorsFromSales(salesInRange);
+
+        return {
+            totalSales,
+            totalExpenses,
+            estimatedResult,
+            inventoryValue: inv.inventoryValue,
+            lowStockProducts: inv.lowStockProducts,
+            debtorsCount: debtors.debtorsCount,
+            periodLabel: String(dashRange?.value || '').trim() || '—'
+        };
+    }
+
+    function renderKPIs(kpis) {
+        if (kpiTotalSales) kpiTotalSales.textContent = formatearMoneda(kpis.totalSales);
+        if (kpiTotalExpenses) kpiTotalExpenses.textContent = formatearMoneda(kpis.totalExpenses);
+        if (kpiInventoryValue) kpiInventoryValue.textContent = formatearMoneda(kpis.inventoryValue);
+        if (kpiLowStock) kpiLowStock.textContent = String(kpis.lowStockProducts || 0);
+        if (kpiDebtors) kpiDebtors.textContent = String(kpis.debtorsCount || 0);
+        if (kpiEstimatedResult) {
+            kpiEstimatedResult.textContent = formatearMoneda(kpis.estimatedResult);
+            const pos = kpis.estimatedResult >= 0;
+            kpiEstimatedResult.classList.toggle('text-emerald-700', pos);
+            kpiEstimatedResult.classList.toggle('text-red-700', !pos);
+        }
+    }
+
+    function calcAndRender() {
+        const range = getRangeOrDefault();
+        setSkeleton(true);
+        setEmpty(false);
+
+        return tryGetAllData().then(function (payload) {
+            const kpis = calculateDashboardKPIs(payload, range);
+            const chartsData = calculateChartsData(range, payload.sales, payload.expenses);
+
+            const hasAny = (kpis.totalSales > 0) || (kpis.totalExpenses > 0);
+            setEmpty(!hasAny);
+
+            if (chartSalesExpensesSubtitle) {
+                chartSalesExpensesSubtitle.textContent = (String(dashRange?.value || '').trim() || 'Período actual');
+            }
+
+            renderKPIs(kpis);
+            renderCharts(chartsData);
+
+            lastSummary = {
+                period: String(dashRange?.value || '').trim() || '—',
+                timestamp: new Date().toISOString(),
+                kpis,
+                chartsData
+            };
+
+            return null;
+        }).finally(function () {
+            setSkeleton(false);
+        });
+    }
+
+    function openExport() {
+        if (!modalExport) return;
+        modalExport.classList.remove('hidden');
+    }
+    function closeExport() {
+        if (!modalExport) return;
+        modalExport.classList.add('hidden');
+    }
+
+    function escapeCsvCell(v) {
+        const s = String(v ?? '');
+        if (/[\n\r",;]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+        return s;
+    }
+
+    function exportCsv() {
+        const s = lastSummary || {};
+        const k = s.kpis || {};
+        const header = ['Período','Ventas del período','Gastos del período','Resultado estimado','Stock valorizado','Productos con alerta','Clientes deudores','Exportado (ISO)'];
+        const lines = [header.map(escapeCsvCell).join(';')];
+        lines.push([
+            s.period || '—',
+            String(k.totalSales ?? 0),
+            String(k.totalExpenses ?? 0),
+            String(k.estimatedResult ?? 0),
+            String(k.inventoryValue ?? 0),
+            String(k.lowStockProducts ?? 0),
+            String(k.debtorsCount ?? 0),
+            String(new Date().toISOString())
+        ].map(escapeCsvCell).join(';'));
+        const blob = new Blob(["\ufeff" + lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'dashboard_' + String(s.period || 'todo').replace(/\s+/g, '_').replace(/\//g, '-') + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(a.href); }, 500);
+    }
+
+    function exportPdfPrint() {
+        const s = lastSummary || {};
+        const k = s.kpis || {};
+        const w = window.open('', '_blank');
+        if (!w) return;
+        const logoUrl = "{{ url_for('static', filename='images/zentra-consultora-horizontal.png.png') }}";
+        const exportedAt = new Date();
+        const exportedAtLabel = exportedAt.toLocaleString('es-AR');
+        const chart1 = (_salesExpensesChart && typeof _salesExpensesChart.toBase64Image === 'function') ? _salesExpensesChart.toBase64Image() : '';
+        const chart2 = (_topExpenseCatsChart && typeof _topExpenseCatsChart.toBase64Image === 'function') ? _topExpenseCatsChart.toBase64Image() : '';
+        const html = ''
+            + '<!doctype html><html lang="es"><head><meta charset="utf-8" />'
+            + '<title>Exportar dashboard</title>'
+            + '<style>body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:#111}h1{font-size:18px;margin:0 0 6px 0}p{margin:0 0 14px 0;color:#555;font-size:12px}.muted{color:#666;font-size:11px}.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 18px 0}.card{border:1px solid #e5e7eb;border-radius:12px;padding:10px}.card .t{font-size:11px;color:#6b7280;margin:0}.card .v{font-size:16px;font-weight:700;margin:6px 0 0 0}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.img{border:1px solid #e5e7eb;border-radius:12px;padding:10px}.img img{width:100%;height:auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #e5e7eb;padding:8px;text-align:left}th{background:#f9fafb}td.num{text-align:right}</style>'
+            + '</head><body>'
+            + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">'
+            + '  <div>'
+            + '    <h1>Informe de Dashboard</h1>'
+            + '    <p>Período: ' + String(s.period || '—') + '</p>'
+            + '    <p class="muted">Exportado: ' + exportedAtLabel + '</p>'
+            + '  </div>'
+            + '  <img src="' + logoUrl + '" alt="Zentral" style="height:38px;object-fit:contain" />'
+            + '</div>'
+            + '<div class="kpis">'
+            + '  <div class="card"><p class="t">Ventas del período</p><p class="v">' + formatearMoneda(parseFloat(k.totalSales || 0)) + '</p></div>'
+            + '  <div class="card"><p class="t">Gastos del período</p><p class="v">' + formatearMoneda(parseFloat(k.totalExpenses || 0)) + '</p></div>'
+            + '  <div class="card"><p class="t">Resultado estimado</p><p class="v">' + formatearMoneda(parseFloat(k.estimatedResult || 0)) + '</p></div>'
+            + '  <div class="card"><p class="t">Stock valorizado</p><p class="v">' + formatearMoneda(parseFloat(k.inventoryValue || 0)) + '</p></div>'
+            + '  <div class="card"><p class="t">Productos con alerta</p><p class="v">' + String(k.lowStockProducts || 0) + '</p></div>'
+            + '  <div class="card"><p class="t">Clientes deudores</p><p class="v">' + String(k.debtorsCount || 0) + '</p></div>'
+            + '</div>'
+            + '<div class="row">'
+            + '  <div class="img">' + (chart1 ? ('<div class="muted" style="margin:0 0 6px 0">Ventas vs Gastos</div><img src="' + chart1 + '" />') : '<div class="muted">(Gráfico no disponible)</div>') + '</div>'
+            + '  <div class="img">' + (chart2 ? ('<div class="muted" style="margin:0 0 6px 0">Top categorías de gasto</div><img src="' + chart2 + '" />') : '<div class="muted">(Gráfico no disponible)</div>') + '</div>'
+            + '</div>'
+            + '<p class="muted" style="margin-top:14px">Informe generado por Zentral – Zentra Consultora</p>'
+            + '<script>window.onload=function(){window.print();}<\/script>'
+            + '</body></html>';
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+    }
+
+    if (dashRange && window.flatpickr) {
+        flatpickr(dashRange, {
+            mode: 'range',
+            dateFormat: 'd/m/Y',
+            locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es',
+            allowInput: false,
+            onChange: function (selectedDates) {
+                if (Array.isArray(selectedDates) && selectedDates.length === 2) calcAndRender();
+            },
+            onClose: function (selectedDates) {
+                if (Array.isArray(selectedDates) && selectedDates.length === 2) calcAndRender();
+            }
+        });
+        dashRange.addEventListener('change', calcAndRender);
+    }
+
+    if (btnExport) btnExport.addEventListener('click', function () { openExport(); });
+    if (btnCloseExport) btnCloseExport.addEventListener('click', function () { closeExport(); });
+    if (btnCancelExport) btnCancelExport.addEventListener('click', function () { closeExport(); });
+    if (btnExportXls) btnExportXls.addEventListener('click', function () { exportCsv(); closeExport(); });
+    if (btnExportPdf) btnExportPdf.addEventListener('click', function () { exportPdfPrint(); closeExport(); });
+    if (modalExport) {
+        modalExport.addEventListener('click', function (e) {
+            const target = e.target;
+            if (target && target === modalExport.firstElementChild) closeExport();
+        });
+    }
+
+    if (kpiWrap) {
+        kpiWrap.addEventListener('click', function (e) {
+            const card = e.target.closest('[data-href]');
+            if (!card) return;
+            const href = card.getAttribute('data-href');
+            if (href) window.location.href = href;
+        });
+    }
+
+    window.addEventListener('storage', function () {
+        calcAndRender();
+    });
+
+    calcAndRender();
+});
+</script>
+{% endblock %}
+{% endblock %}

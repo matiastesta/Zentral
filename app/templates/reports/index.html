@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Reportes{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Reportes y Análisis</h1>
+    <p class="mt-1 text-sm text-gray-600">Analiza el rendimiento financiero de tu negocio con gráficos y exportaciones.</p>
+</div>
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <!-- Ingresos vs Gastos -->
+    <div class="p-5 bg-white rounded-lg shadow">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-medium text-gray-900">Ingresos vs Gastos</h2>
+            <button class="inline-flex items-center px-3 py-1 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
+                <i class="fas fa-file-download mr-2"></i> Exportar
+            </button>
+        </div>
+        <div class="h-64 flex items-center justify-center text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">
+            Gráfico de ingresos vs gastos (placeholder)
+        </div>
+    </div>
+
+    <!-- Top categorías -->
+    <div class="p-5 bg-white rounded-lg shadow">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-medium text-gray-900">Top categorías de venta</h2>
+        </div>
+        <div class="h-64 flex items-center justify-center text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">
+            Gráfico de categorías (placeholder)
+        </div>
+    </div>
+</div>
+
+<div class="mt-6 p-5 bg-white rounded-lg shadow">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-medium text-gray-900">Exportaciones</h2>
+    </div>
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <button class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+            <i class="fas fa-file-excel mr-2 text-green-600"></i> Exportar a Excel
+        </button>
+        <button class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+            <i class="fas fa-file-pdf mr-2 text-red-600"></i> Exportar a PDF
+        </button>
+        <button class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+            <i class="fas fa-envelope mr-2 text-blue-600"></i> Enviar por email
+        </button>
+    </div>
+</div>
+{% endblock %}

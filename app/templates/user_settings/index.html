@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}Configuración de Usuario{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Configuración de Usuario y Permisos</h1>
+    <p class="mt-1 text-sm text-gray-600">Administra los datos del negocio, los usuarios internos y los permisos por módulo.</p>
+</div>
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <!-- Datos del negocio / cuenta -->
+    <div class="p-5 bg-white rounded-lg shadow">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Datos del negocio</h2>
+        <form class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Nombre del negocio</label>
+                <input type="text" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Zentral Market">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Logo</label>
+                <input type="file" class="mt-1 block w-full text-sm text-gray-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Rubro</label>
+                <select class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option>Retail / Tienda</option>
+                    <option>Gastronomía</option>
+                    <option>Servicios profesionales</option>
+                    <option>Salud / Consultorios</option>
+                    <option>Otro</option>
+                </select>
+            </div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="contacto@tu-negocio.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Teléfono</label>
+                    <input type="text" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: +54 11 ...">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Dirección fiscal</label>
+                <input type="text" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Calle, número, ciudad, país">
+            </div>
+            <button type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                Guardar datos
+            </button>
+        </form>
+    </div>
+
+    <!-- Gestión de usuarios y permisos -->
+    <div class="p-5 bg-white rounded-lg shadow space-y-4">
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-medium text-gray-900">Usuarios y roles</h2>
+            <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                <i class="fas fa-user-plus mr-2"></i> Nuevo usuario
+            </button>
+        </div>
+        <p class="text-xs text-gray-500">Define qué puede ver y hacer cada usuario dentro de Zentral. Los permisos son por módulo/página.</p>
+
+        <div class="bg-blue-50 border border-blue-100 text-xs text-blue-800 rounded-md p-3 flex items-start gap-2">
+            <i class="fas fa-shield-alt mt-0.5"></i>
+            <p><strong>Zentra Admin:</strong> existe siempre un usuario administrador master de soporte (Zentra) con acceso completo. Esta cuenta no es editable desde aquí.</p>
+        </div>
+
+        <div class="overflow-hidden border border-gray-200 rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200 text-xs">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Dashboard</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Ventas</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Egresos</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Inventario</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Clientes</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Proveedores</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Informes</th>
+                        <th class="px-3 py-2"></th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for user in users %}
+                    <tr>
+                        <td class="px-3 py-2 text-gray-900">{{ user.name }}</td>
+                        <td class="px-3 py-2 text-gray-500">{{ user.role }}</td>
+                        <td class="px-3 py-2 text-center"><input type="checkbox" checked></td>
+                        <td class="px-3 py-2 text-center"><input type="checkbox" checked></td>
+                        <td class="px-3 py-2 text-center"><input type="checkbox"></td>
+                        <td class="px-3 py-2 text-center"><input type="checkbox"></td>
+                        <td class="px-3 py-2 text-center"><input type="checkbox"></td>
+                        <td class="px-3 py-2 text-center"><input type="checkbox"></td>
+                        <td class="px-3 py-2 text-right text-gray-500 text-xs">Editar</td>
+                        <td class="px-3 py-2 text-right text-red-500 text-xs">Eliminar</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="px-3 py-4 text-center text-gray-500">Todavía no hay usuarios cargados. Agrega tu primer usuario con permisos personalizados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

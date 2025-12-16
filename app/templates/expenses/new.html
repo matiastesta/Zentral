@@ -1,0 +1,1068 @@
+{% extends 'base.html' %}
+{% block title %}Nuevo gasto{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <div class="flex items-start justify-between gap-3">
+        <div>
+            <h1 id="titulo-egreso" class="text-2xl font-bold text-gray-900">Nuevo gasto</h1>
+            <p class="mt-1 text-sm text-gray-600">Cargá un egreso con categoría, proveedor y forma de pago. Vista simulada.</p>
+        </div>
+        <a href="{{ url_for('expenses.index') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+            <i class="fas fa-arrow-left mr-2"></i> Volver al historial
+        </a>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow border border-gray-200">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Datos del egreso</h2>
+            <p class="text-xs text-gray-500">Se guarda en el navegador (localStorage). No afecta la base de datos.</p>
+        </div>
+        <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700">Simulado</span>
+    </div>
+
+    <div class="p-4 space-y-4">
+        <input id="egreso-id" type="hidden" value="">
+
+        <div class="grid grid-cols-1 lg:grid-cols-6 gap-3">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Fecha</label>
+                <input id="egreso-fecha" type="date" class="w-full px-3 py-2 text-sm border rounded-md" value="{{ today }}">
+            </div>
+            <div class="lg:col-span-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Categoría</label>
+                <select id="egreso-categoria" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                    <option value="Servicios públicos">💡 Servicios públicos</option>
+                    <option value="Gastos operativos">🧾 Gastos operativos</option>
+                    <option value="Arriendo">🏠 Arriendo</option>
+                    <option value="Nómina">🧑‍💼 Nómina</option>
+                    <option value="Transportes">🚚 Transportes</option>
+                    <option value="Mantenimiento y reparaciones">🛠️ Mantenimiento y reparaciones</option>
+                    <option value="Muebles, equipos o maquinarias">🪑 Muebles, equipos o maquinarias</option>
+                    <option value="Otro">🏷️ Otro</option>
+                </select>
+                <div class="mt-2 flex flex-col gap-2">
+                    <div class="text-[11px] text-gray-500">
+                        ℹ️ Las compras que ingresan a inventario deben registrarse desde el módulo de Inventario.
+                    </div>
+                    <a href="{{ url_for('inventory.index') }}" class="inline-flex items-center justify-center px-3 py-2 text-[11px] font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 w-full sm:w-max">
+                        <i class="fas fa-boxes mr-2 text-gray-500"></i> Ir a Inventario
+                    </a>
+                </div>
+            </div>
+            <div id="wrap-egreso-categoria-otro" class="lg:col-span-2 hidden">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Especificar categoría</label>
+                <input id="egreso-categoria-otro" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Publicidad">
+                <div class="mt-2 flex items-center gap-2">
+                    <input id="egreso-categoria-guardar" type="checkbox" class="rounded">
+                    <label for="egreso-categoria-guardar" class="text-xs text-gray-600">Guardar para futuros usos</label>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Valor ($)</label>
+                <input id="egreso-valor" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: 12000">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-6 gap-3">
+            <div class="lg:col-span-3">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Nota</label>
+                <input id="egreso-nota" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Observación del egreso">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Forma de pago</label>
+                <select id="egreso-forma-pago" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                    <option value="Efectivo">💵 Efectivo</option>
+                    <option value="Transferencia">🏦 Transferencia</option>
+                    <option value="Débito">💳 Débito</option>
+                    <option value="Crédito">💳 Crédito</option>
+                </select>
+            </div>
+            <div id="wrap-egreso-proveedor" class="lg:col-span-2">
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor</label>
+                    <a id="link-crear-proveedor" href="{{ url_for('suppliers.new') }}" class="text-[11px] text-blue-600 hover:text-blue-800">Crear proveedor</a>
+                </div>
+                <div class="relative" id="wrap-egreso-proveedor-autocomplete">
+                    <input id="egreso-proveedor-input" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="🚚 Buscar y seleccionar proveedor" autocomplete="off">
+                    <input id="egreso-proveedor-id" type="hidden" value="">
+                    <div id="egreso-proveedor-dd" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden"></div>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">Tip: escribí para buscar. Si no existe, crealo en su legajo y volvés con el proveedor seleccionado.</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-6 gap-3">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
+                <select id="egreso-tipo" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                    <option value="Variable">Variable</option>
+                    <option value="Fijo">Fijo</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Frecuencia</label>
+                <select id="egreso-frecuencia" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                    <option value="Único">Único</option>
+                    <option value="Mensual">Mensual</option>
+                    <option value="Eventual">Eventual</option>
+                </select>
+            </div>
+            <div class="lg:col-span-4">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Adjuntar comprobante (opcional)</label>
+                <input id="egreso-comprobante" type="file" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                <p class="mt-1 text-xs text-gray-500">Se guardan solo metadatos en modo dummy.</p>
+            </div>
+        </div>
+
+        <div id="panel-campos-personalizados" class="hidden border rounded-lg p-4 bg-gray-50">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-900">Campos personalizados</h3>
+                    <p class="text-xs text-gray-500">Agregá pares clave/valor para adaptar este gasto a tu negocio.</p>
+                </div>
+                <button id="btn-add-campo" type="button" class="text-[11px] text-blue-600 hover:text-blue-800">Agregar campo</button>
+            </div>
+            <div id="campos-wrap" class="mt-3 space-y-2"></div>
+        </div>
+
+        <div id="panel-nomina" class="hidden border rounded-lg p-4 bg-gray-50">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-900">Nómina / Pago de empleados</h3>
+                    <p class="text-xs text-gray-500">Campos obligatorios para registrar pagos de sueldos, adelantos o extras.</p>
+                </div>
+                <span class="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">Categoría especial</span>
+            </div>
+
+            <div class="mt-3 grid grid-cols-1 lg:grid-cols-6 gap-3">
+                <div class="lg:col-span-3">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Empleado</label>
+                        <button id="btn-crear-empleado" type="button" class="text-[11px] text-blue-600 hover:text-blue-800">Crear empleado</button>
+                    </div>
+                    <select id="egreso-empleado" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                        <option value="">— Seleccionar —</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">Se guarda en el navegador (dummy).</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Período (desde)</label>
+                    <input id="egreso-periodo-desde" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Período (hasta)</label>
+                    <input id="egreso-periodo-hasta" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Tipo de pago</label>
+                    <select id="egreso-tipo-pago" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                        <option>Sueldo</option>
+                        <option>Adelanto</option>
+                        <option>Bono</option>
+                        <option>Horas extra</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="wrap-egreso-empleado-nuevo" class="mt-3 hidden space-y-3 border rounded-lg p-4 bg-white">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-900">Alta de empleado</h4>
+                        <p class="text-xs text-gray-500">Separado por datos obligatorios y complementarios.</p>
+                    </div>
+                    <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700">Simulado</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+                        <input id="empleado-nombre" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Apellido</label>
+                        <input id="empleado-apellido" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de incorporación</label>
+                        <input id="empleado-incorporo" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Forma de pago habitual</label>
+                        <select id="empleado-forma-pago" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option>Efectivo</option>
+                            <option>Transferencia</option>
+                            <option>Débito</option>
+                            <option>Crédito</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Tipo de contratación</label>
+                        <select id="empleado-contrato" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option>Fijo</option>
+                            <option>Eventual</option>
+                            <option>Freelance / por horas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <button id="btn-toggle-empleado-comp" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">Datos complementarios</button>
+                </div>
+
+                <div id="empleado-comp" class="hidden border rounded-lg p-4 bg-gray-50 space-y-3">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de nacimiento</label>
+                            <input id="empleado-nacimiento" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Documento / ID</label>
+                            <input id="empleado-doc" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Teléfono</label>
+                            <input id="empleado-tel" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                            <input id="empleado-email" type="email" class="w-full px-3 py-2 text-sm border rounded-md">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Dirección</label>
+                            <input id="empleado-direccion" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Puesto / rol</label>
+                            <input id="empleado-rol" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Salario de referencia</label>
+                            <input id="empleado-salario" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Notas internas</label>
+                            <input id="empleado-notas" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col md:flex-row gap-2 justify-end">
+                    <button id="btn-cancelar-empleado" type="button" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50">Cancelar</button>
+                    <button id="btn-guardar-empleado" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Guardar empleado</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row gap-2 justify-end">
+            <a href="{{ url_for('expenses.index') }}" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-center">Cancelar</a>
+            <button id="btn-guardar-egreso" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Guardar egreso (dummy)</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const titulo = document.getElementById('titulo-egreso');
+
+    const inputId = document.getElementById('egreso-id');
+    const inputFecha = document.getElementById('egreso-fecha');
+    const selectCategoria = document.getElementById('egreso-categoria');
+    const wrapOtro = document.getElementById('wrap-egreso-categoria-otro');
+    const inputOtro = document.getElementById('egreso-categoria-otro');
+    const checkGuardarCategoria = document.getElementById('egreso-categoria-guardar');
+    const inputValor = document.getElementById('egreso-valor');
+    const inputNota = document.getElementById('egreso-nota');
+    const selectPago = document.getElementById('egreso-forma-pago');
+    const wrapProveedor = document.getElementById('wrap-egreso-proveedor');
+    const linkCrearProveedor = document.getElementById('link-crear-proveedor');
+    const inputProveedor = document.getElementById('egreso-proveedor-input');
+    const inputProveedorId = document.getElementById('egreso-proveedor-id');
+    const ddProveedor = document.getElementById('egreso-proveedor-dd');
+
+    const selectTipo = document.getElementById('egreso-tipo');
+    const selectFrecuencia = document.getElementById('egreso-frecuencia');
+    const inputComprobante = document.getElementById('egreso-comprobante');
+
+    const panelCampos = document.getElementById('panel-campos-personalizados');
+    const btnAddCampo = document.getElementById('btn-add-campo');
+    const camposWrap = document.getElementById('campos-wrap');
+
+    const panelNomina = document.getElementById('panel-nomina');
+    const selectEmpleado = document.getElementById('egreso-empleado');
+    const btnCrearEmpleado = document.getElementById('btn-crear-empleado');
+    const wrapEmpleadoNuevo = document.getElementById('wrap-egreso-empleado-nuevo');
+
+    const inputPeriodoDesde = document.getElementById('egreso-periodo-desde');
+    const inputPeriodoHasta = document.getElementById('egreso-periodo-hasta');
+    const selectTipoPagoNomina = document.getElementById('egreso-tipo-pago');
+
+    const empleadoNombre = document.getElementById('empleado-nombre');
+    const empleadoApellido = document.getElementById('empleado-apellido');
+    const empleadoIncorporo = document.getElementById('empleado-incorporo');
+    const empleadoFormaPago = document.getElementById('empleado-forma-pago');
+    const empleadoContrato = document.getElementById('empleado-contrato');
+
+    const btnToggleEmpleadoComp = document.getElementById('btn-toggle-empleado-comp');
+    const panelEmpleadoComp = document.getElementById('empleado-comp');
+    const empleadoNacimiento = document.getElementById('empleado-nacimiento');
+    const empleadoDoc = document.getElementById('empleado-doc');
+    const empleadoTel = document.getElementById('empleado-tel');
+    const empleadoEmail = document.getElementById('empleado-email');
+    const empleadoDireccion = document.getElementById('empleado-direccion');
+    const empleadoRol = document.getElementById('empleado-rol');
+    const empleadoSalario = document.getElementById('empleado-salario');
+    const empleadoNotas = document.getElementById('empleado-notas');
+
+    const btnCancelarEmpleado = document.getElementById('btn-cancelar-empleado');
+    const btnGuardarEmpleado = document.getElementById('btn-guardar-empleado');
+
+    const btnGuardar = document.getElementById('btn-guardar-egreso');
+
+    const baseListUrl = "{{ url_for('expenses.index') }}";
+    const suppliersNewUrl = "{{ url_for('suppliers.new') }}";
+
+    function parseNumeroSeguro(v) {
+        const n = parseFloat(String(v || '').replace(',', '.'));
+        return isNaN(n) ? 0 : n;
+    }
+
+    function isPromise(x) {
+        return !!x && typeof x.then === 'function';
+    }
+
+    function leerEgresos() {
+        try {
+            if (window.StorageService && typeof window.StorageService.getExpenses === 'function') {
+                const res = window.StorageService.getExpenses();
+                return res;
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            const raw = window.localStorage.getItem('egresos_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function guardarEgresos(arr) {
+        try {
+            if (window.StorageService && typeof window.StorageService.saveExpenses === 'function') {
+                return window.StorageService.saveExpenses(Array.isArray(arr) ? arr : []);
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            window.localStorage.setItem('egresos_dummy', JSON.stringify(arr));
+        } catch (e) {
+            // noop
+        }
+    }
+
+    function leerEmpleados() {
+        try {
+            if (window.StorageService && typeof window.StorageService.getAdapter === 'function') {
+                const a = window.StorageService.getAdapter();
+                if (a && typeof a.getEmployees === 'function') {
+                    const res = a.getEmployees();
+                    return res;
+                }
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            const raw = window.localStorage.getItem('empleados_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function guardarEmpleados(arr) {
+        try {
+            if (window.StorageService && typeof window.StorageService.getAdapter === 'function') {
+                const a = window.StorageService.getAdapter();
+                if (a && typeof a.saveEmployees === 'function') {
+                    return a.saveEmployees(Array.isArray(arr) ? arr : []);
+                }
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            window.localStorage.setItem('empleados_dummy', JSON.stringify(arr));
+        } catch (e) {
+            // noop
+        }
+    }
+
+    function leerCategoriasPersonalizadas() {
+        try {
+            if (window.StorageService && typeof window.StorageService.getAdapter === 'function') {
+                const a = window.StorageService.getAdapter();
+                if (a && typeof a.getExpenseCategories === 'function') {
+                    const res = a.getExpenseCategories();
+                    return res;
+                }
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            const raw = window.localStorage.getItem('expense_categories_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function guardarCategoriasPersonalizadas(arr) {
+        try {
+            if (window.StorageService && typeof window.StorageService.getAdapter === 'function') {
+                const a = window.StorageService.getAdapter();
+                if (a && typeof a.saveExpenseCategories === 'function') {
+                    return a.saveExpenseCategories(Array.isArray(arr) ? arr : []);
+                }
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            window.localStorage.setItem('expense_categories_dummy', JSON.stringify(arr));
+        } catch (e) {
+            // noop
+        }
+    }
+
+    function leerProveedores() {
+        try {
+            if (window.StorageService && typeof window.StorageService.getSuppliers === 'function') {
+                const res = window.StorageService.getSuppliers();
+                return res;
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            const raw = window.localStorage.getItem('suppliers_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function guardarProveedores(obj) {
+        try {
+            if (window.StorageService && typeof window.StorageService.saveSuppliers === 'function') {
+                return window.StorageService.saveSuppliers(Array.isArray(obj) ? obj : []);
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            window.localStorage.setItem('suppliers_dummy', JSON.stringify(obj));
+        } catch (e) {
+            // noop
+        }
+    }
+
+    function setProveedorSeleccionado(id, name) {
+        if (inputProveedorId) inputProveedorId.value = id ? String(id) : '';
+        if (inputProveedor) inputProveedor.value = name ? String(name) : '';
+    }
+
+    function hideProveedorDd() {
+        if (!ddProveedor) return;
+        ddProveedor.classList.add('hidden');
+        ddProveedor.innerHTML = '';
+    }
+
+    function showProveedorDd(items, query) {
+        if (!ddProveedor) return;
+        ddProveedor.innerHTML = '';
+        const q = String(query || '').trim();
+        items.forEach(s => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'w-full text-left px-3 py-2 text-sm hover:bg-gray-50';
+            btn.textContent = String(s?.name || 'Proveedor');
+            btn.addEventListener('click', function () {
+                setProveedorSeleccionado(s?.id || '', s?.name || '');
+                hideProveedorDd();
+            });
+            ddProveedor.appendChild(btn);
+        });
+
+        if (q && !items.length) {
+            const empty = document.createElement('div');
+            empty.className = 'px-3 py-2 text-xs text-gray-500';
+            empty.textContent = 'Sin coincidencias.';
+            ddProveedor.appendChild(empty);
+        }
+
+        if (q) {
+            const hr = document.createElement('div');
+            hr.className = 'h-px bg-gray-100';
+            ddProveedor.appendChild(hr);
+
+            const btnCreate = document.createElement('button');
+            btnCreate.type = 'button';
+            btnCreate.className = 'w-full text-left px-3 py-2 text-sm text-blue-700 hover:bg-blue-50';
+            btnCreate.textContent = '+ Crear proveedor';
+            btnCreate.addEventListener('click', function () {
+                const returnTo = window.location.pathname + window.location.search;
+                window.location.href = suppliersNewUrl + '?return_to=' + encodeURIComponent(returnTo);
+            });
+            ddProveedor.appendChild(btnCreate);
+        }
+
+        if (!items.length && !q) {
+            hideProveedorDd();
+            return;
+        }
+        ddProveedor.classList.remove('hidden');
+    }
+
+    function actualizarProveedorDd() {
+        const q = (inputProveedor?.value || '').trim().toLowerCase();
+        if (!q) {
+            hideProveedorDd();
+            return;
+        }
+        const res = leerProveedores();
+        const apply = function (suppliers) {
+            const items = (Array.isArray(suppliers) ? suppliers : [])
+                .filter(s => (s?.status || 'Active') !== 'Discontinued')
+                .filter(s => String(s?.name || '').toLowerCase().includes(q))
+                .slice(0, 10);
+            showProveedorDd(items, q);
+        };
+        if (isPromise(res)) {
+            res.then(apply);
+        } else {
+            apply(res);
+        }
+    }
+
+    function leerAttachmentsMeta(filesInput) {
+        if (!filesInput || !filesInput.files) return [];
+        return Array.from(filesInput.files).map(f => ({
+            name: f.name,
+            size: f.size,
+            type: f.type,
+            lastModified: f.lastModified
+        }));
+    }
+
+    function poblarEmpleados() {
+        if (!selectEmpleado) return;
+        const res = leerEmpleados();
+        const apply = function (empleados) {
+            selectEmpleado.innerHTML = '<option value="">— Seleccionar —</option>';
+            (Array.isArray(empleados) ? empleados : []).forEach(e => {
+                const nombre = (e?.first_name || '').trim();
+                const apellido = (e?.last_name || '').trim();
+                const label = (nombre + ' ' + apellido).trim() || 'Empleado';
+                const opt = document.createElement('option');
+                opt.value = String(e?.id || '');
+                opt.textContent = label;
+                selectEmpleado.appendChild(opt);
+            });
+        };
+        if (isPromise(res)) res.then(apply);
+        else apply(res);
+    }
+
+    function poblarCategorias() {
+        if (!selectCategoria) return;
+        const base = [
+            'Servicios públicos',
+            'Gastos operativos',
+            'Arriendo',
+            'Nómina',
+            'Transportes',
+            'Mantenimiento y reparaciones',
+            'Muebles, equipos o maquinarias',
+            'Otro'
+        ];
+
+        const customRes = leerCategoriasPersonalizadas();
+        const finish = function (custom) {
+            const current = (selectCategoria.value || '').trim();
+            const all = base.slice();
+            (Array.isArray(custom) ? custom : []).forEach(c => {
+                const name = String(c || '').trim();
+                if (!name) return;
+                if (all.includes(name)) return;
+                all.splice(all.length - 1, 0, name);
+            });
+
+            const icon = {
+                'Servicios públicos': '💡',
+                'Gastos operativos': '🧾',
+                'Arriendo': '🏠',
+                'Nómina': '🧑‍💼',
+                'Transportes': '🚚',
+                'Mantenimiento y reparaciones': '🛠️',
+                'Muebles, equipos o maquinarias': '🪑',
+                'Otro': '🏷️'
+            };
+
+            selectCategoria.innerHTML = '';
+            all.forEach(c => {
+                const opt = document.createElement('option');
+                const ico = icon[c] || '';
+                opt.textContent = ico ? (ico + ' ' + c) : c;
+                opt.value = c;
+                selectCategoria.appendChild(opt);
+            });
+            if (current && all.includes(current)) selectCategoria.value = current;
+        };
+
+        if (isPromise(customRes)) customRes.then(finish);
+        else finish(customRes);
+    }
+
+    function crearCampoRow(key, value) {
+        const row = document.createElement('div');
+        row.className = 'grid grid-cols-1 md:grid-cols-7 gap-2 items-center';
+        row.innerHTML = `
+            <div class="md:col-span-3">
+                <input type="text" class="campo-key w-full px-3 py-2 text-sm border rounded-md" placeholder="Campo (ej: Centro de costo)" value="${key ? String(key).replace(/"/g, '&quot;') : ''}">
+            </div>
+            <div class="md:col-span-3">
+                <input type="text" class="campo-value w-full px-3 py-2 text-sm border rounded-md" placeholder="Valor" value="${value ? String(value).replace(/"/g, '&quot;') : ''}">
+            </div>
+            <div class="md:col-span-1 flex justify-end">
+                <button type="button" class="btn-del-campo text-xs font-medium text-red-600 hover:text-red-800">Quitar</button>
+            </div>
+        `;
+        const btnDel = row.querySelector('.btn-del-campo');
+        if (btnDel) {
+            btnDel.addEventListener('click', function() {
+                row.remove();
+            });
+        }
+        return row;
+    }
+
+    function leerCamposPersonalizadosDesdeUI() {
+        if (!camposWrap) return [];
+        const rows = Array.from(camposWrap.querySelectorAll('div'));
+        return rows
+            .map(r => {
+                const k = (r.querySelector('.campo-key')?.value || '').trim();
+                const v = (r.querySelector('.campo-value')?.value || '').trim();
+                if (!k && !v) return null;
+                return { key: k, value: v };
+            })
+            .filter(Boolean);
+    }
+
+    function aplicarVisibilidadPorCategoria() {
+        const categoria = (selectCategoria?.value || '').trim();
+        const esNomina = categoria === 'Nómina';
+        const esOtro = categoria === 'Otro';
+
+        if (wrapOtro) wrapOtro.classList.toggle('hidden', !esOtro);
+        if (panelNomina) panelNomina.classList.toggle('hidden', !esNomina);
+        if (wrapProveedor) wrapProveedor.classList.toggle('hidden', esNomina);
+        if (panelCampos) panelCampos.classList.toggle('hidden', !esOtro);
+    }
+
+    function cargarDesdeId(id) {
+        const res = leerEgresos();
+        const apply = function (egresos) {
+            const list = Array.isArray(egresos) ? egresos : [];
+            const found = list.find(x => String(x?.id) === String(id));
+            if (!found) return;
+
+            const categoriaRaw = (found.categoria === 'Compra de productos e insumos') ? 'Gastos operativos' : found.categoria;
+
+            if (titulo) titulo.textContent = 'Editar gasto';
+            if (inputId) inputId.value = String(found.id);
+            if (inputFecha) inputFecha.value = found.fecha || '';
+
+            if (selectCategoria) {
+            const categoriasBase = [
+                'Servicios públicos','Gastos operativos','Arriendo','Nómina','Transportes','Mantenimiento y reparaciones','Muebles, equipos o maquinarias','Otro'
+            ];
+            const esOtro = !categoriasBase.includes(categoriaRaw);
+            if (esOtro) {
+                selectCategoria.value = 'Otro';
+                if (wrapOtro) wrapOtro.classList.remove('hidden');
+                if (inputOtro) inputOtro.value = categoriaRaw;
+            } else {
+                selectCategoria.value = categoriaRaw;
+            }
+        }
+
+            aplicarVisibilidadPorCategoria();
+            poblarEmpleados();
+
+            if (inputValor) inputValor.value = String(parseNumeroSeguro(found.valor));
+            if (inputNota) inputNota.value = found.nota || '';
+            if (selectPago) selectPago.value = found.forma_pago || 'Efectivo';
+            if (selectTipo) selectTipo.value = found.tipo_gasto || 'Variable';
+            if (selectFrecuencia) selectFrecuencia.value = found.frecuencia || 'Único';
+            if (found.supplier_id) {
+                setProveedorSeleccionado(String(found.supplier_id), found.supplier_name || found.proveedor || '');
+            }
+            if (selectEmpleado) selectEmpleado.value = found.employee_id || '';
+            if (inputPeriodoDesde) inputPeriodoDesde.value = found.payroll_period_from || '';
+            if (inputPeriodoHasta) inputPeriodoHasta.value = found.payroll_period_to || '';
+            if (selectTipoPagoNomina) selectTipoPagoNomina.value = found.payroll_payment_type || 'Sueldo';
+
+            if (panelCampos && camposWrap) {
+                camposWrap.innerHTML = '';
+                const cf = Array.isArray(found.custom_fields) ? found.custom_fields : [];
+                cf.forEach(x => {
+                    camposWrap.appendChild(crearCampoRow(x?.key || '', x?.value || ''));
+                });
+            }
+        };
+        if (isPromise(res)) res.then(apply);
+        else apply(res);
+    }
+
+    function cargarParaDuplicar(id) {
+        const res = leerEgresos();
+        const apply = function (egresos) {
+            const list = Array.isArray(egresos) ? egresos : [];
+            const found = list.find(x => String(x?.id) === String(id));
+            if (!found) return;
+
+        const categoriaRaw = (found.categoria === 'Compra de productos e insumos') ? 'Gastos operativos' : found.categoria;
+
+            if (titulo) titulo.textContent = 'Nuevo gasto (duplicado)';
+            if (inputId) inputId.value = '';
+            if (inputFecha) inputFecha.value = '{{ today }}';
+
+        if (selectCategoria) {
+            const categoriasBase = [
+                'Servicios públicos','Gastos operativos','Arriendo','Nómina','Transportes','Mantenimiento y reparaciones','Muebles, equipos o maquinarias','Otro'
+            ];
+            const esOtro = !categoriasBase.includes(categoriaRaw);
+            if (esOtro) {
+                selectCategoria.value = 'Otro';
+                if (wrapOtro) wrapOtro.classList.remove('hidden');
+                if (inputOtro) inputOtro.value = categoriaRaw;
+            } else {
+                selectCategoria.value = categoriaRaw;
+            }
+        }
+
+        aplicarVisibilidadPorCategoria();
+
+        if (selectPago) selectPago.value = found.forma_pago || 'Efectivo';
+        if (selectTipo) selectTipo.value = found.tipo_gasto || 'Variable';
+        if (selectFrecuencia) selectFrecuencia.value = found.frecuencia || 'Único';
+
+            if (found.supplier_id) {
+                setProveedorSeleccionado(String(found.supplier_id), found.supplier_name || found.proveedor || '');
+            }
+        };
+        if (isPromise(res)) res.then(apply);
+        else apply(res);
+    }
+
+    function guardarDesdeForm() {
+        const id = (inputId?.value || '').trim() || String(Date.now());
+        const fecha = (inputFecha?.value || '').trim();
+        const categoria = (selectCategoria?.value || '').trim();
+        const categoriaOtro = (inputOtro?.value || '').trim();
+        const categoriaFinal = categoria === 'Otro' ? (categoriaOtro || 'Otro') : categoria;
+        const valor = parseNumeroSeguro(inputValor?.value);
+        const nota = (inputNota?.value || '').trim();
+        const formaPago = (selectPago?.value || '').trim();
+
+        const tipoGasto = (selectTipo?.value || 'Variable').trim();
+        const frecuencia = (selectFrecuencia?.value || 'Único').trim();
+        const customFields = leerCamposPersonalizadosDesdeUI();
+
+        const supplierId = (inputProveedorId?.value || '').trim();
+
+        let employeeId = '';
+        let employeeName = '';
+        let payrollPeriodFrom = '';
+        let payrollPeriodTo = '';
+        let payrollPaymentType = '';
+
+        if (categoria === 'Nómina') {
+            employeeId = (selectEmpleado?.value || '').trim();
+            const empleadosRes = leerEmpleados();
+            const resolveEmpleado = function (empleados) {
+                const list = Array.isArray(empleados) ? empleados : [];
+                const empFound = list.find(x => String(x?.id || '') === String(employeeId));
+                if (empFound) {
+                    employeeName = ((String(empFound?.first_name || '') + ' ' + String(empFound?.last_name || '')).trim());
+                }
+            };
+            if (isPromise(empleadosRes)) empleadosRes.then(resolveEmpleado);
+            else resolveEmpleado(empleadosRes);
+            payrollPeriodFrom = (inputPeriodoDesde?.value || '').trim();
+            payrollPeriodTo = (inputPeriodoHasta?.value || '').trim();
+            payrollPaymentType = (selectTipoPagoNomina?.value || 'Sueldo').trim();
+
+            if (!employeeId) {
+                alert('Seleccioná un empleado para registrar Nómina.');
+                return;
+            }
+            if (!payrollPeriodFrom || !payrollPeriodTo) {
+                alert('Completá el período de pago (desde / hasta).');
+                return;
+            }
+        }
+
+        if (categoria === 'Otro') {
+            const shouldSave = !!checkGuardarCategoria?.checked;
+            if (shouldSave) {
+                const name = (categoriaOtro || '').trim();
+                if (name) {
+                    const currentRes = leerCategoriasPersonalizadas();
+                    const apply = function (current) {
+                        const arr = Array.isArray(current) ? current : [];
+                        const exists = arr.some(x => String(x || '').trim().toLowerCase() === name.toLowerCase());
+                        if (!exists) {
+                            arr.push(name);
+                            const saveRes = guardarCategoriasPersonalizadas(arr);
+                            if (isPromise(saveRes)) saveRes.then(function () { poblarCategorias(); });
+                            else poblarCategorias();
+                        }
+                    };
+                    if (isPromise(currentRes)) currentRes.then(apply);
+                    else apply(currentRes);
+                }
+            }
+        }
+
+        const receipt = leerAttachmentsMeta(inputComprobante);
+
+        const basePayload = {
+            id,
+            fecha,
+            categoria: categoriaFinal,
+            valor,
+            nota,
+            forma_pago: formaPago,
+            tipo_gasto: tipoGasto,
+            frecuencia,
+            comprobante: receipt,
+            custom_fields: customFields,
+            proveedor: '',
+            supplier_id: supplierId || '',
+            supplier_name: '',
+            employee_id: employeeId,
+            employee_name: employeeName,
+            payroll_period_from: payrollPeriodFrom,
+            payroll_period_to: payrollPeriodTo,
+            payroll_payment_type: payrollPaymentType
+        };
+
+        const suppliersRes = leerProveedores();
+        const finalize = function (suppliers) {
+            const list = Array.isArray(suppliers) ? suppliers : [];
+            const supplierFound = list.find(s => String(s?.id) === String(supplierId));
+            const supplierName = supplierFound ? (supplierFound.name || '') : '';
+            const payload = {
+                ...basePayload,
+                proveedor: supplierName || '',
+                supplier_name: supplierName || ''
+            };
+
+            try {
+                if (window.StorageService && typeof window.StorageService.upsertExpense === 'function') {
+                    const res = window.StorageService.upsertExpense(payload);
+                    if (isPromise(res)) {
+                        res.then(function () { window.location.href = baseListUrl; });
+                        return;
+                    }
+                    window.location.href = baseListUrl;
+                    return;
+                }
+            } catch (e) {
+                // fallback
+            }
+
+            const egRes = leerEgresos();
+            const applySave = function (egresos) {
+                const arr = Array.isArray(egresos) ? egresos : [];
+                const idx = arr.findIndex(x => String(x?.id) === String(id));
+                if (idx >= 0) arr[idx] = payload;
+                else arr.push(payload);
+                const saveRes = guardarEgresos(arr);
+                if (isPromise(saveRes)) saveRes.then(function () { window.location.href = baseListUrl; });
+                else window.location.href = baseListUrl;
+            };
+            if (isPromise(egRes)) egRes.then(applySave);
+            else applySave(egRes);
+        };
+
+        if (isPromise(suppliersRes)) suppliersRes.then(finalize);
+        else finalize(suppliersRes);
+    }
+
+    if (selectCategoria) {
+        selectCategoria.addEventListener('change', function() {
+            aplicarVisibilidadPorCategoria();
+        });
+    }
+
+    if (btnAddCampo && camposWrap) {
+        btnAddCampo.addEventListener('click', function() {
+            camposWrap.appendChild(crearCampoRow('', ''));
+        });
+    }
+
+    if (linkCrearProveedor) {
+        linkCrearProveedor.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            const returnTo = window.location.pathname + window.location.search;
+            window.location.href = suppliersNewUrl + '?return_to=' + encodeURIComponent(returnTo);
+        });
+    }
+
+    if (inputProveedor) {
+        inputProveedor.addEventListener('input', function () {
+            if (inputProveedorId) inputProveedorId.value = '';
+            actualizarProveedorDd();
+        });
+        inputProveedor.addEventListener('focus', function () {
+            actualizarProveedorDd();
+        });
+        inputProveedor.addEventListener('blur', function () {
+            window.setTimeout(function () {
+                hideProveedorDd();
+            }, 120);
+        });
+    }
+
+    document.addEventListener('click', function (ev) {
+        const wrap = document.getElementById('wrap-egreso-proveedor-autocomplete');
+        if (!wrap) return;
+        if (!wrap.contains(ev.target)) hideProveedorDd();
+    });
+
+    function abrirPanelEmpleado(abrir) {
+        if (!wrapEmpleadoNuevo) return;
+        if (abrir) {
+            wrapEmpleadoNuevo.classList.remove('hidden');
+            if (empleadoNombre) empleadoNombre.focus();
+        } else {
+            wrapEmpleadoNuevo.classList.add('hidden');
+        }
+    }
+
+    function validarEmpleadoNuevo() {
+        const n = (empleadoNombre?.value || '').trim();
+        const a = (empleadoApellido?.value || '').trim();
+        const h = (empleadoIncorporo?.value || '').trim();
+        const pm = (empleadoFormaPago?.value || '').trim();
+        const ct = (empleadoContrato?.value || '').trim();
+        if (!n || !a || !h || !pm || !ct) return false;
+        return true;
+    }
+
+    function guardarEmpleadoNuevo() {
+        if (!validarEmpleadoNuevo()) {
+            alert('Completá los campos obligatorios del empleado: Nombre, Apellido, Fecha de incorporación, Forma de pago habitual y Tipo de contratación.');
+            return;
+        }
+
+        const id = String(Date.now());
+        const payload = {
+            id,
+            first_name: (empleadoNombre?.value || '').trim(),
+            last_name: (empleadoApellido?.value || '').trim(),
+            hire_date: (empleadoIncorporo?.value || '').trim(),
+            default_payment_method: (empleadoFormaPago?.value || '').trim(),
+            contract_type: (empleadoContrato?.value || '').trim(),
+            birth_date: (empleadoNacimiento?.value || '').trim(),
+            document_id: (empleadoDoc?.value || '').trim(),
+            phone: (empleadoTel?.value || '').trim(),
+            email: (empleadoEmail?.value || '').trim(),
+            address: (empleadoDireccion?.value || '').trim(),
+            role: (empleadoRol?.value || '').trim(),
+            reference_salary: parseNumeroSeguro(empleadoSalario?.value),
+            notes: (empleadoNotas?.value || '').trim()
+        };
+
+        const arr = leerEmpleados();
+        arr.push(payload);
+        guardarEmpleados(arr);
+        poblarEmpleados();
+        if (selectEmpleado) selectEmpleado.value = String(id);
+        abrirPanelEmpleado(false);
+    }
+
+    if (btnCrearEmpleado) {
+        btnCrearEmpleado.addEventListener('click', function() {
+            abrirPanelEmpleado(true);
+        });
+    }
+
+    if (btnCancelarEmpleado) {
+        btnCancelarEmpleado.addEventListener('click', function() {
+            abrirPanelEmpleado(false);
+        });
+    }
+
+    if (btnGuardarEmpleado) {
+        btnGuardarEmpleado.addEventListener('click', function() {
+            guardarEmpleadoNuevo();
+        });
+    }
+
+    if (btnToggleEmpleadoComp && panelEmpleadoComp) {
+        btnToggleEmpleadoComp.addEventListener('click', function() {
+            panelEmpleadoComp.classList.toggle('hidden');
+        });
+    }
+
+    if (btnGuardar) {
+        btnGuardar.addEventListener('click', function() {
+            guardarDesdeForm();
+        });
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const returnedSupplierId = params.get('supplier_id');
+    const returnedSupplierName = params.get('supplier_name');
+    const id = params.get('id');
+    const duplicateId = params.get('duplicate_id');
+
+    poblarCategorias();
+    poblarEmpleados();
+    aplicarVisibilidadPorCategoria();
+
+    if (returnedSupplierId) {
+        setProveedorSeleccionado(returnedSupplierId, returnedSupplierName || '');
+    }
+
+    if (id) {
+        cargarDesdeId(id);
+    } else if (duplicateId) {
+        cargarParaDuplicar(duplicateId);
+    }
+});
+</script>
+{% endblock %}

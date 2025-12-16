@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+{% block title %}Empleados{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Empleados</h1>
+    <p class="mt-1 text-sm text-gray-600">Gestioná tu nómina y los datos administrativos de tu equipo (modo dummy).</p>
+</div>
+
+<div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">Total de empleados</p>
+        <p id="employees-total" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">Activos</p>
+        <p id="employees-active" class="mt-2 text-2xl font-semibold text-green-600">0</p>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">Altas recientes</p>
+        <p class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+    </div>
+</div>
+
+<div class="flex flex-col justify-between gap-2 mb-4 md:flex-row md:items-start">
+    <div class="flex-1">
+        <div class="flex flex-col gap-2">
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input id="employees-search" type="text" placeholder="Buscar por nombre, rol, documento o email" class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <select id="employees-status" class="w-full sm:w-48 px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Todos</option>
+                    <option value="Active">Activos</option>
+                    <option value="Inactive">Inactivos</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="flex gap-2 justify-end">
+        <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
+            <i class="fas fa-file-export mr-2"></i> Exportar
+        </button>
+        <a href="{{ url_for('employees.new') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+            <i class="fas fa-plus mr-2"></i> Nuevo empleado
+        </a>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Empleado</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Rol</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Contratación</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Forma de pago</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Ingreso</th>
+                <th class="px-4 py-3"></th>
+            </tr>
+        </thead>
+        <tbody id="employees-tbody" class="bg-white divide-y divide-gray-200">
+            <tr>
+                <td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay empleados registrados.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tbody = document.getElementById('employees-tbody');
+    const inputSearch = document.getElementById('employees-search');
+    const selectStatus = document.getElementById('employees-status');
+    const elTotal = document.getElementById('employees-total');
+    const elActive = document.getElementById('employees-active');
+
+    const editBaseUrl = "{{ url_for('employees.new') }}";
+
+    function leerEmpleados() {
+        try {
+            const raw = window.localStorage.getItem('empleados_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function guardarEmpleados(arr) {
+        try {
+            window.localStorage.setItem('empleados_dummy', JSON.stringify(arr));
+        } catch (e) {
+            // noop
+        }
+    }
+
+    function labelEstado(v) {
+        if (v === 'Inactive') return 'Inactivo';
+        return 'Activo';
+    }
+
+    function classEstado(v) {
+        if (v === 'Inactive') return 'text-yellow-700 bg-yellow-50';
+        return 'text-green-700 bg-green-50';
+    }
+
+    function render() {
+        if (!tbody) return;
+
+        const q = (inputSearch?.value || '').trim().toLowerCase();
+        const status = (selectStatus?.value || '').trim();
+
+        let list = leerEmpleados();
+
+        if (status) {
+            list = list.filter(e => String(e?.status || 'Active') === status);
+        }
+
+        if (q) {
+            list = list.filter(e => {
+                const hay = [
+                    e?.first_name,
+                    e?.last_name,
+                    e?.role,
+                    e?.document_id,
+                    e?.email,
+                    e?.phone
+                ].map(x => String(x || '').toLowerCase()).join(' ');
+                return hay.includes(q);
+            });
+        }
+
+        if (elTotal) elTotal.textContent = String(leerEmpleados().length);
+        if (elActive) elActive.textContent = String(leerEmpleados().filter(e => String(e?.status || 'Active') === 'Active').length);
+
+        tbody.innerHTML = '';
+        if (!list.length) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados.</td>';
+            tbody.appendChild(tr);
+            return;
+        }
+
+        list.sort((a, b) => String(a?.last_name || '').localeCompare(String(b?.last_name || '')));
+        list.forEach(e => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+
+            const fullName = ((String(e?.first_name || '') + ' ' + String(e?.last_name || '')).trim()) || 'Empleado';
+            const statusLabel = labelEstado(e?.status || 'Active');
+            const statusClass = classEstado(e?.status || 'Active');
+
+            tr.innerHTML = `
+                <td class="px-4 py-3 text-sm text-gray-900">
+                    <div class="flex items-center justify-between gap-2">
+                        <span>${fullName}</span>
+                        <span class="text-[11px] px-2 py-0.5 rounded-full ${statusClass}">${statusLabel}</span>
+                    </div>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-500">${e?.role || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-500">${e?.contract_type || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-500">${e?.default_payment_method || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-500">${e?.hire_date || '-'}</td>
+                <td class="px-4 py-3 text-sm text-right">
+                    <div class="inline-flex gap-3">
+                        <button type="button" class="btn-edit text-blue-600 hover:text-blue-800 text-xs font-medium" data-id="${e?.id}">Editar</button>
+                        <button type="button" class="btn-del text-red-600 hover:text-red-800 text-xs font-medium" data-id="${e?.id}">Eliminar</button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    if (tbody) {
+        tbody.addEventListener('click', function (ev) {
+            const btnEdit = ev.target.closest('.btn-edit');
+            if (btnEdit) {
+                const id = btnEdit.getAttribute('data-id');
+                if (id) window.location.href = editBaseUrl + '?id=' + encodeURIComponent(id);
+                return;
+            }
+
+            const btnDel = ev.target.closest('.btn-del');
+            if (btnDel) {
+                const id = btnDel.getAttribute('data-id');
+                if (!id) return;
+                const ok = confirm('¿Eliminar empleado? Esta acción no se puede deshacer (dummy).');
+                if (!ok) return;
+                const next = leerEmpleados().filter(e => String(e?.id) !== String(id));
+                guardarEmpleados(next);
+                render();
+            }
+        });
+    }
+
+    if (inputSearch) inputSearch.addEventListener('input', render);
+    if (selectStatus) selectStatus.addEventListener('change', render);
+
+    render();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,335 @@
+{% extends 'base.html' %}
+{% block title %}Nuevo proveedor{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <div class="flex items-start justify-between gap-3">
+        <div>
+            <h1 id="titulo-proveedor" class="text-2xl font-bold text-gray-900">Nuevo proveedor</h1>
+            <p class="mt-1 text-sm text-gray-600">Alta rápida con campos obligatorios y una sección de información complementaria (opcional).</p>
+        </div>
+        <a href="{{ url_for('suppliers.index') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+            <i class="fas fa-arrow-left mr-2"></i> Volver a Proveedores
+        </a>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow border border-gray-200">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Datos obligatorios</h2>
+            <p class="text-xs text-gray-500">Con estos datos ya podés usar el proveedor en Gastos. Guardado simulado en localStorage.</p>
+        </div>
+        <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700">Simulado</span>
+    </div>
+
+    <div class="p-4 space-y-4">
+        <input id="supplier-id" type="hidden" value="">
+
+        <div class="grid grid-cols-1 lg:grid-cols-6 gap-3">
+            <div class="lg:col-span-3">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Nombre del proveedor</label>
+                <input id="supplier-name" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Razón social o nombre comercial">
+            </div>
+            <div class="lg:col-span-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Tipo de proveedor</label>
+                <select id="supplier-type" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                    <option value="Services">Servicios</option>
+                    <option value="Products">Productos</option>
+                    <option value="Mixed">Mixto</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>
+                <select id="supplier-status" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                    <option value="Active">Activo</option>
+                    <option value="Inactive">Inactivo</option>
+                    <option value="Discontinued">Dado de baja</option>
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Categorías (multiselección)</label>
+            <div id="supplier-categories" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Servicios públicos" class="rounded"> <span>Servicios públicos</span></label>
+                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Compra de productos e insumos" class="rounded"> <span>Compra de productos e insumos</span></label>
+                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Arriendo" class="rounded"> <span>Arriendo</span></label>
+                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Nómina" class="rounded"> <span>Nómina</span></label>
+                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Transportes" class="rounded"> <span>Transportes</span></label>
+                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Domicilios y logística" class="rounded"> <span>Domicilios y logística</span></label>
+                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Mantenimiento y reparaciones" class="rounded"> <span>Mantenimiento y reparaciones</span></label>
+                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Muebles, equipos o maquinarias" class="rounded"> <span>Muebles, equipos o maquinarias</span></label>
+                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Otro" class="rounded"> <span>Otro</span></label>
+            </div>
+        </div>
+
+        <div class="pt-2">
+            <button id="btn-toggle-complementaria" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
+                Información complementaria
+            </button>
+        </div>
+
+        <div id="panel-complementaria" class="hidden border rounded-lg p-4 bg-gray-50 space-y-4">
+            <div>
+                <h3 class="text-sm font-semibold text-gray-900">Información administrativa</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Tipo de comprobante habitual</label>
+                        <select id="supplier-invoice-type" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="">—</option>
+                            <option>Factura A</option>
+                            <option>Factura B</option>
+                            <option>Factura C</option>
+                            <option>Ticket</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Forma de pago habitual</label>
+                        <select id="supplier-default-payment" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="">—</option>
+                            <option>Efectivo</option>
+                            <option>Transferencia</option>
+                            <option>Tarjeta</option>
+                            <option>Cuenta corriente</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Plazo de pago</label>
+                        <select id="supplier-payment-terms" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="">—</option>
+                            <option>Contado</option>
+                            <option>7 días</option>
+                            <option>15 días</option>
+                            <option>30 días</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-sm font-semibold text-gray-900">Información de contacto</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Persona de contacto</label>
+                        <input id="supplier-contact-person" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Teléfono</label>
+                        <input id="supplier-phone" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                        <input id="supplier-email" type="email" class="w-full px-3 py-2 text-sm border rounded-md">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Dirección</label>
+                        <input id="supplier-address" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Canal preferido</label>
+                        <select id="supplier-preferred-channel" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="">—</option>
+                            <option>WhatsApp</option>
+                            <option>Email</option>
+                            <option>Teléfono</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-sm font-semibold text-gray-900">Archivos y documentación</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Adjuntar archivos</label>
+                        <input id="supplier-attachments" type="file" multiple class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                        <p class="mt-1 text-xs text-gray-500">Se guardan solo metadatos en modo dummy.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Notas internas</label>
+                        <textarea id="supplier-notes" rows="3" class="w-full px-3 py-2 text-sm border rounded-md"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row gap-2 justify-end pt-2">
+            <a href="{{ url_for('suppliers.index') }}" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-center">Cancelar</a>
+            <button id="btn-guardar-proveedor" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Guardar proveedor (dummy)</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const baseListUrl = "{{ url_for('suppliers.index') }}";
+    const params = new URLSearchParams(window.location.search);
+    const returnTo = params.get('return_to');
+
+    const titulo = document.getElementById('titulo-proveedor');
+    const inputId = document.getElementById('supplier-id');
+    const inputName = document.getElementById('supplier-name');
+    const selectType = document.getElementById('supplier-type');
+    const selectStatus = document.getElementById('supplier-status');
+    const categoriesWrap = document.getElementById('supplier-categories');
+
+    const btnToggle = document.getElementById('btn-toggle-complementaria');
+    const panelComp = document.getElementById('panel-complementaria');
+
+    const invoiceType = document.getElementById('supplier-invoice-type');
+    const defaultPayment = document.getElementById('supplier-default-payment');
+    const paymentTerms = document.getElementById('supplier-payment-terms');
+
+    const contactPerson = document.getElementById('supplier-contact-person');
+    const phone = document.getElementById('supplier-phone');
+    const email = document.getElementById('supplier-email');
+    const address = document.getElementById('supplier-address');
+    const preferredChannel = document.getElementById('supplier-preferred-channel');
+
+    const attachments = document.getElementById('supplier-attachments');
+    const notes = document.getElementById('supplier-notes');
+
+    const btnGuardar = document.getElementById('btn-guardar-proveedor');
+
+    function leerSuppliers() {
+        try {
+            const raw = window.localStorage.getItem('suppliers_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function guardarSuppliers(arr) {
+        try {
+            window.localStorage.setItem('suppliers_dummy', JSON.stringify(arr));
+        } catch (e) {
+            // noop
+        }
+    }
+
+    function getSelectedCategories() {
+        if (!categoriesWrap) return [];
+        return Array.from(categoriesWrap.querySelectorAll('input[type="checkbox"]'))
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+    }
+
+    function setSelectedCategories(values) {
+        if (!categoriesWrap) return;
+        const set = new Set((values || []).map(String));
+        categoriesWrap.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.checked = set.has(String(cb.value));
+        });
+    }
+
+    function readAttachmentsMeta() {
+        if (!attachments || !attachments.files) return [];
+        return Array.from(attachments.files).map(f => ({
+            name: f.name,
+            size: f.size,
+            type: f.type,
+            lastModified: f.lastModified
+        }));
+    }
+
+    function cargarDesdeId(id) {
+        const list = leerSuppliers();
+        const found = list.find(s => String(s?.id) === String(id));
+        if (!found) return;
+
+        if (titulo) titulo.textContent = 'Editar proveedor';
+        if (inputId) inputId.value = String(found.id);
+        if (inputName) inputName.value = found.name || '';
+        if (selectType) selectType.value = found.supplier_type || 'Services';
+        if (selectStatus) selectStatus.value = found.status || 'Active';
+        setSelectedCategories(found.categories || []);
+
+        if (invoiceType) invoiceType.value = found.invoice_type || '';
+        if (defaultPayment) defaultPayment.value = found.default_payment_method || '';
+        if (paymentTerms) paymentTerms.value = found.payment_terms || '';
+
+        if (contactPerson) contactPerson.value = found.contact_person || '';
+        if (phone) phone.value = found.phone || '';
+        if (email) email.value = found.email || '';
+        if (address) address.value = found.address || '';
+        if (preferredChannel) preferredChannel.value = found.preferred_contact_channel || '';
+
+        if (notes) notes.value = found.notes || '';
+    }
+
+    function validarObligatorios() {
+        const name = (inputName?.value || '').trim();
+        const cats = getSelectedCategories();
+        if (!name) return false;
+        if (!cats.length) return false;
+        return true;
+    }
+
+    function guardarProveedor() {
+        if (!validarObligatorios()) {
+            alert('Completá los campos obligatorios: Nombre y al menos 1 categoría.');
+            return;
+        }
+
+        const list = leerSuppliers();
+        const id = (inputId?.value || '').trim() || String(Date.now());
+
+        const payload = {
+            id,
+            name: (inputName?.value || '').trim(),
+            supplier_type: (selectType?.value || 'Services').trim(),
+            categories: getSelectedCategories(),
+            status: (selectStatus?.value || 'Active').trim(),
+            invoice_type: (invoiceType?.value || '').trim(),
+            default_payment_method: (defaultPayment?.value || '').trim(),
+            payment_terms: (paymentTerms?.value || '').trim(),
+            contact_person: (contactPerson?.value || '').trim(),
+            phone: (phone?.value || '').trim(),
+            email: (email?.value || '').trim(),
+            address: (address?.value || '').trim(),
+            preferred_contact_channel: (preferredChannel?.value || '').trim(),
+            attachments: readAttachmentsMeta(),
+            notes: (notes?.value || '').trim()
+        };
+
+        const idx = list.findIndex(s => String(s?.id) === String(id));
+        if (idx >= 0) {
+            list[idx] = { ...list[idx], ...payload };
+        } else {
+            list.push(payload);
+        }
+        guardarSuppliers(list);
+
+        if (returnTo) {
+            const sep = returnTo.includes('?') ? '&' : '?';
+            const next = returnTo + sep + 'supplier_id=' + encodeURIComponent(String(id)) + '&supplier_name=' + encodeURIComponent(payload.name || '');
+            window.location.href = next;
+            return;
+        }
+        window.location.href = baseListUrl;
+    }
+
+    if (btnToggle && panelComp) {
+        btnToggle.addEventListener('click', function() {
+            panelComp.classList.toggle('hidden');
+        });
+    }
+
+    if (btnGuardar) {
+        btnGuardar.addEventListener('click', function() {
+            guardarProveedor();
+        });
+    }
+
+    const id = params.get('id');
+    if (id) {
+        cargarDesdeId(id);
+    }
+});
+</script>
+{% endblock %}
