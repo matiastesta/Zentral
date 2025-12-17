@@ -182,6 +182,19 @@
             return finalize(ensureArray(maybe));
         },
 
+        getEmployees: function () {
+            const a = this.getAdapter();
+            if (!a || typeof a.getEmployees !== 'function') return [];
+            const res = a.getEmployees();
+            return (res && typeof res.then === 'function') ? res.then(ensureArray) : ensureArray(res);
+        },
+
+        saveEmployees: function (arr) {
+            const a = this.getAdapter();
+            if (!a || typeof a.saveEmployees !== 'function') return;
+            return a.saveEmployees(ensureArray(arr));
+        },
+
         getSuppliers: function () {
             const a = this.getAdapter();
             const res = a.getSuppliers();

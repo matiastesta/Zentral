@@ -10,40 +10,41 @@
     <!-- Datos del negocio / cuenta -->
     <div class="p-5 bg-white rounded-lg shadow">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Datos del negocio</h2>
-        <form class="space-y-4">
+        <form method="post" enctype="multipart/form-data" class="space-y-4">
+            <input type="hidden" name="action" value="save_business">
             <div>
                 <label class="block text-sm font-medium text-gray-700">Nombre del negocio</label>
-                <input type="text" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Zentral Market">
+                <input name="business_name" type="text" value="{{ business.name }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Zentral Market">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Logo</label>
-                <input type="file" class="mt-1 block w-full text-sm text-gray-500">
+                <input name="business_logo" type="file" class="mt-1 block w-full text-sm text-gray-500">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Rubro</label>
-                <select class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option>Retail / Tienda</option>
-                    <option>Gastronomía</option>
-                    <option>Servicios profesionales</option>
-                    <option>Salud / Consultorios</option>
-                    <option>Otro</option>
+                <select name="business_industry" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option {% if (business.industry or '') == 'Retail / Tienda' %}selected{% endif %}>Retail / Tienda</option>
+                    <option {% if (business.industry or '') == 'Gastronomía' %}selected{% endif %}>Gastronomía</option>
+                    <option {% if (business.industry or '') == 'Servicios profesionales' %}selected{% endif %}>Servicios profesionales</option>
+                    <option {% if (business.industry or '') == 'Salud / Consultorios' %}selected{% endif %}>Salud / Consultorios</option>
+                    <option {% if (business.industry or '') == 'Otro' %}selected{% endif %}>Otro</option>
                 </select>
             </div>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Email</label>
-                    <input type="email" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="contacto@tu-negocio.com">
+                    <input name="business_email" type="email" value="{{ business.email or '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="contacto@tu-negocio.com">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Teléfono</label>
-                    <input type="text" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: +54 11 ...">
+                    <input name="business_phone" type="text" value="{{ business.phone or '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: +54 11 ...">
                 </div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Dirección fiscal</label>
-                <input type="text" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Calle, número, ciudad, país">
+                <input name="business_address" type="text" value="{{ business.address or '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Calle, número, ciudad, país">
             </div>
-            <button type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+            <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
                 Guardar datos
             </button>
         </form>
@@ -51,9 +52,10 @@
 
     <!-- Gestión de usuarios y permisos -->
     <div class="p-5 bg-white rounded-lg shadow space-y-4">
+        {% set can_manage_users = current_user.is_authenticated and (current_user.is_master or current_user.role == 'admin') %}
         <div class="flex items-center justify-between">
             <h2 class="text-lg font-medium text-gray-900">Usuarios y roles</h2>
-            <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+            <button id="btn-open-new-user" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700" {% if not can_manage_users %}disabled{% endif %}>
                 <i class="fas fa-user-plus mr-2"></i> Nuevo usuario
             </button>
         </div>
@@ -64,39 +66,58 @@
             <p><strong>Zentra Admin:</strong> existe siempre un usuario administrador master de soporte (Zentra) con acceso completo. Esta cuenta no es editable desde aquí.</p>
         </div>
 
-        <div class="overflow-hidden border border-gray-200 rounded-lg">
-            <table class="min-w-full divide-y divide-gray-200 text-xs">
+        <div class="border border-gray-200 rounded-lg overflow-visible">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Activo</th>
                         <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Rol</th>
-                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Dashboard</th>
-                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Ventas</th>
-                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Egresos</th>
-                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Inventario</th>
-                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Clientes</th>
-                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Proveedores</th>
-                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Informes</th>
-                        <th class="px-3 py-2"></th>
+                        <th class="px-3 py-2 text-right"></th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for user in users %}
                     <tr>
-                        <td class="px-3 py-2 text-gray-900">{{ user.name }}</td>
-                        <td class="px-3 py-2 text-gray-500">{{ user.role }}</td>
-                        <td class="px-3 py-2 text-center"><input type="checkbox" checked></td>
-                        <td class="px-3 py-2 text-center"><input type="checkbox" checked></td>
-                        <td class="px-3 py-2 text-center"><input type="checkbox"></td>
-                        <td class="px-3 py-2 text-center"><input type="checkbox"></td>
-                        <td class="px-3 py-2 text-center"><input type="checkbox"></td>
-                        <td class="px-3 py-2 text-center"><input type="checkbox"></td>
-                        <td class="px-3 py-2 text-right text-gray-500 text-xs">Editar</td>
-                        <td class="px-3 py-2 text-right text-red-500 text-xs">Eliminar</td>
+                        <td class="px-3 py-2 text-gray-900">
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium">{{ user.username }}</span>
+                                {% if user.is_master %}<span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">master</span>{% endif %}
+                            </div>
+                        </td>
+                        <td class="px-3 py-2 text-center">
+                            <div class="inline-flex items-center justify-center h-9 w-9 rounded-md border border-gray-200 bg-gray-50">
+                                <input type="checkbox" {% if user.active %}checked{% endif %} disabled>
+                            </div>
+                        </td>
+                        <td class="px-3 py-2 text-gray-700">
+                            <span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-gray-100 text-gray-700">{{ user.role }}</span>
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                            <div class="relative inline-block text-left">
+                                <button type="button" class="btn-user-actions inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-gray-100" data-menu="menu-{{ user.id }}" {% if user.is_master and not can_manage_users %}disabled{% endif %}>
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <div id="menu-{{ user.id }}" class="hidden origin-top-right absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+                                    <div class="py-1">
+                                        {% if can_manage_users or current_user.id == user.id %}
+                                        <a href="{{ url_for('user_settings.user_detail', user_id=user.id) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Editar</a>
+                                        {% endif %}
+                                        {% if can_manage_users and not user.is_master and current_user.id != user.id %}
+                                        <form method="post" class="block">
+                                            <input type="hidden" name="action" value="delete_user">
+                                            <input type="hidden" name="user_id" value="{{ user.id }}">
+                                            <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50">Eliminar</button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="10" class="px-3 py-4 text-center text-gray-500">Todavía no hay usuarios cargados. Agrega tu primer usuario con permisos personalizados.</td>
+                        <td colspan="4" class="px-3 py-4 text-center text-gray-500">Todavía no hay usuarios cargados. Agrega tu primer usuario.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -104,4 +125,98 @@
         </div>
     </div>
 </div>
+
+<div id="modal-new-user" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Nuevo usuario</h3>
+                    <p class="text-xs text-gray-500">Se crea un usuario interno con permisos por módulo.</p>
+                </div>
+                <button id="btn-close-new-user" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <form method="post" class="p-5 space-y-3">
+                <input type="hidden" name="action" value="create_user">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Usuario</label>
+                        <input name="username" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: juan">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Email (opcional)</label>
+                        <input name="email" type="email" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="juan@...">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Contraseña</label>
+                        <input name="password" type="password" class="w-full px-3 py-2 text-sm border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Rol</label>
+                        <select name="role" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            {% for r in roles %}
+                                <option value="{{ r }}">{{ r }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="border border-gray-200 rounded-xl p-3">
+                    <div class="text-xs font-semibold text-gray-700">Permisos</div>
+                    <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                        <label class="inline-flex items-center gap-2"><input name="perm_dashboard" type="checkbox" checked>Dashboard</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_calendar" type="checkbox">Calendario</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_sales" type="checkbox" checked>Ventas</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_expenses" type="checkbox">Egresos</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_inventory" type="checkbox">Inventario</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_customers" type="checkbox">Clientes</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_suppliers" type="checkbox">Proveedores</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_reports" type="checkbox">Informes</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_employees" type="checkbox">Empleados</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_movements" type="checkbox">Movimientos</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_settings" type="checkbox">Config. negocio</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_user_settings" type="checkbox">Config. usuario</label>
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button id="btn-cancel-new-user" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">Crear usuario</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('modal-new-user');
+    const btnOpen = document.getElementById('btn-open-new-user');
+    const btnClose = document.getElementById('btn-close-new-user');
+    const btnCancel = document.getElementById('btn-cancel-new-user');
+    function open() { if (modal) modal.classList.remove('hidden'); }
+    function close() { if (modal) modal.classList.add('hidden'); }
+    if (btnOpen) btnOpen.addEventListener('click', open);
+    if (btnClose) btnClose.addEventListener('click', close);
+    if (btnCancel) btnCancel.addEventListener('click', close);
+    if (modal) modal.addEventListener('click', function (e) {
+        if (e.target === modal.firstElementChild) close();
+    });
+
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.btn-user-actions');
+        document.querySelectorAll('[id^="menu-"]').forEach(function (m) {
+            if (btn && m.id === btn.getAttribute('data-menu')) return;
+            m.classList.add('hidden');
+        });
+        if (btn) {
+            const id = btn.getAttribute('data-menu');
+            const menu = document.getElementById(id);
+            if (menu) menu.classList.toggle('hidden');
+        }
+    });
+});
+</script>
 {% endblock %}

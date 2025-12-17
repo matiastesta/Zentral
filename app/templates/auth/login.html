@@ -14,7 +14,11 @@
             <!-- Lado izquierdo: branding -->
             <div class="flex flex-col items-center justify-center px-8 py-10" style="background-color:#fbf9f5;">
                 <div class="h-24 w-24 rounded-full border border-gray-200 flex items-center justify-center overflow-hidden mb-4 bg-white">
-                    <img src="{{ url_for('static', filename='images/zentra-consultora-logo.png') }}" alt="Zentra Consultora" class="h-16">
+                    {% if business and business.logo_filename %}
+                        <img src="{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}" alt="Logo" class="h-16 w-16 object-contain">
+                    {% else %}
+                        <span class="text-2xl font-semibold" style="color:#0d1067;">{{ (business.name[0] if business and business.name else 'Z')|upper }}</span>
+                    {% endif %}
                 </div>
                 <h1 class="text-xl font-semibold" style="color:#0d1067;">Zentral</h1>
                 <p class="mt-1 text-sm text-gray-600">Plataforma de gestión integral por Zentra Consultora.</p>

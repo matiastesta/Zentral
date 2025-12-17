@@ -88,13 +88,14 @@
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Responsable</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Apertura</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Efectivo del día</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Cierre</th>
                         </tr>
                     </thead>
                     <tbody id="mov-arqueo-tbody" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="4" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
+                        <tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -386,6 +387,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         lastRendered = historico.map(r => ({
             Fecha: r?.fecha || '',
+            Responsable: (r?.employee_name || r?.employee_id || ''),
             Apertura: formatearMoneda(parseNumeroSeguro(r?.apertura)),
             Efectivo_dia: formatearMoneda(parseNumeroSeguro(r?.efectivo_dia)),
             Cierre: formatearMoneda(parseNumeroSeguro(r?.cierre))
@@ -393,7 +395,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         tbodyArqueo.innerHTML = '';
         if (!historico.length) {
-            tbodyArqueo.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+            tbodyArqueo.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
             return;
         }
         historico.forEach(r => {
@@ -401,6 +403,7 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.className = 'hover:bg-gray-50';
             tr.innerHTML = ''
                 + '<td class="px-4 py-3 text-sm text-gray-700">' + String(r?.fecha || '-') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-700">' + String(r?.employee_name || r?.employee_id || '-') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.apertura)) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.efectivo_dia)) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.cierre)) + '</td>';

@@ -3,18 +3,18 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-    <h1 class="text-2xl font-bold text-gray-900">Panel de Control</h1>
-    <p class="mt-1 text-sm text-gray-600">Bienvenido de vuelta, {{ current_user.username }}. Aquí tienes un resumen de tu negocio.</p>
-</div>
-
-<div class="flex flex-col justify-between gap-2 mb-4 md:flex-row md:items-start">
-    <div class="flex-1"></div>
-    <div class="flex gap-2 justify-end">
-        <input id="dash-range" type="text" class="w-56 px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="📅 Período" readonly>
-        <button id="btn-export-dashboard" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
-            <i class="fas fa-file-export mr-2"></i> Exportar
-        </button>
+<div class="mb-4">
+    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div class="min-w-0">
+            <h1 class="text-2xl font-bold text-gray-900">Panel de Control</h1>
+            <p id="dash-subtitle" class="mt-1 text-sm text-gray-600">Bienvenido {{ business.name if business else 'tu negocio' }} de vuelta. Aquí tienes un resumen de tu negocio</p>
+        </div>
+        <div class="flex gap-2 justify-end">
+            <input id="dash-range" type="text" class="w-56 px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="📅 Período" readonly>
+            <button id="btn-export-dashboard" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
+                <i class="fas fa-file-export mr-2"></i> Exportar
+            </button>
+        </div>
     </div>
 </div>
 
@@ -80,7 +80,78 @@
             </div>
         </div>
     </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('customers.index') }}" title="👥 Total de clientes cargados">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">👥</div>
+            <div class="min-w-0">
+                <div class="text-sm font-medium text-gray-500">Clientes totales</div>
+                <div id="kpi-customers-total" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                <div id="sk-kpi-customers-total" class="mt-2 h-4 w-14 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('customers.index') }}" title="💳 Deuda total acumulada en cuenta corriente">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">💳</div>
+            <div class="min-w-0">
+                <div class="text-sm font-medium text-gray-500">Deuda total</div>
+                <div id="kpi-debt-total" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                <div id="sk-kpi-debt-total" class="mt-2 h-4 w-24 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('customers.index') }}" title="🏆 Cliente con mayor monto comprado en el período">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">🏆</div>
+            <div class="min-w-0">
+                <div class="text-sm font-medium text-gray-500">Mejor cliente</div>
+                <div id="kpi-best-customer" class="mt-1 text-2xl font-semibold text-gray-900 truncate">—</div>
+                <div id="kpi-best-customer-amount" class="mt-1 text-xs text-gray-500">—</div>
+                <div id="sk-kpi-best-customer" class="mt-2 h-4 w-40 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('customers.index') }}" title="💎 Monto total comprado por el mejor cliente del período">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">💎</div>
+            <div class="min-w-0">
+                <div class="text-sm font-medium text-gray-500">Mejor cliente (monto)</div>
+                <div id="kpi-best-customer-amount-card" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+            </div>
+        </div>
+    </div>
 </div>
+
+{% if upcoming_calendar_events is defined and upcoming_calendar_events %}
+<div class="mt-6 bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div>
+            <div class="text-sm font-semibold text-gray-900">Próximos avisos</div>
+            <div class="text-xs text-gray-500">Eventos de alta prioridad y vencidos (próximos 30 días)</div>
+        </div>
+        <a href="{{ url_for('calendar.index') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-md hover:bg-blue-100">
+            <i class="fas fa-calendar-alt mr-2"></i> Ver calendario
+        </a>
+    </div>
+    <div class="p-5 space-y-2">
+        {% for ev in upcoming_calendar_events %}
+        <div class="p-3 border border-gray-200 rounded-lg flex items-center justify-between gap-3">
+            <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                    <div class="h-2.5 w-2.5 rounded-full {% if ev.color == 'red' %}bg-red-500{% elif ev.color == 'yellow' %}bg-yellow-500{% else %}bg-emerald-500{% endif %}"></div>
+                    <div class="text-sm font-semibold text-gray-900 truncate">{{ ev.title }}</div>
+                    {% if ev.overdue %}<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-100">vencido</span>{% endif %}
+                </div>
+                <div class="mt-1 text-xs text-gray-500">{{ ev.date.strftime('%d/%m/%Y') }}</div>
+            </div>
+            <a href="{{ url_for('calendar.index', view='list', year=ev.date.year, month=ev.date.month) }}" class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 hover:bg-gray-50 text-gray-700" title="Ver">
+                <i class="fas fa-arrow-right"></i>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 
 <div id="dash-empty" class="hidden mt-6 p-5 bg-white rounded-lg shadow border border-gray-200">
     <div class="text-sm font-medium text-gray-900">No hay datos para el período seleccionado</div>
@@ -91,7 +162,7 @@
 <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
     <div class="p-5 bg-white rounded-lg shadow border border-gray-200">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-medium text-gray-900">Ventas vs Gastos por día</h2>
+            <h2 class="text-lg font-medium text-gray-900">Ventas vs Gastos vs Margen por día</h2>
             <div class="text-xs text-gray-500" id="chart-sales-expenses-subtitle">—</div>
         </div>
         <div class="h-64">
@@ -150,6 +221,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const kpiInventoryValue = document.getElementById('kpi-inventory-value');
     const kpiLowStock = document.getElementById('kpi-low-stock');
     const kpiDebtors = document.getElementById('kpi-debtors');
+    const kpiCustomersTotal = document.getElementById('kpi-customers-total');
+    const kpiDebtTotal = document.getElementById('kpi-debt-total');
+    const kpiBestCustomer = document.getElementById('kpi-best-customer');
+    const kpiBestCustomerAmount = document.getElementById('kpi-best-customer-amount');
+    const kpiBestCustomerAmountCard = document.getElementById('kpi-best-customer-amount-card');
     const emptyState = document.getElementById('dash-empty');
     const kpiWrap = document.getElementById('dash-kpis');
 
@@ -159,6 +235,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const skKpiInventoryValue = document.getElementById('sk-kpi-inventory-value');
     const skKpiLowStock = document.getElementById('sk-kpi-low-stock');
     const skKpiDebtors = document.getElementById('sk-kpi-debtors');
+    const skKpiCustomersTotal = document.getElementById('sk-kpi-customers-total');
+    const skKpiDebtTotal = document.getElementById('sk-kpi-debt-total');
+    const skKpiBestCustomer = document.getElementById('sk-kpi-best-customer');
 
     const chartSalesExpensesSubtitle = document.getElementById('chart-sales-expenses-subtitle');
     const dashRange = document.getElementById('dash-range');
@@ -217,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function setSkeleton(on) {
-        const sks = [skKpiTotalSales, skKpiTotalExpenses, skKpiEstimatedResult, skKpiInventoryValue, skKpiLowStock, skKpiDebtors];
+        const sks = [skKpiTotalSales, skKpiTotalExpenses, skKpiEstimatedResult, skKpiInventoryValue, skKpiLowStock, skKpiDebtors, skKpiCustomersTotal, skKpiDebtTotal, skKpiBestCustomer];
         sks.forEach(el => {
             if (!el) return;
             el.classList.toggle('hidden', !on);
@@ -348,6 +427,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const salesSeries = labels.map(k => salesBy[k] || 0);
         const expSeries = labels.map(k => expBy[k] || 0);
+        const marginSeries = labels.map((k, idx) => (salesSeries[idx] || 0) - (expSeries[idx] || 0));
 
         const catSum = {};
         (Array.isArray(expenses) ? expenses : []).forEach(e => {
@@ -362,7 +442,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .slice(0, 5);
 
         return {
-            salesExpenses: { labels, salesSeries, expSeries },
+            salesExpenses: { labels, salesSeries, expSeries, marginSeries },
             topExpenseCats: topCats
         };
     }
@@ -430,6 +510,13 @@ document.addEventListener('DOMContentLoaded', function() {
                             data: chartsData.salesExpenses.expSeries,
                             backgroundColor: 'rgba(239, 68, 68, 0.25)',
                             borderColor: 'rgba(239, 68, 68, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Margen',
+                            data: chartsData.salesExpenses.marginSeries,
+                            backgroundColor: 'rgba(16, 185, 129, 0.25)',
+                            borderColor: 'rgba(16, 185, 129, 1)',
                             borderWidth: 1
                         }
                     ]
@@ -507,6 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const expenses = Array.isArray(payload?.expenses) ? payload.expenses : [];
         const products = Array.isArray(payload?.products) ? payload.products : [];
         const lots = Array.isArray(payload?.lots) ? payload.lots : [];
+        const customers = Array.isArray(payload?.customers) ? payload.customers : [];
 
         const salesInRange = sales.filter(s => {
             const dt = normalizeSalesDate(s);
@@ -524,6 +612,34 @@ document.addEventListener('DOMContentLoaded', function() {
         const estimatedResult = totalSales - totalExpenses;
         const inv = calculateInventoryMetrics(products, lots);
         const debtors = calculateDebtorsFromSales(salesInRange);
+        const debtTotal = Array.from(debtors.debtorsMap.values()).reduce((acc, v) => acc + (parseFloat(v || 0) || 0), 0);
+
+        const bestMap = new Map();
+        salesInRange.forEach(s => {
+            const name = String(s?.customer_name || s?.cliente || s?.customer || '').trim();
+            const id = String(s?.customer_id || s?.customerId || '').trim();
+            const key = id || name;
+            if (!key) return;
+            const total = (parseFloat(s?.total || '0') || 0);
+            bestMap.set(key, (bestMap.get(key) || 0) + total);
+        });
+        let bestCustomerKey = '';
+        let bestCustomerAmount = 0;
+        bestMap.forEach((val, key) => {
+            if ((val || 0) > bestCustomerAmount) {
+                bestCustomerAmount = val || 0;
+                bestCustomerKey = key;
+            }
+        });
+        let bestCustomerName = '';
+        if (bestCustomerKey) {
+            const fromCustomers = customers.find(c => String(c?.id || '') === String(bestCustomerKey)) || null;
+            if (fromCustomers) {
+                bestCustomerName = (String(fromCustomers?.first_name || '') + ' ' + String(fromCustomers?.last_name || '')).trim();
+            } else {
+                bestCustomerName = String(bestCustomerKey);
+            }
+        }
 
         return {
             totalSales,
@@ -532,6 +648,10 @@ document.addEventListener('DOMContentLoaded', function() {
             inventoryValue: inv.inventoryValue,
             lowStockProducts: inv.lowStockProducts,
             debtorsCount: debtors.debtorsCount,
+            customersTotal: customers.length,
+            debtTotal: debtTotal,
+            bestCustomerName: bestCustomerName,
+            bestCustomerAmount: bestCustomerAmount,
             periodLabel: String(dashRange?.value || '').trim() || '—'
         };
     }
@@ -542,6 +662,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (kpiInventoryValue) kpiInventoryValue.textContent = formatearMoneda(kpis.inventoryValue);
         if (kpiLowStock) kpiLowStock.textContent = String(kpis.lowStockProducts || 0);
         if (kpiDebtors) kpiDebtors.textContent = String(kpis.debtorsCount || 0);
+        if (kpiCustomersTotal) kpiCustomersTotal.textContent = String(kpis.customersTotal || 0);
+        if (kpiDebtTotal) kpiDebtTotal.textContent = formatearMoneda(kpis.debtTotal || 0);
+        if (kpiBestCustomer) kpiBestCustomer.textContent = String(kpis.bestCustomerName || '—');
+        if (kpiBestCustomerAmount) kpiBestCustomerAmount.textContent = kpis.bestCustomerName ? ('Monto: ' + formatearMoneda(kpis.bestCustomerAmount || 0)) : '—';
+        if (kpiBestCustomerAmountCard) kpiBestCustomerAmountCard.textContent = kpis.bestCustomerName ? formatearMoneda(kpis.bestCustomerAmount || 0) : '—';
         if (kpiEstimatedResult) {
             kpiEstimatedResult.textContent = formatearMoneda(kpis.estimatedResult);
             const pos = kpis.estimatedResult >= 0;
@@ -599,19 +724,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function exportCsv() {
         const s = lastSummary || {};
-        const k = s.kpis || {};
-        const header = ['Período','Ventas del período','Gastos del período','Resultado estimado','Stock valorizado','Productos con alerta','Clientes deudores','Exportado (ISO)'];
+        const se = s?.chartsData?.salesExpenses || {};
+        const labels = Array.isArray(se.labels) ? se.labels : [];
+        const salesSeries = Array.isArray(se.salesSeries) ? se.salesSeries : [];
+        const expSeries = Array.isArray(se.expSeries) ? se.expSeries : [];
+        const marginSeries = Array.isArray(se.marginSeries) ? se.marginSeries : [];
+
+        if (!labels.length) return;
+
+        const header = ['Fecha', 'Ventas', 'Gastos', 'Margen'];
         const lines = [header.map(escapeCsvCell).join(';')];
-        lines.push([
-            s.period || '—',
-            String(k.totalSales ?? 0),
-            String(k.totalExpenses ?? 0),
-            String(k.estimatedResult ?? 0),
-            String(k.inventoryValue ?? 0),
-            String(k.lowStockProducts ?? 0),
-            String(k.debtorsCount ?? 0),
-            String(new Date().toISOString())
-        ].map(escapeCsvCell).join(';'));
+        labels.forEach((d, idx) => {
+            lines.push([
+                String(d || ''),
+                String(salesSeries[idx] ?? 0),
+                String(expSeries[idx] ?? 0),
+                String(marginSeries[idx] ?? ((salesSeries[idx] || 0) - (expSeries[idx] || 0)))
+            ].map(escapeCsvCell).join(';'));
+        });
         const blob = new Blob(["\ufeff" + lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -624,18 +754,42 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function exportPdfPrint() {
         const s = lastSummary || {};
-        const k = s.kpis || {};
         const w = window.open('', '_blank');
         if (!w) return;
         const logoUrl = "{{ url_for('static', filename='images/zentra-consultora-horizontal.png.png') }}";
         const exportedAt = new Date();
         const exportedAtLabel = exportedAt.toLocaleString('es-AR');
-        const chart1 = (_salesExpensesChart && typeof _salesExpensesChart.toBase64Image === 'function') ? _salesExpensesChart.toBase64Image() : '';
-        const chart2 = (_topExpenseCatsChart && typeof _topExpenseCatsChart.toBase64Image === 'function') ? _topExpenseCatsChart.toBase64Image() : '';
+
+        const se = s?.chartsData?.salesExpenses || {};
+        const labels = Array.isArray(se.labels) ? se.labels : [];
+        const salesSeries = Array.isArray(se.salesSeries) ? se.salesSeries : [];
+        const expSeries = Array.isArray(se.expSeries) ? se.expSeries : [];
+        const marginSeries = Array.isArray(se.marginSeries) ? se.marginSeries : [];
+
+        const totals = labels.reduce((acc, _d, idx) => {
+            acc.sales += (parseFloat(salesSeries[idx] || 0) || 0);
+            acc.exp += (parseFloat(expSeries[idx] || 0) || 0);
+            acc.margin += (parseFloat(marginSeries[idx] || ((salesSeries[idx] || 0) - (expSeries[idx] || 0))) || 0);
+            return acc;
+        }, { sales: 0, exp: 0, margin: 0 });
+
+        const rowsHtml = labels.map((d, idx) => {
+            const vSales = parseFloat(salesSeries[idx] || 0) || 0;
+            const vExp = parseFloat(expSeries[idx] || 0) || 0;
+            const vMargin = parseFloat(marginSeries[idx] || (vSales - vExp)) || 0;
+            return ''
+                + '<tr>'
+                +   '<td>' + String(d || '') + '</td>'
+                +   '<td class="num">' + formatearMoneda(vSales) + '</td>'
+                +   '<td class="num">' + formatearMoneda(vExp) + '</td>'
+                +   '<td class="num">' + formatearMoneda(vMargin) + '</td>'
+                + '</tr>';
+        }).join('');
+
         const html = ''
             + '<!doctype html><html lang="es"><head><meta charset="utf-8" />'
             + '<title>Exportar dashboard</title>'
-            + '<style>body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:#111}h1{font-size:18px;margin:0 0 6px 0}p{margin:0 0 14px 0;color:#555;font-size:12px}.muted{color:#666;font-size:11px}.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 18px 0}.card{border:1px solid #e5e7eb;border-radius:12px;padding:10px}.card .t{font-size:11px;color:#6b7280;margin:0}.card .v{font-size:16px;font-weight:700;margin:6px 0 0 0}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.img{border:1px solid #e5e7eb;border-radius:12px;padding:10px}.img img{width:100%;height:auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #e5e7eb;padding:8px;text-align:left}th{background:#f9fafb}td.num{text-align:right}</style>'
+            + '<style>body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:#111}h1{font-size:18px;margin:0 0 6px 0}p{margin:0 0 14px 0;color:#555;font-size:12px}.muted{color:#666;font-size:11px}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}th,td{border:1px solid #e5e7eb;padding:8px;text-align:left}th{background:#f9fafb}td.num{text-align:right}tfoot td{font-weight:700}</style>'
             + '</head><body>'
             + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">'
             + '  <div>'
@@ -645,18 +799,11 @@ document.addEventListener('DOMContentLoaded', function() {
             + '  </div>'
             + '  <img src="' + logoUrl + '" alt="Zentral" style="height:38px;object-fit:contain" />'
             + '</div>'
-            + '<div class="kpis">'
-            + '  <div class="card"><p class="t">Ventas del período</p><p class="v">' + formatearMoneda(parseFloat(k.totalSales || 0)) + '</p></div>'
-            + '  <div class="card"><p class="t">Gastos del período</p><p class="v">' + formatearMoneda(parseFloat(k.totalExpenses || 0)) + '</p></div>'
-            + '  <div class="card"><p class="t">Resultado estimado</p><p class="v">' + formatearMoneda(parseFloat(k.estimatedResult || 0)) + '</p></div>'
-            + '  <div class="card"><p class="t">Stock valorizado</p><p class="v">' + formatearMoneda(parseFloat(k.inventoryValue || 0)) + '</p></div>'
-            + '  <div class="card"><p class="t">Productos con alerta</p><p class="v">' + String(k.lowStockProducts || 0) + '</p></div>'
-            + '  <div class="card"><p class="t">Clientes deudores</p><p class="v">' + String(k.debtorsCount || 0) + '</p></div>'
-            + '</div>'
-            + '<div class="row">'
-            + '  <div class="img">' + (chart1 ? ('<div class="muted" style="margin:0 0 6px 0">Ventas vs Gastos</div><img src="' + chart1 + '" />') : '<div class="muted">(Gráfico no disponible)</div>') + '</div>'
-            + '  <div class="img">' + (chart2 ? ('<div class="muted" style="margin:0 0 6px 0">Top categorías de gasto</div><img src="' + chart2 + '" />') : '<div class="muted">(Gráfico no disponible)</div>') + '</div>'
-            + '</div>'
+            + '<table>'
+            + '  <thead><tr><th>Fecha</th><th>Ventas</th><th>Gastos</th><th>Margen</th></tr></thead>'
+            + '  <tbody>' + rowsHtml + '</tbody>'
+            + '  <tfoot><tr><td>Total</td><td class="num">' + formatearMoneda(totals.sales) + '</td><td class="num">' + formatearMoneda(totals.exp) + '</td><td class="num">' + formatearMoneda(totals.margin) + '</td></tr></tfoot>'
+            + '</table>'
             + '<p class="muted" style="margin-top:14px">Informe generado por Zentral – Zentra Consultora</p>'
             + '<script>window.onload=function(){window.print();}<\/script>'
             + '</body></html>';

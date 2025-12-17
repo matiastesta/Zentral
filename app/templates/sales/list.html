@@ -34,7 +34,7 @@
                 <i class="fas fa-box-open"></i>
             </div>
             <div>
-                <p class="text-xs uppercase tracking-wide text-gray-500">Artículos vendidos hoy</p>
+                <p class="text-xs uppercase tracking-wide text-gray-500">Cantidad de artículos vendidos</p>
                 <p id="kpi-items-dia" class="text-lg font-semibold text-gray-900">0</p>
             </div>
         </div>
@@ -56,6 +56,14 @@
                 <div>
                     <label class="block font-medium text-gray-600 mb-1">Fecha de arqueo</label>
                     <input id="fecha-arqueo" type="date" class="w-full px-2 py-1 border rounded-md text-xs" value="{{ now.strftime('%Y-%m-%d') }}">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-600 mb-1">Empleado responsable del arqueo</label>
+                    <select id="arqueo-employee" class="w-full px-2 py-1 border rounded-md text-xs bg-white">
+                        <option value="">— Seleccionar —</option>
+                    </select>
+                    <p id="msg-arqueo-no-employees" class="mt-1 text-[11px] text-gray-500 hidden">No hay empleados cargados. <a href="{{ url_for('employees.new') }}" class="text-indigo-700 hover:underline">Crear empleado</a></p>
+                    <p id="msg-arqueo-employee-required" class="mt-1 text-[11px] text-red-600 hidden flex items-center gap-1"><i class="fas fa-exclamation-circle"></i><span>Seleccioná un empleado responsable para guardar el arqueo.</span></p>
                 </div>
                 <div class="grid grid-cols-3 gap-2 items-end text-center">
                     <div>
@@ -116,25 +124,27 @@
                     <th class="px-3 py-2 text-center text-gray-600 font-semibold align-bottom"></th>
                 </tr>
                 <tr class="text-[11px] bg-white align-middle">
-                    <th class="px-3 py-1"></th>
+                    <th class="px-3 py-1">
+                        <input id="ventas-search-ticket" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="Buscar por ticket">
+                    </th>
                     <th class="px-3 py-1 text-left text-gray-400">
                         <div class="inline-block min-w-[110px] max-w-[140px] w-full">
                             <input type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 fecha-rango-input" placeholder="dd/mm/aaaa - dd/mm/aaaa">
                         </div>
                     </th>
                     <th class="px-3 py-1 text-left text-gray-400">
-                        <select class="px-2 py-0.5 border rounded-md text-xs text-gray-600 w-20 -ml-2 block">
+                        <select id="ventas-filter-tipo" class="px-2 py-0.5 border rounded-md text-xs text-gray-600 w-20 -ml-2 block">
                             <option value="">Todos</option>
                             <option>Venta</option>
                             <option>Cambio</option>
                         </select>
                     </th>
                     <th class="px-3 py-1">
-                        <input id="ventas-search" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="Buscar por cliente o ticket">
+                        <input id="ventas-search-cliente" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="Buscar por cliente">
                     </th>
                     <th class="px-3 py-1"></th>
                     <th class="px-3 py-1 text-center text-gray-400">
-                        <select class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600">
+                        <select id="ventas-filter-pago" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600">
                             <option value="">Todas</option>
                             <option>Efectivo</option>
                             <option>Transferencia</option>
@@ -143,7 +153,7 @@
                         </select>
                     </th>
                     <th class="px-3 py-1 text-center text-gray-400">
-                        <select class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600">
+                        <select id="ventas-filter-estado" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600">
                             <option value="">Todas</option>
                             <option>Completada</option>
                             <option>Pendiente</option>
@@ -306,7 +316,6 @@
                     <option>Transferencia</option>
                     <option>Débito</option>
                     <option>Crédito</option>
-                    <option>Cuenta corriente</option>
                 </select>
             </div>
         </div>
@@ -402,6 +411,49 @@
     </div>
 </div>
 
+<div id="modal-cuenta-corriente" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Cuenta corriente</h3>
+                    <p class="text-xs text-gray-500">Indicá cuánto abona ahora y se registrará el saldo pendiente en el legajo del cliente.</p>
+                </div>
+                <button id="btn-close-cc" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div class="p-3 border border-gray-200 rounded-lg">
+                        <div class="text-[11px] text-gray-500">Cliente</div>
+                        <div id="cc-cliente" class="mt-1 text-sm font-semibold text-gray-900 truncate">—</div>
+                        <div id="cc-cliente-alertas" class="mt-2 text-[11px] text-gray-600">—</div>
+                    </div>
+                    <div class="p-3 border border-gray-200 rounded-lg">
+                        <div class="text-[11px] text-gray-500">Total del ticket</div>
+                        <div id="cc-total" class="mt-1 text-sm font-semibold text-gray-900">$0,00</div>
+                        <div class="mt-2 flex items-center justify-between gap-2">
+                            <label class="text-[11px] text-gray-600">Abona ahora</label>
+                            <input id="cc-paid" type="number" min="0" step="0.01" class="w-32 px-2 py-1 border rounded-md text-right text-sm" value="0">
+                        </div>
+                        <div class="mt-2 flex items-center justify-between text-[11px] text-gray-600">
+                            <span>Saldo a deber</span>
+                            <span id="cc-due" class="font-semibold text-red-700">$0,00</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="cc-error" class="text-[11px] text-red-600 hidden flex items-center gap-1"><i class="fas fa-exclamation-circle"></i><span>Revisá el monto abonado.</span></div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-cancel-cc" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-accept-cc" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">Aceptar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Vista dummy: realizar cambio -->
 <div id="vista-realizar-cambio" class="hidden space-y-4">
     <div class="flex items-center justify-between">
@@ -444,26 +496,7 @@
                     </div>
                 </div>
                 <div id="grid-productos-cambio" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto" style="max-height: 380px;">
-                    {% set productos_dummy = [
-                        {'nombre': 'Café latte', 'precio': '2.500', 'categoria': 'Cafetería'},
-                        {'nombre': 'Tostado mixto', 'precio': '3.200', 'categoria': 'Cafetería'},
-                        {'nombre': 'Gaseosa 500ml', 'precio': '1.200', 'categoria': 'Bebidas'},
-                        {'nombre': 'Agua mineral', 'precio': '900', 'categoria': 'Bebidas'},
-                        {'nombre': 'Chips salados', 'precio': '1.500', 'categoria': 'Snacks'},
-                        {'nombre': 'Barra de cereal', 'precio': '1.100', 'categoria': 'Snacks'}
-                    ] %}
-                    {% for p in productos_dummy %}
-                    <button type="button" class="btn-producto-cambio flex flex-col items-start p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 text-left text-xs" data-nombre="{{ p.nombre }}" data-precio="{{ p.precio }}" data-categoria="{{ p.categoria }}">
-                        <div class="w-full mb-2 flex items-center justify-center">
-                            <div class="h-16 w-16 rounded-md bg-white border border-gray-200 flex items-center justify-center overflow-hidden">
-                                <img src="{{ url_for('static', filename='images/zentra-consultora-horizontal.png.png') }}" alt="{{ p.nombre }}" class="h-10">
-                            </div>
-                        </div>
-                        <div class="font-medium text-gray-800 truncate w-full">{{ p.nombre }}</div>
-                        <div class="text-[11px] text-gray-500">{{ p.categoria }}</div>
-                        <div class="mt-1 font-semibold text-sm text-gray-900">${{ p.precio }}</div>
-                    </button>
-                    {% endfor %}
+                    <div class="col-span-full px-3 py-4 text-sm text-gray-500">Cargando productos del inventario...</div>
                 </div>
             </div>
 
@@ -516,19 +549,8 @@
                         </span>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto" style="max-height: 380px;">
-                    {% for p in productos_dummy %}
-                    <button type="button" class="btn-producto-cambio-venta flex flex-col items-start p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 text-left text-xs" data-nombre="{{ p.nombre }}" data-precio="{{ p.precio }}" data-categoria="{{ p.categoria }}">
-                        <div class="w-full mb-2 flex items-center justify-center">
-                            <div class="h-16 w-16 rounded-md bg-white border border-gray-200 flex items-center justify-center overflow-hidden">
-                                <img src="{{ url_for('static', filename='images/zentra-consultora-horizontal.png.png') }}" alt="{{ p.nombre }}" class="h-10">
-                            </div>
-                        </div>
-                        <div class="font-medium text-gray-800 truncate w-full">{{ p.nombre }}</div>
-                        <div class="text-[11px] text-gray-500">{{ p.categoria }}</div>
-                        <div class="mt-1 font-semibold text-sm text-gray-900">${{ p.precio }}</div>
-                    </button>
-                    {% endfor %}
+                <div id="grid-productos-cambio-venta" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto" style="max-height: 380px;">
+                    <div class="col-span-full px-3 py-4 text-sm text-gray-500">Cargando productos del inventario...</div>
                 </div>
             </div>
 
@@ -618,22 +640,18 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
                 <div class="p-4 bg-white rounded-lg border border-gray-100 space-y-3 lg:col-span-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium text-gray-800">Cliente</span>
-                        <label class="inline-flex items-center text-xs text-gray-600">
-                            <input id="toggle-cliente-cambio" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm mr-2">
-                            Asociar a un cliente
-                        </label>
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-sm font-medium text-gray-800">Cliente (opcional)</span>
+                        <button id="btn-select-cliente-cambio" type="button" class="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700">Seleccionar cliente</button>
                     </div>
-                    <div class="mt-1 text-[11px] text-gray-500">Opcional: vinculá este cambio a un cliente del legajo o creá uno nuevo.</div>
-                    <div id="panel-cliente-cambio" class="mt-2 space-y-3 hidden">
+                    <div id="panel-cliente-cambio" class="mt-2 space-y-3">
                         <div class="relative">
-                            <input id="cambio-cliente" type="text" placeholder="Buscar en el legajo de clientes" class="w-full pl-9 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <input id="cambio-cliente" type="text" placeholder="🔍 Buscador de cliente" class="w-full pl-9 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" autocomplete="off">
                             <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
                                 <i class="fas fa-search"></i>
                             </span>
                         </div>
-                        <button class="w-full inline-flex items-center justify-center px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
+                        <button id="btn-crear-cliente-cambio" type="button" class="w-full inline-flex items-center justify-center px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
                             <i class="fas fa-user-plus mr-2"></i> Crear nuevo cliente
                         </button>
                     </div>
@@ -663,8 +681,11 @@
                 <i class="fas fa-arrow-left"></i>
             </button>
             <div>
-                <h2 class="text-lg font-semibold text-gray-900">Registrar venta</h2>
-                <p class="text-xs text-gray-500">Primero elegí los productos, luego completá los datos del ticket.</p>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <h2 id="ventas-flow-title" class="text-lg font-semibold text-gray-900">Registrar venta</h2>
+                    <span id="ventas-edit-badge" class="hidden inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">✏️ Editando</span>
+                </div>
+                <p id="ventas-flow-subtitle" class="text-xs text-gray-500">Primero elegí los productos, luego completá los datos del ticket.</p>
             </div>
         </div>
         <div class="flex items-center gap-2 text-[11px]">
@@ -718,28 +739,8 @@
                 </div>
             </div>
 
-            <!-- Grilla de productos simulados -->
             <div id="grid-productos" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto" style="max-height: 380px;">
-                {% set productos_dummy = [
-                    {'nombre': 'Café latte', 'precio': '2.500', 'categoria': 'Cafetería'},
-                    {'nombre': 'Tostado mixto', 'precio': '3.200', 'categoria': 'Cafetería'},
-                    {'nombre': 'Gaseosa 500ml', 'precio': '1.200', 'categoria': 'Bebidas'},
-                    {'nombre': 'Agua mineral', 'precio': '900', 'categoria': 'Bebidas'},
-                    {'nombre': 'Chips salados', 'precio': '1.500', 'categoria': 'Snacks'},
-                    {'nombre': 'Barra de cereal', 'precio': '1.100', 'categoria': 'Snacks'}
-                ] %}
-                {% for p in productos_dummy %}
-                <button type="button" class="btn-producto flex flex-col items-start p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 text-left text-xs" data-nombre="{{ p.nombre }}" data-precio="{{ p.precio }}" data-categoria="{{ p.categoria }}">
-                    <div class="w-full mb-2 flex items-center justify-center">
-                        <div class="h-16 w-16 rounded-md bg-white border border-gray-200 flex items-center justify-center overflow-hidden">
-                            <img src="{{ url_for('static', filename='images/zentra-consultora-horizontal.png.png') }}" alt="{{ p.nombre }}" class="h-10">
-                        </div>
-                    </div>
-                    <div class="font-medium text-gray-800 truncate w-full">{{ p.nombre }}</div>
-                    <div class="text-[11px] text-gray-500">{{ p.categoria }}</div>
-                    <div class="mt-1 font-semibold text-sm text-gray-900">${{ p.precio }}</div>
-                </button>
-                {% endfor %}
+                <div class="col-span-full px-3 py-4 text-sm text-gray-500">Cargando productos del inventario...</div>
             </div>
         </div>
 
@@ -767,8 +768,13 @@
                     </tbody>
                 </table>
             </div>
-            <div class="space-y-1 text-xs">
+            <div class="space-y-2 text-xs">
                 <div class="flex justify-between font-semibold"><span>Total estimado</span><span id="total-estimado">$0,00</span></div>
+                <div class="flex justify-between items-center gap-2">
+                    <span>Descuento general</span>
+                    <input id="ticket-descuento-general" type="number" class="w-20 px-2 py-1 border rounded-md text-right" placeholder="0" min="0" max="100">
+                    <span class="text-[11px] text-gray-500">%</span>
+                </div>
             </div>
             <button id="btn-continuar-ticket" class="mt-3 inline-flex items-center justify-center w-full px-3 py-2 text-xs font-medium text-white rounded-md" style="background-color:#0d1067;">
                 Continuar al Paso 2
@@ -817,10 +823,6 @@
                                 <input type="radio" name="forma_pago" value="Crédito" class="text-indigo-600">
                                 <span><i class="fas fa-credit-card mr-1 text-indigo-500"></i>Crédito</span>
                             </label>
-                            <label class="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 bg-gray-50 cursor-pointer">
-                                <input type="radio" name="forma_pago" value="Cuenta corriente" class="text-indigo-600">
-                                <span><i class="fas fa-file-invoice-dollar mr-1 text-yellow-600"></i>Cuenta corriente</span>
-                            </label>
                         </div>
                     </div>
                 </div>
@@ -843,51 +845,115 @@
         <!-- Cliente y confirmación (movidos debajo) -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
             <div class="p-4 bg-white rounded-lg shadow space-y-3 lg:col-span-2">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-gray-800">Cliente</span>
-                    <label class="inline-flex items-center text-xs text-gray-600">
-                        <input id="toggle-cliente" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm mr-2">
-                        Asociar a un cliente
-                    </label>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-sm font-medium text-gray-800">Cliente (opcional)</span>
+                    <button id="btn-select-cliente" type="button" class="px-3 py-1.5 text-xs font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700">Seleccionar cliente</button>
                 </div>
-                <div class="mt-1 text-[11px] text-gray-500">Opcional: vinculá esta venta a un cliente del legajo o creá uno nuevo.</div>
-                <div id="panel-cliente" class="mt-2 space-y-3 hidden">
+                <div id="panel-cliente" class="mt-2 space-y-3">
                     <div class="relative">
-                        <input id="ticket-cliente-busqueda" type="text" placeholder="Buscar en el legajo de clientes" class="w-full pl-9 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" autocomplete="off">
+                        <input id="ticket-cliente-busqueda" type="text" placeholder="🔍 Buscador de cliente" class="w-full pl-9 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" autocomplete="off">
                         <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
                             <i class="fas fa-search"></i>
                         </span>
                         <div id="ticket-cliente-dd" class="hidden absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden"></div>
                     </div>
-                    <button class="w-full inline-flex items-center justify-center px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
+                    <button id="btn-crear-cliente" type="button" class="w-full inline-flex items-center justify-center px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
                         <i class="fas fa-user-plus mr-2"></i> Crear nuevo cliente
                     </button>
                     <div class="pt-2 border-t border-gray-100 space-y-2 text-xs text-gray-600">
                         <div class="flex items-center justify-between">
-                            <span>Opción de cobro</span>
+                            <span>Pago</span>
                             <span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-700">Simulado</span>
                         </div>
-                        <div class="flex gap-2">
-                            <button id="btn-pago-completo" type="button" class="flex-1 px-2 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700">Pago completo</button>
-                            <button id="btn-cuenta-corriente" type="button" class="flex-1 px-2 py-1 rounded-md text-xs font-medium bg-yellow-50 text-yellow-700">Cuenta corriente</button>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <button id="btn-pago-completo" type="button" class="w-full px-3 py-2 rounded-md text-sm font-medium bg-green-50 text-green-700 border border-green-100 hover:bg-green-100">💵 Pago completo</button>
+                            <button id="btn-cuenta-corriente" type="button" class="w-full px-3 py-2 rounded-md text-sm font-medium bg-yellow-50 text-yellow-700 border border-yellow-100 hover:bg-yellow-100">🧾 Cuenta corriente</button>
                         </div>
-                        <p class="text-[11px] text-gray-500">En cuenta corriente se propondrá automáticamente el saldo a deber y el monto abonado. Más adelante lo vincularemos con el módulo de Clientes.</p>
+                        <p id="cuenta-corriente-notice" class="text-[11px] text-gray-500">Se registrará saldo pendiente en el legajo del cliente.</p>
                     </div>
                 </div>
             </div>
             <div class="p-4 bg-white rounded-lg shadow flex flex-col justify-between text-sm lg:sticky lg:top-24 h-full">
                 <div class="space-y-2 text-xs">
                     <div class="flex justify-between"><span>Total del ticket</span><span id="ticket-total-sidebar" class="font-semibold">$0,00</span></div>
-                    <div class="flex justify-between items-center gap-2">
-                        <span>Descuento general</span>
-                        <input id="ticket-descuento-general" type="number" class="w-20 px-2 py-1 border rounded-md text-right" placeholder="0" min="0" max="100">
-                        <span class="text-[11px] text-gray-500">%</span>
-                    </div>
                     <div class="flex justify-between"><span>Descuentos aplicados</span><span id="ticket-descuentos-sidebar" class="font-semibold">$0,00</span></div>
+                    <div class="flex justify-between"><span>Descuento general</span><span id="ticket-descuento-general-view" class="font-semibold text-gray-700">0%</span></div>
                 </div>
                 <button id="btn-confirmar-venta" class="w-full mt-3 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">
                     Confirmar venta (dummy)
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-select-customer" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Seleccionar cliente</h3>
+                    <p class="text-xs text-gray-500">Buscá por nombre y seleccioná (o cerrá para continuar sin cliente).</p>
+                </div>
+                <button id="btn-close-select-customer" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-3">
+                <div class="relative">
+                    <input id="select-customer-q" type="text" placeholder="Buscar cliente por nombre" class="w-full pl-9 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" autocomplete="off">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400"><i class="fas fa-search"></i></span>
+                </div>
+                <div id="select-customer-list" class="border border-gray-200 rounded-md overflow-hidden max-h-80 overflow-y-auto">
+                    <div class="px-3 py-4 text-sm text-gray-500">Sin datos.</div>
+                </div>
+                <button id="btn-open-create-customer" type="button" class="w-full inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
+                    <i class="fas fa-user-plus mr-2"></i> Crear nuevo cliente
+                </button>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end">
+                <button id="btn-cancel-select-customer" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-create-customer" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Crear cliente</h3>
+                    <p class="text-xs text-gray-500">Guardá y se seleccionará automáticamente.</p>
+                </div>
+                <button id="btn-close-create-customer" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+                    <input id="new-customer-first" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Juan">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Apellido</label>
+                    <input id="new-customer-last" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Pérez">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Email (opcional)</label>
+                    <input id="new-customer-email" type="email" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Teléfono</label>
+                    <input id="new-customer-phone" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="">
+                </div>
+                <div id="msg-create-customer-error" class="md:col-span-2 text-[11px] text-red-600 hidden flex items-center gap-1"><i class="fas fa-exclamation-circle"></i><span>Completá nombre, apellido y teléfono.</span></div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-cancel-create-customer" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-save-create-customer" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">Guardar cliente</button>
             </div>
         </div>
     </div>
@@ -912,12 +978,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputVentaLibreNombre = document.getElementById('venta-libre-nombre');
     const inputVentaLibrePrecio = document.getElementById('venta-libre-precio');
     const btnAgregarVentaLibre = document.getElementById('btn-agregar-venta-libre');
-    const toggleCliente = document.getElementById('toggle-cliente');
     const panelCliente = document.getElementById('panel-cliente');
-    const toggleClienteCambio = document.getElementById('toggle-cliente-cambio');
+    const btnSelectCliente = document.getElementById('btn-select-cliente');
+    const btnCrearCliente = document.getElementById('btn-crear-cliente');
     const panelClienteCambio = document.getElementById('panel-cliente-cambio');
+    const btnSelectClienteCambio = document.getElementById('btn-select-cliente-cambio');
+    const btnCrearClienteCambio = document.getElementById('btn-crear-cliente-cambio');
     const historial = document.getElementById('historial-ventas');
     const headerFlujo = document.getElementById('header-flujo');
+    const ventasFlowTitle = document.getElementById('ventas-flow-title');
+    const ventasFlowSubtitle = document.getElementById('ventas-flow-subtitle');
+    const ventasEditBadge = document.getElementById('ventas-edit-badge');
     const pillPaso1 = document.querySelector('[data-paso="1"]') || null;
     const pillPaso2 = document.querySelector('[data-paso="2"]') || null;
     const montoApertura = document.getElementById('monto-apertura');
@@ -932,13 +1003,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnConfirmarVenta = document.getElementById('btn-confirmar-venta');
     const btnToggleArqueo = document.getElementById('btn-toggle-arqueo');
     const panelArqueo = document.getElementById('panel-arqueo');
+    const selectArqueoEmployee = document.getElementById('arqueo-employee');
+    const msgArqueoNoEmployees = document.getElementById('msg-arqueo-no-employees');
+    const msgArqueoEmployeeRequired = document.getElementById('msg-arqueo-employee-required');
     const panelCambio = document.getElementById('panel-cambio');
     const gridProductos = document.getElementById('grid-productos');
+    const gridProductosCambio = document.getElementById('grid-productos-cambio');
+    const gridProductosCambioVenta = document.getElementById('grid-productos-cambio-venta');
     const ticketFecha = document.getElementById('ticket-fecha');
     const ticketNotas = document.getElementById('ticket-notas');
     const toggleVentaLibreTicket = document.getElementById('toggle-venta-libre-ticket');
     const tablaCarrito = document.getElementById('tabla-carrito');
-    const carritoEmptyRow = document.getElementById('carrito-empty-row');
+    let carritoEmptyRow = document.getElementById('carrito-empty-row');
     const totalEstimadoEl = document.getElementById('total-estimado');
     const tablaTicketDetalle = document.getElementById('tabla-ticket-detalle');
     const ticketSubtotalEl = document.getElementById('ticket-subtotal');
@@ -970,10 +1046,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnExportVentasPdf = document.getElementById('btn-export-ventas-pdf');
     const btnExportVentasXls = document.getElementById('btn-export-ventas-xls');
     const inputSearchVentas = document.getElementById('ventas-search');
+    const inputSearchVentasCliente = document.getElementById('ventas-search-cliente');
+    const inputSearchVentasTicket = document.getElementById('ventas-search-ticket');
+    const selectVentasTipo = document.getElementById('ventas-filter-tipo');
+    const selectVentasPago = document.getElementById('ventas-filter-pago');
+    const selectVentasEstado = document.getElementById('ventas-filter-estado');
     const kpiVentasDiaEl = document.getElementById('kpi-ventas-dia');
     const kpiItemsDiaEl = document.getElementById('kpi-items-dia');
     // Elementos específicos del flujo de cambio
-    const botonesProductoCambio = document.querySelectorAll('#vista-realizar-cambio .btn-producto-cambio');
+    let botonesProductoCambio = [];
     const tablaCarritoCambio = document.getElementById('tabla-carrito-cambio');
     const carritoCambioEmptyRow = document.getElementById('carrito-cambio-empty-row');
     const totalCambioEl = document.getElementById('total-cambio');
@@ -985,7 +1066,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const pillCambioPaso1 = document.getElementById('pill-cambio-paso1');
     const pillCambioPaso2 = document.getElementById('pill-cambio-paso2');
     const pillCambioPaso3 = document.getElementById('pill-cambio-paso3');
-    const botonesProductoCambioVenta = document.querySelectorAll('#vista-realizar-cambio .btn-producto-cambio-venta');
+    let botonesProductoCambioVenta = [];
     const tablaCarritoCambioVenta = document.getElementById('tabla-carrito-cambio-venta');
     const carritoCambioVentaEmptyRow = document.getElementById('carrito-cambio-venta-empty-row');
     const saldoAFavorEl = document.getElementById('saldo-a-favor');
@@ -1007,15 +1088,46 @@ document.addEventListener('DOMContentLoaded', function() {
     let contadorHistorialDummy = 2; // ya hay 2 filas dummy al inicio
 
     const inputDescuentoGeneral = document.getElementById('ticket-descuento-general');
+    const ticketDescuentoGeneralView = document.getElementById('ticket-descuento-general-view');
     const ticketTotalSidebar = document.getElementById('ticket-total-sidebar');
     const ticketDescuentosSidebar = document.getElementById('ticket-descuentos-sidebar');
     const inputClienteBusqueda = document.getElementById('ticket-cliente-busqueda');
     const ddCliente = document.getElementById('ticket-cliente-dd');
     const btnPagoCompleto = document.getElementById('btn-pago-completo');
     const btnCuentaCorriente = document.getElementById('btn-cuenta-corriente');
+    const modalCuentaCorriente = document.getElementById('modal-cuenta-corriente');
+    const btnCloseCc = document.getElementById('btn-close-cc');
+    const btnCancelCc = document.getElementById('btn-cancel-cc');
+    const btnAcceptCc = document.getElementById('btn-accept-cc');
+    const ccCliente = document.getElementById('cc-cliente');
+    const ccClienteAlertas = document.getElementById('cc-cliente-alertas');
+    const ccTotal = document.getElementById('cc-total');
+    const ccPaid = document.getElementById('cc-paid');
+    const ccDue = document.getElementById('cc-due');
+    const ccError = document.getElementById('cc-error');
+    const modalSelectCustomer = document.getElementById('modal-select-customer');
+    const btnCloseSelectCustomer = document.getElementById('btn-close-select-customer');
+    const btnCancelSelectCustomer = document.getElementById('btn-cancel-select-customer');
+    const inputSelectCustomerQ = document.getElementById('select-customer-q');
+    const listSelectCustomer = document.getElementById('select-customer-list');
+    const btnOpenCreateCustomer = document.getElementById('btn-open-create-customer');
+    const modalCreateCustomer = document.getElementById('modal-create-customer');
+    const btnCloseCreateCustomer = document.getElementById('btn-close-create-customer');
+    const btnCancelCreateCustomer = document.getElementById('btn-cancel-create-customer');
+    const btnSaveCreateCustomer = document.getElementById('btn-save-create-customer');
+    const inputNewCustomerFirst = document.getElementById('new-customer-first');
+    const inputNewCustomerLast = document.getElementById('new-customer-last');
+    const inputNewCustomerEmail = document.getElementById('new-customer-email');
+    const inputNewCustomerPhone = document.getElementById('new-customer-phone');
+    const msgCreateCustomerError = document.getElementById('msg-create-customer-error');
 
     let cacheCustomers = [];
     let selectedCustomer = null;
+    let currentCustomerContext = 'sale';
+    let editTicketId = null;
+
+    let ventaOnAccount = false;
+    let ventaPaidAmount = 0;
 
     let editTicketHabilitado = false;
 
@@ -1061,6 +1173,113 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function clearCartVenta() {
+        if (!tablaCarrito) return;
+        const body = tablaCarrito.querySelector('tbody');
+        if (!body) return;
+        body.innerHTML = '<tr id="carrito-empty-row"><td colspan="6" class="px-2 py-3 text-center text-gray-400 text-[11px]">Aquí se listarán los productos que vayas seleccionando, junto con los descuentos por ítem. Más adelante lo conectaremos con el inventario real.</td></tr>';
+        carritoEmptyRow = document.getElementById('carrito-empty-row');
+        if (carritoEmptyRow) carritoEmptyRow.classList.remove('hidden');
+    }
+
+    function addCartRowFromItem(item) {
+        if (!tablaCarrito) return;
+        const tbody = tablaCarrito.querySelector('tbody');
+        if (!tbody) return;
+
+        const nombre = String(item?.nombre || 'Producto');
+        const precio = parseFloat(item?.precio || 0) || 0;
+        const cantidad = parseFloat(item?.cantidad || 0) || 0;
+        const descuento = parseFloat(item?.descuento || 0) || 0;
+        const subtotal = parseFloat(item?.subtotal || 0) || (precio * cantidad * (1 - (descuento / 100)));
+        const productId = String(item?.product_id || '').trim();
+
+        if (carritoEmptyRow) carritoEmptyRow.classList.add('hidden');
+
+        const tr = document.createElement('tr');
+        if (productId) tr.setAttribute('data-product-id', productId);
+        tr.innerHTML = `
+            <td class="px-1 py-1 text-gray-700 truncate">${nombre}</td>
+            <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" step="0.01" class="input-precio w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${precio.toFixed(2)}"></td>
+            <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" step="1" class="input-cantidad w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${cantidad}"></td>
+            <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" max="100" step="0.01" class="input-descuento w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${descuento.toFixed(2)}"></td>
+            <td class="px-1 py-1 text-right text-gray-900 font-medium"><input type="number" min="0" step="0.01" class="input-subtotal w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${(isFinite(subtotal) ? subtotal : 0).toFixed(2)}"></td>
+            <td class="px-1 py-1 text-center">
+                <button type="button" class="btn-eliminar-item inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-50 text-red-500 hover:bg-red-100">
+                    <i class="fas fa-times text-[10px]"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+
+        const inputPrecio = tr.querySelector('.input-precio');
+        const inputCantidad = tr.querySelector('.input-cantidad');
+        const inputDescuento = tr.querySelector('.input-descuento');
+        const inputSubtotal = tr.querySelector('.input-subtotal');
+
+        [
+            { el: inputPrecio, origen: 'precio' },
+            { el: inputCantidad, origen: 'cantidad' },
+            { el: inputDescuento, origen: 'descuento' },
+            { el: inputSubtotal, origen: 'subtotal' },
+        ].forEach(({ el, origen }) => {
+            if (!el) return;
+            el.addEventListener('input', function () {
+                recalcularFila(tr, origen === 'subtotal' ? 'subtotal' : 'otros');
+            });
+        });
+
+        if (inputDescuento) {
+            inputDescuento.addEventListener('focus', function() {
+                if (inputDescuento.value === '0.00' || inputDescuento.value === '0' || inputDescuento.value === '0.0') {
+                    inputDescuento.value = '';
+                }
+            });
+            inputDescuento.addEventListener('blur', function() {
+                if (inputDescuento.value.trim() === '') {
+                    inputDescuento.value = '0.00';
+                    recalcularFila(tr, 'otros');
+                }
+            });
+        }
+    }
+
+    function upsertHistorialRowVenta(venta) {
+        if (!historial || !historialTbody) return;
+        const ticket = String(venta?.ticket || '').trim();
+        if (!ticket) return;
+        const rows = Array.from(historialTbody.querySelectorAll('tr'));
+        const found = rows.find(tr => {
+            const td = tr.querySelector('td');
+            return td && String(td.textContent || '').trim() === ticket;
+        });
+        const tr = found || document.createElement('tr');
+        tr.innerHTML = ''
+            + '<td class="px-3 py-2 text-gray-500">' + ticket + '</td>'
+            + '<td class="px-3 py-2 text-gray-500">' + String(venta?.fecha || '—') + '</td>'
+            + '<td class="px-3 py-2 text-gray-500">Venta</td>'
+            + '<td class="px-3 py-2 text-gray-500">' + String(venta?.customer_name || '—') + '</td>'
+            + '<td class="px-3 py-2 text-right text-gray-500">' + formatearMoneda(parseFloat(venta?.total || '0') || 0) + '</td>'
+            + '<td class="px-3 py-2 text-center text-gray-500">' + String(venta?.payment_method || 'Efectivo') + '</td>'
+            + '<td class="px-3 py-2 text-center"><span class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[11px]">Completada</span></td>'
+            + '<td class="px-3 py-2 text-center">—</td>';
+        if (!found) historialTbody.insertBefore(tr, historialTbody.firstChild);
+    }
+
+    function showPasoProductos() {
+        if (pasoTicket) pasoTicket.classList.add('hidden');
+        if (pasoProductos) pasoProductos.classList.remove('hidden');
+        if (pillPaso1) {
+            pillPaso1.classList.add('bg-indigo-600','text-white');
+            pillPaso1.classList.remove('bg-indigo-50','text-indigo-700');
+        }
+        if (pillPaso2) {
+            pillPaso2.classList.add('bg-indigo-50','text-indigo-700');
+            pillPaso2.classList.remove('bg-indigo-600','text-white');
+        }
+        scrollAElemento(pasoProductos || flujo);
+    }
+
     function recalcularArqueoAutomatico() {
         if (!montoEfectivoDia) return;
         const efectivo = calcularEfectivoDelDiaDesdeHistorial();
@@ -1092,6 +1311,75 @@ document.addEventListener('DOMContentLoaded', function() {
     function formatearMoneda(valor) {
         const numero = isNaN(valor) ? 0 : valor;
         return '$' + numero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function parseDateToTs(raw) {
+        const v = String(raw || '').trim();
+        if (!v) return 0;
+        if (v.includes('/')) {
+            const parts = v.split('/').map(x => parseInt(x, 10));
+            if (parts.length >= 3) {
+                const d = parts[0];
+                const m = parts[1];
+                const y = parts[2];
+                if (d && m && y) {
+                    const dt = new Date(y, m - 1, d);
+                    const ts = dt.getTime();
+                    return isNaN(ts) ? 0 : ts;
+                }
+            }
+        }
+        const t = Date.parse(v);
+        return isNaN(t) ? 0 : t;
+    }
+
+    function leerEmpleados() {
+        try {
+            if (window.StorageService && typeof window.StorageService.getEmployees === 'function') {
+                return window.StorageService.getEmployees();
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            const raw = window.localStorage.getItem('empleados_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function initArqueoEmployees() {
+        if (!selectArqueoEmployee) return;
+        const res = leerEmpleados();
+        const apply = function (arr) {
+            const empleados = Array.isArray(arr) ? arr : [];
+            const current = String(selectArqueoEmployee.value || '');
+            selectArqueoEmployee.innerHTML = '<option value="">— Seleccionar —</option>';
+            if (!empleados.length) {
+                selectArqueoEmployee.disabled = true;
+                if (msgArqueoNoEmployees) msgArqueoNoEmployees.classList.remove('hidden');
+                return;
+            }
+            selectArqueoEmployee.disabled = false;
+            if (msgArqueoNoEmployees) msgArqueoNoEmployees.classList.add('hidden');
+            empleados
+                .slice()
+                .sort((a, b) => String(a?.last_name || '').localeCompare(String(b?.last_name || '')))
+                .forEach(e => {
+                    const id = String(e?.id || '');
+                    const name = (String(e?.first_name || '') + ' ' + String(e?.last_name || '')).trim() || 'Empleado';
+                    const opt = document.createElement('option');
+                    opt.value = id;
+                    opt.textContent = name;
+                    selectArqueoEmployee.appendChild(opt);
+                });
+            if (current) selectArqueoEmployee.value = current;
+        };
+        if (isPromise(res)) return res.then(apply);
+        apply(res);
+        return null;
     }
 
     const logoUrl = "{{ url_for('static', filename='images/zentra-consultora-horizontal.png.png') }}";
@@ -1131,7 +1419,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'w-full text-left px-3 py-2 text-sm hover:bg-gray-50';
-            const name = String(c?.name || c?.nombre || 'Cliente');
+            const name = String(c?.name || c?.nombre || (String(c?.first_name || '') + ' ' + String(c?.last_name || '')).trim() || 'Cliente');
             btn.textContent = name;
             btn.addEventListener('click', function () {
                 selectedCustomer = { id: String(c?.id || ''), name: name };
@@ -1156,7 +1444,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         const list = Array.isArray(cacheCustomers) ? cacheCustomers : [];
-        const items = list.filter(c => String(c?.name || c?.nombre || '').toLowerCase().includes(q));
+        const items = list.filter(c => {
+            const nm = String(c?.name || c?.nombre || (String(c?.first_name || '') + ' ' + String(c?.last_name || '')).trim() || '').toLowerCase();
+            return nm.includes(q);
+        });
         showClienteDd(items);
     }
 
@@ -1168,6 +1459,221 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isPromise(res)) return res.then(apply);
         apply(res);
         return null;
+    }
+
+    function guardarCustomers(arr) {
+        try {
+            if (window.StorageService && typeof window.StorageService.saveCustomers === 'function') {
+                return window.StorageService.saveCustomers(Array.isArray(arr) ? arr : []);
+            }
+        } catch (e) {
+            // fallback
+        }
+        try {
+            window.localStorage.setItem('customers_dummy', JSON.stringify(Array.isArray(arr) ? arr : []));
+        } catch (e) {
+            // noop
+        }
+        return null;
+    }
+
+    function openModal(el) {
+        if (!el) return;
+        el.classList.remove('hidden');
+    }
+
+    function closeModal(el) {
+        if (!el) return;
+        el.classList.add('hidden');
+    }
+
+    function setEditState(ticket) {
+        editTicketId = ticket ? String(ticket) : null;
+        if (ventasFlowTitle) {
+            ventasFlowTitle.textContent = editTicketId ? ('Editando Ticket ' + editTicketId) : 'Registrar venta';
+        }
+        if (ventasEditBadge) {
+            ventasEditBadge.classList.toggle('hidden', !editTicketId);
+        }
+        if (ventasFlowSubtitle) {
+            ventasFlowSubtitle.textContent = editTicketId ? 'Usás el mismo formulario de venta. Solo estás editando el ticket.' : 'Primero elegí los productos, luego completá los datos del ticket.';
+        }
+    }
+
+    function showPasoTicket() {
+        if (pasoProductos) pasoProductos.classList.add('hidden');
+        if (pasoTicket) pasoTicket.classList.remove('hidden');
+        if (pillPaso1) {
+            pillPaso1.classList.remove('bg-indigo-600','text-white');
+            pillPaso1.classList.add('bg-indigo-50','text-indigo-700');
+        }
+        if (pillPaso2) {
+            pillPaso2.classList.add('bg-indigo-600','text-white');
+            pillPaso2.classList.remove('bg-indigo-50','text-indigo-700');
+        }
+        scrollAElemento(pasoTicket || flujo);
+    }
+
+    function openEditTicket(ticket) {
+        if (!home || !flujo) return;
+        home.classList.add('hidden');
+        flujo.classList.remove('hidden');
+        setEditState(ticket || '');
+        // Precargar datos del ticket en el flujo (sin crear una vista nueva)
+        try {
+            const res = leerSales();
+            const apply = function (arr) {
+                const sales = Array.isArray(arr) ? arr : [];
+                const t = String(ticket || '').trim();
+                const sale = sales.find(s => String(s?.ticket || '').trim() === t) || null;
+                if (!sale) return;
+
+                clearCartVenta();
+                const items = Array.isArray(sale?.items) ? sale.items : [];
+                items.forEach(it => {
+                    addCartRowFromItem(it);
+                });
+
+                if (inputDescuentoGeneral) {
+                    const pct = parseFloat(sale?.discount_general_pct || 0) || 0;
+                    inputDescuentoGeneral.value = String(pct);
+                }
+
+                if (ticketFecha) ticketFecha.value = String(sale?.fecha || '').trim() || defaultFecha;
+                if (ticketNotas) ticketNotas.value = String(sale?.notes || '').trim();
+
+                const cid = String(sale?.customer_id || '').trim();
+                const cname = String(sale?.customer_name || '').trim();
+                selectedCustomer = (cid || cname) ? { id: cid, name: cname } : null;
+                if (inputClienteBusqueda) inputClienteBusqueda.value = cname;
+
+                setPaymentMethod(String(sale?.payment_method || 'Efectivo'));
+                ventaPaidAmount = parseFloat(sale?.paid_amount || 0) || 0;
+                ventaOnAccount = (parseFloat(sale?.due_amount || 0) || 0) > 0;
+                computeTicketTotals();
+            };
+            if (isPromise(res)) res.then(apply);
+            else apply(res);
+        } catch (e) {
+        }
+        showPasoProductos();
+    }
+
+    function currentCustomerNameFromInput() {
+        return String(inputClienteBusqueda?.value || '').trim();
+    }
+
+    function setCustomerForContext(customer) {
+        const c = customer && typeof customer === 'object' ? customer : null;
+        const name = c ? String(c.name || c.nombre || '').trim() : '';
+        const id = c ? String(c.id || '').trim() : '';
+        selectedCustomer = c ? { id, name } : null;
+        if (currentCustomerContext === 'sale') {
+            if (inputClienteBusqueda) inputClienteBusqueda.value = name;
+            hideClienteDd();
+            setPagoCompleto();
+        }
+        if (currentCustomerContext === 'cambio') {
+            const input = document.getElementById('cambio-cliente');
+            if (input) input.value = name;
+        }
+    }
+
+    function renderSelectCustomerList() {
+        if (!listSelectCustomer) return;
+        const q = String(inputSelectCustomerQ?.value || '').trim().toLowerCase();
+        const list = Array.isArray(cacheCustomers) ? cacheCustomers : [];
+        const filtered = q ? list.filter(c => {
+            const nm = String(c?.name || c?.nombre || (String(c?.first_name || '') + ' ' + String(c?.last_name || '')).trim() || '').toLowerCase();
+            return nm.includes(q);
+        }) : list;
+
+        listSelectCustomer.innerHTML = '';
+        if (!filtered.length) {
+            const empty = document.createElement('div');
+            empty.className = 'px-3 py-4 text-sm text-gray-500';
+            empty.textContent = 'Sin resultados.';
+            listSelectCustomer.appendChild(empty);
+            return;
+        }
+
+        filtered.slice(0, 200).forEach(c => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'w-full text-left px-3 py-3 text-sm hover:bg-gray-50 border-b border-gray-100';
+            const name = String(c?.name || c?.nombre || (String(c?.first_name || '') + ' ' + String(c?.last_name || '')).trim() || 'Cliente');
+            btn.textContent = name;
+            btn.addEventListener('click', function () {
+                setCustomerForContext({ id: String(c?.id || ''), name: name });
+                closeModal(modalSelectCustomer);
+            });
+            listSelectCustomer.appendChild(btn);
+        });
+        return;
+    }
+
+    function openSelectCustomer(context) {
+        currentCustomerContext = context || 'sale';
+        initCustomers();
+        if (inputSelectCustomerQ) inputSelectCustomerQ.value = '';
+        renderSelectCustomerList();
+        openModal(modalSelectCustomer);
+        if (inputSelectCustomerQ) inputSelectCustomerQ.focus();
+    }
+
+    function openCreateCustomer(prefillName) {
+        if (msgCreateCustomerError) msgCreateCustomerError.classList.add('hidden');
+        const raw = String(prefillName || '').trim();
+        const parts = raw.split(' ').filter(Boolean);
+        const first = parts.length ? parts[0] : '';
+        const last = parts.length > 1 ? parts.slice(1).join(' ') : '';
+        if (inputNewCustomerFirst) inputNewCustomerFirst.value = first;
+        if (inputNewCustomerLast) inputNewCustomerLast.value = last;
+        if (inputNewCustomerEmail) inputNewCustomerEmail.value = '';
+        if (inputNewCustomerPhone) inputNewCustomerPhone.value = '';
+        openModal(modalCreateCustomer);
+        if (inputNewCustomerFirst) inputNewCustomerFirst.focus();
+    }
+
+    function saveNewCustomer() {
+        const first = String(inputNewCustomerFirst?.value || '').trim();
+        const last = String(inputNewCustomerLast?.value || '').trim();
+        const email = String(inputNewCustomerEmail?.value || '').trim();
+        const phone = String(inputNewCustomerPhone?.value || '').trim();
+        if (!first || !last || !phone) {
+            if (msgCreateCustomerError) msgCreateCustomerError.classList.remove('hidden');
+            if (inputNewCustomerFirst && !first) inputNewCustomerFirst.focus();
+            else if (inputNewCustomerLast && !last) inputNewCustomerLast.focus();
+            else if (inputNewCustomerPhone && !phone) inputNewCustomerPhone.focus();
+            return;
+        }
+
+        const next = Array.isArray(cacheCustomers) ? cacheCustomers.slice() : [];
+        const normKey = (String(first).toLowerCase() + '|' + String(last).toLowerCase() + '|' + String(phone).toLowerCase()).trim();
+        const existing = next.find(c => {
+            const f = String(c?.first_name || '').trim().toLowerCase();
+            const l = String(c?.last_name || '').trim().toLowerCase();
+            const p = String(c?.phone || '').trim().toLowerCase();
+            return (f + '|' + l + '|' + p) === normKey;
+        });
+
+        if (existing) {
+            const nm = (String(existing?.first_name || '') + ' ' + String(existing?.last_name || '')).trim();
+            setCustomerForContext({ id: String(existing?.id || ''), name: nm });
+            closeModal(modalCreateCustomer);
+            closeModal(modalSelectCustomer);
+            return;
+        }
+
+        const id = String(Date.now());
+        const payload = { id, first_name: first, last_name: last, phone: phone, email: email, status: 'activo', created_at: Date.now() };
+        next.push(payload);
+        cacheCustomers = next;
+        guardarCustomers(next);
+
+        setCustomerForContext({ id: id, name: (first + ' ' + last).trim() });
+        closeModal(modalCreateCustomer);
+        closeModal(modalSelectCustomer);
     }
 
     function setPaymentMethod(v) {
@@ -1202,7 +1708,178 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (ticketTotalSidebar) ticketTotalSidebar.textContent = formatearMoneda(total);
         if (ticketDescuentosSidebar) ticketDescuentosSidebar.textContent = formatearMoneda(descuentos);
+        if (ticketDescuentoGeneralView) ticketDescuentoGeneralView.textContent = String(pct.toFixed(0)) + '%';
         return { subtotalBruto, subtotalConDescItem, descItems, pct, descGeneral, total };
+    }
+
+    function readCustomersAlertsConfig() {
+        try {
+            const raw = window.localStorage.getItem('clientes_alertas_config');
+            const parsed = raw ? JSON.parse(raw) : null;
+            if (parsed && typeof parsed === 'object') {
+                return {
+                    warn10: Math.max(1, parseInt(parsed.warn10 || 10, 10) || 10),
+                    warn15: Math.max(1, parseInt(parsed.warn15 || 15, 10) || 15),
+                    crit30: Math.max(1, parseInt(parsed.crit30 || 30, 10) || 30)
+                };
+            }
+        } catch (e) {
+        }
+        return { warn10: 10, warn15: 15, crit30: 30 };
+    }
+
+    function getCustomerDebtSummary(customer) {
+        const c = customer && typeof customer === 'object' ? customer : null;
+        if (!c) return { saldo: 0, dias: 0, alert: '' };
+
+        const sales = Array.isArray(leerSales()) ? leerSales() : [];
+        const cid = String(c.id || '').trim();
+        const cname = String(c.name || '').trim();
+
+        let saldo = 0;
+        let lastImpagoTs = 0;
+        sales.forEach(s => {
+            const sid = String(s?.customer_id || '').trim();
+            const sn = String(s?.customer_name || '').trim();
+            const isSame = (cid && sid === cid) || (!sid && cname && sn && sn.toLowerCase() === cname.toLowerCase());
+            if (!isSame) return;
+            const due = parseFloat(s?.due_amount || 0) || 0;
+            if (due > 0) {
+                saldo += due;
+                const ts = (parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0));
+                if (ts > lastImpagoTs) lastImpagoTs = ts;
+            }
+        });
+        const dias = (saldo > 0 && lastImpagoTs) ? Math.max(0, Math.floor((Date.now() - lastImpagoTs) / (1000 * 60 * 60 * 24))) : 0;
+
+        const cfg = readCustomersAlertsConfig();
+        let alert = '';
+        if (saldo > 0) {
+            if (dias >= cfg.crit30) alert = 'critica';
+            else if (dias >= cfg.warn15) alert = 'warn15';
+            else if (dias >= cfg.warn10) alert = 'warn10';
+        }
+        return { saldo, dias, alert };
+    }
+
+    function openCuentaCorrienteModal() {
+        if (!modalCuentaCorriente) return;
+        if (!selectedCustomer || !selectedCustomer.name) {
+            alert('Para usar cuenta corriente tenés que asociar un cliente.');
+            return;
+        }
+        const totals = computeTicketTotals();
+        const total = totals.total;
+
+        const debt = getCustomerDebtSummary(selectedCustomer);
+        if (ccCliente) ccCliente.textContent = selectedCustomer.name || '—';
+        if (ccTotal) ccTotal.textContent = formatearMoneda(total);
+        if (ccPaid) ccPaid.value = String(Math.max(0, Math.min(total, ventaPaidAmount || 0)));
+        if (ccDue) ccDue.textContent = formatearMoneda(Math.max(0, total - (parseFloat(ccPaid?.value || '0') || 0)));
+        if (ccError) ccError.classList.add('hidden');
+
+        let alertTxt = '';
+        if ((debt.saldo || 0) > 0) {
+            alertTxt = 'Deuda actual: ' + formatearMoneda(debt.saldo) + ' · ' + String(debt.dias || 0) + ' días';
+            if (debt.alert === 'critica') alertTxt += ' · Crítica';
+            else if (debt.alert === 'warn15') alertTxt += ' · Aviso';
+            else if (debt.alert === 'warn10') alertTxt += ' · Aviso';
+        } else {
+            alertTxt = 'Sin deudas registradas.';
+        }
+        if (ccClienteAlertas) ccClienteAlertas.textContent = alertTxt;
+
+        openModal(modalCuentaCorriente);
+        if (ccPaid) ccPaid.focus();
+    }
+
+    function closeCuentaCorrienteModal() {
+        closeModal(modalCuentaCorriente);
+    }
+
+    function syncCcDuePreview() {
+        const totals = computeTicketTotals();
+        const total = totals.total;
+        const paid = parseFloat(String(ccPaid?.value || '0').replace(',', '.')) || 0;
+        const due = Math.max(0, total - Math.max(0, paid));
+        if (ccDue) ccDue.textContent = formatearMoneda(due);
+    }
+
+    function acceptCuentaCorriente() {
+        const totals = computeTicketTotals();
+        const total = totals.total;
+        let paid = parseFloat(String(ccPaid?.value || '0').replace(',', '.')) || 0;
+        if (paid < 0) paid = 0;
+        if (paid > total) paid = total;
+        const due = Math.max(0, total - paid);
+
+        if (ccPaid) ccPaid.value = String(paid.toFixed(2));
+        if (ccDue) ccDue.textContent = formatearMoneda(due);
+
+        ventaOnAccount = due > 0;
+        ventaPaidAmount = paid;
+
+        closeCuentaCorrienteModal();
+    }
+
+    function setPagoCompleto() {
+        ventaOnAccount = false;
+        ventaPaidAmount = 0;
+        const totals = computeTicketTotals();
+        const total = totals.total;
+        ventaPaidAmount = total;
+    }
+
+    function applyVentasFilters() {
+        if (!historial) return;
+        const body = historial.querySelector('tbody');
+        if (!body) return;
+        const rows = Array.from(body.querySelectorAll('tr'));
+        const qCli = String(inputSearchVentasCliente?.value || '').trim().toLowerCase();
+        const qTic = String(inputSearchVentasTicket?.value || '').trim().toLowerCase();
+        const tipo = String(selectVentasTipo?.value || '').trim();
+        const pago = String(selectVentasPago?.value || '').trim();
+        const estado = String(selectVentasEstado?.value || '').trim();
+
+        let fromTs = 0;
+        let toTs = 0;
+        const r = String(inputFechaRango?.value || '').trim();
+        if (r && r.includes('-')) {
+            const parts = r.split('-').map(x => x.trim());
+            if (parts.length >= 2) {
+                const a = parseDateToTs(parts[0]);
+                const b = parseDateToTs(parts[1]);
+                if (a && b) {
+                    fromTs = Math.min(a, b);
+                    toTs = Math.max(a, b) + (24 * 60 * 60 * 1000 - 1);
+                }
+            }
+        }
+
+        rows.forEach(tr => {
+            const tds = tr.querySelectorAll('td');
+            if (!tds || tds.length < 7) return;
+            const vTicket = String(tds[0]?.textContent || '').trim();
+            const vFecha = String(tds[1]?.textContent || '').trim();
+            const vTipo = String(tds[2]?.textContent || '').trim();
+            const vCliente = String(tds[3]?.textContent || '').trim();
+            const vPago = String(tds[5]?.textContent || '').trim();
+            const vEstado = String(tds[6]?.textContent || '').trim();
+
+            let ok = true;
+            if (qTic && !vTicket.toLowerCase().includes(qTic)) ok = false;
+            if (qCli && !vCliente.toLowerCase().includes(qCli)) ok = false;
+            if (tipo && vTipo !== tipo) ok = false;
+            if (pago && vPago !== pago) ok = false;
+            if (estado && !vEstado.toLowerCase().includes(estado.toLowerCase())) ok = false;
+
+            if (ok && fromTs && toTs) {
+                const ts = parseDateToTs(vFecha);
+                if (!ts || ts < fromTs || ts > toTs) ok = false;
+            }
+
+            tr.classList.toggle('hidden', !ok);
+        });
     }
 
     function initKpisFromSales() {
@@ -1339,6 +2016,102 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             bindProductButtons();
+        };
+
+        if (isPromise(res)) res.then(apply);
+        else apply(res);
+    }
+
+    function renderProductosCambioDesdeInventario() {
+        if (!gridProductosCambio) return;
+        const res = leerInventario();
+
+        const apply = function (data) {
+            const products = Array.isArray(data?.products) ? data.products : [];
+            const lots = Array.isArray(data?.lots) ? data.lots : [];
+            gridProductosCambio.innerHTML = '';
+            if (!products.length) {
+                gridProductosCambio.innerHTML = '<div class="col-span-full px-3 py-4 text-sm text-gray-500">No hay productos en inventario.</div>';
+                botonesProductoCambio = [];
+                return;
+            }
+
+            products.slice(0, 200).forEach(p => {
+                const stock = stockDisponiblePorProducto(lots, p?.id);
+                const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn-producto-cambio flex flex-col items-start p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 text-left text-xs';
+                btn.setAttribute('data-product-id', String(p?.id || ''));
+                btn.setAttribute('data-nombre', String(p?.name || 'Producto'));
+                btn.setAttribute('data-precio', String(price.toFixed(2)));
+                btn.setAttribute('data-categoria', String(p?.category || ''));
+                btn.innerHTML = ''
+                    + '<div class="w-full mb-2 flex items-center justify-center">'
+                    + '  <div class="h-16 w-16 rounded-md bg-white border border-gray-200 flex items-center justify-center overflow-hidden">'
+                    + '    <img src="' + logoUrl + '" alt="" class="h-10">'
+                    + '  </div>'
+                    + '</div>'
+                    + '<div class="font-medium text-gray-800 truncate w-full">' + String(p?.name || 'Producto') + '</div>'
+                    + '<div class="text-[11px] text-gray-500">' + String(p?.category || '') + '</div>'
+                    + '<div class="mt-1 font-semibold text-sm text-gray-900">' + formatearMoneda(price) + '</div>'
+                    + '<div class="mt-1 text-[11px] text-gray-500">Stock: ' + String((isNaN(stock) ? 0 : stock).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</div>';
+                btn.addEventListener('click', function () {
+                    const nombre = btn.getAttribute('data-nombre') || 'Producto';
+                    const precio = btn.getAttribute('data-precio') || '0';
+                    agregarProductoAlCarritoCambio(nombre, precio);
+                });
+                gridProductosCambio.appendChild(btn);
+            });
+            botonesProductoCambio = Array.from(gridProductosCambio.querySelectorAll('.btn-producto-cambio'));
+        };
+
+        if (isPromise(res)) res.then(apply);
+        else apply(res);
+    }
+
+    function renderProductosCambioVentaDesdeInventario() {
+        if (!gridProductosCambioVenta) return;
+        const res = leerInventario();
+
+        const apply = function (data) {
+            const products = Array.isArray(data?.products) ? data.products : [];
+            const lots = Array.isArray(data?.lots) ? data.lots : [];
+            gridProductosCambioVenta.innerHTML = '';
+            if (!products.length) {
+                gridProductosCambioVenta.innerHTML = '<div class="col-span-full px-3 py-4 text-sm text-gray-500">No hay productos en inventario.</div>';
+                botonesProductoCambioVenta = [];
+                return;
+            }
+
+            products.slice(0, 200).forEach(p => {
+                const stock = stockDisponiblePorProducto(lots, p?.id);
+                const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn-producto-cambio-venta flex flex-col items-start p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 text-left text-xs';
+                btn.setAttribute('data-product-id', String(p?.id || ''));
+                btn.setAttribute('data-nombre', String(p?.name || 'Producto'));
+                btn.setAttribute('data-precio', String(price.toFixed(2)));
+                btn.setAttribute('data-categoria', String(p?.category || ''));
+                btn.innerHTML = ''
+                    + '<div class="w-full mb-2 flex items-center justify-center">'
+                    + '  <div class="h-16 w-16 rounded-md bg-white border border-gray-200 flex items-center justify-center overflow-hidden">'
+                    + '    <img src="' + logoUrl + '" alt="" class="h-10">'
+                    + '  </div>'
+                    + '</div>'
+                    + '<div class="font-medium text-gray-800 truncate w-full">' + String(p?.name || 'Producto') + '</div>'
+                    + '<div class="text-[11px] text-gray-500">' + String(p?.category || '') + '</div>'
+                    + '<div class="mt-1 font-semibold text-sm text-gray-900">' + formatearMoneda(price) + '</div>'
+                    + '<div class="mt-1 text-[11px] text-gray-500">Stock: ' + String((isNaN(stock) ? 0 : stock).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</div>';
+                btn.addEventListener('click', function () {
+                    const nombre = btn.getAttribute('data-nombre') || 'Producto';
+                    const precio = btn.getAttribute('data-precio') || '0';
+                    agregarProductoAlCarritoCambioVenta(nombre, precio);
+                });
+                gridProductosCambioVenta.appendChild(btn);
+            });
+            botonesProductoCambioVenta = Array.from(gridProductosCambioVenta.querySelectorAll('.btn-producto-cambio-venta'));
         };
 
         if (isPromise(res)) res.then(apply);
@@ -1941,7 +2714,20 @@ document.addEventListener('DOMContentLoaded', function() {
             // Mostrar siempre el flujo y ocultar el home
             home.classList.add('hidden');
             flujo.classList.remove('hidden');
+            setEditState(null);
 
+            // Reset pasos
+            pasoTicket.classList.add('hidden');
+            pasoProductos.classList.remove('hidden');
+            if (headerFlujo) {
+                headerFlujo.classList.remove('hidden');
+            }
+            if (pillPaso1 && pillPaso2) {
+                pillPaso1.classList.add('bg-indigo-600','text-white');
+                pillPaso1.classList.remove('bg-indigo-50','text-indigo-700');
+                pillPaso2.classList.add('bg-indigo-50','text-indigo-700');
+                pillPaso2.classList.remove('bg-indigo-600','text-white');
+            }
             scrollAElemento(flujo);
         });
     }
@@ -1976,6 +2762,7 @@ document.addEventListener('DOMContentLoaded', function() {
         btnVolverHome.addEventListener('click', function() {
             flujo.classList.add('hidden');
             home.classList.remove('hidden');
+            setEditState(null);
             scrollAElemento(home);
         });
     }
@@ -2077,13 +2864,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (toggleCliente && panelCliente) {
-        toggleCliente.addEventListener('change', function() {
-            if (toggleCliente.checked) {
-                panelCliente.classList.remove('hidden');
-            } else {
-                panelCliente.classList.add('hidden');
-            }
+    if (btnSelectCliente) {
+        btnSelectCliente.addEventListener('click', function () {
+            openSelectCustomer('sale');
+        });
+    }
+
+    if (btnCrearCliente) {
+        btnCrearCliente.addEventListener('click', function () {
+            openCreateCustomer(currentCustomerNameFromInput());
         });
     }
 
@@ -2109,13 +2898,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (toggleClienteCambio && panelClienteCambio) {
-        toggleClienteCambio.addEventListener('change', function() {
-            if (toggleClienteCambio.checked) {
-                panelClienteCambio.classList.remove('hidden');
-            } else {
-                panelClienteCambio.classList.add('hidden');
-            }
+    if (btnSelectClienteCambio) {
+        btnSelectClienteCambio.addEventListener('click', function () {
+            openSelectCustomer('cambio');
+        });
+    }
+
+    if (btnCrearClienteCambio) {
+        btnCrearClienteCambio.addEventListener('click', function () {
+            const prefill = String(document.getElementById('cambio-cliente')?.value || '').trim();
+            openCreateCustomer(prefill);
         });
     }
 
@@ -2140,14 +2932,31 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    if (selectArqueoEmployee) {
+        selectArqueoEmployee.addEventListener('change', function () {
+            if (msgArqueoEmployeeRequired) msgArqueoEmployeeRequired.classList.add('hidden');
+        });
+    }
+
     if (btnGuardarArqueo && montoApertura && montoEfectivoDia && montoCierre) {
         btnGuardarArqueo.addEventListener('click', function() {
             // Asegurar cálculo y validación antes de guardar
             recalcularArqueoAutomatico();
 
+            if (msgArqueoEmployeeRequired) msgArqueoEmployeeRequired.classList.add('hidden');
+            const employeeId = String(selectArqueoEmployee?.value || '').trim();
+            if (!employeeId) {
+                if (msgArqueoEmployeeRequired) msgArqueoEmployeeRequired.classList.remove('hidden');
+                if (selectArqueoEmployee && !selectArqueoEmployee.disabled) selectArqueoEmployee.focus();
+                return;
+            }
+            const employeeName = String(selectArqueoEmployee?.selectedOptions?.[0]?.textContent || '').trim();
+
             const fecha = (document.getElementById('fecha-arqueo')?.value || '');
             const payload = {
                 fecha,
+                employee_id: employeeId,
+                employee_name: employeeName,
                 apertura: montoApertura.value || '',
                 efectivo_dia: montoEfectivoDia.value || '',
                 cierre: montoCierre.value || ''
@@ -2196,12 +3005,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (saved.apertura !== undefined) montoApertura.value = saved.apertura;
                 if (saved.efectivo_dia !== undefined) montoEfectivoDia.value = saved.efectivo_dia;
                 if (saved.cierre !== undefined) montoCierre.value = saved.cierre;
+                if (selectArqueoEmployee && saved.employee_id !== undefined) selectArqueoEmployee.value = String(saved.employee_id || '');
                 validarCierreArqueo();
             }
         }
     } catch (e) {
         // noop
     }
+
+    initArqueoEmployees();
 
     if (btnToggleArqueo && panelArqueo) {
         btnToggleArqueo.addEventListener('click', function() {
@@ -2213,6 +3025,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (!panelArqueo.classList.contains('hidden')) {
+                initArqueoEmployees();
                 recalcularArqueoAutomatico();
             }
         });
@@ -2467,13 +3280,9 @@ document.addEventListener('DOMContentLoaded', function() {
             e.stopPropagation();
             const ticket = (btnVer || btnEliminar).getAttribute('data-ticket') || '';
 
-            if (btnVer && vistaEditarMovimiento) {
-                if (inputEditTicketId) inputEditTicketId.textContent = ticket;
-                if (tituloTicketId) tituloTicketId.textContent = ticket;
-                setClienteTicketDummy(ticket);
-                setModoEdicionTicket(false);
+            if (btnVer) {
                 cerrarTodosLosMenusMov();
-                mostrarVistaMovimiento(vistaEditarMovimiento);
+                openEditTicket(ticket);
             } else if (btnEliminar) {
                 const confirmar = window.confirm('¿Seguro que querés eliminar el ticket ' + ticket + ' (simulado)?');
                 if (confirmar) {
@@ -2491,7 +3300,10 @@ document.addEventListener('DOMContentLoaded', function() {
             mode: 'range',
             dateFormat: 'd/m/Y',
             locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es',
-            allowInput: false
+            allowInput: false,
+            onChange: function () {
+                applyVentasFilters();
+            }
         });
     }
 
@@ -2597,7 +3409,7 @@ td.num,th.num{text-align:right}
     <h1>Historial de ventas</h1>
     <p>Período: ${period || 'todo'}</p>
   </div>
-  <div class="pill">Filtro búsqueda: <strong>${(inputSearchVentas?.value || '').trim() || '—'}</strong></div>
+  <div class="pill">Filtros: <strong>${(inputSearchVentasCliente?.value || '').trim() || '—'}</strong> / <strong>${(inputSearchVentasTicket?.value || '').trim() || '—'}</strong></div>
 </div>
 <table>
   <thead><tr>
@@ -2629,7 +3441,12 @@ td.num,th.num{text-align:right}
     if (btnClearVentas) {
         btnClearVentas.addEventListener('click', function () {
             if (inputFechaRango) inputFechaRango.value = '';
-            if (inputSearchVentas) inputSearchVentas.value = '';
+            if (inputSearchVentasCliente) inputSearchVentasCliente.value = '';
+            if (inputSearchVentasTicket) inputSearchVentasTicket.value = '';
+            if (selectVentasTipo) selectVentasTipo.value = '';
+            if (selectVentasPago) selectVentasPago.value = '';
+            if (selectVentasEstado) selectVentasEstado.value = '';
+            applyVentasFilters();
         });
     }
 
@@ -2722,10 +3539,8 @@ td.num,th.num{text-align:right}
                 return;
             }
 
-            const pagoActual = getSelectedPaymentMethod();
-            if (pagoActual === 'Cuenta corriente') {
-                const asociar = !!(toggleCliente && toggleCliente.checked);
-                if (!asociar || !selectedCustomer || !selectedCustomer.name) {
+            if (ventaOnAccount) {
+                if (!selectedCustomer || !selectedCustomer.name) {
                     alert('Para usar cuenta corriente tenés que asociar un cliente.');
                     return;
                 }
@@ -2737,6 +3552,76 @@ td.num,th.num{text-align:right}
             const totals = computeTicketTotals();
             const total = totals.total;
             const ventaLibre = !!(toggleVentaLibreTicket?.checked || toggleVentaLibre?.checked);
+
+            // Si estamos editando un ticket existente: actualizar venta y NO consumir inventario nuevamente
+            if (editTicketId) {
+                const salesRes = leerSales();
+                const applySales = function (sales) {
+                    const list = Array.isArray(sales) ? sales : [];
+                    const idx = list.findIndex(s => String(s?.ticket || '').trim() === String(editTicketId || '').trim());
+                    if (idx < 0) {
+                        alert('No se encontró el ticket a editar.');
+                        return;
+                    }
+                    const prev = list[idx] || {};
+                    const paidAmount = ventaOnAccount ? Math.max(0, Math.min(total, (parseFloat(ventaPaidAmount || 0) || 0))) : total;
+                    const dueAmount = ventaOnAccount ? Math.max(0, total - paidAmount) : 0;
+
+                    const updated = {
+                        ...prev,
+                        fecha,
+                        payment_method: pago,
+                        notes: notas,
+                        total,
+                        discount_general_pct: totals.pct,
+                        discount_general_amount: totals.descGeneral,
+                        items,
+                        customer_id: selectedCustomer ? (selectedCustomer.id || '') : '',
+                        customer_name: selectedCustomer ? (selectedCustomer.name || '') : '',
+                        on_account: ventaOnAccount,
+                        paid_amount: paidAmount,
+                        due_amount: dueAmount,
+                        updated_at: Date.now()
+                    };
+                    list[idx] = updated;
+
+                    const resSave = guardarSales(list);
+                    const finishUi = function () {
+                        upsertHistorialRowVenta(updated);
+                        recalcularArqueoAutomatico();
+
+                        clearCartVenta();
+                        if (inputDescuentoGeneral) inputDescuentoGeneral.value = '';
+                        if (inputClienteBusqueda) inputClienteBusqueda.value = '';
+                        if (ticketNotas) ticketNotas.value = '';
+                        selectedCustomer = null;
+                        ventaOnAccount = false;
+                        ventaPaidAmount = 0;
+                        setEditState(null);
+                        actualizarTotalEstimado();
+
+                        pasoTicket.classList.add('hidden');
+                        pasoProductos.classList.remove('hidden');
+                        flujo.classList.add('hidden');
+                        home.classList.remove('hidden');
+                        if (headerFlujo) headerFlujo.classList.remove('hidden');
+                        if (pillPaso1 && pillPaso2) {
+                            pillPaso1.classList.add('bg-indigo-600','text-white');
+                            pillPaso1.classList.remove('bg-indigo-50','text-indigo-700');
+                            pillPaso2.classList.add('bg-indigo-50','text-indigo-700');
+                            pillPaso2.classList.remove('bg-indigo-600','text-white');
+                        }
+                        scrollAElemento(home);
+                    };
+
+                    if (isPromise(resSave)) resSave.then(finishUi);
+                    else finishUi();
+                };
+
+                if (isPromise(salesRes)) salesRes.then(applySales);
+                else applySales(salesRes);
+                return;
+            }
 
             const resInv = leerInventario();
             const applyInv = function (data) {
@@ -2786,6 +3671,9 @@ td.num,th.num{text-align:right}
                     const nextTicketNum = list.length + 1;
                     const ticket = '#'+ String(nextTicketNum).padStart(4, '0');
 
+                    const paidAmount = ventaOnAccount ? Math.max(0, Math.min(total, (parseFloat(ventaPaidAmount || 0) || 0))) : total;
+                    const dueAmount = ventaOnAccount ? Math.max(0, total - paidAmount) : 0;
+
                     const payloadVenta = {
                         id: String(Date.now()),
                         ticket,
@@ -2799,9 +3687,9 @@ td.num,th.num{text-align:right}
                         items,
                         customer_id: selectedCustomer ? (selectedCustomer.id || '') : '',
                         customer_name: selectedCustomer ? (selectedCustomer.name || '') : '',
-                        on_account: pago === 'Cuenta corriente',
-                        paid_amount: (pago === 'Cuenta corriente') ? 0 : total,
-                        due_amount: (pago === 'Cuenta corriente') ? total : 0,
+                        on_account: ventaOnAccount,
+                        paid_amount: paidAmount,
+                        due_amount: dueAmount,
                         inventory_linked: !ventaLibre,
                         cost_breakdown: costBreakdown,
                         created_at: Date.now()
@@ -2852,7 +3740,7 @@ td.num,th.num{text-align:right}
                         list.push(payloadVenta);
                         const saveSalesRes = guardarSales(list);
                         const finishUi = function () {
-                            appendHistorialRowVenta(payloadVenta);
+                            upsertHistorialRowVenta(payloadVenta);
                             recalcularArqueoAutomatico();
 
                             // reset UI
@@ -2863,6 +3751,9 @@ td.num,th.num{text-align:right}
                             if (inputDescuentoGeneral) inputDescuentoGeneral.value = '';
                             if (inputClienteBusqueda) inputClienteBusqueda.value = '';
                             selectedCustomer = null;
+                            ventaOnAccount = false;
+                            ventaPaidAmount = 0;
+                            setEditState(null);
                             actualizarTotalEstimado();
 
                             pasoTicket.classList.add('hidden');
@@ -2902,6 +3793,8 @@ td.num,th.num{text-align:right}
 
     // Si hay inventario real, reemplazar grilla dummy por productos reales
     renderProductosDesdeInventario();
+    renderProductosCambioDesdeInventario();
+    renderProductosCambioVentaDesdeInventario();
 
     // Init customers + autocomplete
     initCustomers();
@@ -2922,14 +3815,52 @@ td.num,th.num{text-align:right}
         });
     }
 
-    if (btnPagoCompleto) btnPagoCompleto.addEventListener('click', function () { setPaymentMethod('Efectivo'); });
-    if (btnCuentaCorriente) btnCuentaCorriente.addEventListener('click', function () { setPaymentMethod('Cuenta corriente'); });
+    if (btnPagoCompleto) btnPagoCompleto.addEventListener('click', function () { setPagoCompleto(); });
+    if (btnCuentaCorriente) btnCuentaCorriente.addEventListener('click', function () { openCuentaCorrienteModal(); });
+
+    if (ccPaid) ccPaid.addEventListener('input', function () { syncCcDuePreview(); });
+    if (btnCloseCc) btnCloseCc.addEventListener('click', function () { closeCuentaCorrienteModal(); });
+    if (btnCancelCc) btnCancelCc.addEventListener('click', function () { closeCuentaCorrienteModal(); });
+    if (btnAcceptCc) btnAcceptCc.addEventListener('click', function () { acceptCuentaCorriente(); });
+    if (modalCuentaCorriente) {
+        modalCuentaCorriente.addEventListener('click', function (e) {
+            const target = e.target;
+            if (target && target === modalCuentaCorriente.firstElementChild) closeCuentaCorrienteModal();
+        });
+    }
+
+    if (modalSelectCustomer) {
+        modalSelectCustomer.addEventListener('click', function (e) {
+            const target = e.target;
+            if (target && target === modalSelectCustomer.firstElementChild) closeModal(modalSelectCustomer);
+        });
+    }
+    if (btnCloseSelectCustomer) btnCloseSelectCustomer.addEventListener('click', function () { closeModal(modalSelectCustomer); });
+    if (btnCancelSelectCustomer) btnCancelSelectCustomer.addEventListener('click', function () { closeModal(modalSelectCustomer); });
+    if (inputSelectCustomerQ) inputSelectCustomerQ.addEventListener('input', function () { renderSelectCustomerList(); });
+    if (btnOpenCreateCustomer) btnOpenCreateCustomer.addEventListener('click', function () { openCreateCustomer(''); });
+
+    if (modalCreateCustomer) {
+        modalCreateCustomer.addEventListener('click', function (e) {
+            const target = e.target;
+            if (target && target === modalCreateCustomer.firstElementChild) closeModal(modalCreateCustomer);
+        });
+    }
+    if (btnCloseCreateCustomer) btnCloseCreateCustomer.addEventListener('click', function () { closeModal(modalCreateCustomer); });
+    if (btnCancelCreateCustomer) btnCancelCreateCustomer.addEventListener('click', function () { closeModal(modalCreateCustomer); });
+    if (btnSaveCreateCustomer) btnSaveCreateCustomer.addEventListener('click', function () { saveNewCustomer(); });
 
     if (inputDescuentoGeneral) {
         inputDescuentoGeneral.addEventListener('input', function () {
             computeTicketTotals();
         });
     }
+
+    if (inputSearchVentasCliente) inputSearchVentasCliente.addEventListener('input', function () { applyVentasFilters(); });
+    if (inputSearchVentasTicket) inputSearchVentasTicket.addEventListener('input', function () { applyVentasFilters(); });
+    if (selectVentasTipo) selectVentasTipo.addEventListener('change', function () { applyVentasFilters(); });
+    if (selectVentasPago) selectVentasPago.addEventListener('change', function () { applyVentasFilters(); });
+    if (selectVentasEstado) selectVentasEstado.addEventListener('change', function () { applyVentasFilters(); });
 
     // Init KPIs
     initKpisFromSales();

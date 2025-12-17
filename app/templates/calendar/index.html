@@ -1,0 +1,693 @@
+{% extends 'base.html' %}
+{% block title %}Calendario{% endblock %}
+{% block content %}
+{% set module_styles = {
+    'manual': 'bg-slate-200 border-slate-400',
+    'clientes': 'bg-sky-200 border-sky-400',
+    'ventas': 'bg-indigo-200 border-indigo-400',
+    'empleados': 'bg-emerald-200 border-emerald-400',
+    'movimientos': 'bg-violet-200 border-violet-400',
+    'inventario': 'bg-amber-200 border-amber-400',
+    'gastos': 'bg-rose-200 border-rose-400',
+    'proveedores': 'bg-teal-200 border-teal-400',
+    'reportes': 'bg-gray-200 border-gray-400',
+    'configuracion': 'bg-blue-200 border-blue-400',
+    'sistema': 'bg-gray-50 border-gray-200 text-gray-800'
+} %}
+{% set prio_styles = {
+    'baja': {'dot': 'bg-emerald-500', 'label': 'baja'},
+    'media': {'dot': 'bg-yellow-400', 'label': 'media'},
+    'alta': {'dot': 'bg-orange-500', 'label': 'alta'},
+    'critica': {'dot': 'bg-red-600', 'label': 'critica'}
+} %}
+<div class="mb-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Calendario</h1>
+            <p class="mt-1 text-sm text-gray-600">Centro de control temporal: vencimientos, avisos y recordatorios.</p>
+        </div>
+        <div class="flex gap-2 justify-end">
+            <a href="{{ url_for('calendar.index', view='month', year=year, month=month) }}" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border {% if view == 'month' %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-700 border-gray-200 hover:bg-gray-50{% endif %}">
+                <i class="fas fa-calendar-alt mr-2"></i> Mensual
+            </a>
+            <a href="{{ url_for('calendar.index', view='list', year=year, month=month) }}" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border {% if view == 'list' %}bg-blue-600 text-white border-blue-600{% else %}bg-white text-gray-700 border-gray-200 hover:bg-gray-50{% endif %}">
+                <i class="fas fa-list mr-2"></i> Lista
+            </a>
+            <button id="btn-open-config" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                <i class="fas fa-sliders-h mr-2"></i> Editar avisos / eventos
+            </button>
+            <button id="btn-open-new" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">
+                <i class="fas fa-plus mr-2"></i> Nuevo aviso
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            {% if view == 'list' and range_mode is defined and range_ref is defined and prev_date is defined and next_date is defined %}
+                <a href="{{ url_for('calendar.index', view='list', range=range_mode, year=prev_date.year, month=prev_date.month, day=prev_date.day) }}" class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 hover:bg-gray-50 text-gray-700" title="Anterior">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+                <div class="text-sm font-semibold text-gray-900">
+                    {% if range_mode == 'day' %}
+                        {{ range_ref.strftime('%d/%m/%Y') }}
+                    {% elif range_mode == 'week' %}
+                        Semana de {{ (range_week_start.strftime('%d/%m/%Y') if range_week_start is defined and range_week_start else range_ref.strftime('%d/%m/%Y')) }}
+                    {% else %}
+                        {{ '%02d'|format(month) }}/{{ year }}
+                    {% endif %}
+                </div>
+                <a href="{{ url_for('calendar.index', view='list', range=range_mode, year=next_date.year, month=next_date.month, day=next_date.day) }}" class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 hover:bg-gray-50 text-gray-700" title="Siguiente">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            {% else %}
+                {% set prev_month = month - 1 %}
+                {% set prev_year = year %}
+                {% if prev_month < 1 %}{% set prev_month = 12 %}{% set prev_year = year - 1 %}{% endif %}
+                {% set next_month = month + 1 %}
+                {% set next_year = year %}
+                {% if next_month > 12 %}{% set next_month = 1 %}{% set next_year = year + 1 %}{% endif %}
+                <a href="{{ url_for('calendar.index', view=view, year=prev_year, month=prev_month) }}" class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 hover:bg-gray-50 text-gray-700" title="Mes anterior">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+                <div class="text-sm font-semibold text-gray-900">
+                    {{ '%02d'|format(month) }}/{{ year }}
+                </div>
+                <a href="{{ url_for('calendar.index', view=view, year=next_year, month=next_month) }}" class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 hover:bg-gray-50 text-gray-700" title="Mes siguiente">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            {% endif %}
+        </div>
+        <a href="{{ url_for('calendar.index', view=view, range=(range_mode if range_mode is defined else None)) }}" class="text-xs text-blue-700 hover:text-blue-900">Hoy</a>
+    </div>
+
+    {% if view == 'month' %}
+    <div class="p-4">
+        <div class="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden">
+            {% for wd in ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'] %}
+            <div class="bg-gray-50 px-2 py-2 text-xs font-semibold text-gray-600">{{ wd }}</div>
+            {% endfor %}
+
+            {% for week in weeks %}
+                {% for cell in week %}
+                    {% set d = cell.date %}
+                    <div class="bg-white h-24 p-2 overflow-hidden {% if not cell.in_month %}opacity-50{% endif %} {% if d == today %}ring-2 ring-blue-400 ring-inset bg-blue-50/30{% endif %}" data-day="{{ d.isoformat() }}" style="height:104px;">
+                        <div class="flex items-center justify-between">
+                            <div class="font-semibold {% if d == today %}text-blue-700{% else %}text-gray-700{% endif %}" style="font-size:12px;">{{ d.day }}</div>
+                            <div class="text-gray-400" style="font-size:9px;">{{ d.strftime('%a') }}</div>
+                        </div>
+                        <div class="mt-1 space-y-1">
+                            {% for ev in cell.events[:3] %}
+                                {% set mod = (ev.source_module or 'manual') %}
+                                {% set pr = (ev.priority or 'media')|lower %}
+                                {% set pr_info = prio_styles.get(pr, prio_styles.get('media')) %}
+                                {% set mod_cls = module_styles.get(mod, module_styles.get('manual')) %}
+                                {% if ev.is_system %}
+                                    <div class="w-full text-left px-2 py-1 rounded-md border {{ mod_cls }} text-gray-900" style="font-size:9px;line-height:1.15;">
+                                        <div class="flex items-start gap-1">
+                                            <span class="shrink-0 mt-0.5 h-2.5 w-2.5 rounded-full {{ pr_info.dot }}" title="{{ pr_info.label }}"></span>
+                                            <span class="font-medium" title="{{ ev.title|e }}" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ ev.title }}</span>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <button type="button" class="w-full text-left px-2 py-1 rounded-md border {{ mod_cls }} text-gray-900 hover:bg-white/60" style="font-size:9px;line-height:1.15;" data-edit-event="{{ ev.id }}" data-title="{{ ev.title|e }}" data-description="{{ (ev.description or '')|e }}" data-date="{{ ev.event_date.isoformat() }}" data-priority="{{ ev.priority }}" data-status="{{ ev.status }}" data-source-module="{{ ev.source_module }}">
+                                        <div class="flex items-start gap-1">
+                                            <span class="shrink-0 mt-0.5 h-2.5 w-2.5 rounded-full {{ pr_info.dot }}" title="{{ pr_info.label }}"></span>
+                                            <span class="font-medium" title="{{ ev.title|e }}" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ ev.title }}</span>
+                                        </div>
+                                    </button>
+                                {% endif %}
+                            {% endfor %}
+                            {% if cell.events|length > 3 %}
+                                <div class="text-[10px] text-gray-500">+{{ cell.events|length - 3 }} más</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if view == 'list' %}
+    <div class="p-4">
+        <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div class="inline-flex rounded-md border border-gray-200 overflow-hidden">
+                {% set rm = (range_mode if range_mode is defined else 'month') %}
+                {% set rr = (range_ref if range_ref is defined else today) %}
+                <a href="{{ url_for('calendar.index', view='list', range='day', year=rr.year, month=rr.month, day=rr.day) }}" class="px-3 py-2 text-xs font-medium {% if rm == 'day' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 hover:bg-gray-50{% endif %}">Día</a>
+                <a href="{{ url_for('calendar.index', view='list', range='week', year=rr.year, month=rr.month, day=rr.day) }}" class="px-3 py-2 text-xs font-medium border-l border-gray-200 {% if rm == 'week' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 hover:bg-gray-50{% endif %}">Semana</a>
+                <a href="{{ url_for('calendar.index', view='list', range='month', year=rr.year, month=rr.month, day=1) }}" class="px-3 py-2 text-xs font-medium border-l border-gray-200 {% if rm == 'month' %}bg-blue-600 text-white{% else %}bg-white text-gray-700 hover:bg-gray-50{% endif %}">Mes</a>
+            </div>
+            <div class="text-xs text-gray-500">Agrupado por día</div>
+        </div>
+
+        {% if events|length == 0 %}
+            <div class="text-sm text-gray-500 text-center py-8">No hay avisos para este mes.</div>
+        {% else %}
+            <div class="space-y-4">
+                {% for group in events %}
+                    <div data-group-date="{{ group['date'].isoformat() }}">
+                        <div class="text-xs font-semibold text-gray-700 mb-2">{{ group['date'].strftime('%A %d/%m/%Y') }}</div>
+                        <div class="space-y-2" data-group-items="{{ group['date'].isoformat() }}">
+                            {% for row in group['items'] %}
+                                {% set ev = row.event %}
+                                {% set mod = (ev.source_module or 'manual') %}
+                                {% set pr = (ev.priority or 'media')|lower %}
+                                {% set pr_info = prio_styles.get(pr, prio_styles.get('media')) %}
+                                {% set mod_cls = module_styles.get(mod, module_styles.get('manual')) %}
+                                <div class="p-3 border rounded-lg flex items-start justify-between gap-3 {{ mod_cls }}">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <span class="h-2.5 w-2.5 rounded-full {{ pr_info.dot }}" title="{{ pr_info.label }}"></span>
+                                            <span class="px-2 py-0.5 rounded text-[10px] border bg-white/40 border-black/10 text-gray-900">{{ mod }}</span>
+                                            <div class="text-sm font-semibold text-gray-900" title="{{ ev.title|e }}" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ ev.title }}</div>
+                                            {% if row.overdue %}<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-100">vencido</span>{% endif %}
+                                            {% if ev.status == 'done' %}<span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 border border-gray-200">resuelto</span>{% endif %}
+                                        </div>
+                                        <div class="mt-1 text-xs text-gray-500">{{ ev.event_date.strftime('%d/%m/%Y') }}{% if ev.description %} · {{ ev.description }}{% endif %}</div>
+                                    </div>
+                                    {% if ev.is_system %}
+                                        <div class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 text-gray-300" title="Evento del sistema">
+                                            <i class="fas fa-lock"></i>
+                                        </div>
+                                    {% else %}
+                                        <button type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 hover:bg-gray-50 text-gray-700" data-edit-event="{{ ev.id }}" data-title="{{ ev.title|e }}" data-description="{{ (ev.description or '')|e }}" data-date="{{ ev.event_date.isoformat() }}" data-priority="{{ ev.priority }}" data-status="{{ ev.status }}" data-source-module="{{ ev.source_module }}" title="Editar">
+                                            <i class="fas fa-pen"></i>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script id="calendar-bootstrap" type="application/json">{{ {
+    'employee_edit_url': url_for('employees.new'),
+    'customer_index_url': url_for('customers.index'),
+    'cfg_sources': (cfg.get('event_sources') if cfg else {}),
+    'view': view,
+    'year': year,
+    'month': month,
+    'range_start': (range_start.isoformat() if range_start is defined and range_start else ''),
+    'range_end': (range_end.isoformat() if range_end is defined and range_end else ''),
+}|tojson }}</script>
+
+<div id="modal-new" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 id="modal-new-title" class="text-base font-semibold text-gray-900">Nuevo aviso</h3>
+                    <p class="text-xs text-gray-500">Crea un recordatorio manual para una fecha específica.</p>
+                </div>
+                <button id="btn-close-new" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+
+            <form id="form-event" method="post" class="p-5 space-y-3">
+                <input id="event-action" type="hidden" name="action" value="create_manual_event">
+                <input id="event-id" type="hidden" name="event_id" value="">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Título</label>
+                    <input id="event-title" name="title" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Llamar a Juan">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Descripción</label>
+                    <textarea id="event-description" name="description" class="w-full px-3 py-2 text-sm border rounded-md" rows="3" placeholder="Detalle opcional"></textarea>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Fecha</label>
+                        <input id="event-date" name="date" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Prioridad</label>
+                        <select id="event-priority" name="priority" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="baja">Baja</option>
+                            <option value="media" selected>Media</option>
+                            <option value="alta">Alta</option>
+                            <option value="critica">Crítica</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Módulo</label>
+                        <select id="event-source-module" name="source_module" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="manual" selected>Manual</option>
+                            <option value="clientes">Clientes</option>
+                            <option value="ventas">Ventas</option>
+                            <option value="empleados">Empleados</option>
+                            <option value="movimientos">Movimientos</option>
+                            <option value="inventario">Inventario</option>
+                            <option value="gastos">Gastos</option>
+                            <option value="proveedores">Proveedores</option>
+                            <option value="reportes">Reportes</option>
+                            <option value="configuracion">Configuración</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>
+                        <select id="event-status" name="status" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="open" selected>Pendiente</option>
+                            <option value="done">Resuelto</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pt-2 flex items-center justify-between gap-2">
+                    <button id="btn-delete-event" type="button" class="hidden inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-white border border-red-200 rounded-md hover:bg-red-50">
+                        <i class="fas fa-trash mr-2"></i> Eliminar
+                    </button>
+                    <div class="flex justify-end gap-2 ml-auto">
+                        <button id="btn-cancel-new" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                        <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">Guardar</button>
+                    </div>
+                </div>
+            </form>
+
+            <form id="form-delete" method="post" class="hidden">
+                <input type="hidden" name="action" value="delete_manual_event">
+                <input id="delete-event-id" type="hidden" name="event_id" value="">
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="modal-config" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Editar avisos / eventos</h3>
+                    <p class="text-xs text-gray-500">Activá o desactivá fuentes y reglas de avisos. No se eliminan, solo se muestran u ocultan.</p>
+                </div>
+                <button id="btn-close-config" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+
+            <form method="post" class="p-5 space-y-4">
+                <input type="hidden" name="action" value="save_calendar_config">
+
+                {% set sources = (cfg.get('event_sources') if cfg else {}) %}
+                {% if not sources %}{% set sources = {} %}{% endif %}
+                {% set clientes_src = sources.get('clientes', {}) %}
+                {% set empleados_src = sources.get('empleados', {}) %}
+                {% set ventas_src = sources.get('ventas', {}) %}
+                {% set movimientos_src = sources.get('movimientos', {}) %}
+                {% set inventario_src = sources.get('inventario', {}) %}
+                {% set gastos_src = sources.get('gastos', {}) %}
+                {% set proveedores_src = sources.get('proveedores', {}) %}
+                {% set reportes_src = sources.get('reportes', {}) %}
+                {% set config_src = sources.get('configuracion', {}) %}
+                {% set sistema_src = sources.get('sistema', {}) %}
+                {% set manual_src = sources.get('manual', {}) %}
+                {% set alerts_cfg = (cfg.get('alerts') if cfg else {}) %}
+                {% if not alerts_cfg %}{% set alerts_cfg = {} %}{% endif %}
+
+                <div class="border border-gray-200 rounded-xl p-3">
+                    <div class="text-xs font-semibold text-gray-700">Fuentes de eventos</div>
+                    <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        <label class="inline-flex items-center gap-2"><input name="src_clientes_cumpleanos" type="checkbox" {% if clientes_src.get('cumpleanos', True) %}checked{% endif %}>Clientes · Cumpleaños</label>
+                        <label class="inline-flex items-center gap-2"><input name="src_clientes_deudas" type="checkbox" {% if clientes_src.get('deudas', True) %}checked{% endif %}>Clientes · Deudas</label>
+                        <label class="inline-flex items-center gap-2"><input name="src_clientes_inactivos" type="checkbox" {% if clientes_src.get('inactivos', False) %}checked{% endif %}>Clientes · Inactivos</label>
+
+                        <label class="inline-flex items-center gap-2"><input name="src_empleados_cumpleanos" type="checkbox" {% if empleados_src.get('cumpleanos', True) %}checked{% endif %}>Empleados · Cumpleaños</label>
+                        <label class="inline-flex items-center gap-2"><input name="src_empleados_avisos" type="checkbox" {% if empleados_src.get('avisos', True) %}checked{% endif %}>Empleados · Avisos</label>
+                        <label class="inline-flex items-center gap-2"><input name="src_empleados_licencias" type="checkbox" {% if empleados_src.get('licencias', True) %}checked{% endif %}>Empleados · Licencias</label>
+
+                        <label class="inline-flex items-center gap-2"><input name="src_ventas_vencimientos" type="checkbox" {% if ventas_src.get('vencimientos', True) %}checked{% endif %}>Ventas · Vencimientos</label>
+                        <label class="inline-flex items-center gap-2"><input name="src_ventas_pagos" type="checkbox" {% if ventas_src.get('pagos_pactados', True) %}checked{% endif %}>Ventas · Pagos pactados</label>
+
+                        <label class="inline-flex items-center gap-2"><input name="src_mov_vencimientos" type="checkbox" {% if movimientos_src.get('vencimientos_financieros', True) %}checked{% endif %}>Movimientos · Vencimientos</label>
+                        <label class="inline-flex items-center gap-2"><input name="src_mov_arqueo" type="checkbox" {% if movimientos_src.get('arqueo_caja', True) %}checked{% endif %}>Movimientos · Arqueo</label>
+
+                        <label class="inline-flex items-center gap-2"><input name="src_inventario_recordatorios" type="checkbox" {% if inventario_src.get('recordatorios', True) %}checked{% endif %}>Inventario · Recordatorios</label>
+                        <label class="inline-flex items-center gap-2"><input name="src_gastos_recordatorios" type="checkbox" {% if gastos_src.get('recordatorios', True) %}checked{% endif %}>Gastos · Recordatorios</label>
+                        <label class="inline-flex items-center gap-2"><input name="src_proveedores_recordatorios" type="checkbox" {% if proveedores_src.get('recordatorios', True) %}checked{% endif %}>Proveedores · Recordatorios</label>
+                        <label class="inline-flex items-center gap-2"><input name="src_reportes_recordatorios" type="checkbox" {% if reportes_src.get('recordatorios', True) %}checked{% endif %}>Reportes · Recordatorios</label>
+                        <label class="inline-flex items-center gap-2"><input name="src_config_recordatorios" type="checkbox" {% if config_src.get('recordatorios', True) %}checked{% endif %}>Configuración · Recordatorios</label>
+
+                        <label class="inline-flex items-center gap-2"><input name="src_sys_cierres" type="checkbox" {% if sistema_src.get('cierres', True) %}checked{% endif %}>Sistema · Cierres</label>
+                        <label class="inline-flex items-center gap-2"><input name="src_sys_mant" type="checkbox" {% if sistema_src.get('mantenimientos', True) %}checked{% endif %}>Sistema · Mantenimientos</label>
+
+                        <label class="inline-flex items-center gap-2"><input name="src_manual_notas" type="checkbox" {% if manual_src.get('notas', True) %}checked{% endif %}>Manual · Notas/avisos</label>
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl p-3">
+                    <div class="text-xs font-semibold text-gray-700">Alertas</div>
+                    <div class="mt-2 space-y-2 text-xs">
+                        <label class="inline-flex items-center gap-2"><input name="alerts_enabled" type="checkbox" {% if alerts_cfg.get('enabled', True) %}checked{% endif %}>Activar alertas (10/15/30 días)</label>
+                        <label class="inline-flex items-center gap-2"><input name="alerts_dashboard" type="checkbox" {% if alerts_cfg.get('dashboard_integration', True) %}checked{% endif %}>Eventos críticos visibles en Dashboard</label>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button id="btn-cancel-config" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modalNew = document.getElementById('modal-new');
+    const modalCfg = document.getElementById('modal-config');
+
+    const btnOpenNew = document.getElementById('btn-open-new');
+    const btnCloseNew = document.getElementById('btn-close-new');
+    const btnCancelNew = document.getElementById('btn-cancel-new');
+
+    const btnOpenCfg = document.getElementById('btn-open-config');
+    const btnCloseCfg = document.getElementById('btn-close-config');
+    const btnCancelCfg = document.getElementById('btn-cancel-config');
+
+    const formEvent = document.getElementById('form-event');
+    const formDelete = document.getElementById('form-delete');
+
+    const actionInput = document.getElementById('event-action');
+    const idInput = document.getElementById('event-id');
+
+    const titleInput = document.getElementById('event-title');
+    const descInput = document.getElementById('event-description');
+    const dateInput = document.getElementById('event-date');
+    const prioInput = document.getElementById('event-priority');
+    const sourceInput = document.getElementById('event-source-module');
+    const statusInput = document.getElementById('event-status');
+
+    const deleteBtn = document.getElementById('btn-delete-event');
+    const deleteIdInput = document.getElementById('delete-event-id');
+
+    function openModal(el) { if (el) el.classList.remove('hidden'); }
+    function closeModal(el) { if (el) el.classList.add('hidden'); }
+
+    function resetForm() {
+        if (actionInput) actionInput.value = 'create_manual_event';
+        if (idInput) idInput.value = '';
+        if (titleInput) titleInput.value = '';
+        if (descInput) descInput.value = '';
+        if (dateInput) dateInput.valueAsDate = new Date();
+        if (prioInput) prioInput.value = 'media';
+        if (sourceInput) sourceInput.value = 'manual';
+        if (statusInput) statusInput.value = 'open';
+        if (deleteBtn) deleteBtn.classList.add('hidden');
+        if (deleteIdInput) deleteIdInput.value = '';
+    }
+
+    if (btnOpenNew) btnOpenNew.addEventListener('click', function () {
+        resetForm();
+        openModal(modalNew);
+    });
+    if (btnCloseNew) btnCloseNew.addEventListener('click', function () { closeModal(modalNew); });
+    if (btnCancelNew) btnCancelNew.addEventListener('click', function () { closeModal(modalNew); });
+
+    if (btnOpenCfg) btnOpenCfg.addEventListener('click', function () { openModal(modalCfg); });
+    if (btnCloseCfg) btnCloseCfg.addEventListener('click', function () { closeModal(modalCfg); });
+    if (btnCancelCfg) btnCancelCfg.addEventListener('click', function () { closeModal(modalCfg); });
+
+    document.querySelectorAll('[data-edit-event]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (actionInput) actionInput.value = 'update_manual_event';
+            if (idInput) idInput.value = btn.getAttribute('data-edit-event') || '';
+            if (titleInput) titleInput.value = btn.getAttribute('data-title') || '';
+            if (descInput) descInput.value = btn.getAttribute('data-description') || '';
+            if (dateInput) dateInput.value = btn.getAttribute('data-date') || '';
+            if (prioInput) prioInput.value = btn.getAttribute('data-priority') || 'media';
+            if (sourceInput) sourceInput.value = btn.getAttribute('data-source-module') || 'manual';
+            if (statusInput) statusInput.value = btn.getAttribute('data-status') || 'open';
+            if (deleteBtn) deleteBtn.classList.remove('hidden');
+            if (deleteIdInput) deleteIdInput.value = btn.getAttribute('data-edit-event') || '';
+            openModal(modalNew);
+        });
+    });
+
+    if (deleteBtn) deleteBtn.addEventListener('click', function () {
+        if (formDelete) formDelete.submit();
+    });
+
+    if (modalNew) modalNew.addEventListener('click', function (e) {
+        if (e.target === modalNew.firstElementChild) closeModal(modalNew);
+    });
+    if (modalCfg) modalCfg.addEventListener('click', function (e) {
+        if (e.target === modalCfg.firstElementChild) closeModal(modalCfg);
+    });
+
+    function parseISODate(s) {
+        const v = String(s || '').trim();
+        if (!v) return null;
+        const t = Date.parse(v);
+        if (!isNaN(t)) return new Date(t);
+        return null;
+    }
+
+    function ymd(d) {
+        const pad = (n) => String(n).padStart(2, '0');
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
+
+    function inRange(iso, startIso, endIso) {
+        if (!iso || !startIso || !endIso) return false;
+        return iso >= startIso && iso <= endIso;
+    }
+
+    let bootstrap = {};
+    try {
+        const el = document.getElementById('calendar-bootstrap');
+        bootstrap = JSON.parse(el ? (el.textContent || '{}') : '{}') || {};
+    } catch (e) {
+        bootstrap = {};
+    }
+
+    const EMPLOYEE_EDIT_URL = safeStr(bootstrap.employee_edit_url);
+    const CUSTOMER_INDEX_URL = safeStr(bootstrap.customer_index_url);
+    const cfgSources = (bootstrap && typeof bootstrap.cfg_sources === 'object' && bootstrap.cfg_sources) ? bootstrap.cfg_sources : {};
+    const enableEmpBday = !(cfgSources && cfgSources.empleados && cfgSources.empleados.cumpleanos === false);
+    const enableCustBday = !(cfgSources && cfgSources.clientes && cfgSources.clientes.cumpleanos === false);
+
+    const moduleClasses = {
+        manual: 'bg-slate-200 border-slate-400',
+        clientes: 'bg-sky-200 border-sky-400',
+        ventas: 'bg-indigo-200 border-indigo-400',
+        empleados: 'bg-emerald-200 border-emerald-400',
+        movimientos: 'bg-violet-200 border-violet-400',
+        inventario: 'bg-amber-200 border-amber-400',
+        gastos: 'bg-rose-200 border-rose-400',
+        proveedores: 'bg-teal-200 border-teal-400',
+        reportes: 'bg-gray-200 border-gray-400',
+        configuracion: 'bg-blue-200 border-blue-400',
+        sistema: 'bg-gray-50 border-gray-200'
+    };
+    const prioDots = {
+        baja: 'bg-emerald-500',
+        media: 'bg-yellow-400',
+        alta: 'bg-orange-500',
+        critica: 'bg-red-600'
+    };
+
+    function safeStr(v) { return String(v == null ? '' : v); }
+    function ensureArray(x) { return Array.isArray(x) ? x : []; }
+
+    function readEmployees() {
+        try {
+            const raw = window.localStorage.getItem('empleados_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return ensureArray(parsed);
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function readCustomers() {
+        try {
+            if (window.StorageService && typeof window.StorageService.getCustomers === 'function') {
+                const res = window.StorageService.getCustomers();
+                if (res && typeof res.then === 'function') return res;
+                return ensureArray(res);
+            }
+        } catch (e) {
+        }
+        try {
+            const raw = window.localStorage.getItem('customers_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return ensureArray(parsed);
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function normalizeName(first, last) {
+        const f = safeStr(first).trim();
+        const l = safeStr(last).trim();
+        return (f + ' ' + l).trim() || 'Sin nombre';
+    }
+
+    function mkBirthdayEvent(kind, obj, targetYear) {
+        const id = safeStr(obj?.id || obj?.employee_id || obj?.customer_id || '') || safeStr(Date.now());
+        const name = normalizeName(obj?.first_name, obj?.last_name);
+        const birth = safeStr(obj?.birth_date || obj?.birthday || '').trim();
+        const d = parseISODate(birth);
+        if (!d) return null;
+        const month = d.getMonth();
+        const day = d.getDate();
+        const evDate = new Date(targetYear, month, day);
+        const iso = ymd(evDate);
+        if (kind === 'employee') {
+            return {
+                iso,
+                title: 'Cumpleaños: ' + name,
+                module: 'empleados',
+                priority: 'media',
+                href: EMPLOYEE_EDIT_URL + '?id=' + encodeURIComponent(id)
+            };
+        }
+        return {
+            iso,
+            title: 'Cumpleaños: ' + name,
+            module: 'clientes',
+            priority: 'media',
+            href: CUSTOMER_INDEX_URL + '?open_legajo=' + encodeURIComponent(id)
+        };
+    }
+
+    function appendToMonth(ev) {
+        const cell = document.querySelector('[data-day="' + ev.iso + '"]');
+        if (!cell) return;
+        const list = cell.querySelector('div.mt-1.space-y-1');
+        if (!list) return;
+
+        const dot = prioDots[ev.priority] || prioDots.media;
+        const modCls = moduleClasses[ev.module] || moduleClasses.manual;
+
+        const a = document.createElement('a');
+        a.href = ev.href;
+        a.className = 'block w-full text-left px-2 py-1 rounded-md border text-gray-900 ' + modCls + ' hover:bg-white/60';
+        a.style.fontSize = '9px';
+        a.style.lineHeight = '1.15';
+        a.title = ev.title;
+
+        a.innerHTML = ''
+            + '<div class="flex items-start gap-1">'
+            +   '<span class="shrink-0 mt-0.5 h-2.5 w-2.5 rounded-full ' + dot + '" title="' + ev.priority + '"></span>'
+            +   '<span class="font-medium" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + ev.title + '</span>'
+            + '</div>';
+
+        list.appendChild(a);
+    }
+
+    function appendToList(ev) {
+        const container = document.querySelector('[data-group-items="' + ev.iso + '"]');
+        const dot = prioDots[ev.priority] || prioDots.media;
+        const modCls = moduleClasses[ev.module] || moduleClasses.manual;
+
+        const rowHtml = (function () {
+            const wrap = document.createElement('div');
+            wrap.className = 'p-3 border rounded-lg flex items-start justify-between gap-3 ' + modCls;
+            wrap.innerHTML = ''
+                + '<div class="min-w-0">'
+                +   '<div class="flex items-center gap-2">'
+                +     '<span class="h-2.5 w-2.5 rounded-full ' + dot + '" title="' + ev.priority + '"></span>'
+                +     '<span class="px-2 py-0.5 rounded text-[10px] border bg-white/40 border-black/10 text-gray-900">' + ev.module + '</span>'
+                +     '<div class="text-sm font-semibold text-gray-900" title="' + ev.title.replace(/\"/g, '&quot;') + '" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + ev.title + '</div>'
+                +   '</div>'
+                +   '<div class="mt-1 text-xs text-gray-500">' + ev.iso.split('-').reverse().join('/') + '</div>'
+                + '</div>'
+                + '<a href="' + ev.href + '" class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 hover:bg-gray-50 text-gray-700" title="Abrir">'
+                +   '<i class="fas fa-arrow-right"></i>'
+                + '</a>';
+            return wrap;
+        })();
+
+        if (container) {
+            container.appendChild(rowHtml);
+            return;
+        }
+
+        // Si no existe el día en la lista (porque no había eventos manuales), lo creamos.
+        const listRoot = document.querySelector('.space-y-4');
+        if (!listRoot) return;
+
+        const group = document.createElement('div');
+        group.setAttribute('data-group-date', ev.iso);
+        group.innerHTML = ''
+            + '<div class="text-xs font-semibold text-gray-700 mb-2">' + ev.iso.split('-').reverse().join('/') + '</div>'
+            + '<div class="space-y-2" data-group-items="' + ev.iso + '"></div>';
+        const items = group.querySelector('[data-group-items]');
+        if (items) items.appendChild(rowHtml);
+
+        // Insertar ordenado por fecha
+        const existing = Array.from(listRoot.querySelectorAll('[data-group-date]'));
+        let inserted = false;
+        for (const el of existing) {
+            const k = el.getAttribute('data-group-date') || '';
+            if (k && ev.iso < k) {
+                listRoot.insertBefore(group, el);
+                inserted = true;
+                break;
+            }
+        }
+        if (!inserted) listRoot.appendChild(group);
+    }
+
+    function injectBirthdays(employees, customers) {
+        const y = parseInt(bootstrap.year || 0, 10) || (new Date()).getFullYear();
+        const m = parseInt(bootstrap.month || 0, 10) || ((new Date()).getMonth() + 1);
+
+        const isList = safeStr(bootstrap.view) === 'list';
+        const rangeStart = safeStr(bootstrap.range_start);
+        const rangeEnd = safeStr(bootstrap.range_end);
+
+        const events = [];
+        if (enableEmpBday) {
+            ensureArray(employees).forEach(e => {
+                const ev = mkBirthdayEvent('employee', e, y);
+                if (!ev) return;
+                events.push(ev);
+            });
+        }
+        if (enableCustBday) {
+            ensureArray(customers).forEach(c => {
+                const ev = mkBirthdayEvent('customer', c, y);
+                if (!ev) return;
+                events.push(ev);
+            });
+        }
+
+        events.forEach(ev => {
+            if (isList) {
+                if (!rangeStart || !rangeEnd || !inRange(ev.iso, rangeStart, rangeEnd)) return;
+                appendToList(ev);
+            } else {
+                // mensual: solo los del mes visible
+                const parts = ev.iso.split('-');
+                const mm = parseInt(parts[1], 10);
+                if (mm !== m) return;
+                appendToMonth(ev);
+            }
+        });
+    }
+
+    const emp = readEmployees();
+    const cust = readCustomers();
+    if (cust && typeof cust.then === 'function') {
+        cust.then(function (customers) {
+            injectBirthdays(emp, customers);
+        });
+    } else {
+        injectBirthdays(emp, cust);
+    }
+});
+</script>
+{% endblock %}

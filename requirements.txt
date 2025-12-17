@@ -11,7 +11,8 @@ Werkzeug==2.3.7
 Flask-Babel==3.1.0
 
 # Base de datos
-SQLAlchemy==2.0.36
+SQLAlchemy==2.0.45
+greenlet>=3.1.1
 
 # Formularios
 WTForms==3.0.1

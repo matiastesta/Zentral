@@ -7,18 +7,22 @@
 </div>
 
 <!-- Resumen de clientes -->
-<div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
+<div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-4">
     <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
         <p class="text-sm font-medium text-gray-500">Total de clientes</p>
-        <p class="mt-2 text-2xl font-semibold text-gray-900">{{ customers|length }}</p>
+        <p id="kpi-clientes-total" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
     </div>
     <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Clientes recientes</p>
-        <p class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+        <p class="text-sm font-medium text-gray-500">Clientes activos</p>
+        <p id="kpi-clientes-activos" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
     </div>
     <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Con compras en el último mes</p>
-        <p class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+        <p class="text-sm font-medium text-gray-500">Clientes deudores</p>
+        <p id="kpi-clientes-deudores" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <p class="text-sm font-medium text-gray-500">Deuda total</p>
+        <p id="kpi-clientes-deuda" class="mt-2 text-2xl font-semibold text-gray-900">$0,00</p>
     </div>
 </div>
 
@@ -26,51 +30,1186 @@
 <div class="flex flex-col justify-between gap-2 mb-4 md:flex-row md:items-start">
     <div class="flex-1">
         <div class="flex flex-col gap-2">
-            <div class="flex flex-col sm:flex-row gap-2">
-                <input type="text" placeholder="Buscar por nombre, email o teléfono" class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <div class="flex flex-col lg:flex-row gap-2">
+                <input id="clientes-search" type="text" placeholder="Buscar por nombre, email o teléfono" class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <select id="clientes-filter-estado" class="w-full lg:w-56 px-3 py-2 text-sm border rounded-md bg-white">
+                    <option value="">Estado: todos</option>
+                    <option value="activo">Activo</option>
+                    <option value="inactivo">Inactivo</option>
+                    <option value="bloqueado">Bloqueado</option>
+                </select>
+                <select id="clientes-filter-clasificacion" class="w-full lg:w-64 px-3 py-2 text-sm border rounded-md bg-white">
+                    <option value="">Clasificación: todas</option>
+                    <option value="mejor_cliente">Mejor cliente</option>
+                    <option value="frecuente">Frecuente</option>
+                    <option value="ocasional">Ocasional</option>
+                    <option value="inactivo">Inactivo</option>
+                    <option value="deudor">Deudor</option>
+                </select>
+                <select id="clientes-filter-cc" class="w-full lg:w-72 px-3 py-2 text-sm border rounded-md bg-white">
+                    <option value="">Cuenta corriente: todas</option>
+                    <option value="con_cc">Con cuenta corriente</option>
+                    <option value="sin_cc">Sin cuenta corriente</option>
+                    <option value="deudores">Deudores</option>
+                    <option value="vencida">Cuenta corriente vencida</option>
+                </select>
             </div>
         </div>
     </div>
     <div class="flex gap-2 justify-end">
-        <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
-            <i class="fas fa-file-export mr-2"></i> Exportar
+        <button id="btn-config-alertas" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+            <i class="fas fa-bell mr-2"></i> Alertas
         </button>
-        <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+        <button id="btn-nuevo-cliente" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
             <i class="fas fa-user-plus mr-2"></i> Nuevo cliente
         </button>
     </div>
 </div>
 
 <!-- Tabla de clientes -->
-<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+<div class="bg-white rounded-lg shadow border border-gray-200 overflow-visible">
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nombre</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Email</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Teléfono</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Última compra</th>
+                <th data-sort="nombre" class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none">Nombre y apellido</th>
+                <th data-sort="clasificacion" class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none">Clasificación</th>
+                <th data-sort="cantidad_compras" class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">Compras totales</th>
+                <th data-sort="monto_total_comprado" class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">Monto</th>
+                <th data-sort="saldo_actual" class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">Cuenta corriente</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Notas</th>
                 <th class="px-4 py-3"></th>
             </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-            {% for customer in customers %}
-            <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3 text-sm text-gray-900">{{ customer.first_name }}</td>
-                <td class="px-4 py-3 text-sm text-gray-500">{{ customer.email or '—' }}</td>
-                <td class="px-4 py-3 text-sm text-gray-500">{{ customer.phone or '—' }}</td>
-                <td class="px-4 py-3 text-sm text-gray-500">—</td>
-                <td class="px-4 py-3 text-sm text-right space-x-2">
-                    <button class="text-blue-600 hover:text-blue-800 text-xs font-medium">Ver ficha</button>
-                    <button class="text-red-600 hover:text-red-800 text-xs font-medium">Eliminar</button>
-                </td>
-            </tr>
-            {% else %}
+        <tbody id="clientes-tbody" class="bg-white divide-y divide-gray-200">
             <tr>
-                <td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay clientes cargados. Agrega tu primer cliente con el botón "Nuevo cliente".</td>
+                <td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando...</td>
             </tr>
-            {% endfor %}
         </tbody>
     </table>
 </div>
+
+<div id="modal-customer-form" class="hidden fixed inset-0 z-50" style="z-index:70;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 id="customer-form-title" class="text-base font-semibold text-gray-900">Nuevo cliente</h3>
+                    <p class="text-xs text-gray-500">Los campos obligatorios son: nombre, apellido y teléfono.</p>
+                </div>
+                <button id="btn-close-customer-form" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+                    <input id="cust-first-name" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Apellido</label>
+                    <input id="cust-last-name" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Teléfono</label>
+                    <input id="cust-phone" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Email (opcional)</label>
+                    <input id="cust-email" type="email" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Cumpleaños (opcional)</label>
+                    <input id="cust-birthday" type="date" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>
+                    <select id="cust-status" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                        <option value="activo">Activo</option>
+                        <option value="inactivo">Inactivo</option>
+                        <option value="bloqueado">Bloqueado</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Dirección (opcional)</label>
+                    <input id="cust-address" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Observaciones internas (opcional)</label>
+                    <textarea id="cust-notes" rows="3" class="w-full px-3 py-2 text-sm border rounded-md" placeholder=""></textarea>
+                </div>
+                <div id="msg-customer-form-error" class="md:col-span-2 text-[11px] text-red-600 hidden flex items-center gap-1"><i class="fas fa-exclamation-circle"></i><span>Completá nombre, apellido y teléfono.</span></div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-cancel-customer-form" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-save-customer-form" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-alerts" class="hidden fixed inset-0 z-50" style="z-index:70;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Alertas de cuenta corriente</h3>
+                    <p class="text-xs text-gray-500">Configura en cuántos días se considera vencida una cuenta corriente.</p>
+                </div>
+                <button id="btn-close-alerts" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Aviso</label>
+                    <input id="alerts-warn-10" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="10">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Aviso fuerte</label>
+                    <input id="alerts-warn-15" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="15">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Crítica</label>
+                    <input id="alerts-crit-30" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="30">
+                </div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-cancel-alerts" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-save-alerts" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-customer-legajo" class="hidden fixed inset-0 z-50" style="z-index:60;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-5xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="min-w-0">
+                    <h3 id="legajo-title" class="text-base font-semibold text-gray-900 truncate">Legajo del cliente</h3>
+                    <p id="legajo-subtitle" class="text-xs text-gray-500 truncate">—</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btn-edit-legajo" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
+                        <i class="fas fa-pen mr-2"></i> Editar
+                    </button>
+                    <button id="btn-close-legajo" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Datos</div>
+                        <div class="mt-2 space-y-1 text-sm text-gray-800">
+                            <div><span class="text-gray-500">Nombre:</span> <span id="legajo-fullname">—</span></div>
+                            <div><span class="text-gray-500">Teléfono:</span> <span id="legajo-phone">—</span></div>
+                            <div><span class="text-gray-500">Email:</span> <span id="legajo-email">—</span></div>
+                            <div><span class="text-gray-500">Incorporación:</span> <span id="legajo-join">—</span></div>
+                            <div><span class="text-gray-500">Cumpleaños:</span> <span id="legajo-bday">—</span></div>
+                            <div><span class="text-gray-500">Dirección:</span> <span id="legajo-address">—</span></div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">CRM</div>
+                        <div class="mt-2 space-y-1 text-sm text-gray-800">
+                            <div><span class="text-gray-500">Estado:</span> <span id="legajo-status">—</span></div>
+                            <div><span class="text-gray-500">Clasificación:</span> <span id="legajo-clas">—</span></div>
+                            <div><span class="text-gray-500">Compras:</span> <span id="legajo-compras">—</span></div>
+                            <div><span class="text-gray-500">Monto total:</span> <span id="legajo-monto">—</span></div>
+                            <div><span class="text-gray-500">Última compra:</span> <span id="legajo-ultima">—</span></div>
+                            <div><span class="text-gray-500">Frecuencia:</span> <span id="legajo-freq">—</span></div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Cuenta corriente</div>
+                        <div class="mt-2 space-y-1 text-sm text-gray-800">
+                            <div><span class="text-gray-500">Tiene CC:</span> <span id="legajo-cc">—</span></div>
+                            <div><span class="text-gray-500">Saldo actual:</span> <span id="legajo-saldo">—</span></div>
+                            <div><span class="text-gray-500">Días de deuda:</span> <span id="legajo-dias">—</span></div>
+                            <div><span class="text-gray-500">Alerta:</span> <span id="legajo-alerta">—</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                    <div class="flex items-center justify-between gap-2">
+                        <div>
+                            <div class="text-xs font-semibold text-gray-700">Últimas compras</div>
+                            <div class="text-[11px] text-gray-500">Se muestran las últimas ventas asociadas al cliente.</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 overflow-hidden border border-gray-200 rounded-lg">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Pago</th>
+                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Total</th>
+                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Adeudado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="legajo-sales" class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="4" class="px-3 py-4 text-sm text-gray-500 text-center">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                    <div class="text-xs font-semibold text-gray-700">Observaciones internas</div>
+                    <div id="legajo-notes" class="mt-2 text-sm text-gray-700 whitespace-pre-wrap">—</div>
+                </div>
+            </div>
+
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-close-legajo-2" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-settle-debt" class="hidden fixed inset-0 z-50" style="z-index:70;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Saldar deuda</h3>
+                    <p id="settle-subtitle" class="text-xs text-gray-500">—</p>
+                </div>
+                <button id="btn-close-settle" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Venta adeudada</label>
+                    <select id="settle-sale" class="w-full px-3 py-2 text-sm border rounded-md bg-white"></select>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div class="p-3 border border-gray-200 rounded-lg">
+                        <div class="text-[11px] text-gray-500">Deuda a saldar</div>
+                        <div id="settle-amount" class="mt-1 text-sm font-semibold text-red-700">$0,00</div>
+                    </div>
+                    <div class="p-3 border border-gray-200 rounded-lg">
+                        <div class="text-[11px] text-gray-500">Medio de pago</div>
+                        <select id="settle-method" class="mt-2 w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Débito">Débito</option>
+                            <option value="Crédito">Crédito</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="settle-error" class="text-[11px] text-red-600 hidden flex items-center gap-1"><i class="fas fa-exclamation-circle"></i><span>Seleccioná una venta válida.</span></div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-cancel-settle" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-confirm-settle" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const KEY_ALERTS = 'clientes_alertas_config';
+
+    const kpiTotal = document.getElementById('kpi-clientes-total');
+    const kpiActivos = document.getElementById('kpi-clientes-activos');
+    const kpiDeudores = document.getElementById('kpi-clientes-deudores');
+    const kpiDeuda = document.getElementById('kpi-clientes-deuda');
+
+    const inputSearch = document.getElementById('clientes-search');
+    const filterEstado = document.getElementById('clientes-filter-estado');
+    const filterClas = document.getElementById('clientes-filter-clasificacion');
+    const filterCc = document.getElementById('clientes-filter-cc');
+    const tbody = document.getElementById('clientes-tbody');
+    const btnNuevo = document.getElementById('btn-nuevo-cliente');
+    const btnConfigAlertas = document.getElementById('btn-config-alertas');
+
+    const modalForm = document.getElementById('modal-customer-form');
+    const titleForm = document.getElementById('customer-form-title');
+    const btnCloseForm = document.getElementById('btn-close-customer-form');
+    const btnCancelForm = document.getElementById('btn-cancel-customer-form');
+    const btnSaveForm = document.getElementById('btn-save-customer-form');
+    const msgFormError = document.getElementById('msg-customer-form-error');
+    const inputFirst = document.getElementById('cust-first-name');
+    const inputLast = document.getElementById('cust-last-name');
+    const inputPhone = document.getElementById('cust-phone');
+    const inputEmail = document.getElementById('cust-email');
+    const inputBirthday = document.getElementById('cust-birthday');
+    const inputAddress = document.getElementById('cust-address');
+    const inputNotes = document.getElementById('cust-notes');
+    const inputStatus = document.getElementById('cust-status');
+
+    const modalAlerts = document.getElementById('modal-alerts');
+    const btnCloseAlerts = document.getElementById('btn-close-alerts');
+    const btnCancelAlerts = document.getElementById('btn-cancel-alerts');
+    const btnSaveAlerts = document.getElementById('btn-save-alerts');
+    const inputWarn10 = document.getElementById('alerts-warn-10');
+    const inputWarn15 = document.getElementById('alerts-warn-15');
+    const inputCrit30 = document.getElementById('alerts-crit-30');
+
+    const modalLegajo = document.getElementById('modal-customer-legajo');
+    const btnCloseLegajo = document.getElementById('btn-close-legajo');
+    const btnCloseLegajo2 = document.getElementById('btn-close-legajo-2');
+    const btnEditLegajo = document.getElementById('btn-edit-legajo');
+    const legajoTitle = document.getElementById('legajo-title');
+    const legajoSubtitle = document.getElementById('legajo-subtitle');
+    const legajoFullname = document.getElementById('legajo-fullname');
+    const legajoPhone = document.getElementById('legajo-phone');
+    const legajoEmail = document.getElementById('legajo-email');
+    const legajoJoin = document.getElementById('legajo-join');
+    const legajoBday = document.getElementById('legajo-bday');
+    const legajoAddress = document.getElementById('legajo-address');
+    const legajoStatus = document.getElementById('legajo-status');
+    const legajoClas = document.getElementById('legajo-clas');
+    const legajoCompras = document.getElementById('legajo-compras');
+    const legajoMonto = document.getElementById('legajo-monto');
+    const legajoUltima = document.getElementById('legajo-ultima');
+    const legajoFreq = document.getElementById('legajo-freq');
+    const legajoCc = document.getElementById('legajo-cc');
+    const legajoSaldo = document.getElementById('legajo-saldo');
+    const legajoDias = document.getElementById('legajo-dias');
+    const legajoAlerta = document.getElementById('legajo-alerta');
+    const legajoSales = document.getElementById('legajo-sales');
+    const legajoNotes = document.getElementById('legajo-notes');
+
+    const modalSettle = document.getElementById('modal-settle-debt');
+    const btnCloseSettle = document.getElementById('btn-close-settle');
+    const btnCancelSettle = document.getElementById('btn-cancel-settle');
+    const btnConfirmSettle = document.getElementById('btn-confirm-settle');
+    const settleSubtitle = document.getElementById('settle-subtitle');
+    const settleSale = document.getElementById('settle-sale');
+    const settleAmount = document.getElementById('settle-amount');
+    const settleMethod = document.getElementById('settle-method');
+    const settleError = document.getElementById('settle-error');
+
+    let cacheCustomers = [];
+    let cacheSales = [];
+    let editingCustomerId = null;
+    let sortKey = 'monto_total_comprado';
+    let sortDir = 'desc';
+    let lastDerived = [];
+    let legajoCustomerId = null;
+    let settleCustomerId = null;
+
+    function isPromise(x) { return !!x && typeof x.then === 'function'; }
+    function ensureArray(x) { return Array.isArray(x) ? x : []; }
+    function safeStr(v) { return String(v == null ? '' : v); }
+
+    function openModal(el) { if (el) el.classList.remove('hidden'); }
+    function closeModal(el) { if (el) el.classList.add('hidden'); }
+
+    function readAlertsConfig() {
+        try {
+            const raw = window.localStorage.getItem(KEY_ALERTS);
+            const parsed = raw ? JSON.parse(raw) : null;
+            if (parsed && typeof parsed === 'object') {
+                return {
+                    warn10: Math.max(1, parseInt(parsed.warn10 || 10, 10) || 10),
+                    warn15: Math.max(1, parseInt(parsed.warn15 || 15, 10) || 15),
+                    crit30: Math.max(1, parseInt(parsed.crit30 || 30, 10) || 30)
+                };
+            }
+        } catch (e) {
+        }
+        return { warn10: 10, warn15: 15, crit30: 30 };
+    }
+
+    function saveSales(list) {
+        const payload = ensureArray(list);
+        try {
+            if (window.StorageService && typeof window.StorageService.saveSales === 'function') {
+                return window.StorageService.saveSales(payload);
+            }
+        } catch (e) {
+        }
+        try {
+            window.localStorage.setItem('sales_dummy', JSON.stringify(payload));
+        } catch (e) {
+        }
+        return null;
+    }
+
+    function truncateText(s, max) {
+        const txt = safeStr(s);
+        const m = parseInt(max || 80, 10) || 80;
+        if (txt.length <= m) return txt;
+        return txt.slice(0, m - 1) + '…';
+    }
+
+    function closeAllRowMenus() {
+        const menus = document.querySelectorAll('.menu-cliente-acciones');
+        menus.forEach(m => m.classList.add('hidden'));
+    }
+
+    function salesForCustomer(customer) {
+        const cid = safeStr(customer?.id);
+        const fullName = safeStr(customer?.full_name).trim();
+        const list = ensureArray(cacheSales).filter(s => {
+            const sid = safeStr(s?.customer_id);
+            if (sid && cid && sid === cid) return true;
+            if (!sid && fullName) return safeStr(s?.customer_name).toLowerCase() === fullName.toLowerCase();
+            return false;
+        });
+        return list.slice().sort((a, b) => {
+            const ta = parseDateToTs(a?.fecha) || (parseInt(a?.created_at || 0, 10) || 0);
+            const tb = parseDateToTs(b?.fecha) || (parseInt(b?.created_at || 0, 10) || 0);
+            return (tb || 0) - (ta || 0);
+        });
+    }
+
+    function openLegajo(id) {
+        const derived = ensureArray(lastDerived).length ? lastDerived : computeDerived(cacheCustomers, cacheSales);
+        const c = ensureArray(derived).find(x => safeStr(x.id) === safeStr(id));
+        if (!c) return;
+
+        legajoCustomerId = safeStr(c.id);
+
+        const joinDate = new Date(c.created_at || Date.now()).toISOString().slice(0, 10);
+
+        if (legajoTitle) legajoTitle.textContent = 'Legajo · ' + safeStr(c.full_name || 'Cliente');
+        if (legajoSubtitle) legajoSubtitle.textContent = 'ID ' + safeStr(c.id) + ' · ' + badgeClas(c).replace(/<[^>]*>/g, '').trim();
+        if (legajoFullname) legajoFullname.textContent = safeStr(c.full_name || '—');
+        if (legajoPhone) legajoPhone.textContent = safeStr(c.phone || '—');
+        if (legajoEmail) legajoEmail.textContent = safeStr(c.email || '—');
+        if (legajoJoin) legajoJoin.textContent = joinDate;
+        if (legajoBday) legajoBday.textContent = safeStr(c.birthday || '—');
+        if (legajoAddress) legajoAddress.textContent = safeStr(c.address || '—');
+
+        if (legajoStatus) legajoStatus.innerHTML = badgeEstado(c.status);
+        if (legajoClas) legajoClas.innerHTML = badgeClas(c) + (badgeAlerta(c) ? (' ' + badgeAlerta(c)) : '');
+        if (legajoCompras) legajoCompras.textContent = safeStr(c.cantidad_compras || 0);
+        if (legajoMonto) legajoMonto.textContent = fmtMoney(parseFloat(c.monto_total_comprado || 0) || 0);
+        if (legajoUltima) legajoUltima.textContent = safeStr(c.ultima_compra || '—');
+        if (legajoFreq) legajoFreq.textContent = (isFinite(c.frecuencia_compra) ? c.frecuencia_compra.toFixed(2) : '0.00') + ' compras/mes';
+
+        if (legajoCc) legajoCc.textContent = c.tiene_cuenta_corriente ? 'Sí' : 'No';
+        if (legajoSaldo) legajoSaldo.textContent = fmtMoney(parseFloat(c.saldo_actual || 0) || 0);
+        if (legajoDias) legajoDias.textContent = c.saldo_actual > 0 ? (safeStr(c.dias_deuda || 0) + ' días') : '—';
+        if (legajoAlerta) legajoAlerta.innerHTML = badgeAlerta(c) || '<span class="text-gray-500">—</span>';
+
+        if (legajoNotes) legajoNotes.textContent = safeStr(c.notes || '—');
+
+        if (legajoSales) {
+            const list = salesForCustomer(c).slice(0, 10);
+            if (!list.length) {
+                legajoSales.innerHTML = '<tr><td colspan="4" class="px-3 py-4 text-sm text-gray-500 text-center">Sin ventas asociadas.</td></tr>';
+            } else {
+                legajoSales.innerHTML = '';
+                list.forEach(s => {
+                    const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
+                    const fecha = ts ? new Date(ts).toISOString().slice(0, 10) : '—';
+                    const pago = safeStr(s?.payment_method || s?.forma_pago || (s?.on_account ? 'Cuenta corriente' : '') || '—');
+                    const total = fmtMoney(parseFloat(s?.total || 0) || 0);
+                    const due = fmtMoney(parseFloat(s?.due_amount || 0) || 0);
+                    const dueClass = (parseFloat(s?.due_amount || 0) || 0) > 0 ? 'text-red-700 font-semibold' : 'text-gray-700';
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = ''
+                        + '<td class="px-3 py-2 text-sm text-gray-700">' + fecha + '</td>'
+                        + '<td class="px-3 py-2 text-sm text-gray-700">' + pago + '</td>'
+                        + '<td class="px-3 py-2 text-sm text-right text-gray-700">' + total + '</td>'
+                        + '<td class="px-3 py-2 text-sm text-right ' + dueClass + '">' + due + '</td>';
+                    legajoSales.appendChild(tr);
+                });
+            }
+        }
+
+        openModal(modalLegajo);
+    }
+
+    function openSettleDebt(id) {
+        const derived = ensureArray(lastDerived).length ? lastDerived : computeDerived(cacheCustomers, cacheSales);
+        const c = ensureArray(derived).find(x => safeStr(x.id) === safeStr(id));
+        if (!c) return;
+
+        settleCustomerId = safeStr(c.id);
+        if (settleSubtitle) settleSubtitle.textContent = safeStr(c.full_name || 'Cliente');
+        if (settleError) settleError.classList.add('hidden');
+
+        const outs = ensureArray(cacheSales)
+            .filter(s => {
+                const sid = safeStr(s?.customer_id);
+                return sid && sid === settleCustomerId && (parseFloat(s?.due_amount || 0) || 0) > 0;
+            })
+            .sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
+
+        if (settleSale) {
+            settleSale.innerHTML = '';
+            if (!outs.length) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Sin deudas pendientes.';
+                settleSale.appendChild(opt);
+            } else {
+                outs.forEach(s => {
+                    const due = parseFloat(s?.due_amount || 0) || 0;
+                    const opt = document.createElement('option');
+                    opt.value = safeStr(s?.id);
+                    opt.textContent = safeStr(s?.ticket || '') + ' · ' + safeStr(s?.fecha || '') + ' · Deuda: ' + fmtMoney(due);
+                    settleSale.appendChild(opt);
+                });
+            }
+        }
+
+        const firstId = outs.length ? safeStr(outs[0]?.id) : '';
+        if (settleSale && firstId) settleSale.value = firstId;
+        const firstDue = outs.length ? (parseFloat(outs[0]?.due_amount || 0) || 0) : 0;
+        if (settleAmount) settleAmount.textContent = fmtMoney(firstDue);
+
+        openModal(modalSettle);
+    }
+
+    function syncSettleAmount() {
+        const id = safeStr(settleSale?.value);
+        const s = ensureArray(cacheSales).find(x => safeStr(x?.id) === id);
+        const due = s ? (parseFloat(s?.due_amount || 0) || 0) : 0;
+        if (settleAmount) settleAmount.textContent = fmtMoney(due);
+    }
+
+    function confirmSettleDebt() {
+        const saleId = safeStr(settleSale?.value);
+        const method = safeStr(settleMethod?.value || 'Efectivo') || 'Efectivo';
+        if (!saleId) {
+            if (settleError) settleError.classList.remove('hidden');
+            return;
+        }
+        const next = ensureArray(cacheSales).slice();
+        const idx = next.findIndex(x => safeStr(x?.id) === saleId);
+        if (idx < 0) {
+            if (settleError) settleError.classList.remove('hidden');
+            return;
+        }
+        const sale = next[idx];
+        const due = parseFloat(sale?.due_amount || 0) || 0;
+        const total = parseFloat(sale?.total || 0) || 0;
+        const paidPrev = parseFloat(sale?.paid_amount || 0) || 0;
+
+        next[idx] = {
+            ...sale,
+            due_amount: 0,
+            paid_amount: Math.max(total, paidPrev + due),
+            on_account: false,
+            settled_at: Date.now(),
+            settled_payment_method: method,
+            settled_amount: due
+        };
+
+        cacheSales = next;
+        saveSales(next);
+        closeModal(modalSettle);
+        render();
+        if (legajoCustomerId && legajoCustomerId === settleCustomerId) {
+            openLegajo(legajoCustomerId);
+        }
+    }
+
+    function writeAlertsConfig(cfg) {
+        try {
+            window.localStorage.setItem(KEY_ALERTS, JSON.stringify(cfg));
+        } catch (e) {
+        }
+    }
+
+    function fmtMoney(n) {
+        const num = isNaN(n) ? 0 : n;
+        return '$' + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function parseDateToTs(d) {
+        const s = safeStr(d).trim();
+        if (!s) return 0;
+        const t = Date.parse(s);
+        if (!isNaN(t)) return t;
+        return 0;
+    }
+
+    function daysSince(ts) {
+        if (!ts) return null;
+        const diff = Date.now() - ts;
+        const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+        return d < 0 ? 0 : d;
+    }
+
+    function monthsBetween(fromTs, toTs) {
+        const a = new Date(fromTs || Date.now());
+        const b = new Date(toTs || Date.now());
+        const months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+        return Math.max(1, months + 1);
+    }
+
+    function canonicalizeCustomer(c) {
+        const obj = c && typeof c === 'object' ? c : {};
+        const id = safeStr(obj.id || obj.customer_id || '').trim() || safeStr(obj.created_at || Date.now());
+
+        const full = safeStr(obj.name || obj.nombre || '').trim();
+        const first = safeStr(obj.first_name || obj.nombre || '').trim();
+        const last = safeStr(obj.last_name || obj.apellido || '').trim();
+
+        let firstName = first;
+        let lastName = last;
+        if ((!firstName || !lastName) && full) {
+            const parts = full.split(' ').filter(Boolean);
+            if (!firstName && parts.length) firstName = parts[0];
+            if (!lastName && parts.length > 1) lastName = parts.slice(1).join(' ');
+        }
+
+        const phone = safeStr(obj.phone || obj.telefono || '').trim();
+        const email = safeStr(obj.email || '').trim();
+        const birthday = safeStr(obj.birthday || obj.fecha_cumpleanos || '').trim();
+        const address = safeStr(obj.address || obj.direccion || '').trim();
+        const notes = safeStr(obj.notes || obj.observaciones || '').trim();
+        const status = safeStr(obj.status || obj.estado || 'activo').trim() || 'activo';
+        const createdAt = parseInt(obj.created_at || obj.fecha_incorporacion_ts || 0, 10) || parseDateToTs(obj.fecha_incorporacion) || Date.now();
+
+        return {
+            id,
+            first_name: firstName,
+            last_name: lastName,
+            phone,
+            email,
+            birthday,
+            address,
+            notes,
+            status: (status === 'inactivo' || status === 'bloqueado') ? status : 'activo',
+            created_at: createdAt
+        };
+    }
+
+    function dedupeCustomers(list) {
+        const map = new Map();
+        ensureArray(list).forEach(raw => {
+            const c = canonicalizeCustomer(raw);
+            const key = c.id || (safeStr(c.first_name).toLowerCase() + '|' + safeStr(c.last_name).toLowerCase() + '|' + safeStr(c.phone).toLowerCase());
+            if (!map.has(key)) {
+                map.set(key, c);
+                return;
+            }
+            const prev = map.get(key);
+            map.set(key, {
+                ...prev,
+                first_name: prev.first_name || c.first_name,
+                last_name: prev.last_name || c.last_name,
+                phone: prev.phone || c.phone,
+                email: prev.email || c.email,
+                birthday: prev.birthday || c.birthday,
+                address: prev.address || c.address,
+                notes: prev.notes || c.notes,
+                status: prev.status || c.status,
+                created_at: Math.min(prev.created_at || Date.now(), c.created_at || Date.now())
+            });
+        });
+        return Array.from(map.values());
+    }
+
+    function readCustomers() {
+        try {
+            if (window.StorageService && typeof window.StorageService.getCustomers === 'function') {
+                return window.StorageService.getCustomers();
+            }
+        } catch (e) {
+        }
+        try {
+            const raw = window.localStorage.getItem('customers_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return ensureArray(parsed);
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveCustomers(list) {
+        const payload = ensureArray(list);
+        try {
+            if (window.StorageService && typeof window.StorageService.saveCustomers === 'function') {
+                return window.StorageService.saveCustomers(payload);
+            }
+        } catch (e) {
+        }
+        try {
+            window.localStorage.setItem('customers_dummy', JSON.stringify(payload));
+        } catch (e) {
+        }
+        return null;
+    }
+
+    function readSales() {
+        try {
+            if (window.StorageService && typeof window.StorageService.getSales === 'function') {
+                return window.StorageService.getSales();
+            }
+        } catch (e) {
+        }
+        try {
+            const raw = window.localStorage.getItem('sales_dummy');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return ensureArray(parsed);
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function computeP90(values) {
+        const arr = ensureArray(values).filter(v => typeof v === 'number' && isFinite(v)).sort((a, b) => a - b);
+        if (!arr.length) return 0;
+        const idx = Math.floor(0.9 * (arr.length - 1));
+        return arr[idx];
+    }
+
+    function computeDerived(customers, sales) {
+        const alertsCfg = readAlertsConfig();
+        const salesArr = ensureArray(sales);
+
+        const mapped = customers.map(c => {
+            const cid = safeStr(c.id);
+            const fullName = (safeStr(c.first_name) + ' ' + safeStr(c.last_name)).trim();
+            const salesFor = salesArr.filter(s => safeStr(s?.customer_id) === cid || (!safeStr(s?.customer_id) && fullName && safeStr(s?.customer_name).toLowerCase() === fullName.toLowerCase()));
+
+            const cantidad = salesFor.length;
+            const totalComprado = salesFor.reduce((acc, s) => acc + (parseFloat(s?.total || 0) || 0), 0);
+            const ultimaTs = salesFor.reduce((acc, s) => {
+                const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
+                return Math.max(acc, ts || 0);
+            }, 0);
+            const meses = monthsBetween(c.created_at || Date.now(), Date.now());
+            const freq = cantidad / meses;
+
+            const saldo = salesFor.reduce((acc, s) => acc + (parseFloat(s?.due_amount || 0) || 0), 0);
+            const tieneCc = saldo > 0 || salesFor.some(s => !!s?.on_account);
+            const lastImpagoTs = salesFor.reduce((acc, s) => {
+                const due = parseFloat(s?.due_amount || 0) || 0;
+                if (due <= 0) return acc;
+                const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
+                return Math.max(acc, ts || 0);
+            }, 0);
+            const diasDeuda = saldo > 0 ? (daysSince(lastImpagoTs) ?? 0) : 0;
+
+            const diasUltCompra = ultimaTs ? (daysSince(ultimaTs) ?? 0) : null;
+            const isInactivo = (diasUltCompra != null) ? (diasUltCompra > 60) : false;
+
+            let clas = 'ocasional';
+            if (saldo > 0) clas = 'deudor';
+            else if (isInactivo) clas = 'inactivo';
+            else if (freq >= 1) clas = 'frecuente';
+
+            let alert = '';
+            if (saldo > 0) {
+                if (diasDeuda >= alertsCfg.crit30) alert = 'critica';
+                else if (diasDeuda >= alertsCfg.warn15) alert = 'warn15';
+                else if (diasDeuda >= alertsCfg.warn10) alert = 'warn10';
+            }
+
+            return {
+                ...c,
+                full_name: fullName,
+                cantidad_compras: cantidad,
+                monto_total_comprado: totalComprado,
+                ultima_compra_ts: ultimaTs,
+                ultima_compra: ultimaTs ? new Date(ultimaTs).toISOString().slice(0, 10) : '',
+                frecuencia_compra: freq,
+                saldo_actual: saldo,
+                tiene_cuenta_corriente: tieneCc,
+                dias_deuda: diasDeuda,
+                clasificacion: clas,
+                alerta_cc: alert
+            };
+        });
+
+        const p90 = computeP90(mapped.map(x => x.monto_total_comprado || 0));
+        return mapped.map(x => {
+            const mejor = (x.monto_total_comprado || 0) >= p90 && (x.monto_total_comprado || 0) > 0;
+            if (mejor && x.clasificacion !== 'deudor' && x.clasificacion !== 'inactivo') {
+                return { ...x, clasificacion: 'mejor_cliente' };
+            }
+            return x;
+        });
+    }
+
+    function applyFilters(list) {
+        const q = safeStr(inputSearch?.value).trim().toLowerCase();
+        const st = safeStr(filterEstado?.value).trim();
+        const cl = safeStr(filterClas?.value).trim();
+        const cc = safeStr(filterCc?.value).trim();
+
+        return ensureArray(list).filter(c => {
+            if (st && safeStr(c.status) !== st) return false;
+            if (cl && safeStr(c.clasificacion) !== cl) return false;
+
+            if (cc === 'con_cc' && !c.tiene_cuenta_corriente) return false;
+            if (cc === 'sin_cc' && c.tiene_cuenta_corriente) return false;
+            if (cc === 'deudores' && !(c.saldo_actual > 0)) return false;
+            if (cc === 'vencida' && !(c.alerta_cc === 'warn10' || c.alerta_cc === 'warn15' || c.alerta_cc === 'critica')) return false;
+
+            if (q) {
+                const hay = [
+                    safeStr(c.first_name),
+                    safeStr(c.last_name),
+                    safeStr(c.full_name),
+                    safeStr(c.email),
+                    safeStr(c.phone)
+                ].join(' ').toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            return true;
+        });
+    }
+
+    function sortRows(list) {
+        const dir = (sortDir === 'asc') ? 1 : -1;
+        const key = safeStr(sortKey);
+
+        const getVal = function (c) {
+            if (key === 'nombre') return safeStr(c.full_name).toLowerCase();
+            if (key === 'fecha_incorporacion') return c.created_at || 0;
+            if (key === 'cantidad_compras') return c.cantidad_compras || 0;
+            if (key === 'frecuencia_compra') return c.frecuencia_compra || 0;
+            if (key === 'monto_total_comprado') return c.monto_total_comprado || 0;
+            if (key === 'saldo_actual') return c.saldo_actual || 0;
+            if (key === 'estado') return safeStr(c.status);
+            return 0;
+        };
+
+        return ensureArray(list).slice().sort((a, b) => {
+            const va = getVal(a);
+            const vb = getVal(b);
+            if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+            return safeStr(va).localeCompare(safeStr(vb)) * dir;
+        });
+    }
+
+    function badgeEstado(status) {
+        const s = safeStr(status);
+        if (s === 'bloqueado') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">Bloqueado</span>';
+        if (s === 'inactivo') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">Inactivo</span>';
+        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[11px] font-medium">Activo</span>';
+    }
+
+    function badgeClas(c) {
+        const cls = safeStr(c.clasificacion);
+        if (cls === 'deudor') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">Deudor</span>';
+        if (cls === 'inactivo') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">Inactivo</span>';
+        if (cls === 'mejor_cliente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium">Mejor</span>';
+        if (cls === 'frecuente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">Frecuente</span>';
+        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-medium">Ocasional</span>';
+    }
+
+    function badgeAlerta(c) {
+        if (!(c.saldo_actual > 0)) return '';
+        if (c.alerta_cc === 'critica') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[11px] font-medium">Crítica · ' + safeStr(c.dias_deuda) + 'd</span>';
+        if (c.alerta_cc === 'warn15') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-medium">Aviso · ' + safeStr(c.dias_deuda) + 'd</span>';
+        if (c.alerta_cc === 'warn10') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-[11px] font-medium">Aviso · ' + safeStr(c.dias_deuda) + 'd</span>';
+        return '';
+    }
+
+    function render() {
+        if (!tbody) return;
+
+        const derived = computeDerived(cacheCustomers, cacheSales);
+        lastDerived = derived;
+        const filtered = applyFilters(derived);
+        const sorted = sortRows(filtered);
+
+        const totalClientes = derived.length;
+        const activos = derived.filter(x => x.status === 'activo').length;
+        const deudores = derived.filter(x => (x.saldo_actual || 0) > 0).length;
+        const deudaTotal = derived.reduce((acc, x) => acc + (parseFloat(x.saldo_actual || 0) || 0), 0);
+
+        if (kpiTotal) kpiTotal.textContent = safeStr(totalClientes);
+        if (kpiActivos) kpiActivos.textContent = safeStr(activos);
+        if (kpiDeudores) kpiDeudores.textContent = safeStr(deudores);
+        if (kpiDeuda) kpiDeuda.textContent = fmtMoney(deudaTotal);
+
+        if (!sorted.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        sorted.forEach(c => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+
+            const comprasInt = parseInt(c.cantidad_compras || 0, 10) || 0;
+            const monto = fmtMoney(parseFloat(c.monto_total_comprado || 0) || 0);
+            const saldo = parseFloat(c.saldo_actual || 0) || 0;
+            const ccText = saldo > 0 ? fmtMoney(saldo) : '—';
+            const ccClass = saldo > 0 ? 'text-red-700 font-semibold' : 'text-gray-600';
+            const notas = truncateText(c.notes || '', 60) || '—';
+
+            const isDebtor = saldo > 0;
+
+            tr.innerHTML = ''
+                + '<td class="px-4 py-3 text-sm text-gray-900">'
+                +   '<div class="font-medium">' + safeStr(c.full_name || '-') + '</div>'
+                + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-700">' + badgeClas(c) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + String(comprasInt) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + monto + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right ' + ccClass + '">' + ccText + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-700">' + safeStr(notas) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right">'
+                +   '<div class="relative inline-block text-left">'
+                +     '<button type="button" class="btn-cliente-menu inline-flex items-center justify-center h-8 w-8 rounded-full hover:bg-gray-100" data-id="' + safeStr(c.id) + '">' 
+                +       '<i class="fas fa-ellipsis-v text-gray-500 text-xs"></i>'
+                +     '</button>'
+                +     '<div class="menu-cliente-acciones hidden origin-top-right absolute right-0 mt-1 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">'
+                +       '<div class="py-1 text-[11px]">'
+                +         '<button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="legajo" data-id="' + safeStr(c.id) + '">Ver legajo</button>'
+                +         '<button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="edit" data-id="' + safeStr(c.id) + '">Editar</button>'
+                +         (isDebtor ? ('<button type="button" class="w-full text-left px-3 py-2 text-red-700 hover:bg-red-50" data-action="settle" data-id="' + safeStr(c.id) + '">Saldar deuda</button>') : '')
+                +       '</div>'
+                +     '</div>'
+                +   '</div>'
+                + '</td>';
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    function loadAll() {
+        const cRes = readCustomers();
+        const sRes = readSales();
+
+        const apply = function (customers, sales) {
+            cacheCustomers = dedupeCustomers(customers);
+            cacheSales = ensureArray(sales);
+            render();
+        };
+
+        if (isPromise(cRes) || isPromise(sRes)) {
+            Promise.all([Promise.resolve(cRes), Promise.resolve(sRes)]).then(arr => {
+                apply(arr[0], arr[1]);
+            });
+        } else {
+            apply(cRes, sRes);
+        }
+    }
+
+    function clearForm() {
+        editingCustomerId = null;
+        if (titleForm) titleForm.textContent = 'Nuevo cliente';
+        if (msgFormError) msgFormError.classList.add('hidden');
+        if (inputFirst) inputFirst.value = '';
+        if (inputLast) inputLast.value = '';
+        if (inputPhone) inputPhone.value = '';
+        if (inputEmail) inputEmail.value = '';
+        if (inputBirthday) inputBirthday.value = '';
+        if (inputAddress) inputAddress.value = '';
+        if (inputNotes) inputNotes.value = '';
+        if (inputStatus) inputStatus.value = 'activo';
+    }
+
+    function openNewCustomer() {
+        clearForm();
+        openModal(modalForm);
+        if (inputFirst) inputFirst.focus();
+    }
+
+    function openEditCustomer(id) {
+        const c = ensureArray(cacheCustomers).find(x => safeStr(x.id) === safeStr(id));
+        if (!c) return;
+        editingCustomerId = safeStr(c.id);
+        if (titleForm) titleForm.textContent = 'Editar cliente';
+        if (msgFormError) msgFormError.classList.add('hidden');
+        if (inputFirst) inputFirst.value = safeStr(c.first_name);
+        if (inputLast) inputLast.value = safeStr(c.last_name);
+        if (inputPhone) inputPhone.value = safeStr(c.phone);
+        if (inputEmail) inputEmail.value = safeStr(c.email);
+        if (inputBirthday) inputBirthday.value = safeStr(c.birthday);
+        if (inputAddress) inputAddress.value = safeStr(c.address);
+        if (inputNotes) inputNotes.value = safeStr(c.notes);
+        if (inputStatus) inputStatus.value = safeStr(c.status || 'activo');
+        openModal(modalForm);
+    }
+
+    function saveCustomerFromForm() {
+        const first = safeStr(inputFirst?.value).trim();
+        const last = safeStr(inputLast?.value).trim();
+        const phone = safeStr(inputPhone?.value).trim();
+
+        if (!first || !last || !phone) {
+            if (msgFormError) msgFormError.classList.remove('hidden');
+            return;
+        }
+
+        const payload = {
+            id: editingCustomerId || safeStr(Date.now()),
+            first_name: first,
+            last_name: last,
+            phone: phone,
+            email: safeStr(inputEmail?.value).trim(),
+            birthday: safeStr(inputBirthday?.value).trim(),
+            address: safeStr(inputAddress?.value).trim(),
+            notes: safeStr(inputNotes?.value).trim(),
+            status: safeStr(inputStatus?.value).trim() || 'activo',
+            created_at: editingCustomerId ? (ensureArray(cacheCustomers).find(x => safeStr(x.id) === safeStr(editingCustomerId))?.created_at || Date.now()) : Date.now()
+        };
+
+        const next = ensureArray(cacheCustomers).slice();
+        const idx = next.findIndex(x => safeStr(x.id) === safeStr(payload.id));
+        if (idx >= 0) next[idx] = payload;
+        else next.push(payload);
+
+        cacheCustomers = dedupeCustomers(next);
+        const res = saveCustomers(cacheCustomers);
+        if (isPromise(res)) {
+            res.then(function () {
+                closeModal(modalForm);
+                render();
+            });
+        } else {
+            closeModal(modalForm);
+            render();
+        }
+    }
+
+    function initSorting() {
+        const ths = document.querySelectorAll('thead th[data-sort]');
+        ths.forEach(th => {
+            th.addEventListener('click', function () {
+                const k = safeStr(th.getAttribute('data-sort'));
+                if (!k) return;
+                if (sortKey === k) sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
+                else {
+                    sortKey = k;
+                    sortDir = (k === 'nombre' || k === 'estado') ? 'asc' : 'desc';
+                }
+                render();
+            });
+        });
+    }
+
+    function initActions() {
+        if (btnNuevo) btnNuevo.addEventListener('click', function () { openNewCustomer(); });
+        if (btnCloseForm) btnCloseForm.addEventListener('click', function () { closeModal(modalForm); });
+        if (btnCancelForm) btnCancelForm.addEventListener('click', function () { closeModal(modalForm); });
+        if (btnSaveForm) btnSaveForm.addEventListener('click', function () { saveCustomerFromForm(); });
+        if (modalForm) {
+            modalForm.addEventListener('click', function (e) {
+                const target = e.target;
+                if (target && target === modalForm.firstElementChild) closeModal(modalForm);
+            });
+        }
+
+        if (btnConfigAlertas) {
+            btnConfigAlertas.addEventListener('click', function () {
+                const cfg = readAlertsConfig();
+                if (inputWarn10) inputWarn10.value = safeStr(cfg.warn10);
+                if (inputWarn15) inputWarn15.value = safeStr(cfg.warn15);
+                if (inputCrit30) inputCrit30.value = safeStr(cfg.crit30);
+                openModal(modalAlerts);
+            });
+        }
+        if (btnCloseAlerts) btnCloseAlerts.addEventListener('click', function () { closeModal(modalAlerts); });
+        if (btnCancelAlerts) btnCancelAlerts.addEventListener('click', function () { closeModal(modalAlerts); });
+        if (btnSaveAlerts) {
+            btnSaveAlerts.addEventListener('click', function () {
+                const cfg = {
+                    warn10: Math.max(1, parseInt(inputWarn10?.value || 10, 10) || 10),
+                    warn15: Math.max(1, parseInt(inputWarn15?.value || 15, 10) || 15),
+                    crit30: Math.max(1, parseInt(inputCrit30?.value || 30, 10) || 30)
+                };
+                writeAlertsConfig(cfg);
+                closeModal(modalAlerts);
+                render();
+            });
+        }
+        if (modalAlerts) {
+            modalAlerts.addEventListener('click', function (e) {
+                const target = e.target;
+                if (target && target === modalAlerts.firstElementChild) closeModal(modalAlerts);
+            });
+        }
+
+        if (btnCloseLegajo) btnCloseLegajo.addEventListener('click', function () { closeModal(modalLegajo); });
+        if (btnCloseLegajo2) btnCloseLegajo2.addEventListener('click', function () { closeModal(modalLegajo); });
+        if (btnEditLegajo) btnEditLegajo.addEventListener('click', function () { if (legajoCustomerId) openEditCustomer(legajoCustomerId); });
+        if (modalLegajo) {
+            modalLegajo.addEventListener('click', function (e) {
+                const target = e.target;
+                if (target && target === modalLegajo.firstElementChild) closeModal(modalLegajo);
+            });
+        }
+
+        if (btnCloseSettle) btnCloseSettle.addEventListener('click', function () { closeModal(modalSettle); });
+        if (btnCancelSettle) btnCancelSettle.addEventListener('click', function () { closeModal(modalSettle); });
+        if (btnConfirmSettle) btnConfirmSettle.addEventListener('click', function () { confirmSettleDebt(); });
+        if (settleSale) settleSale.addEventListener('change', function () { syncSettleAmount(); });
+        if (modalSettle) {
+            modalSettle.addEventListener('click', function (e) {
+                const target = e.target;
+                if (target && target === modalSettle.firstElementChild) closeModal(modalSettle);
+            });
+        }
+
+        if (inputSearch) inputSearch.addEventListener('input', function () { render(); });
+        if (filterEstado) filterEstado.addEventListener('change', function () { render(); });
+        if (filterClas) filterClas.addEventListener('change', function () { render(); });
+        if (filterCc) filterCc.addEventListener('change', function () { render(); });
+
+        if (tbody) {
+            tbody.addEventListener('click', function (e) {
+                const menuBtn = e.target.closest('button.btn-cliente-menu');
+                if (menuBtn) {
+                    e.stopPropagation();
+                    const wrap = menuBtn.closest('.relative');
+                    if (!wrap) return;
+                    const menu = wrap.querySelector('.menu-cliente-acciones');
+                    if (!menu) return;
+                    const wasOpen = !menu.classList.contains('hidden');
+                    closeAllRowMenus();
+                    if (!wasOpen) menu.classList.remove('hidden');
+                    return;
+                }
+
+                const actionBtn = e.target.closest('button[data-action]');
+                if (!actionBtn) return;
+                e.stopPropagation();
+                const action = safeStr(actionBtn.getAttribute('data-action'));
+                const id = safeStr(actionBtn.getAttribute('data-id'));
+                closeAllRowMenus();
+                if (action === 'edit') openEditCustomer(id);
+                if (action === 'legajo') openLegajo(id);
+                if (action === 'settle') openSettleDebt(id);
+            });
+        }
+
+        document.addEventListener('click', function () {
+            closeAllRowMenus();
+        });
+    }
+
+    initSorting();
+    initActions();
+    loadAll();
+
+    // Deep-link desde calendario
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const openId = safeStr(params.get('open_legajo'));
+        if (openId) {
+            const doOpen = function () {
+                openLegajo(openId);
+            };
+            setTimeout(doOpen, 0);
+        }
+    } catch (e) {
+    }
+});
+</script>
 {% endblock %}

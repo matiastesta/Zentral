@@ -10,32 +10,41 @@
     <!-- Datos del negocio -->
     <div class="p-5 bg-white rounded-lg shadow">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Datos generales</h2>
-        <form class="space-y-4">
+        <form method="post" enctype="multipart/form-data" class="space-y-4">
+            <input type="hidden" name="action" value="save_business">
             <div>
                 <label class="block text-sm font-medium text-gray-700">Nombre del negocio</label>
-                <input type="text" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Mi Tienda SRL">
+                <input name="business_name" type="text" value="{{ business.name if business else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Mi Tienda SRL">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Logo</label>
+                <input name="business_logo" type="file" class="mt-1 block w-full text-sm text-gray-500">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Rubro principal</label>
-                <select class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option>Retail / Tienda</option>
-                    <option>Gastronomía / Bar</option>
-                    <option>Servicios profesionales</option>
-                    <option>Salud / Bienestar</option>
-                    <option>Otro</option>
+                <select name="business_industry" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option {% if business and (business.industry or '') == 'Retail / Tienda' %}selected{% endif %}>Retail / Tienda</option>
+                    <option {% if business and (business.industry or '') == 'Gastronomía' %}selected{% endif %}>Gastronomía</option>
+                    <option {% if business and (business.industry or '') == 'Servicios profesionales' %}selected{% endif %}>Servicios profesionales</option>
+                    <option {% if business and (business.industry or '') == 'Salud / Consultorios' %}selected{% endif %}>Salud / Consultorios</option>
+                    <option {% if business and (business.industry or '') == 'Otro' %}selected{% endif %}>Otro</option>
                 </select>
             </div>
-            <div class="flex gap-4">
-                <div class="flex-1">
-                    <label class="block text-sm font-medium text-gray-700">Moneda</label>
-                    <input type="text" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: ARS">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    <input name="business_email" type="email" value="{{ business.email if business and business.email else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="contacto@tu-negocio.com">
                 </div>
-                <div class="flex-1">
-                    <label class="block text-sm font-medium text-gray-700">Zona horaria</label>
-                    <input type="text" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: America/Argentina/Buenos_Aires">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Teléfono</label>
+                    <input name="business_phone" type="text" value="{{ business.phone if business and business.phone else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: +54 11 ...">
                 </div>
             </div>
-            <button type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Dirección fiscal</label>
+                <input name="business_address" type="text" value="{{ business.address if business and business.address else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Calle, número, ciudad, país">
+            </div>
+            <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
                 Guardar cambios
             </button>
         </form>
@@ -66,4 +75,8 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
 {% endblock %}
