@@ -7,51 +7,8 @@
 </div>
 
 <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-    <!-- Datos del negocio / cuenta -->
-    <div class="p-5 bg-white rounded-lg shadow">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Datos del negocio</h2>
-        <form method="post" enctype="multipart/form-data" class="space-y-4">
-            <input type="hidden" name="action" value="save_business">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Nombre del negocio</label>
-                <input name="business_name" type="text" value="{{ business.name }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Zentral Market">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Logo</label>
-                <input name="business_logo" type="file" class="mt-1 block w-full text-sm text-gray-500">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Rubro</label>
-                <select name="business_industry" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option {% if (business.industry or '') == 'Retail / Tienda' %}selected{% endif %}>Retail / Tienda</option>
-                    <option {% if (business.industry or '') == 'Gastronomía' %}selected{% endif %}>Gastronomía</option>
-                    <option {% if (business.industry or '') == 'Servicios profesionales' %}selected{% endif %}>Servicios profesionales</option>
-                    <option {% if (business.industry or '') == 'Salud / Consultorios' %}selected{% endif %}>Salud / Consultorios</option>
-                    <option {% if (business.industry or '') == 'Otro' %}selected{% endif %}>Otro</option>
-                </select>
-            </div>
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Email</label>
-                    <input name="business_email" type="email" value="{{ business.email or '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="contacto@tu-negocio.com">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Teléfono</label>
-                    <input name="business_phone" type="text" value="{{ business.phone or '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: +54 11 ...">
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Dirección fiscal</label>
-                <input name="business_address" type="text" value="{{ business.address or '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Calle, número, ciudad, país">
-            </div>
-            <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
-                Guardar datos
-            </button>
-        </form>
-    </div>
-
     <!-- Gestión de usuarios y permisos -->
-    <div class="p-5 bg-white rounded-lg shadow space-y-4">
+    <div class="p-5 bg-white rounded-lg shadow space-y-4 lg:col-span-2">
         {% set can_manage_users = current_user.is_authenticated and (current_user.is_master or current_user.role == 'admin') %}
         <div class="flex items-center justify-between">
             <h2 class="text-lg font-medium text-gray-900">Usuarios y roles</h2>

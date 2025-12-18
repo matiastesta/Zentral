@@ -47,5 +47,21 @@ def business_settings():
             flash('Datos del negocio guardados.', 'success')
             return redirect(url_for('settings.business_settings'))
 
+        if action == 'save_personalization':
+            bs = BusinessSettings.get_singleton()
+            bs.label_customers = (request.form.get('label_customers') or '').strip() or None
+            bs.label_products = (request.form.get('label_products') or '').strip() or None
+
+            raw_color = (request.form.get('primary_color') or '').strip()
+            if raw_color and raw_color.startswith('#') and len(raw_color) in {4, 7}:
+                bs.primary_color = raw_color
+            elif not raw_color:
+                bs.primary_color = None
+
+            db.session.add(bs)
+            db.session.commit()
+            flash('Personalización guardada.', 'success')
+            return redirect(url_for('settings.business_settings'))
+
     business = BusinessSettings.get_singleton()
     return render_template("settings/business.html", title="Configuración del negocio", business=business)

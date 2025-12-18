@@ -36,7 +36,7 @@ def index():
 
         if dashboard_enabled:
             today = date.today()
-            horizon = today + timedelta(days=30)
+            horizon = today + timedelta(days=365)
 
             q = db.session.query(CalendarEvent)
             q = q.filter(CalendarEvent.status != 'done')

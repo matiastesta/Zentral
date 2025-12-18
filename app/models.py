@@ -77,6 +77,9 @@ class BusinessSettings(db.Model):
     phone = db.Column(db.String(64), nullable=True)
     address = db.Column(db.String(255), nullable=True)
     logo_filename = db.Column(db.String(255), nullable=True)
+    label_customers = db.Column(db.String(64), nullable=True)
+    label_products = db.Column(db.String(64), nullable=True)
+    primary_color = db.Column(db.String(16), nullable=True)
 
     @staticmethod
     def get_singleton():
@@ -106,6 +109,128 @@ class CalendarEvent(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class Category(db.Model):
+    __tablename__ = 'category'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False, index=True)
+    parent_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True, index=True)
+
+    parent = db.relationship('Category', remote_side=[id], backref='children')
+
+
+class Product(db.Model):
+    __tablename__ = 'product'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False, index=True)
+    description = db.Column(db.Text, nullable=True)
+
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True, index=True)
+    category = db.relationship('Category', backref='products')
+
+    sale_price = db.Column(db.Float, nullable=False, default=0.0)
+    internal_code = db.Column(db.String(64), nullable=True, unique=True, index=True)
+    barcode = db.Column(db.String(64), nullable=True, unique=True, index=True)
+
+    unit_name = db.Column(db.String(32), nullable=True)
+    uses_lots = db.Column(db.Boolean, nullable=False, default=True)
+    method = db.Column(db.String(16), nullable=False, default='FIFO')
+    min_stock = db.Column(db.Float, nullable=False, default=0.0)
+
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class InventoryLot(db.Model):
+    __tablename__ = 'inventory_lot'
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False, index=True)
+    product = db.relationship('Product', backref='lots')
+
+    qty_initial = db.Column(db.Float, nullable=False, default=0.0)
+    qty_available = db.Column(db.Float, nullable=False, default=0.0)
+    unit_cost = db.Column(db.Float, nullable=False, default=0.0)
+
+    received_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    supplier_name = db.Column(db.String(255), nullable=True)
+    expiration_date = db.Column(db.Date, nullable=True, index=True)
+    lot_code = db.Column(db.String(64), nullable=True, index=True)
+    note = db.Column(db.Text, nullable=True)
+    origin_sale_ticket = db.Column(db.String(32), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class InventoryMovement(db.Model):
+    __tablename__ = 'inventory_movement'
+
+    id = db.Column(db.Integer, primary_key=True)
+    movement_date = db.Column(db.Date, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    type = db.Column(db.String(16), nullable=False, default='sale')
+    sale_ticket = db.Column(db.String(32), nullable=True, index=True)
+
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False, index=True)
+    product = db.relationship('Product', backref='movements')
+    lot_id = db.Column(db.Integer, db.ForeignKey('inventory_lot.id'), nullable=True, index=True)
+    lot = db.relationship('InventoryLot', backref='movements')
+
+    qty_delta = db.Column(db.Float, nullable=False, default=0.0)
+    unit_cost = db.Column(db.Float, nullable=False, default=0.0)
+    total_cost = db.Column(db.Float, nullable=False, default=0.0)
+
+
+class Sale(db.Model):
+    __tablename__ = 'sale'
+
+    id = db.Column(db.Integer, primary_key=True)
+    ticket = db.Column(db.String(32), nullable=False, unique=True, index=True)
+    sale_date = db.Column(db.Date, nullable=False, index=True)
+    sale_type = db.Column(db.String(16), nullable=False, default='Venta')
+    status = db.Column(db.String(16), nullable=False, default='Completada')
+    payment_method = db.Column(db.String(32), nullable=False, default='Efectivo')
+    notes = db.Column(db.Text, nullable=True)
+
+    total = db.Column(db.Float, nullable=False, default=0.0)
+    discount_general_pct = db.Column(db.Float, nullable=False, default=0.0)
+    discount_general_amount = db.Column(db.Float, nullable=False, default=0.0)
+
+    on_account = db.Column(db.Boolean, nullable=False, default=False)
+    paid_amount = db.Column(db.Float, nullable=False, default=0.0)
+    due_amount = db.Column(db.Float, nullable=False, default=0.0)
+
+    customer_id = db.Column(db.String(64), nullable=True)
+    customer_name = db.Column(db.String(255), nullable=True)
+
+    exchange_return_total = db.Column(db.Float, nullable=True)
+    exchange_new_total = db.Column(db.Float, nullable=True)
+
+    created_by_user_id = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    items = db.relationship('SaleItem', backref='sale', cascade='all, delete-orphan', lazy=True)
+
+
+class SaleItem(db.Model):
+    __tablename__ = 'sale_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sale.id'), nullable=False, index=True)
+    direction = db.Column(db.String(8), nullable=False, default='out')
+
+    product_id = db.Column(db.String(64), nullable=True)
+    product_name = db.Column(db.String(255), nullable=False, default='Producto')
+    qty = db.Column(db.Float, nullable=False, default=0.0)
+    unit_price = db.Column(db.Float, nullable=False, default=0.0)
+    discount_pct = db.Column(db.Float, nullable=False, default=0.0)
+    subtotal = db.Column(db.Float, nullable=False, default=0.0)
+
+
 class CalendarUserConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False, unique=True, index=True)
@@ -123,3 +248,116 @@ class CalendarUserConfig(db.Model):
     def set_config(self, cfg: dict) -> None:
         payload = cfg if isinstance(cfg, dict) else {}
         self.config_json = json.dumps(payload, ensure_ascii=False)
+
+
+class CashCount(db.Model):
+    __tablename__ = 'cash_count'
+
+    id = db.Column(db.Integer, primary_key=True)
+    count_date = db.Column(db.Date, nullable=False, unique=True, index=True)
+    employee_id = db.Column(db.String(64), nullable=True)
+    employee_name = db.Column(db.String(255), nullable=True)
+    opening_amount = db.Column(db.Float, nullable=False, default=0.0)
+    cash_day_amount = db.Column(db.Float, nullable=False, default=0.0)
+    closing_amount = db.Column(db.Float, nullable=False, default=0.0)
+    difference_amount = db.Column(db.Float, nullable=False, default=0.0)
+    created_by_user_id = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Customer(db.Model):
+    __tablename__ = 'customer'
+
+    id = db.Column(db.String(64), primary_key=True)
+    first_name = db.Column(db.String(255), nullable=True)
+    last_name = db.Column(db.String(255), nullable=True)
+    name = db.Column(db.String(255), nullable=True, index=True)
+    email = db.Column(db.String(255), nullable=True)
+    phone = db.Column(db.String(64), nullable=True)
+    birthday = db.Column(db.Date, nullable=True)
+    address = db.Column(db.String(255), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(32), nullable=False, default='activo')
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Employee(db.Model):
+    __tablename__ = 'employee'
+
+    id = db.Column(db.String(64), primary_key=True)
+    first_name = db.Column(db.String(255), nullable=True)
+    last_name = db.Column(db.String(255), nullable=True)
+    name = db.Column(db.String(255), nullable=True, index=True)
+    hire_date = db.Column(db.Date, nullable=True, index=True)
+    default_payment_method = db.Column(db.String(32), nullable=True)
+    contract_type = db.Column(db.String(64), nullable=True)
+    status = db.Column(db.String(16), nullable=False, default='Active')
+    role = db.Column(db.String(255), nullable=True)
+    birth_date = db.Column(db.Date, nullable=True)
+    document_id = db.Column(db.String(64), nullable=True)
+    phone = db.Column(db.String(64), nullable=True)
+    email = db.Column(db.String(255), nullable=True)
+    address = db.Column(db.String(255), nullable=True)
+    reference_salary = db.Column(db.Float, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Expense(db.Model):
+    __tablename__ = 'expense'
+
+    id = db.Column(db.String(64), primary_key=True)
+    expense_date = db.Column(db.Date, nullable=False, index=True)
+    payment_method = db.Column(db.String(32), nullable=False, default='Efectivo')
+    amount = db.Column(db.Float, nullable=False, default=0.0)
+    description = db.Column(db.Text, nullable=True)
+    category = db.Column(db.String(255), nullable=True)
+    supplier_id = db.Column(db.String(64), nullable=True)
+    supplier_name = db.Column(db.String(255), nullable=True)
+    note = db.Column(db.Text, nullable=True)
+    expense_type = db.Column(db.String(32), nullable=True)
+    frequency = db.Column(db.String(32), nullable=True)
+    employee_id = db.Column(db.String(64), nullable=True)
+    employee_name = db.Column(db.String(255), nullable=True)
+    period_from = db.Column(db.Date, nullable=True)
+    period_to = db.Column(db.Date, nullable=True)
+    meta_json = db.Column(db.Text, nullable=True)
+    origin = db.Column(db.String(32), nullable=False, default='manual')
+    created_by_user_id = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Supplier(db.Model):
+    __tablename__ = 'supplier'
+
+    id = db.Column(db.String(64), primary_key=True)
+    name = db.Column(db.String(255), nullable=False, index=True)
+    supplier_type = db.Column(db.String(32), nullable=True)
+    status = db.Column(db.String(32), nullable=False, default='Active')
+    categories_json = db.Column(db.Text, nullable=True)
+    invoice_type = db.Column(db.String(32), nullable=True)
+    default_payment_method = db.Column(db.String(64), nullable=True)
+    payment_terms = db.Column(db.String(64), nullable=True)
+    contact_person = db.Column(db.String(255), nullable=True)
+    preferred_contact_channel = db.Column(db.String(32), nullable=True)
+    phone = db.Column(db.String(64), nullable=True)
+    email = db.Column(db.String(255), nullable=True)
+    address = db.Column(db.String(255), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    meta_json = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ExpenseCategory(db.Model):
+    __tablename__ = 'expense_category'
+
+    id = db.Column(db.String(64), primary_key=True)
+    name = db.Column(db.String(255), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

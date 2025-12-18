@@ -1,19 +1,16 @@
 {% extends "base.html" %}
-{% import 'bootstrap/wtf.html' as wtf %}
 
-{% block app_content %}
-<div class="row">
-    <div class="col-md-6 offset-md-3">
-        <h1 class="text-center">Registrarse</h1>
-        <div class="card mt-4">
-            <div class="card-body">
-                {{ wtf.quick_form(form) }}
-            </div>
-            <div class="card-footer text-center">
-                <p class="mb-0">
-                    ¿Ya tienes una cuenta? <a href="{{ url_for('auth.login') }}">Inicia sesión</a>
-                </p>
-            </div>
+{% block title %}Registrarse{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto">
+    <div class="bg-white rounded-xl shadow border border-gray-200 p-6">
+        <h1 class="text-xl font-semibold text-gray-900">Registrarse</h1>
+        <p class="mt-1 text-sm text-gray-600">Registro deshabilitado. Solicitá al administrador que cree tu usuario.</p>
+        <div class="mt-6">
+            <a href="{{ url_for('auth.login') }}" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white" style="background-color:#0d1067;">
+                Volver al login
+            </a>
         </div>
     </div>
 </div>

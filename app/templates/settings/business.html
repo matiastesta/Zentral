@@ -54,22 +54,23 @@
     <div class="p-5 bg-white rounded-lg shadow">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Personalización por rubro</h2>
         <p class="text-sm text-gray-600 mb-4">Adapta los textos e iconografía según tu tipo de negocio (ej: "Pacientes" en vez de "Clientes").</p>
-        <form class="space-y-4">
+        <form method="post" class="space-y-4">
+            <input type="hidden" name="action" value="save_personalization">
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Etiqueta para "Clientes"</label>
-                    <input type="text" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Clientes / Pacientes">
+                    <input name="label_customers" type="text" value="{{ business.label_customers if business and business.label_customers else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Clientes / Pacientes">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Etiqueta para "Productos"</label>
-                    <input type="text" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Productos / Servicios">
+                    <input name="label_products" type="text" value="{{ business.label_products if business and business.label_products else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Productos / Servicios">
                 </div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Color principal (branding)</label>
-                <input type="color" class="mt-1 h-10 w-16 p-0 border rounded-md">
+                <input name="primary_color" type="color" value="{{ business.primary_color if business and business.primary_color else '#0d1067' }}" class="mt-1 h-10 w-16 p-0 border rounded-md">
             </div>
-            <button type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+            <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
                 Guardar personalización
             </button>
         </form>

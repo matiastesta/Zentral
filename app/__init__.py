@@ -3,7 +3,6 @@ from datetime import datetime
 from flask import Flask
 from flask_login import LoginManager
 from flask_babel import Babel
-from flask_bootstrap import Bootstrap
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
 from config import Config
@@ -12,7 +11,6 @@ login_manager = LoginManager()
 login_manager.login_view = 'auth.login'
 login_manager.login_message_category = 'info'
 babel = Babel()
-bootstrap = Bootstrap()
 db = SQLAlchemy()
 
 
@@ -23,7 +21,6 @@ def create_app(config_class=Config):
     # Inicializar extensiones que no dependen de base de datos
     login_manager.init_app(app)
     babel.init_app(app)
-    bootstrap.init_app(app)
     db.init_app(app)
 
     # Registrar blueprints principales
@@ -94,6 +91,9 @@ def create_app(config_class=Config):
                         ('phone', 'VARCHAR(64)'),
                         ('address', 'VARCHAR(255)'),
                         ('logo_filename', 'VARCHAR(255)'),
+                        ('label_customers', 'VARCHAR(64)'),
+                        ('label_products', 'VARCHAR(64)'),
+                        ('primary_color', 'VARCHAR(16)'),
                     ])
                     ensure_columns('user', [
                         ('role', 'VARCHAR(32)'),
@@ -102,6 +102,129 @@ def create_app(config_class=Config):
                         ('active', 'BOOLEAN'),
                         ('email', 'VARCHAR(255)'),
                         ('password_hash', 'VARCHAR(255)'),
+                    ])
+
+                    ensure_columns('product', [
+                        ('description', 'TEXT'),
+                        ('category_id', 'INTEGER'),
+                        ('sale_price', 'FLOAT'),
+                        ('internal_code', 'VARCHAR(64)'),
+                        ('barcode', 'VARCHAR(64)'),
+                        ('unit_name', 'VARCHAR(32)'),
+                        ('uses_lots', 'BOOLEAN'),
+                        ('method', 'VARCHAR(16)'),
+                        ('min_stock', 'FLOAT'),
+                        ('active', 'BOOLEAN'),
+                        ('created_at', 'DATETIME'),
+                        ('updated_at', 'DATETIME'),
+                    ])
+
+                    ensure_columns('inventory_lot', [
+                        ('qty_initial', 'FLOAT'),
+                        ('qty_available', 'FLOAT'),
+                        ('unit_cost', 'FLOAT'),
+                        ('received_at', 'DATETIME'),
+                        ('supplier_name', 'VARCHAR(255)'),
+                        ('expiration_date', 'DATE'),
+                        ('lot_code', 'VARCHAR(64)'),
+                        ('note', 'TEXT'),
+                        ('origin_sale_ticket', 'VARCHAR(32)'),
+                        ('created_at', 'DATETIME'),
+                        ('updated_at', 'DATETIME'),
+                    ])
+
+                    ensure_columns('inventory_movement', [
+                        ('movement_date', 'DATE'),
+                        ('created_at', 'DATETIME'),
+                        ('type', 'VARCHAR(16)'),
+                        ('sale_ticket', 'VARCHAR(32)'),
+                        ('product_id', 'INTEGER'),
+                        ('lot_id', 'INTEGER'),
+                        ('qty_delta', 'FLOAT'),
+                        ('unit_cost', 'FLOAT'),
+                        ('total_cost', 'FLOAT'),
+                    ])
+
+                    ensure_columns('customer', [
+                        ('first_name', 'VARCHAR(255)'),
+                        ('last_name', 'VARCHAR(255)'),
+                        ('name', 'VARCHAR(255)'),
+                        ('email', 'VARCHAR(255)'),
+                        ('phone', 'VARCHAR(64)'),
+                        ('birthday', 'DATE'),
+                        ('address', 'VARCHAR(255)'),
+                        ('notes', 'TEXT'),
+                        ('status', 'VARCHAR(32)'),
+                        ('created_at', 'DATETIME'),
+                        ('updated_at', 'DATETIME'),
+                    ])
+
+                    ensure_columns('employee', [
+                        ('first_name', 'VARCHAR(255)'),
+                        ('last_name', 'VARCHAR(255)'),
+                        ('name', 'VARCHAR(255)'),
+                        ('hire_date', 'DATE'),
+                        ('default_payment_method', 'VARCHAR(32)'),
+                        ('contract_type', 'VARCHAR(64)'),
+                        ('status', 'VARCHAR(16)'),
+                        ('role', 'VARCHAR(255)'),
+                        ('birth_date', 'DATE'),
+                        ('document_id', 'VARCHAR(64)'),
+                        ('phone', 'VARCHAR(64)'),
+                        ('email', 'VARCHAR(255)'),
+                        ('address', 'VARCHAR(255)'),
+                        ('reference_salary', 'FLOAT'),
+                        ('notes', 'TEXT'),
+                        ('active', 'BOOLEAN'),
+                        ('created_at', 'DATETIME'),
+                        ('updated_at', 'DATETIME'),
+                    ])
+
+                    ensure_columns('expense', [
+                        ('expense_date', 'DATE'),
+                        ('payment_method', 'VARCHAR(32)'),
+                        ('amount', 'FLOAT'),
+                        ('description', 'TEXT'),
+                        ('category', 'VARCHAR(255)'),
+                        ('supplier_id', 'VARCHAR(64)'),
+                        ('supplier_name', 'VARCHAR(255)'),
+                        ('note', 'TEXT'),
+                        ('expense_type', 'VARCHAR(32)'),
+                        ('frequency', 'VARCHAR(32)'),
+                        ('employee_id', 'VARCHAR(64)'),
+                        ('employee_name', 'VARCHAR(255)'),
+                        ('period_from', 'DATE'),
+                        ('period_to', 'DATE'),
+                        ('meta_json', 'TEXT'),
+                        ('origin', 'VARCHAR(32)'),
+                        ('created_by_user_id', 'INTEGER'),
+                        ('created_at', 'DATETIME'),
+                        ('updated_at', 'DATETIME'),
+                    ])
+
+                    ensure_columns('supplier', [
+                        ('name', 'VARCHAR(255)'),
+                        ('supplier_type', 'VARCHAR(32)'),
+                        ('status', 'VARCHAR(32)'),
+                        ('categories_json', 'TEXT'),
+                        ('invoice_type', 'VARCHAR(32)'),
+                        ('default_payment_method', 'VARCHAR(64)'),
+                        ('payment_terms', 'VARCHAR(64)'),
+                        ('contact_person', 'VARCHAR(255)'),
+                        ('preferred_contact_channel', 'VARCHAR(32)'),
+                        ('phone', 'VARCHAR(64)'),
+                        ('email', 'VARCHAR(255)'),
+                        ('address', 'VARCHAR(255)'),
+                        ('notes', 'TEXT'),
+                        ('meta_json', 'TEXT'),
+                        ('created_at', 'DATETIME'),
+                        ('updated_at', 'DATETIME'),
+                    ])
+
+                    ensure_columns('expense_category', [
+                        ('name', 'VARCHAR(255)'),
+                        ('created_at', 'DATETIME'),
+                        ('updated_at', 'DATETIME'),
                     ])
                     db.session.commit()
             except Exception:

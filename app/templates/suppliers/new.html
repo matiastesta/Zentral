@@ -194,22 +194,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const btnGuardar = document.getElementById('btn-guardar-proveedor');
 
+    function isPromise(x) {
+        return !!x && typeof x.then === 'function';
+    }
+
     function leerSuppliers() {
         try {
-            const raw = window.localStorage.getItem('suppliers_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
+            if (window.StorageService && typeof window.StorageService.getSuppliers === 'function') {
+                return window.StorageService.getSuppliers();
+            }
         } catch (e) {
-            return [];
         }
+        return [];
     }
 
     function guardarSuppliers(arr) {
         try {
-            window.localStorage.setItem('suppliers_dummy', JSON.stringify(arr));
+            if (window.StorageService && typeof window.StorageService.saveSuppliers === 'function') {
+                return window.StorageService.saveSuppliers(Array.isArray(arr) ? arr : []);
+            }
         } catch (e) {
-            // noop
         }
+        return null;
     }
 
     function getSelectedCategories() {
@@ -238,28 +244,33 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function cargarDesdeId(id) {
-        const list = leerSuppliers();
-        const found = list.find(s => String(s?.id) === String(id));
-        if (!found) return;
+        const res = leerSuppliers();
+        const apply = function (list) {
+            const arr = Array.isArray(list) ? list : [];
+            const found = arr.find(s => String(s?.id) === String(id));
+            if (!found) return;
 
-        if (titulo) titulo.textContent = 'Editar proveedor';
-        if (inputId) inputId.value = String(found.id);
-        if (inputName) inputName.value = found.name || '';
-        if (selectType) selectType.value = found.supplier_type || 'Services';
-        if (selectStatus) selectStatus.value = found.status || 'Active';
-        setSelectedCategories(found.categories || []);
+            if (titulo) titulo.textContent = 'Editar proveedor';
+            if (inputId) inputId.value = String(found.id);
+            if (inputName) inputName.value = found.name || '';
+            if (selectType) selectType.value = found.supplier_type || 'Services';
+            if (selectStatus) selectStatus.value = found.status || 'Active';
+            setSelectedCategories(found.categories || []);
 
-        if (invoiceType) invoiceType.value = found.invoice_type || '';
-        if (defaultPayment) defaultPayment.value = found.default_payment_method || '';
-        if (paymentTerms) paymentTerms.value = found.payment_terms || '';
+            if (invoiceType) invoiceType.value = found.invoice_type || '';
+            if (defaultPayment) defaultPayment.value = found.default_payment_method || '';
+            if (paymentTerms) paymentTerms.value = found.payment_terms || '';
 
-        if (contactPerson) contactPerson.value = found.contact_person || '';
-        if (phone) phone.value = found.phone || '';
-        if (email) email.value = found.email || '';
-        if (address) address.value = found.address || '';
-        if (preferredChannel) preferredChannel.value = found.preferred_contact_channel || '';
+            if (contactPerson) contactPerson.value = found.contact_person || '';
+            if (phone) phone.value = found.phone || '';
+            if (email) email.value = found.email || '';
+            if (address) address.value = found.address || '';
+            if (preferredChannel) preferredChannel.value = found.preferred_contact_channel || '';
 
-        if (notes) notes.value = found.notes || '';
+            if (notes) notes.value = found.notes || '';
+        };
+        if (isPromise(res)) res.then(apply).catch(() => apply([]));
+        else apply(res);
     }
 
     function validarObligatorios() {
@@ -276,7 +287,6 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const list = leerSuppliers();
         const id = (inputId?.value || '').trim() || String(Date.now());
 
         const payload = {
@@ -297,21 +307,28 @@ document.addEventListener('DOMContentLoaded', function () {
             notes: (notes?.value || '').trim()
         };
 
-        const idx = list.findIndex(s => String(s?.id) === String(id));
-        if (idx >= 0) {
-            list[idx] = { ...list[idx], ...payload };
-        } else {
-            list.push(payload);
-        }
-        guardarSuppliers(list);
-
-        if (returnTo) {
-            const sep = returnTo.includes('?') ? '&' : '?';
-            const next = returnTo + sep + 'supplier_id=' + encodeURIComponent(String(id)) + '&supplier_name=' + encodeURIComponent(payload.name || '');
-            window.location.href = next;
-            return;
-        }
-        window.location.href = baseListUrl;
+        const res = leerSuppliers();
+        const apply = function (list) {
+            const arr = Array.isArray(list) ? list.slice() : [];
+            const idx = arr.findIndex(s => String(s?.id) === String(id));
+            if (idx >= 0) {
+                arr[idx] = { ...arr[idx], ...payload };
+            } else {
+                arr.push(payload);
+            }
+            const saveRes = guardarSuppliers(arr);
+            Promise.resolve(saveRes).finally(function () {
+                if (returnTo) {
+                    const sep = returnTo.includes('?') ? '&' : '?';
+                    const next = returnTo + sep + 'supplier_id=' + encodeURIComponent(String(id)) + '&supplier_name=' + encodeURIComponent(payload.name || '');
+                    window.location.href = next;
+                    return;
+                }
+                window.location.href = baseListUrl;
+            });
+        };
+        if (isPromise(res)) res.then(apply).catch(() => apply([]));
+        else apply(res);
     }
 
     if (btnToggle && panelComp) {

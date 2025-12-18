@@ -8,6 +8,9 @@
             <p class="mt-1 text-sm text-gray-600">Inventario es el único punto de entrada de stock. Cada alta de lote genera un egreso automático.</p>
         </div>
         <div class="flex gap-2 justify-end">
+            <button id="btn-precios-inv" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                <i class="fas fa-tags mr-2"></i> Actualizar precios
+            </button>
             <button id="btn-export-inv" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100">
                 <i class="fas fa-file-export mr-2"></i> Exportar
             </button>
@@ -24,7 +27,7 @@
         <p id="kpi-stock-value" class="mt-2 text-2xl font-semibold text-gray-900">$0,00</p>
     </div>
     <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">📦 Productoss</p>
+        <p class="text-sm font-medium text-gray-500">📦 Productos</p>
         <p id="kpi-products" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
     </div>
     <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
@@ -89,7 +92,7 @@
             <button id="tab-specific" type="button" class="px-3 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:text-gray-900">Stock específico</button>
             <button id="tab-history" type="button" class="px-3 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:text-gray-900">Historial producto</button>
         </div>
-        <div class="text-[11px] text-gray-500">Vista dummy con localStorage</div>
+        <div class="text-[11px] text-gray-500">Stock y movimientos desde base de datos.</div>
     </div>
 
     <div id="panel-current">
@@ -178,7 +181,7 @@
                         <option value="">— Seleccionar —</option>
                     </select>
                 </div>
-                <div class="text-[11px] text-gray-500">Movimientos (ventas/consumos) desde <code>inventory_movements_dummy</code>.</div>
+                <div class="text-[11px] text-gray-500">Movimientos (ventas/consumos) del producto seleccionado.</div>
             </div>
         </div>
         <table class="min-w-full divide-y divide-gray-200">
@@ -198,6 +201,61 @@
                 </tr>
             </tbody>
         </table>
+    </div>
+</div>
+
+<div id="modal-precios-inv" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-5xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Actualizar precios</h3>
+                    <p class="text-xs text-gray-500">Editá el precio de venta. Se guarda en base de datos y se refleja en Ventas.</p>
+                </div>
+                <button id="btn-close-precios-inv" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="p-5">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Buscar producto</label>
+                        <input id="precios-q" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Nombre del producto">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Categoría</label>
+                        <select id="precios-cat" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-4 overflow-auto border border-gray-200 rounded-lg" style="max-height: 60vh;">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Producto</th>
+                                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
+                                <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Precio actual</th>
+                                <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Nuevo precio</th>
+                                <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">% cambio</th>
+                            </tr>
+                        </thead>
+                        <tbody id="precios-tbody" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-between">
+                <div id="precios-msg" class="text-[11px] text-gray-600">Guardá para aplicar los cambios.</div>
+                <div class="flex gap-2">
+                    <button id="btn-cancel-precios-inv" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cerrar</button>
+                    <button id="btn-save-precios-inv" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">Guardar cambios</button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -369,12 +427,8 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const KEY_PRODUCTS = 'inventory_products_dummy';
-    const KEY_LOTS = 'inventory_lots_dummy';
-    const KEY_EGRESOS = 'egresos_dummy';
-    const KEY_MOVEMENTS = 'inventory_movements_dummy';
-
     const btnCreate = document.getElementById('btn-create-inv');
+    const btnPrecios = document.getElementById('btn-precios-inv');
     const btnExport = document.getElementById('btn-export-inv');
     const btnClear = document.getElementById('btn-clear-inv');
     const tabCurrent = document.getElementById('tab-current');
@@ -443,6 +497,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnExportPdf = document.getElementById('btn-export-inv-pdf');
     const btnExportXls = document.getElementById('btn-export-inv-xls');
 
+    const modalPrecios = document.getElementById('modal-precios-inv');
+    const btnClosePrecios = document.getElementById('btn-close-precios-inv');
+    const btnCancelPrecios = document.getElementById('btn-cancel-precios-inv');
+    const btnSavePrecios = document.getElementById('btn-save-precios-inv');
+    const preciosTbody = document.getElementById('precios-tbody');
+    const preciosMsg = document.getElementById('precios-msg');
+    const preciosQ = document.getElementById('precios-q');
+    const preciosCat = document.getElementById('precios-cat');
+
     let activeTab = 'current';
 
     let cacheProducts = [];
@@ -459,83 +522,100 @@ document.addEventListener('DOMContentLoaded', function () {
         return '$' + val.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function leerJson(key) {
-        try {
-            if (key === KEY_PRODUCTS && window.StorageService && typeof window.StorageService.getInventoryProducts === 'function') {
-                return window.StorageService.getInventoryProducts();
-            }
-            if (key === KEY_LOTS && window.StorageService && typeof window.StorageService.getInventoryLots === 'function') {
-                return window.StorageService.getInventoryLots();
-            }
-            if (key === KEY_MOVEMENTS && window.StorageService && typeof window.StorageService.getInventoryMovements === 'function') {
-                return window.StorageService.getInventoryMovements();
-            }
-            if (key === KEY_EGRESOS && window.StorageService && typeof window.StorageService.getExpenses === 'function') {
-                return window.StorageService.getExpenses();
-            }
-        } catch (e) {
-            // fallback
+    function openPrecios() {
+        abrirModal(modalPrecios, true);
+        if (!Array.isArray(cacheProducts) || !cacheProducts.length) {
+            if (preciosTbody) preciosTbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>';
+            loadProductsLots(function () {
+                renderPreciosTable();
+            });
+            return;
         }
-        try {
-            const raw = window.localStorage.getItem(key);
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
+        renderPreciosTable();
     }
 
-    function guardarJson(key, arr) {
-        try {
-            if (key === KEY_PRODUCTS && window.StorageService && typeof window.StorageService.saveInventoryProducts === 'function') {
-                return window.StorageService.saveInventoryProducts(Array.isArray(arr) ? arr : []);
-            }
-            if (key === KEY_LOTS && window.StorageService && typeof window.StorageService.saveInventoryLots === 'function') {
-                return window.StorageService.saveInventoryLots(Array.isArray(arr) ? arr : []);
-            }
-            if (key === KEY_EGRESOS && window.StorageService && typeof window.StorageService.saveExpenses === 'function') {
-                return window.StorageService.saveExpenses(Array.isArray(arr) ? arr : []);
-            }
-        } catch (e) {
-            // fallback
-        }
-        try {
-            window.localStorage.setItem(key, JSON.stringify(arr));
-        } catch (e) {
-            // noop
-        }
+    function closePrecios() {
+        abrirModal(modalPrecios, false);
     }
 
     function isPromise(x) {
         return !!x && typeof x.then === 'function';
     }
 
+    function apiListProducts() {
+        return fetch('/inventory/api/products?active=1&limit=5000', { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(d => (d && d.ok && Array.isArray(d.items)) ? d.items : []);
+    }
+
+    function apiListLots() {
+        return fetch('/inventory/api/lots?limit=10000', { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(d => (d && d.ok && Array.isArray(d.items)) ? d.items : []);
+    }
+
+    function apiListMovements(productId) {
+        const qs = [];
+        if (productId) qs.push('product_id=' + encodeURIComponent(String(productId)));
+        qs.push('limit=2000');
+        const url = '/inventory/api/movements' + (qs.length ? ('?' + qs.join('&')) : '');
+        return fetch(url, { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(d => (d && d.ok && Array.isArray(d.items)) ? d.items : []);
+    }
+
+    function apiCreateProduct(payload) {
+        return fetch('/inventory/api/products', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {})
+        }).then(r => r.json());
+    }
+
+    function apiCreateLot(payload) {
+        return fetch('/inventory/api/lots', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {})
+        }).then(r => r.json());
+    }
+
+    function apiBulkUpdatePrices(items) {
+        return fetch('/inventory/api/products/prices', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: Array.isArray(items) ? items : [] })
+        }).then(r => r.json());
+    }
+
+    function apiDeleteLot(lotId) {
+        return fetch('/inventory/api/lots/' + encodeURIComponent(String(lotId)), {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        }).then(r => r.json());
+    }
+
     function loadProductsLots(cb) {
-        const pRes = leerJson(KEY_PRODUCTS);
-        const lRes = leerJson(KEY_LOTS);
-
-        const mRes = leerJson(KEY_MOVEMENTS);
-
-        if (isPromise(pRes) || isPromise(lRes) || isPromise(mRes)) {
-            return Promise.all([Promise.resolve(pRes), Promise.resolve(lRes), Promise.resolve(mRes)]).then(function (vals) {
-                const products = Array.isArray(vals[0]) ? vals[0] : [];
-                const lots = Array.isArray(vals[1]) ? vals[1] : [];
-                const movements = Array.isArray(vals[2]) ? vals[2] : [];
-                cacheProducts = products;
-                cacheLots = lots;
-                cacheMovements = movements;
-                if (typeof cb === 'function') cb(products, lots, movements);
-            });
-        }
-
-        const products = Array.isArray(pRes) ? pRes : [];
-        const lots = Array.isArray(lRes) ? lRes : [];
-        const movements = Array.isArray(mRes) ? mRes : [];
-        cacheProducts = products;
-        cacheLots = lots;
-        cacheMovements = movements;
-        if (typeof cb === 'function') cb(products, lots, movements);
-        return null;
+        const pRes = apiListProducts();
+        const lRes = apiListLots();
+        const mRes = apiListMovements('');
+        return Promise.all([Promise.resolve(pRes), Promise.resolve(lRes), Promise.resolve(mRes)]).then(function (vals) {
+            const products = Array.isArray(vals[0]) ? vals[0] : [];
+            const lots = Array.isArray(vals[1]) ? vals[1] : [];
+            const movements = Array.isArray(vals[2]) ? vals[2] : [];
+            cacheProducts = products;
+            cacheLots = lots;
+            cacheMovements = movements;
+            if (typeof cb === 'function') cb(products, lots, movements);
+        }).catch(function () {
+            cacheProducts = [];
+            cacheLots = [];
+            cacheMovements = [];
+            if (typeof cb === 'function') cb([], [], []);
+        });
     }
 
     function badgeStatus(st) {
@@ -643,26 +723,27 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        lots.sort((a, b) => String(a?.entry_date || '').localeCompare(String(b?.entry_date || '')));
+        lots.sort((a, b) => String(a?.received_at || '').localeCompare(String(b?.received_at || '')));
         tbodySpecific.innerHTML = '';
         lots.forEach(l => {
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-gray-50';
             tr.innerHTML = ''
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l?.lot_code || '') + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l?.entry_date || '') + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l?.supplier || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l?.received_at || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l?.supplier_name || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(parseNumeroSeguro(l?.unit_cost)) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(parseNumeroSeguro(l?.qty_available).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500">' + (l?.expiration ? String(l.expiration) : '—') + '</td>';
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + (l?.expiration_date ? String(l.expiration_date) : '—') + '</td>';
             tbodySpecific.appendChild(tr);
         });
     }
 
     function fmtMovDate(m) {
         const dt = m?.created_at;
-        if (typeof dt === 'number' && isFinite(dt)) {
+        if (dt) {
             const d = new Date(dt);
+            if (isNaN(d.getTime())) return String(m?.date || m?.fecha || '');
             const dd = String(d.getDate()).padStart(2, '0');
             const mm = String(d.getMonth() + 1).padStart(2, '0');
             const yy = String(d.getFullYear());
@@ -681,36 +762,33 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const movements = (Array.isArray(cacheMovements) ? cacheMovements : [])
-            .filter(m => String(m?.product_id || '') === productId);
-
-        if (!movements.length) {
-            tbodyHistory.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay movimientos para este producto.</td></tr>';
-            return;
-        }
-
-        movements.sort((a, b) => {
-            const ta = (typeof a?.created_at === 'number') ? a.created_at : 0;
-            const tb = (typeof b?.created_at === 'number') ? b.created_at : 0;
-            return tb - ta;
-        });
-
-        tbodyHistory.innerHTML = '';
-        movements.forEach(m => {
+        tbodyHistory.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
+        apiListMovements(productId).then(function (movements) {
+            const list = Array.isArray(movements) ? movements.slice() : [];
+            if (!list.length) {
+                tbodyHistory.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay movimientos para este producto.</td></tr>';
+                return;
+            }
+            list.sort((a, b) => String(b?.created_at || '').localeCompare(String(a?.created_at || '')));
+            tbodyHistory.innerHTML = '';
+            list.forEach(m => {
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-gray-50';
-            const qty = parseNumeroSeguro(m?.qty || m?.quantity);
-            const cost = parseNumeroSeguro(m?.cost_total || m?.total_cost);
-            const ref = String(m?.origin_ref || m?.sale_id || m?.ticket_id || m?.ref || '');
-            const detail = String(m?.note || m?.details || '');
+            const qty = parseNumeroSeguro(m?.qty_delta);
+            const cost = parseNumeroSeguro(m?.total_cost);
+            const ref = String(m?.sale_ticket || '');
+            const detail = String(m?.note || '');
             tr.innerHTML = ''
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtMovDate(m) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(m?.type || 'consumption') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(m?.type || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + (ref || '—') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(qty.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(cost) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + (detail || '—') + '</td>';
             tbodyHistory.appendChild(tr);
+            });
+        }).catch(function () {
+            tbodyHistory.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">No se pudo cargar el historial.</td></tr>';
         });
     }
 
@@ -735,7 +813,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const filteredProducts = products
             .filter(p => {
                 if (q && !String(p.name || '').toLowerCase().includes(q)) return false;
-                if (cat && String(p.category || '') !== cat) return false;
+                if (cat && String(p?.category?.name || p?.category || '') !== cat) return false;
                 const metrics = compute(p);
                 if (st && metrics.status !== st) return false;
                 return true;
@@ -747,8 +825,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const p = products.find(x => String(x.id) === String(l.product_id));
                 if (!p) return false;
                 if (q && !String(p.name || '').toLowerCase().includes(q)) return false;
-                if (cat && String(p.category || '') !== cat) return false;
-                if (sup && String(l.supplier || '') !== sup) return false;
+                if (cat && String(p?.category?.name || p?.category || '') !== cat) return false;
+                if (sup && String(l.supplier_name || '') !== sup) return false;
                 const status = getStatus(parseNumeroSeguro(l.qty_available), 0);
                 if (st && status !== st && st !== 'OK') return false;
                 return true;
@@ -764,7 +842,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateFilterOptions(products, lots) {
         if (filterCat) {
             const current = filterCat.value;
-            const cats = Array.from(new Set(products.map(p => String(p.category || '').trim()).filter(Boolean))).sort();
+            const cats = Array.from(new Set(products.map(p => String(p.category || p?.category?.name || '').trim()).filter(Boolean))).sort();
             filterCat.innerHTML = '<option value="">Todas</option>';
             cats.forEach(c => {
                 const opt = document.createElement('option');
@@ -776,7 +854,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (filterSup) {
             const current = filterSup.value;
-            const sups = Array.from(new Set(lots.map(l => String(l.supplier || '').trim()).filter(Boolean))).sort();
+            const sups = Array.from(new Set(lots.map(l => String(l.supplier_name || '').trim()).filter(Boolean))).sort();
             filterSup.innerHTML = '<option value="">Todos</option>';
             sups.forEach(s => {
                 const opt = document.createElement('option');
@@ -792,7 +870,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const days30 = 30 * 24 * 60 * 60 * 1000;
         const now = Date.now();
         const expSoon = lots.filter(l => {
-            const exp = String(l.expiration || '').trim();
+            const exp = String(l.expiration_date || '').trim();
             if (!exp) return false;
             const t = new Date(exp).getTime();
             if (!t) return false;
@@ -830,9 +908,9 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.className = 'hover:bg-gray-50';
             tr.innerHTML = ''
                 + '<td class="px-4 py-3 text-sm text-gray-900">' + String(p.name || '') + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(p.category || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(p.category || p?.category?.name || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(m.stock.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(p.unit || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(p.unit_name || p.unit || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(m.avg) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(m.total) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-center">' + badgeStatus(m.status) + '</td>'
@@ -868,12 +946,12 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.innerHTML = ''
                 + '<td class="px-4 py-3 text-sm text-gray-900">' + String(p?.name || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l.lot_code || '') + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l.entry_date || '') + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l.supplier || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l.received_at || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l.supplier_name || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(parseNumeroSeguro(l.unit_cost)) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(parseNumeroSeguro(l.qty_available).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(ct) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500">' + (l.expiration ? String(l.expiration) : '—') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + (l.expiration_date ? String(l.expiration_date) : '—') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-center">' + badgeStatus(status) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right">'
                 + '  <button type="button" class="btn-del-lot text-xs font-medium text-red-600 hover:text-red-800" data-lot-id="' + String(l.id) + '">Eliminar</button>'
@@ -883,19 +961,15 @@ document.addEventListener('DOMContentLoaded', function () {
         Array.from(tbodyLots.querySelectorAll('.btn-del-lot')).forEach(btn => {
             btn.addEventListener('click', function () {
                 const id = this.getAttribute('data-lot-id') || '';
-                const res = leerJson(KEY_LOTS);
-                const apply = function (lots) {
-                    const next = (Array.isArray(lots) ? lots : []).filter(x => String(x.id) !== String(id));
-                    const saveRes = guardarJson(KEY_LOTS, next);
-                    if (isPromise(saveRes)) return saveRes.then(function () { renderAll(); });
+                if (!id) return;
+                if (!window.confirm('¿Seguro que querés eliminar este lote?')) return;
+                apiDeleteLot(id).then(function (res) {
+                    if (!res || res.ok !== true) {
+                        alert('No se pudo eliminar el lote.');
+                        return;
+                    }
                     renderAll();
-                    return null;
-                };
-                if (isPromise(res)) {
-                    res.then(apply);
-                } else {
-                    apply(res);
-                }
+                }).catch(function () { alert('No se pudo eliminar el lote.'); });
             });
         });
     }
@@ -937,7 +1011,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function crearEgresoDesdeInventario({ fecha, proveedor, valor, nota }) {
         try {
             if (window.StorageService && typeof window.StorageService.addExpenseFromInventory === 'function') {
-                return window.StorageService.addExpenseFromInventory({
+                const res = window.StorageService.addExpenseFromInventory({
                     id: String(Date.now()),
                     fecha: String(fecha || ''),
                     categoria: 'Inventario',
@@ -952,28 +1026,89 @@ document.addEventListener('DOMContentLoaded', function () {
                     supplier_id: '',
                     supplier_name: String(proveedor || '')
                 });
+                try {
+                    if (res && typeof res.then === 'function') res.catch(function () { });
+                } catch (e) {
+                }
+                return res;
             }
         } catch (e) {
-            // fallback
+            // noop
         }
-        const egresos = Array.isArray(leerJson(KEY_EGRESOS)) ? leerJson(KEY_EGRESOS) : [];
-        egresos.push({
-            id: String(Date.now()),
-            fecha: String(fecha || ''),
-            categoria: 'Inventario',
-            valor: parseNumeroSeguro(valor),
-            nota: String(nota || ''),
-            forma_pago: 'Transferencia',
-            tipo_gasto: 'Variable',
-            frecuencia: 'Único',
-            comprobante: [],
-            custom_fields: [],
-            proveedor: String(proveedor || ''),
-            supplier_id: '',
-            supplier_name: String(proveedor || ''),
-            origin: 'Inventory'
+        return null;
+    }
+
+    function pctChange(oldPrice, newPrice) {
+        const oldv = parseNumeroSeguro(oldPrice);
+        const newv = parseNumeroSeguro(newPrice);
+        if (!(oldv > 0) || !isFinite(oldv)) return '';
+        const pct = ((newv - oldv) / oldv) * 100;
+        if (!isFinite(pct)) return '';
+        return pct.toFixed(2);
+    }
+
+    function updatePreciosCats(products) {
+        if (!preciosCat) return;
+        const current = String(preciosCat.value || '').trim();
+        const cats = Array.from(new Set((Array.isArray(products) ? products : []).map(p => String(p?.category?.name || p?.category || '').trim()).filter(Boolean))).sort();
+        preciosCat.innerHTML = '<option value="">Todas</option>';
+        cats.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            preciosCat.appendChild(opt);
         });
-        guardarJson(KEY_EGRESOS, egresos);
+        preciosCat.value = current;
+    }
+
+    function renderPreciosTable() {
+        if (!preciosTbody) return;
+        const products = Array.isArray(cacheProducts) ? cacheProducts.slice() : [];
+        products.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
+        updatePreciosCats(products);
+
+        const q = String(preciosQ?.value || '').trim().toLowerCase();
+        const cat = String(preciosCat?.value || '').trim();
+        const visible = products.filter(p => {
+            if (q && !String(p?.name || '').toLowerCase().includes(q)) return false;
+            if (cat && String(p?.category?.name || p?.category || '') !== cat) return false;
+            return true;
+        });
+
+        if (!visible.length) {
+            preciosTbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">No hay productos para los filtros actuales.</td></tr>';
+            return;
+        }
+
+        preciosTbody.innerHTML = '';
+        visible.forEach(p => {
+            const oldP = parseNumeroSeguro(p?.sale_price);
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+            tr.setAttribute('data-product-id', String(p?.id || ''));
+            tr.setAttribute('data-old-price', String(oldP));
+            tr.innerHTML = ''
+                + '<td class="px-4 py-3 text-sm text-gray-900">' + String(p?.name || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(p?.category?.name || p?.category || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(oldP) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right">'
+                +   '<input type="number" step="0.01" min="0" class="w-32 px-2 py-1 border rounded-md text-right text-sm input-new-price" value="' + String(oldP.toFixed(2)) + '">'
+                + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-600">'
+                +   '<span class="pct-cell">' + (oldP > 0 ? '0.00' : '') + '</span>'
+                + '</td>';
+            preciosTbody.appendChild(tr);
+
+            const input = tr.querySelector('.input-new-price');
+            const pctEl = tr.querySelector('.pct-cell');
+            const recalc = function () {
+                const nv = parseNumeroSeguro(input?.value);
+                const pct = pctChange(oldP, nv);
+                if (pctEl) pctEl.textContent = pct;
+            };
+            if (input) input.addEventListener('input', recalc);
+            recalc();
+        });
     }
 
     function exportCsv() {
@@ -984,9 +1119,9 @@ document.addEventListener('DOMContentLoaded', function () {
             filteredProducts.forEach(({ p, m }) => {
                 rows.push([
                     String(p.name || ''),
-                    String(p.category || ''),
+                    String(p.category || p?.category?.name || ''),
                     String(m.stock),
-                    String(p.unit || ''),
+                    String(p.unit_name || p.unit || ''),
                     String(m.avg),
                     String(m.total),
                     String(m.status)
@@ -999,12 +1134,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 rows.push([
                     String(p?.name || ''),
                     String(l.lot_code || ''),
-                    String(l.entry_date || ''),
-                    String(l.supplier || ''),
+                    String(l.received_at || ''),
+                    String(l.supplier_name || ''),
                     String(parseNumeroSeguro(l.unit_cost)),
                     String(parseNumeroSeguro(l.qty_available)),
                     String(ct),
-                    String(l.expiration || '')
+                    String(l.expiration_date || '')
                 ]);
             });
         }
@@ -1032,9 +1167,9 @@ document.addEventListener('DOMContentLoaded', function () {
             filteredProducts.forEach(({ p, m }) => {
                 body += '<tr>'
                     + '<td>' + String(p.name || '') + '</td>'
-                    + '<td>' + String(p.category || '') + '</td>'
+                    + '<td>' + String(p.category || p?.category?.name || '') + '</td>'
                     + '<td style="text-align:right">' + String(m.stock.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
-                    + '<td>' + String(p.unit || '') + '</td>'
+                    + '<td>' + String(p.unit_name || p.unit || '') + '</td>'
                     + '<td style="text-align:right">' + formatMoney(m.avg) + '</td>'
                     + '<td style="text-align:right">' + formatMoney(m.total) + '</td>'
                     + '<td>' + String(m.status) + '</td>'
@@ -1049,12 +1184,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 body += '<tr>'
                     + '<td>' + String(p?.name || '') + '</td>'
                     + '<td>' + String(l.lot_code || '') + '</td>'
-                    + '<td>' + String(l.entry_date || '') + '</td>'
-                    + '<td>' + String(l.supplier || '') + '</td>'
+                    + '<td>' + String(l.received_at || '') + '</td>'
+                    + '<td>' + String(l.supplier_name || '') + '</td>'
                     + '<td style="text-align:right">' + formatMoney(parseNumeroSeguro(l.unit_cost)) + '</td>'
                     + '<td style="text-align:right">' + String(parseNumeroSeguro(l.qty_available).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
                     + '<td style="text-align:right">' + formatMoney(ct) + '</td>'
-                    + '<td>' + (l.expiration ? String(l.expiration) : '—') + '</td>'
+                    + '<td>' + (l.expiration_date ? String(l.expiration_date) : '—') + '</td>'
                     + '</tr>';
             });
         }
@@ -1082,6 +1217,49 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btnCreate) btnCreate.addEventListener('click', openCreate);
     if (btnCloseCreate) btnCloseCreate.addEventListener('click', closeCreate);
     if (btnCancelCreate) btnCancelCreate.addEventListener('click', closeCreate);
+
+    if (btnPrecios) btnPrecios.addEventListener('click', openPrecios);
+    if (btnClosePrecios) btnClosePrecios.addEventListener('click', closePrecios);
+    if (btnCancelPrecios) btnCancelPrecios.addEventListener('click', closePrecios);
+    if (preciosQ) preciosQ.addEventListener('input', renderPreciosTable);
+    if (preciosCat) preciosCat.addEventListener('change', renderPreciosTable);
+    if (btnSavePrecios) {
+        btnSavePrecios.addEventListener('click', function () {
+            const rows = Array.from(preciosTbody ? preciosTbody.querySelectorAll('tr[data-product-id]') : []);
+            const changes = [];
+            rows.forEach(tr => {
+                const id = tr.getAttribute('data-product-id');
+                const oldP = parseNumeroSeguro(tr.getAttribute('data-old-price'));
+                const input = tr.querySelector('.input-new-price');
+                const newP = parseNumeroSeguro(input?.value);
+                if (!id) return;
+                if (!isFinite(newP) || newP < 0) return;
+                if (Math.abs(newP - oldP) < 0.00001) return;
+                changes.push({ id: parseInt(id, 10), sale_price: newP });
+            });
+            if (!changes.length) {
+                if (preciosMsg) preciosMsg.textContent = 'No hay cambios para guardar.';
+                return;
+            }
+            if (preciosMsg) preciosMsg.textContent = 'Guardando…';
+            apiBulkUpdatePrices(changes).then(function (res) {
+                if (!res || res.ok !== true) {
+                    if (preciosMsg) preciosMsg.textContent = 'No se pudieron guardar los precios.';
+                    return;
+                }
+                const updated = Array.isArray(res.items) ? res.items : [];
+                const map = new Map(updated.map(p => [String(p.id), p]));
+                cacheProducts = (Array.isArray(cacheProducts) ? cacheProducts : []).map(p => {
+                    const u = map.get(String(p.id));
+                    return u ? { ...p, sale_price: u.sale_price } : p;
+                });
+                if (preciosMsg) preciosMsg.textContent = 'Precios actualizados.';
+                renderAll();
+            }).catch(function () {
+                if (preciosMsg) preciosMsg.textContent = 'No se pudieron guardar los precios.';
+            });
+        });
+    }
 
     if (btnExport) btnExport.addEventListener('click', openExport);
     if (btnCloseExport) btnCloseExport.addEventListener('click', closeExport);
@@ -1154,44 +1332,25 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!category) { alert('Completá la categoría del producto.'); return; }
             if (!unit) { alert('Completá la unidad.'); return; }
 
-            const payload = {
-                id: String(Date.now()),
+            apiCreateProduct({
                 name,
-                category,
-                unit,
-                manage_lots: manageLots,
+                category_name: category,
+                unit_name: unit,
+                uses_lots: (manageLots === 'Yes'),
                 method,
                 min_stock: min,
-                description: desc
-            };
-
-            try {
-                if (window.StorageService && typeof window.StorageService.addInventoryProduct === 'function') {
-                    const r = window.StorageService.addInventoryProduct(payload);
-                    if (isPromise(r)) {
-                        r.then(function () {
-                            closeCreate();
-                            renderAll();
-                        });
-                        return;
-                    }
-                    closeCreate();
-                    renderAll();
+                description: desc,
+                sale_price: 0
+            }).then(function (res) {
+                if (!res || res.ok !== true) {
+                    alert('No se pudo crear el producto.');
                     return;
                 }
-            } catch (e) {
-                // fallback
-            }
-
-            const products = Array.isArray(leerJson(KEY_PRODUCTS)) ? leerJson(KEY_PRODUCTS) : [];
-            products.push(payload);
-            const saveRes = guardarJson(KEY_PRODUCTS, products);
-            if (isPromise(saveRes)) {
-                saveRes.then(function () { closeCreate(); renderAll(); });
-                return;
-            }
-            closeCreate();
-            renderAll();
+                closeCreate();
+                renderAll();
+            }).catch(function () {
+                alert('No se pudo crear el producto.');
+            });
         });
     }
 
@@ -1216,17 +1375,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const lotId = String(Date.now());
             const lotCode = 'L-' + lotId.slice(-6);
-            const lotPayload = {
-                id: lotId,
-                product_id: productId,
-                lot_code: lotCode,
-                entry_date: entryDate,
-                supplier,
-                unit_cost: cu,
-                qty_available: qty,
-                expiration,
-                note
-            };
 
             const total = cu * qty;
             const expensePayload = {
@@ -1245,42 +1393,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 supplier_name: String(supplier || '')
             };
 
-            try {
-                if (window.StorageService && typeof window.StorageService.addInventoryLot === 'function') {
-                    const r = window.StorageService.addInventoryLot(lotPayload, expensePayload);
-                    if (isPromise(r)) {
-                        r.then(function () {
-                            closeCreate();
-                            renderAll();
-                        });
-                        return;
-                    }
-                    closeCreate();
-                    renderAll();
+            apiCreateLot({
+                product_id: parseInt(productId, 10),
+                date: entryDate,
+                unit_cost: cu,
+                qty: qty,
+                supplier_name: supplier,
+                lot_code: lotCode,
+                expiration_date: expiration,
+                note: note
+            }).then(function (res) {
+                if (!res || res.ok !== true) {
+                    alert('No se pudo cargar el lote.');
                     return;
                 }
-            } catch (e) {
-                // fallback
-            }
-
-            const lots = Array.isArray(leerJson(KEY_LOTS)) ? leerJson(KEY_LOTS) : [];
-            lots.push(lotPayload);
-            const saveRes = guardarJson(KEY_LOTS, lots);
-            if (isPromise(saveRes)) {
-                saveRes.then(function () {
-                    const maybeExp = crearEgresoDesdeInventario({ fecha: entryDate, proveedor: supplier, valor: total, nota: expensePayload.nota });
-                    if (isPromise(maybeExp)) {
-                        maybeExp.then(function () { closeCreate(); renderAll(); });
-                    } else {
-                        closeCreate();
-                        renderAll();
-                    }
-                });
-                return;
-            }
-            crearEgresoDesdeInventario({ fecha: entryDate, proveedor: supplier, valor: total, nota: expensePayload.nota });
-            closeCreate();
-            renderAll();
+                crearEgresoDesdeInventario({ fecha: entryDate, proveedor: supplier, valor: total, nota: expensePayload.nota });
+                closeCreate();
+                renderAll();
+            }).catch(function () {
+                alert('No se pudo cargar el lote.');
+            });
         });
     }
 

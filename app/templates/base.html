@@ -16,8 +16,11 @@
 </head>
 <body class="bg-gray-100" style="background-color: #fbf9f5;">
     {% set ep = request.endpoint or '' %}
+    {% set brand_color = (business.primary_color if business and business.primary_color else '#0d1067') %}
+    {% set label_customers = (business.label_customers if business and business.label_customers else 'Clientes') %}
+    {% set label_products = (business.label_products if business and business.label_products else 'Productos') %}
     <!-- Navigation -->
-    <nav class="text-white shadow-lg sticky top-0 z-20" style="background-color: #0d1067;">
+    <nav class="text-white shadow-lg sticky top-0 z-20" style="background-color: #0d1067;" data-brand-color="{{ brand_color }}">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex">
@@ -73,7 +76,7 @@
                 {% endif %}
                 {% if current_user.is_authenticated and current_user.can('customers') %}
                 <a href="{{ url_for('customers.index') }}" class="{% if ep.startswith('customers.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
-                    <i class="fas fa-user mr-2"></i> Clientes
+                    <i class="fas fa-user mr-2"></i> {{ label_customers }}
                 </a>
                 {% endif %}
                 {% if current_user.is_authenticated and current_user.can('suppliers') %}
@@ -192,7 +195,7 @@
                 {% endif %}
                 {% if current_user.is_authenticated and current_user.can('customers') %}
                 <a href="{{ url_for('customers.index') }}" class="w-full inline-flex items-center px-3 py-2 rounded-md text-sm font-medium {% if ep.startswith('customers.') %}bg-blue-50 text-blue-700{% else %}text-gray-700 hover:bg-blue-50 hover:text-blue-700{% endif %}">
-                    <i class="fas fa-user mr-2"></i> Clientes
+                    <i class="fas fa-user mr-2"></i> {{ label_customers }}
                 </a>
                 {% endif %}
                 {% if current_user.is_authenticated and current_user.can('suppliers') %}
@@ -273,6 +276,15 @@
     <script>
         // Toggle mobile menu
         document.addEventListener('DOMContentLoaded', function() {
+            const nav = document.querySelector('nav[data-brand-color]');
+            if (nav) {
+                const c = (nav.getAttribute('data-brand-color') || '').trim();
+                if (c) nav.style.backgroundColor = c;
+            }
+            document.querySelectorAll('[data-brand-bg]').forEach(function(el) {
+                const c = (el.getAttribute('data-brand-bg') || '').trim();
+                if (c) el.style.backgroundColor = c;
+            });
             const mobileMenuButton = document.querySelector('button[aria-controls="mobile-menu"]');
             const mobileMenu = document.getElementById('mobile-menu');
             const userMenuButton = document.getElementById('user-menu');

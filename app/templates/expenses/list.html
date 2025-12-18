@@ -13,7 +13,7 @@
         <button id="btn-export-egresos" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
             <i class="fas fa-file-export mr-2"></i> Exportar
         </button>
-        <a href="{{ url_for('expenses.new') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+        <a href="{{ url_for('expenses.new') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">
             <i class="fas fa-plus mr-2"></i> Nuevo gasto
         </a>
     </div>
@@ -197,19 +197,11 @@ document.addEventListener('DOMContentLoaded', function () {
     function leerEgresos() {
         try {
             if (window.StorageService && typeof window.StorageService.getExpenses === 'function') {
-                const res = window.StorageService.getExpenses();
-                return Array.isArray(res) ? res : [];
+                return window.StorageService.getExpenses();
             }
         } catch (e) {
-            // fallback
         }
-        try {
-            const raw = window.localStorage.getItem('egresos_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
+        return [];
     }
 
     function guardarEgresos(arr) {
@@ -219,31 +211,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
         } catch (e) {
-            // fallback
-        }
-        try {
-            window.localStorage.setItem('egresos_dummy', JSON.stringify(arr));
-        } catch (e) {
-            // noop
         }
     }
 
     function leerSuppliers() {
         try {
             if (window.StorageService && typeof window.StorageService.getSuppliers === 'function') {
-                const res = window.StorageService.getSuppliers();
-                return Array.isArray(res) ? res : [];
+                return window.StorageService.getSuppliers();
             }
         } catch (e) {
-            // fallback
         }
-        try {
-            const raw = window.localStorage.getItem('suppliers_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
+        return [];
+    }
+
+    function isPromise(x) {
+        return !!x && typeof x.then === 'function';
     }
 
     function setProveedorFiltro(id, name) {
@@ -311,11 +293,16 @@ document.addEventListener('DOMContentLoaded', function () {
             hideProveedorDd();
             return;
         }
-        const items = leerSuppliers()
-            .filter(s => (s?.status || 'Active') !== 'Discontinued')
-            .filter(s => String(s?.name || '').toLowerCase().includes(q))
-            .slice(0, 10);
-        showProveedorDd(items, q);
+        const res = leerSuppliers();
+        const apply = function (suppliers) {
+            const items = (Array.isArray(suppliers) ? suppliers : [])
+                .filter(s => (s?.status || 'Active') !== 'Discontinued')
+                .filter(s => String(s?.name || '').toLowerCase().includes(q))
+                .slice(0, 10);
+            showProveedorDd(items, q);
+        };
+        if (isPromise(res)) res.then(apply).catch(() => apply([]));
+        else apply(res);
     }
 
     function parseRangoFechas(raw) {
@@ -437,7 +424,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderTabla() {
         if (!tbody) return;
-        let egresos = leerEgresos();
+        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
+
+        const res = leerEgresos();
+        const apply = function (arr) {
+        let egresos = Array.isArray(arr) ? arr.slice() : [];
 
         const rango = parseRangoFechas(filtroRango?.value);
         if (rango) {
@@ -536,6 +527,9 @@ document.addEventListener('DOMContentLoaded', function () {
             `;
             tbody.appendChild(tr);
         });
+        };
+        if (isPromise(res)) res.then(apply).catch(() => apply([]));
+        else apply(res);
     }
 
     if (tbody) {

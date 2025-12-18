@@ -72,20 +72,35 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function leerSuppliers() {
         try {
-            const raw = window.localStorage.getItem('suppliers_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
+            if (window.StorageService && typeof window.StorageService.getSuppliers === 'function') {
+                return window.StorageService.getSuppliers();
+            }
         } catch (e) {
-            return [];
         }
+        return [];
     }
 
     function guardarSuppliers(arr) {
         try {
-            window.localStorage.setItem('suppliers_dummy', JSON.stringify(arr));
+            if (window.StorageService && typeof window.StorageService.saveSuppliers === 'function') {
+                return window.StorageService.saveSuppliers(Array.isArray(arr) ? arr : []);
+            }
         } catch (e) {
-            // noop
         }
+        return null;
+    }
+
+    function isPromise(x) {
+        return !!x && typeof x.then === 'function';
+    }
+
+    function deleteSupplier(id) {
+        const sid = String(id || '').trim();
+        if (!sid) return Promise.resolve(null);
+        return fetch('/suppliers/api/suppliers/' + encodeURIComponent(sid), {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        }).then(r => r.json()).catch(() => null);
     }
 
     function labelTipo(v) {
@@ -109,47 +124,54 @@ document.addEventListener('DOMContentLoaded', function () {
     function render() {
         if (!tbody) return;
         const q = (inputBuscar?.value || '').trim().toLowerCase();
-        let list = leerSuppliers();
+        tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
 
-        if (q) {
-            list = list.filter(s => String(s?.name || '').toLowerCase().includes(q));
-        }
+        const res = leerSuppliers();
+        const apply = function (suppliers) {
+            let list = Array.isArray(suppliers) ? suppliers.slice() : [];
 
-        const total = leerSuppliers().length;
-        const activos = leerSuppliers().filter(s => (s?.status || 'Active') === 'Active').length;
-        if (elTotal) elTotal.textContent = String(total);
-        if (elActivos) elActivos.textContent = String(activos);
+            if (q) {
+                list = list.filter(s => String(s?.name || '').toLowerCase().includes(q));
+            }
 
-        tbody.innerHTML = '';
-        if (!list.length) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = '<td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados para tu búsqueda.</td>';
-            tbody.appendChild(tr);
-            return;
-        }
+            const total = (Array.isArray(suppliers) ? suppliers : []).length;
+            const activos = (Array.isArray(suppliers) ? suppliers : []).filter(s => (s?.status || 'Active') === 'Active').length;
+            if (elTotal) elTotal.textContent = String(total);
+            if (elActivos) elActivos.textContent = String(activos);
 
-        list.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
+            tbody.innerHTML = '';
+            if (!list.length) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = '<td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados para tu búsqueda.</td>';
+                tbody.appendChild(tr);
+                return;
+            }
 
-        list.forEach(s => {
-            const cats = Array.isArray(s?.categories) ? s.categories : [];
-            const catsLabel = cats.length ? cats.join(', ') : '—';
-            const status = s?.status || 'Active';
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-gray-50';
-            tr.innerHTML = `
-                <td class="px-4 py-3 text-sm text-gray-900">${s?.name || 'Proveedor'}</td>
-                <td class="px-4 py-3 text-sm text-gray-500">${labelTipo(s?.supplier_type)}</td>
-                <td class="px-4 py-3 text-sm text-gray-500">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${classEstado(status)}">${labelEstado(status)}</span>
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-500">${catsLabel}</td>
-                <td class="px-4 py-3 text-sm text-right space-x-2">
-                    <button type="button" class="btn-editar-sup text-blue-600 hover:text-blue-800 text-xs font-medium" data-id="${s?.id}">Editar</button>
-                    <button type="button" class="btn-eliminar-sup text-red-600 hover:text-red-800 text-xs font-medium" data-id="${s?.id}">Eliminar</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
+            list.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
+
+            list.forEach(s => {
+                const cats = Array.isArray(s?.categories) ? s.categories : [];
+                const catsLabel = cats.length ? cats.join(', ') : '—';
+                const status = s?.status || 'Active';
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+                tr.innerHTML = `
+                    <td class="px-4 py-3 text-sm text-gray-900">${s?.name || 'Proveedor'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-500">${labelTipo(s?.supplier_type)}</td>
+                    <td class="px-4 py-3 text-sm text-gray-500">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${classEstado(status)}">${labelEstado(status)}</span>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-500">${catsLabel}</td>
+                    <td class="px-4 py-3 text-sm text-right space-x-2">
+                        <button type="button" class="btn-editar-sup text-blue-600 hover:text-blue-800 text-xs font-medium" data-id="${s?.id}">Editar</button>
+                        <button type="button" class="btn-eliminar-sup text-red-600 hover:text-red-800 text-xs font-medium" data-id="${s?.id}">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+        if (isPromise(res)) res.then(apply).catch(() => apply([]));
+        else apply(res);
     }
 
     if (inputBuscar) {
@@ -171,12 +193,11 @@ document.addEventListener('DOMContentLoaded', function () {
             if (btnDel) {
                 const id = btnDel.getAttribute('data-id');
                 if (!id) return;
-                const ok = confirm('¿Eliminar proveedor? (dummy)');
+                const ok = confirm('¿Eliminar proveedor?');
                 if (!ok) return;
-                const all = leerSuppliers();
-                const next = all.filter(s => String(s?.id) !== String(id));
-                guardarSuppliers(next);
-                render();
+                deleteSupplier(id).finally(function () {
+                    render();
+                });
             }
         });
     }

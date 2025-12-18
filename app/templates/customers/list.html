@@ -1,23 +1,23 @@
  {% extends 'base.html' %}
-{% block title %}Clientes{% endblock %}
+{% block title %}{{ business.label_customers if business and business.label_customers else 'Clientes' }}{% endblock %}
 {% block content %}
 <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Clientes</h1>
-    <p class="mt-1 text-sm text-gray-600">Centraliza la información de tus clientes para mejorar el seguimiento y la fidelización.</p>
+    <h1 class="text-2xl font-bold text-gray-900">{{ business.label_customers if business and business.label_customers else 'Clientes' }}</h1>
+    <p class="mt-1 text-sm text-gray-600">Centraliza la información de tus {{ label_customers|lower }} para mejorar el seguimiento y la fidelización.</p>
 </div>
 
 <!-- Resumen de clientes -->
 <div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-4">
     <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Total de clientes</p>
+        <p class="text-sm font-medium text-gray-500">Total de {{ label_customers|lower }}</p>
         <p id="kpi-clientes-total" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
     </div>
     <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Clientes activos</p>
+        <p class="text-sm font-medium text-gray-500">{{ label_customers }} activos</p>
         <p id="kpi-clientes-activos" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
     </div>
     <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Clientes deudores</p>
+        <p class="text-sm font-medium text-gray-500">{{ label_customers }} deudores</p>
         <p id="kpi-clientes-deudores" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
     </div>
     <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
@@ -439,11 +439,17 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         } catch (e) {
         }
-        try {
-            window.localStorage.setItem('sales_dummy', JSON.stringify(payload));
-        } catch (e) {
-        }
         return null;
+    }
+
+    function apiSettleDebt(opts) {
+        const payload = opts && typeof opts === 'object' ? opts : {};
+        return fetch('/sales/api/sales/settle', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(r => r.json());
     }
 
     function truncateText(s, max) {
@@ -589,34 +595,25 @@ document.addEventListener('DOMContentLoaded', function () {
             if (settleError) settleError.classList.remove('hidden');
             return;
         }
-        const next = ensureArray(cacheSales).slice();
-        const idx = next.findIndex(x => safeStr(x?.id) === saleId);
-        if (idx < 0) {
-            if (settleError) settleError.classList.remove('hidden');
-            return;
-        }
-        const sale = next[idx];
-        const due = parseFloat(sale?.due_amount || 0) || 0;
-        const total = parseFloat(sale?.total || 0) || 0;
-        const paidPrev = parseFloat(sale?.paid_amount || 0) || 0;
-
-        next[idx] = {
-            ...sale,
-            due_amount: 0,
-            paid_amount: Math.max(total, paidPrev + due),
-            on_account: false,
-            settled_at: Date.now(),
-            settled_payment_method: method,
-            settled_amount: due
-        };
-
-        cacheSales = next;
-        saveSales(next);
-        closeModal(modalSettle);
-        render();
-        if (legajoCustomerId && legajoCustomerId === settleCustomerId) {
-            openLegajo(legajoCustomerId);
-        }
+        apiSettleDebt({ sale_id: saleId, payment_method: method })
+            .then(function (data) {
+                if (!data || data.ok !== true) {
+                    if (settleError) settleError.classList.remove('hidden');
+                    return;
+                }
+                const reload = readSales();
+                Promise.resolve(reload).then(function (sales) {
+                    cacheSales = ensureArray(sales);
+                    closeModal(modalSettle);
+                    render();
+                    if (legajoCustomerId && legajoCustomerId === settleCustomerId) {
+                        openLegajo(legajoCustomerId);
+                    }
+                });
+            })
+            .catch(function () {
+                if (settleError) settleError.classList.remove('hidden');
+            });
     }
 
     function writeAlertsConfig(cfg) {
@@ -724,13 +721,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         } catch (e) {
         }
-        try {
-            const raw = window.localStorage.getItem('customers_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return ensureArray(parsed);
-        } catch (e) {
-            return [];
-        }
+        return [];
     }
 
     function saveCustomers(list) {
@@ -739,10 +730,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (window.StorageService && typeof window.StorageService.saveCustomers === 'function') {
                 return window.StorageService.saveCustomers(payload);
             }
-        } catch (e) {
-        }
-        try {
-            window.localStorage.setItem('customers_dummy', JSON.stringify(payload));
         } catch (e) {
         }
         return null;
@@ -755,13 +742,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         } catch (e) {
         }
-        try {
-            const raw = window.localStorage.getItem('sales_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return ensureArray(parsed);
-        } catch (e) {
-            return [];
-        }
+        return [];
     }
 
     function computeP90(values) {

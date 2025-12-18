@@ -256,14 +256,14 @@
 
                 <div class="flex flex-col md:flex-row gap-2 justify-end">
                     <button id="btn-cancelar-empleado" type="button" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50">Cancelar</button>
-                    <button id="btn-guardar-empleado" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Guardar empleado</button>
+                    <button id="btn-guardar-empleado" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">Guardar empleado</button>
                 </div>
             </div>
         </div>
 
         <div class="flex flex-col md:flex-row gap-2 justify-end">
             <a href="{{ url_for('expenses.index') }}" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-center">Cancelar</a>
-            <button id="btn-guardar-egreso" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Guardar egreso (dummy)</button>
+            <button id="btn-guardar-egreso" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">Guardar egreso (dummy)</button>
         </div>
     </div>
 </div>
@@ -341,6 +341,27 @@ document.addEventListener('DOMContentLoaded', function () {
         return !!x && typeof x.then === 'function';
     }
 
+    const cashflowChannel = (function () {
+        try {
+            if (typeof window.BroadcastChannel === 'function') return new window.BroadcastChannel('zentral-cashflow');
+        } catch (e) {
+        }
+        return null;
+    })();
+
+    function emitCashflowChanged(evt) {
+        const payload = { ...(evt || {}), __ts: Date.now() };
+        try {
+            if (cashflowChannel) cashflowChannel.postMessage(payload);
+        } catch (e) {
+        }
+        try {
+            window.localStorage.setItem('zentral_cashflow_ping', JSON.stringify(payload));
+            window.localStorage.removeItem('zentral_cashflow_ping');
+        } catch (e) {
+        }
+    }
+
     function leerEgresos() {
         try {
             if (window.StorageService && typeof window.StorageService.getExpenses === 'function') {
@@ -348,15 +369,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 return res;
             }
         } catch (e) {
-            // fallback
         }
-        try {
-            const raw = window.localStorage.getItem('egresos_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
+        return [];
     }
 
     function guardarEgresos(arr) {
@@ -365,13 +379,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 return window.StorageService.saveExpenses(Array.isArray(arr) ? arr : []);
             }
         } catch (e) {
-            // fallback
         }
-        try {
-            window.localStorage.setItem('egresos_dummy', JSON.stringify(arr));
-        } catch (e) {
-            // noop
-        }
+        return null;
     }
 
     function leerEmpleados() {
@@ -384,15 +393,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         } catch (e) {
-            // fallback
         }
-        try {
-            const raw = window.localStorage.getItem('empleados_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
+        return [];
     }
 
     function guardarEmpleados(arr) {
@@ -404,13 +406,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         } catch (e) {
-            // fallback
         }
-        try {
-            window.localStorage.setItem('empleados_dummy', JSON.stringify(arr));
-        } catch (e) {
-            // noop
-        }
+        return null;
     }
 
     function leerCategoriasPersonalizadas() {
@@ -423,15 +420,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         } catch (e) {
-            // fallback
         }
-        try {
-            const raw = window.localStorage.getItem('expense_categories_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
+        return [];
     }
 
     function guardarCategoriasPersonalizadas(arr) {
@@ -443,13 +433,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         } catch (e) {
-            // fallback
         }
-        try {
-            window.localStorage.setItem('expense_categories_dummy', JSON.stringify(arr));
-        } catch (e) {
-            // noop
-        }
+        return null;
     }
 
     function leerProveedores() {
@@ -459,15 +444,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 return res;
             }
         } catch (e) {
-            // fallback
         }
-        try {
-            const raw = window.localStorage.getItem('suppliers_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
+        return [];
     }
 
     function guardarProveedores(obj) {
@@ -476,13 +454,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 return window.StorageService.saveSuppliers(Array.isArray(obj) ? obj : []);
             }
         } catch (e) {
-            // fallback
         }
-        try {
-            window.localStorage.setItem('suppliers_dummy', JSON.stringify(obj));
-        } catch (e) {
-            // noop
-        }
+        return null;
     }
 
     function setProveedorSeleccionado(id, name) {
@@ -883,6 +856,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const list = Array.isArray(suppliers) ? suppliers : [];
             const supplierFound = list.find(s => String(s?.id) === String(supplierId));
             const supplierName = supplierFound ? (supplierFound.name || '') : '';
+
             const payload = {
                 ...basePayload,
                 proveedor: supplierName || '',
@@ -892,11 +866,17 @@ document.addEventListener('DOMContentLoaded', function () {
             try {
                 if (window.StorageService && typeof window.StorageService.upsertExpense === 'function') {
                     const res = window.StorageService.upsertExpense(payload);
+                    const afterUpsert = function () {
+                        if (String(payload?.forma_pago || '').trim() === 'Efectivo') {
+                            emitCashflowChanged({ kind: 'expense', fecha: payload.fecha, forma_pago: payload.forma_pago, created_at: Date.now() });
+                        }
+                        window.location.href = baseListUrl;
+                    };
                     if (isPromise(res)) {
-                        res.then(function () { window.location.href = baseListUrl; });
+                        res.then(afterUpsert);
                         return;
                     }
-                    window.location.href = baseListUrl;
+                    afterUpsert();
                     return;
                 }
             } catch (e) {
@@ -910,8 +890,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (idx >= 0) arr[idx] = payload;
                 else arr.push(payload);
                 const saveRes = guardarEgresos(arr);
-                if (isPromise(saveRes)) saveRes.then(function () { window.location.href = baseListUrl; });
-                else window.location.href = baseListUrl;
+                const after = function () {
+                    if (String(payload?.forma_pago || '').trim() === 'Efectivo') {
+                        emitCashflowChanged({ kind: 'expense', fecha: payload.fecha, forma_pago: payload.forma_pago, created_at: Date.now() });
+                    }
+                    window.location.href = baseListUrl;
+                };
+                if (isPromise(saveRes)) saveRes.then(after);
+                else after();
             };
             if (isPromise(egRes)) egRes.then(applySave);
             else applySave(egRes);

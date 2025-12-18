@@ -248,16 +248,26 @@ document.addEventListener('DOMContentLoaded', function () {
         w.document.close();
     }
 
-    function getSales(cb) {
-        try {
-            if (window.StorageService && typeof window.StorageService.getSales === 'function') {
-                const res = window.StorageService.getSales();
-                if (isPromise(res)) return res.then(x => cb(Array.isArray(x) ? x : []));
-                return cb(Array.isArray(res) ? res : []);
-            }
-        } catch (e) {
-        }
-        cb([]);
+    function isoFromDate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + day;
+    }
+
+    function getSalesFromApi(range, cb) {
+        const qs = [];
+        if (range && range.from) qs.push('from=' + encodeURIComponent(isoFromDate(range.from)));
+        if (range && range.to) qs.push('to=' + encodeURIComponent(isoFromDate(range.to)));
+        qs.push('limit=2000');
+        const url = '/sales/api/sales' + (qs.length ? ('?' + qs.join('&')) : '');
+        fetch(url, { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                const items = data && Array.isArray(data.items) ? data.items : [];
+                cb(items);
+            })
+            .catch(() => cb([]));
     }
 
     function getExpenses(cb) {
@@ -272,22 +282,28 @@ document.addEventListener('DOMContentLoaded', function () {
         cb([]);
     }
 
-    function getArqueos() {
-        try {
-            const raw = window.localStorage.getItem('arqueo_dummy_hist');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            return [];
-        }
+    function getArqueosFromApi(fromIso, toIso, cb) {
+        const qs = [];
+        if (fromIso) qs.push('from=' + encodeURIComponent(fromIso));
+        if (toIso) qs.push('to=' + encodeURIComponent(toIso));
+        const url = '/movements/api/cash-counts' + (qs.length ? ('?' + qs.join('&')) : '');
+        fetch(url, { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                const items = data && Array.isArray(data.items) ? data.items : [];
+                cb(items);
+            })
+            .catch(() => cb([]));
     }
 
     function renderVentas() {
         if (!tbodyVentas) return;
-        getSales(function (sales) {
-            const q = String(fVentasQ?.value || '').trim().toLowerCase();
-            const rango = parseRangoFechas(fVentasRange?.value);
-            const pago = String(fVentasPago?.value || '').trim();
+        const q = String(fVentasQ?.value || '').trim().toLowerCase();
+        const rango = parseRangoFechas(fVentasRange?.value);
+        const pago = String(fVentasPago?.value || '').trim();
+
+        tbodyVentas.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
+        getSalesFromApi(rango, function (sales) {
 
             let list = Array.isArray(sales) ? sales.slice() : [];
             list = list.filter(s => {
@@ -298,7 +314,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
                 return true;
             });
-            list.sort((a, b) => String(b?.fecha || '').localeCompare(String(a?.fecha || '')));
+            list.sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
 
             lastRendered = list.map(s => ({
                 Ticket: s?.ticket || '',
@@ -375,39 +391,38 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderArqueo() {
         if (!tbodyArqueo) return;
         const rango = parseRangoFechas(fArqueoRange?.value);
-        let historico = getArqueos();
-        historico.sort((a, b) => String(b?.fecha || '').localeCompare(String(a?.fecha || '')));
-        if (rango) {
-            historico = historico.filter(r => {
-                const dt = parseFecha(r?.fecha || '');
-                if (!dt) return true;
-                return dt >= rango.from && dt <= rango.to;
+        const fromIso = rango ? (rango.from.getFullYear() + '-' + String(rango.from.getMonth() + 1).padStart(2, '0') + '-' + String(rango.from.getDate()).padStart(2, '0')) : '';
+        const toIso = rango ? (rango.to.getFullYear() + '-' + String(rango.to.getMonth() + 1).padStart(2, '0') + '-' + String(rango.to.getDate()).padStart(2, '0')) : '';
+
+        tbodyArqueo.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
+        getArqueosFromApi(fromIso, toIso, function (items) {
+            let historico = Array.isArray(items) ? items.slice() : [];
+            historico.sort((a, b) => String(b?.date || '').localeCompare(String(a?.date || '')));
+
+            lastRendered = historico.map(r => ({
+                Fecha: r?.date || '',
+                Responsable: (r?.employee_name || ''),
+                Apertura: formatearMoneda(parseNumeroSeguro(r?.opening_amount)),
+                Efectivo_dia: formatearMoneda(parseNumeroSeguro(r?.cash_day_amount)),
+                Cierre: formatearMoneda(parseNumeroSeguro(r?.closing_amount))
+            }));
+
+            tbodyArqueo.innerHTML = '';
+            if (!historico.length) {
+                tbodyArqueo.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+                return;
+            }
+            historico.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+                tr.innerHTML = ''
+                    + '<td class="px-4 py-3 text-sm text-gray-700">' + String(r?.date || '-') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-700">' + String(r?.employee_name || '-') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.opening_amount)) + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.cash_day_amount)) + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.closing_amount)) + '</td>';
+                tbodyArqueo.appendChild(tr);
             });
-        }
-
-        lastRendered = historico.map(r => ({
-            Fecha: r?.fecha || '',
-            Responsable: (r?.employee_name || r?.employee_id || ''),
-            Apertura: formatearMoneda(parseNumeroSeguro(r?.apertura)),
-            Efectivo_dia: formatearMoneda(parseNumeroSeguro(r?.efectivo_dia)),
-            Cierre: formatearMoneda(parseNumeroSeguro(r?.cierre))
-        }));
-
-        tbodyArqueo.innerHTML = '';
-        if (!historico.length) {
-            tbodyArqueo.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
-            return;
-        }
-        historico.forEach(r => {
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-gray-50';
-            tr.innerHTML = ''
-                + '<td class="px-4 py-3 text-sm text-gray-700">' + String(r?.fecha || '-') + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-700">' + String(r?.employee_name || r?.employee_id || '-') + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.apertura)) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.efectivo_dia)) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.cierre)) + '</td>';
-            tbodyArqueo.appendChild(tr);
         });
     }
 

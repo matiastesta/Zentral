@@ -79,20 +79,35 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function leerEmpleados() {
         try {
-            const raw = window.localStorage.getItem('empleados_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
+            if (window.StorageService && typeof window.StorageService.getEmployees === 'function') {
+                return window.StorageService.getEmployees();
+            }
         } catch (e) {
-            return [];
         }
+        return [];
     }
 
     function guardarEmpleados(arr) {
         try {
-            window.localStorage.setItem('empleados_dummy', JSON.stringify(arr));
+            if (window.StorageService && typeof window.StorageService.saveEmployees === 'function') {
+                return window.StorageService.saveEmployees(Array.isArray(arr) ? arr : []);
+            }
         } catch (e) {
-            // noop
         }
+        return null;
+    }
+
+    function isPromise(x) {
+        return !!x && typeof x.then === 'function';
+    }
+
+    function deleteEmployee(id) {
+        const eid = String(id || '').trim();
+        if (!eid) return Promise.resolve(null);
+        return fetch('/employees/api/employees/' + encodeURIComponent(eid), {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        }).then(r => r.json()).catch(() => null);
     }
 
     function labelEstado(v) {
@@ -111,66 +126,74 @@ document.addEventListener('DOMContentLoaded', function () {
         const q = (inputSearch?.value || '').trim().toLowerCase();
         const status = (selectStatus?.value || '').trim();
 
-        let list = leerEmpleados();
+        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
 
-        if (status) {
-            list = list.filter(e => String(e?.status || 'Active') === status);
-        }
+        const res = leerEmpleados();
+        const apply = function (employees) {
+            let list = Array.isArray(employees) ? employees.slice() : [];
 
-        if (q) {
-            list = list.filter(e => {
-                const hay = [
-                    e?.first_name,
-                    e?.last_name,
-                    e?.role,
-                    e?.document_id,
-                    e?.email,
-                    e?.phone
-                ].map(x => String(x || '').toLowerCase()).join(' ');
-                return hay.includes(q);
+            if (status) {
+                list = list.filter(e => String(e?.status || 'Active') === status);
+            }
+
+            if (q) {
+                list = list.filter(e => {
+                    const hay = [
+                        e?.first_name,
+                        e?.last_name,
+                        e?.role,
+                        e?.document_id,
+                        e?.email,
+                        e?.phone
+                    ].map(x => String(x || '').toLowerCase()).join(' ');
+                    return hay.includes(q);
+                });
+            }
+
+            const all = Array.isArray(employees) ? employees : [];
+            if (elTotal) elTotal.textContent = String(all.length);
+            if (elActive) elActive.textContent = String(all.filter(e => String(e?.status || 'Active') === 'Active').length);
+
+            tbody.innerHTML = '';
+            if (!list.length) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = '<td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados.</td>';
+                tbody.appendChild(tr);
+                return;
+            }
+
+            list.sort((a, b) => String(a?.last_name || '').localeCompare(String(b?.last_name || '')));
+            list.forEach(e => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+
+                const fullName = ((String(e?.first_name || '') + ' ' + String(e?.last_name || '')).trim()) || 'Empleado';
+                const statusLabel = labelEstado(e?.status || 'Active');
+                const statusClass = classEstado(e?.status || 'Active');
+
+                tr.innerHTML = `
+                    <td class="px-4 py-3 text-sm text-gray-900">
+                        <div class="flex items-center justify-between gap-2">
+                            <span>${fullName}</span>
+                            <span class="text-[11px] px-2 py-0.5 rounded-full ${statusClass}">${statusLabel}</span>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-500">${e?.role || '-'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-500">${e?.contract_type || '-'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-500">${e?.default_payment_method || '-'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-500">${e?.hire_date || '-'}</td>
+                    <td class="px-4 py-3 text-sm text-right">
+                        <div class="inline-flex gap-3">
+                            <button type="button" class="btn-edit text-blue-600 hover:text-blue-800 text-xs font-medium" data-id="${e?.id}">Editar</button>
+                            <button type="button" class="btn-del text-red-600 hover:text-red-800 text-xs font-medium" data-id="${e?.id}">Eliminar</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
             });
-        }
-
-        if (elTotal) elTotal.textContent = String(leerEmpleados().length);
-        if (elActive) elActive.textContent = String(leerEmpleados().filter(e => String(e?.status || 'Active') === 'Active').length);
-
-        tbody.innerHTML = '';
-        if (!list.length) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = '<td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados.</td>';
-            tbody.appendChild(tr);
-            return;
-        }
-
-        list.sort((a, b) => String(a?.last_name || '').localeCompare(String(b?.last_name || '')));
-        list.forEach(e => {
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-gray-50';
-
-            const fullName = ((String(e?.first_name || '') + ' ' + String(e?.last_name || '')).trim()) || 'Empleado';
-            const statusLabel = labelEstado(e?.status || 'Active');
-            const statusClass = classEstado(e?.status || 'Active');
-
-            tr.innerHTML = `
-                <td class="px-4 py-3 text-sm text-gray-900">
-                    <div class="flex items-center justify-between gap-2">
-                        <span>${fullName}</span>
-                        <span class="text-[11px] px-2 py-0.5 rounded-full ${statusClass}">${statusLabel}</span>
-                    </div>
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-500">${e?.role || '-'}</td>
-                <td class="px-4 py-3 text-sm text-gray-500">${e?.contract_type || '-'}</td>
-                <td class="px-4 py-3 text-sm text-gray-500">${e?.default_payment_method || '-'}</td>
-                <td class="px-4 py-3 text-sm text-gray-500">${e?.hire_date || '-'}</td>
-                <td class="px-4 py-3 text-sm text-right">
-                    <div class="inline-flex gap-3">
-                        <button type="button" class="btn-edit text-blue-600 hover:text-blue-800 text-xs font-medium" data-id="${e?.id}">Editar</button>
-                        <button type="button" class="btn-del text-red-600 hover:text-red-800 text-xs font-medium" data-id="${e?.id}">Eliminar</button>
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
+        };
+        if (isPromise(res)) res.then(apply).catch(() => apply([]));
+        else apply(res);
     }
 
     if (tbody) {
@@ -186,11 +209,11 @@ document.addEventListener('DOMContentLoaded', function () {
             if (btnDel) {
                 const id = btnDel.getAttribute('data-id');
                 if (!id) return;
-                const ok = confirm('¿Eliminar empleado? Esta acción no se puede deshacer (dummy).');
+                const ok = confirm('¿Eliminar empleado? Esta acción no se puede deshacer.');
                 if (!ok) return;
-                const next = leerEmpleados().filter(e => String(e?.id) !== String(id));
-                guardarEmpleados(next);
-                render();
+                deleteEmployee(id).finally(function () {
+                    render();
+                });
             }
         });
     }

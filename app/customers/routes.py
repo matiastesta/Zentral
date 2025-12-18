@@ -1,8 +1,49 @@
-from flask import render_template
+from datetime import date as dt_date
+from datetime import datetime
+from uuid import uuid4
+
+from flask import jsonify, render_template, request
 from flask_login import login_required
 
+from app import db
+from app.models import Customer
 from app.permissions import module_required
 from app.customers import bp
+
+
+def _dt_to_ms(dt):
+    try:
+        return int(dt.timestamp() * 1000) if dt else None
+    except Exception:
+        return None
+
+
+def _parse_date_iso(raw, default=None):
+    s = str(raw or '').strip()
+    if not s:
+        return default
+    try:
+        return dt_date.fromisoformat(s)
+    except Exception:
+        return default
+
+
+def _serialize_customer(row: Customer):
+    full_name = (str(row.first_name or '').strip() + ' ' + str(row.last_name or '').strip()).strip()
+    return {
+        'id': row.id,
+        'first_name': row.first_name or '',
+        'last_name': row.last_name or '',
+        'name': (row.name or full_name or '').strip(),
+        'email': row.email or '',
+        'phone': row.phone or '',
+        'birthday': row.birthday.isoformat() if row.birthday else '',
+        'address': row.address or '',
+        'notes': row.notes or '',
+        'status': row.status or 'activo',
+        'created_at': _dt_to_ms(row.created_at),
+        'updated_at': _dt_to_ms(row.updated_at),
+    }
 
 
 @bp.route("/")
@@ -13,3 +54,150 @@ def index():
     """Listado básico de clientes (dummy)."""
     customers = []
     return render_template("customers/list.html", title="Clientes", customers=customers)
+
+
+@bp.get('/api/customers')
+@login_required
+@module_required('customers')
+def list_customers_api():
+    q = (request.args.get('q') or '').strip().lower()
+    limit = int(request.args.get('limit') or 2000)
+    if limit <= 0 or limit > 5000:
+        limit = 2000
+
+    query = db.session.query(Customer)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            (Customer.name.ilike(like))
+            | (Customer.first_name.ilike(like))
+            | (Customer.last_name.ilike(like))
+            | (Customer.email.ilike(like))
+            | (Customer.phone.ilike(like))
+        )
+    rows = query.order_by(Customer.updated_at.desc(), Customer.created_at.desc()).limit(limit).all()
+    return jsonify({'ok': True, 'items': [_serialize_customer(r) for r in rows]})
+
+
+@bp.get('/api/customers/<customer_id>')
+@login_required
+@module_required('customers')
+def get_customer_api(customer_id):
+    cid = str(customer_id or '').strip()
+    row = db.session.get(Customer, cid)
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    return jsonify({'ok': True, 'item': _serialize_customer(row)})
+
+
+def _apply_customer_payload(row: Customer, payload: dict):
+    first_name = str(payload.get('first_name') or payload.get('nombre') or '').strip() or None
+    last_name = str(payload.get('last_name') or payload.get('apellido') or '').strip() or None
+    name = str(payload.get('name') or '').strip() or None
+    email = str(payload.get('email') or '').strip() or None
+    phone = str(payload.get('phone') or payload.get('telefono') or '').strip() or None
+    birthday = _parse_date_iso(payload.get('birthday') or payload.get('fecha_cumpleanos'), None)
+    address = str(payload.get('address') or payload.get('direccion') or '').strip() or None
+    notes = str(payload.get('notes') or payload.get('observaciones') or '').strip() or None
+    status = str(payload.get('status') or payload.get('estado') or row.status or 'activo').strip() or 'activo'
+
+    row.first_name = first_name
+    row.last_name = last_name
+    row.email = email
+    row.phone = phone
+    row.birthday = birthday
+    row.address = address
+    row.notes = notes
+    row.status = status
+
+    if not name:
+        full = (str(first_name or '').strip() + ' ' + str(last_name or '').strip()).strip()
+        name = full or None
+    row.name = name
+
+
+@bp.post('/api/customers')
+@login_required
+@module_required('customers')
+def create_customer_api():
+    payload = request.get_json(silent=True) or {}
+    cid = str(payload.get('id') or '').strip() or uuid4().hex
+
+    row = db.session.get(Customer, cid)
+    if row:
+        return jsonify({'ok': False, 'error': 'already_exists'}), 400
+
+    row = Customer(id=cid)
+    _apply_customer_payload(row, payload)
+
+    db.session.add(row)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+    return jsonify({'ok': True, 'item': _serialize_customer(row)})
+
+
+@bp.put('/api/customers/<customer_id>')
+@login_required
+@module_required('customers')
+def update_customer_api(customer_id):
+    cid = str(customer_id or '').strip()
+    row = db.session.get(Customer, cid)
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    payload = request.get_json(silent=True) or {}
+    _apply_customer_payload(row, payload)
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+    return jsonify({'ok': True, 'item': _serialize_customer(row)})
+
+
+@bp.delete('/api/customers/<customer_id>')
+@login_required
+@module_required('customers')
+def delete_customer_api(customer_id):
+    cid = str(customer_id or '').strip()
+    row = db.session.get(Customer, cid)
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    try:
+        db.session.delete(row)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+    return jsonify({'ok': True})
+
+
+@bp.post('/api/customers/bulk')
+@login_required
+@module_required('customers')
+def upsert_customers_bulk():
+    payload = request.get_json(silent=True) or {}
+    items = payload.get('items')
+    items_list = items if isinstance(items, list) else []
+
+    out = []
+    for it in items_list:
+        d = it if isinstance(it, dict) else {}
+        cid = str(d.get('id') or '').strip() or uuid4().hex
+        row = db.session.get(Customer, cid)
+        if not row:
+            row = Customer(id=cid)
+            db.session.add(row)
+        _apply_customer_payload(row, d)
+        out.append(row)
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+    return jsonify({'ok': True, 'items': [_serialize_customer(r) for r in out]})

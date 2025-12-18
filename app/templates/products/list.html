@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
-{% block title %}Productos{% endblock %}
+{% block title %}{{ business.label_products if business and business.label_products else 'Productos' }}{% endblock %}
 {% block content %}
 <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Productos y Servicios</h1>
-    <p class="mt-1 text-sm text-gray-600">Administra tu catálogo de ítems para venta: productos físicos, servicios, combos, etc.</p>
+    <h1 class="text-2xl font-bold text-gray-900">{{ business.label_products if business and business.label_products else 'Productos' }}</h1>
+    <p class="mt-1 text-sm text-gray-600">Administra tu catálogo de ítems para venta: {{ label_products|lower }} físicos, servicios, combos, etc.</p>
 </div>
 
 <!-- Resumen rápido -->
@@ -70,7 +70,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay productos cargados. Crea tu primer producto con el botón "Nuevo producto".</td>
+                <td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay {{ label_products|lower }} cargados. Crea tu primer producto con el botón "Nuevo producto".</td>
             </tr>
             {% endfor %}
         </tbody>

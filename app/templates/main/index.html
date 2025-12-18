@@ -11,6 +11,15 @@
         </div>
         <div class="flex gap-2 justify-end">
             <input id="dash-range" type="text" class="w-56 px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="📅 Período" readonly>
+            <button id="btn-edit-dashboard" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                <i class="fas fa-pen mr-2"></i> Editar Tablero
+            </button>
+            <button id="btn-save-dashboard" type="button" class="hidden inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">
+                <i class="fas fa-save mr-2"></i> Guardar
+            </button>
+            <button id="btn-cancel-dashboard" type="button" class="hidden inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                <i class="fas fa-times mr-2"></i> Cancelar
+            </button>
             <button id="btn-export-dashboard" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
                 <i class="fas fa-file-export mr-2"></i> Exportar
             </button>
@@ -18,124 +27,208 @@
     </div>
 </div>
 
-<!-- KPIs -->
-<div id="dash-kpis" class="grid grid-cols-1 gap-4 mt-6 md:grid-cols-2 lg:grid-cols-3">
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('sales.index') }}" title="💰 Total monetario de ventas filtradas">
-        <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">💰</div>
-            <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-500">Ventas del período</div>
-                <div id="kpi-total-sales" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
-                <div id="sk-kpi-total-sales" class="mt-2 h-4 w-32 bg-gray-100 rounded animate-pulse"></div>
+<div id="dashboard-root" class="mt-6 space-y-8">
+    <section>
+        <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-gray-900">Estado general del negocio</h2>
+        </div>
+        <div id="block-general" data-block-container="general" class="grid grid-cols-1 gap-4 mt-3 md:grid-cols-2 xl:grid-cols-4">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="sales_period" data-href="{{ url_for('sales.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">💰</div>
+                    <div class="min-w-0">
+                        <div class="text-sm font-medium text-gray-500">Ventas del período</div>
+                        <div id="kpi-total-sales" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div id="sk-kpi-total-sales" class="mt-2 h-4 w-32 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="expenses_period" data-href="{{ url_for('expenses.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">💸</div>
+                    <div class="min-w-0">
+                        <div class="text-sm font-medium text-gray-500">Gastos del período</div>
+                        <div id="kpi-total-expenses" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div id="sk-kpi-total-expenses" class="mt-2 h-4 w-32 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200" data-card-key="estimated_result" title="Resultado estimado = Ventas del período - CMV (costo de mercadería vendida) - Gastos del período.">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">📈</div>
+                    <div class="min-w-0">
+                        <div class="text-sm font-medium text-gray-500">Resultado estimado</div>
+                        <div id="kpi-estimated-result" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">
+                            <span id="kpi-estimated-margin">—</span>
+                            <span class="ml-1">· Ventas – CMV – Gastos del período</span>
+                        </div>
+                        <div id="sk-kpi-estimated-result" class="mt-2 h-4 w-28 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="cash_available" data-href="{{ url_for('movements.index') }}" title="Caja/Bancos estimado desde Movimientos (ventas y egresos por forma de pago).">
+                <div class="flex items-start gap-3">
+                    <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">🏦</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Caja disponible</div>
+                        <div id="kpi-total-available" class="mt-1 text-2xl font-semibold text-gray-900 break-words leading-tight">—</div>
+                        <div class="mt-2 grid grid-cols-2 gap-3 text-xs">
+                            <div class="min-w-0">
+                                <div class="text-gray-600">Efectivo</div>
+                                <div id="kpi-cash" class="mt-0.5 font-semibold text-gray-900 break-words leading-tight">—</div>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-gray-600">Bancos</div>
+                                <div id="kpi-banks" class="mt-0.5 font-semibold text-gray-900 break-words leading-tight">—</div>
+                            </div>
+                        </div>
+                        <div id="sk-kpi-cash" class="mt-2 h-4 w-28 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('expenses.index') }}" title="💸 Total de egresos filtrados">
-        <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">💸</div>
-            <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-500">Gastos del período</div>
-                <div id="kpi-total-expenses" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
-                <div id="sk-kpi-total-expenses" class="mt-2 h-4 w-32 bg-gray-100 rounded animate-pulse"></div>
+    </section>
+    <section>
+        <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-gray-900">Alertas y riesgos</h2>
+        </div>
+        <div id="block-alerts" data-block-container="alerts" class="grid grid-cols-1 gap-4 mt-3 md:grid-cols-3">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200" data-card-key="alerts_active">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-yellow-50 text-yellow-700 flex items-center justify-center">🚨</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Alertas activas</div>
+                        <div id="kpi-alerts-total" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div id="sk-kpi-alerts-total" class="mt-2 h-4 w-20 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
+                <div class="mt-3 space-y-2 text-xs">
+                    <button type="button" class="w-full flex items-center justify-between px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50" data-href="{{ url_for('inventory.index') }}">
+                        <span class="text-gray-600">Stock bajo</span>
+                        <span class="font-semibold text-gray-900"><span id="kpi-alert-stock">—</span> <i class="fas fa-arrow-right text-gray-300 ml-1"></i></span>
+                    </button>
+                    <button type="button" class="w-full flex items-center justify-between px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50" data-href="{{ url_for('customers.index') }}">
+                        <span class="text-gray-600">{{ label_customers }} deudores</span>
+                        <span class="font-semibold text-gray-900"><span id="kpi-alert-debtors">—</span> <i class="fas fa-arrow-right text-gray-300 ml-1"></i></span>
+                    </button>
+                    <button type="button" class="w-full flex items-center justify-between px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50" data-href="{{ url_for('expenses.index') }}">
+                        <span class="text-gray-600">Gastos fuera de rango</span>
+                        <span class="font-semibold text-gray-900"><span id="kpi-alert-expenses">—</span> <i class="fas fa-arrow-right text-gray-300 ml-1"></i></span>
+                    </button>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="stock_critical" data-href="{{ url_for('inventory.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-orange-50 text-orange-700 flex items-center justify-center">📦</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">{{ label_products }} con stock crítico</div>
+                        <div id="kpi-stock-critical-count" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500 truncate">Más crítico: <span id="kpi-stock-critical-top">—</span></div>
+                        <div id="sk-kpi-stock-critical" class="mt-2 h-4 w-24 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="debtors" data-href="{{ url_for('customers.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">💳</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">{{ label_customers }} deudores</div>
+                        <div class="mt-1 flex items-baseline justify-between gap-2">
+                            <div id="kpi-debtors" class="text-2xl font-semibold text-gray-900">—</div>
+                            <div id="kpi-debt-total" class="text-sm font-semibold text-gray-700">—</div>
+                        </div>
+                        <div id="sk-kpi-debtors" class="mt-2 h-4 w-24 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200" title="📈 Ventas menos gastos del período">
-        <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">📈</div>
-            <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-500">Resultado estimado</div>
-                <div id="kpi-estimated-result" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
-                <div id="sk-kpi-estimated-result" class="mt-2 h-4 w-28 bg-gray-100 rounded animate-pulse"></div>
+    </section>
+    <section>
+        <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-gray-900">Actividad comercial</h2>
+        </div>
+        <div id="block-activity" data-block-container="activity" class="grid grid-cols-1 gap-4 mt-3 md:grid-cols-2">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="sales_today" data-href="{{ url_for('sales.index') }}" title="Este KPI no depende del período seleccionado.">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">🧾</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Ventas hoy</div>
+                        <div id="kpi-sales-today-total" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Cantidad: <span id="kpi-sales-today-count">—</span></div>
+                        <div id="sk-kpi-sales-today" class="mt-2 h-4 w-32 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="avg_ticket" data-href="{{ url_for('sales.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">🎟️</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Ticket promedio</div>
+                        <div id="kpi-avg-ticket" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Período seleccionado</div>
+                        <div id="sk-kpi-avg-ticket" class="mt-2 h-4 w-32 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('inventory.index') }}" title="📦 Valor total del inventario actual usando costo promedio por producto">
-        <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">📦</div>
-            <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-500">Stock valorizado</div>
-                <div id="kpi-inventory-value" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
-                <div id="sk-kpi-inventory-value" class="mt-2 h-4 w-36 bg-gray-100 rounded animate-pulse"></div>
+    </section>
+    <section>
+        <div class="p-5 bg-white rounded-lg shadow border border-gray-200">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-medium text-gray-900">Ventas, Gastos y Resultado – Evolución</h2>
+                <div class="text-xs text-gray-500" id="chart-evolution-subtitle">—</div>
+            </div>
+            <div class="h-72">
+                <canvas id="evolutionChart" class="w-full h-full"></canvas>
             </div>
         </div>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('inventory.index') }}" title="⚠️ Cantidad de productos con stock bajo o sin stock">
-        <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-full bg-yellow-50 text-yellow-700 flex items-center justify-center">⚠️</div>
-            <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-500">Productos con alerta</div>
-                <div id="kpi-low-stock" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
-                <div id="sk-kpi-low-stock" class="mt-2 h-4 w-14 bg-gray-100 rounded animate-pulse"></div>
+    </section>
+    <section>
+        <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-gray-900">Rankings simples</h2>
+        </div>
+        <div id="block-rankings" data-block-container="rankings" class="grid grid-cols-1 gap-4 mt-3 md:grid-cols-2">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="best_customer" data-href="{{ url_for('customers.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">🏆</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Mejor {{ label_customers|lower }} del período</div>
+                        <div id="kpi-best-customer" class="mt-1 text-2xl font-semibold text-gray-900 truncate">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Monto: <span id="kpi-best-customer-amount" class="font-semibold">—</span></div>
+                        <div id="sk-kpi-best-customer" class="mt-2 h-4 w-40 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="top_product" data-href="{{ url_for('inventory.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-gray-50 text-gray-700 flex items-center justify-center">📌</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">{{ label_products }} más vendido</div>
+                        <div id="kpi-top-product" class="mt-1 text-2xl font-semibold text-gray-900 truncate">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Cantidad: <span id="kpi-top-product-qty" class="font-semibold">—</span></div>
+                        <div id="sk-kpi-top-product" class="mt-2 h-4 w-40 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('customers.index') }}" title="👤 Clientes con saldo pendiente (cuenta corriente)">
-        <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-full bg-gray-50 text-gray-700 flex items-center justify-center">👤</div>
-            <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-500">Clientes deudores</div>
-                <div id="kpi-debtors" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
-                <div id="sk-kpi-debtors" class="mt-2 h-4 w-14 bg-gray-100 rounded animate-pulse"></div>
-            </div>
-        </div>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('customers.index') }}" title="👥 Total de clientes cargados">
-        <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">👥</div>
-            <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-500">Clientes totales</div>
-                <div id="kpi-customers-total" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
-                <div id="sk-kpi-customers-total" class="mt-2 h-4 w-14 bg-gray-100 rounded animate-pulse"></div>
-            </div>
-        </div>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('customers.index') }}" title="💳 Deuda total acumulada en cuenta corriente">
-        <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">💳</div>
-            <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-500">Deuda total</div>
-                <div id="kpi-debt-total" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
-                <div id="sk-kpi-debt-total" class="mt-2 h-4 w-24 bg-gray-100 rounded animate-pulse"></div>
-            </div>
-        </div>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('customers.index') }}" title="🏆 Cliente con mayor monto comprado en el período">
-        <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">🏆</div>
-            <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-500">Mejor cliente</div>
-                <div id="kpi-best-customer" class="mt-1 text-2xl font-semibold text-gray-900 truncate">—</div>
-                <div id="kpi-best-customer-amount" class="mt-1 text-xs text-gray-500">—</div>
-                <div id="sk-kpi-best-customer" class="mt-2 h-4 w-40 bg-gray-100 rounded animate-pulse"></div>
-            </div>
-        </div>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-href="{{ url_for('customers.index') }}" title="💎 Monto total comprado por el mejor cliente del período">
-        <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">💎</div>
-            <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-500">Mejor cliente (monto)</div>
-                <div id="kpi-best-customer-amount-card" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
-            </div>
-        </div>
-    </div>
+    </section>
 </div>
 
 {% if upcoming_calendar_events is defined and upcoming_calendar_events %}
-<div class="mt-6 bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+<div id="dashboard-upcoming-card" class="mt-6 bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
     <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
         <div>
             <div class="text-sm font-semibold text-gray-900">Próximos avisos</div>
-            <div class="text-xs text-gray-500">Eventos de alta prioridad y vencidos (próximos 30 días)</div>
+            <div class="text-xs text-gray-500">Eventos de alta prioridad y vencidos dentro del período seleccionado</div>
         </div>
         <a href="{{ url_for('calendar.index') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-md hover:bg-blue-100">
             <i class="fas fa-calendar-alt mr-2"></i> Ver calendario
         </a>
     </div>
-    <div class="p-5 space-y-2">
+    <div id="dashboard-upcoming-alerts" class="p-5 space-y-2">
         {% for ev in upcoming_calendar_events %}
-        <div class="p-3 border border-gray-200 rounded-lg flex items-center justify-between gap-3">
+        <div class="p-3 border border-gray-200 rounded-lg flex items-center justify-between gap-3" data-event-date="{{ ev.date.strftime('%Y-%m-%d') }}">
             <div class="min-w-0">
                 <div class="flex items-center gap-2">
                     <div class="h-2.5 w-2.5 rounded-full {% if ev.color == 'red' %}bg-red-500{% elif ev.color == 'yellow' %}bg-yellow-500{% else %}bg-emerald-500{% endif %}"></div>
@@ -158,24 +251,34 @@
     <div class="mt-1 text-xs text-gray-500">Probá ajustando el rango de fechas o cargando nuevas ventas/egresos.</div>
 </div>
 
-<!-- Charts -->
-<div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-    <div class="p-5 bg-white rounded-lg shadow border border-gray-200">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-medium text-gray-900">Ventas vs Gastos vs Margen por día</h2>
-            <div class="text-xs text-gray-500" id="chart-sales-expenses-subtitle">—</div>
-        </div>
-        <div class="h-64">
-            <canvas id="salesExpensesChart" class="w-full h-full"></canvas>
-        </div>
-    </div>
-    <div class="p-5 bg-white rounded-lg shadow border border-gray-200">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-medium text-gray-900">Top categorías de gasto</h2>
-            <div class="text-xs text-gray-500" id="chart-top-cats-subtitle">Top 5</div>
-        </div>
-        <div class="h-64">
-            <canvas id="topExpenseCategoriesChart" class="w-full h-full"></canvas>
+<div id="modal-edit-dashboard" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height:85vh">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Editar tablero</h3>
+                    <p class="text-xs text-gray-500">Arrastrá para mover. Para agregar/eliminar, usá el botón.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btn-toggle-manage-kpis" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                        Agregar/Eliminar KPIs
+                    </button>
+                    <button id="btn-close-edit-dashboard" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-5 overflow-y-auto" style="flex:1">
+                <div id="edit-kpis-list" class="space-y-5"></div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-between">
+                <div class="text-xs text-gray-500">Los cambios se aplican al guardar.</div>
+                <div class="flex items-center gap-2">
+                    <button id="btn-cancel-edit-dashboard" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                    <button id="btn-save-edit-dashboard" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">Guardar</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -212,35 +315,66 @@
     </div>
 </div>
 
+{% endblock %}
+
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const kpiTotalSales = document.getElementById('kpi-total-sales');
     const kpiTotalExpenses = document.getElementById('kpi-total-expenses');
     const kpiEstimatedResult = document.getElementById('kpi-estimated-result');
-    const kpiInventoryValue = document.getElementById('kpi-inventory-value');
-    const kpiLowStock = document.getElementById('kpi-low-stock');
+    const kpiEstimatedMargin = document.getElementById('kpi-estimated-margin');
+    const kpiCash = document.getElementById('kpi-cash');
+    const kpiBanks = document.getElementById('kpi-banks');
+    const kpiTotalAvailable = document.getElementById('kpi-total-available');
+
+    const kpiAlertsTotal = document.getElementById('kpi-alerts-total');
+    const kpiAlertStock = document.getElementById('kpi-alert-stock');
+    const kpiAlertDebtors = document.getElementById('kpi-alert-debtors');
+    const kpiAlertExpenses = document.getElementById('kpi-alert-expenses');
+
+    const kpiStockCriticalCount = document.getElementById('kpi-stock-critical-count');
+    const kpiStockCriticalTop = document.getElementById('kpi-stock-critical-top');
+
     const kpiDebtors = document.getElementById('kpi-debtors');
-    const kpiCustomersTotal = document.getElementById('kpi-customers-total');
     const kpiDebtTotal = document.getElementById('kpi-debt-total');
+
+    const kpiSalesTodayTotal = document.getElementById('kpi-sales-today-total');
+    const kpiSalesTodayCount = document.getElementById('kpi-sales-today-count');
+    const kpiAvgTicket = document.getElementById('kpi-avg-ticket');
+
     const kpiBestCustomer = document.getElementById('kpi-best-customer');
     const kpiBestCustomerAmount = document.getElementById('kpi-best-customer-amount');
-    const kpiBestCustomerAmountCard = document.getElementById('kpi-best-customer-amount-card');
+    const kpiTopProduct = document.getElementById('kpi-top-product');
+    const kpiTopProductQty = document.getElementById('kpi-top-product-qty');
+
     const emptyState = document.getElementById('dash-empty');
-    const kpiWrap = document.getElementById('dash-kpis');
+    const dashboardRoot = document.getElementById('dashboard-root');
 
     const skKpiTotalSales = document.getElementById('sk-kpi-total-sales');
     const skKpiTotalExpenses = document.getElementById('sk-kpi-total-expenses');
     const skKpiEstimatedResult = document.getElementById('sk-kpi-estimated-result');
-    const skKpiInventoryValue = document.getElementById('sk-kpi-inventory-value');
-    const skKpiLowStock = document.getElementById('sk-kpi-low-stock');
+    const skKpiCash = document.getElementById('sk-kpi-cash');
+    const skKpiAlertsTotal = document.getElementById('sk-kpi-alerts-total');
+    const skKpiStockCritical = document.getElementById('sk-kpi-stock-critical');
     const skKpiDebtors = document.getElementById('sk-kpi-debtors');
-    const skKpiCustomersTotal = document.getElementById('sk-kpi-customers-total');
-    const skKpiDebtTotal = document.getElementById('sk-kpi-debt-total');
+    const skKpiSalesToday = document.getElementById('sk-kpi-sales-today');
+    const skKpiAvgTicket = document.getElementById('sk-kpi-avg-ticket');
     const skKpiBestCustomer = document.getElementById('sk-kpi-best-customer');
+    const skKpiTopProduct = document.getElementById('sk-kpi-top-product');
 
-    const chartSalesExpensesSubtitle = document.getElementById('chart-sales-expenses-subtitle');
+    const chartEvolutionSubtitle = document.getElementById('chart-evolution-subtitle');
     const dashRange = document.getElementById('dash-range');
+
+    const btnEdit = document.getElementById('btn-edit-dashboard');
+    const btnSave = document.getElementById('btn-save-dashboard');
+    const btnCancel = document.getElementById('btn-cancel-dashboard');
+    const modalEdit = document.getElementById('modal-edit-dashboard');
+    const btnCloseEdit = document.getElementById('btn-close-edit-dashboard');
+    const btnCancelEdit = document.getElementById('btn-cancel-edit-dashboard');
+    const btnSaveEdit = document.getElementById('btn-save-edit-dashboard');
+    const btnToggleManage = document.getElementById('btn-toggle-manage-kpis');
+    const editList = document.getElementById('edit-kpis-list');
 
     const btnExport = document.getElementById('btn-export-dashboard');
     const modalExport = document.getElementById('modal-export-dashboard');
@@ -248,6 +382,313 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnCancelExport = document.getElementById('btn-cancel-export-dashboard');
     const btnExportPdf = document.getElementById('btn-export-dashboard-pdf');
     const btnExportXls = document.getElementById('btn-export-dashboard-xls');
+
+    const currentUserId = Number('{{ current_user.id if current_user.is_authenticated else 0 }}') || 0;
+    const layoutKey = 'dashboard_layout_u_' + String(currentUserId);
+    const blockContainers = {
+        general: document.getElementById('block-general'),
+        alerts: document.getElementById('block-alerts'),
+        activity: document.getElementById('block-activity'),
+        rankings: document.getElementById('block-rankings')
+    };
+
+    function deepClone(obj) {
+        try { return JSON.parse(JSON.stringify(obj || {})); } catch (e) { return {}; }
+    }
+
+    function readLayout() {
+        try {
+            const raw = window.localStorage.getItem(layoutKey);
+            const parsed = raw ? JSON.parse(raw) : null;
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function writeLayout(cfg) {
+        try {
+            window.localStorage.setItem(layoutKey, JSON.stringify(cfg || {}));
+        } catch (e) {
+        }
+    }
+
+    function getDefaultLayoutFromDom() {
+        const order = {};
+        Object.keys(blockContainers).forEach(block => {
+            const el = blockContainers[block];
+            const cards = el ? Array.from(el.querySelectorAll('[data-card-key]')) : [];
+            order[block] = cards.map(c => String(c.getAttribute('data-card-key') || '')).filter(Boolean);
+        });
+        return { hiddenKeys: [], order: order };
+    }
+
+    function normalizeLayout(cfg) {
+        const base = getDefaultLayoutFromDom();
+        const next = {
+            hiddenKeys: Array.isArray(cfg?.hiddenKeys) ? cfg.hiddenKeys.map(String) : [],
+            order: typeof cfg?.order === 'object' && cfg.order ? cfg.order : {}
+        };
+        Object.keys(base.order).forEach(block => {
+            const existing = new Set(base.order[block]);
+            const wanted = Array.isArray(next.order?.[block]) ? next.order[block].map(String) : [];
+            const filtered = wanted.filter(k => existing.has(k));
+            const missing = base.order[block].filter(k => !filtered.includes(k));
+            next.order[block] = filtered.concat(missing);
+        });
+        next.hiddenKeys = next.hiddenKeys.filter(k => {
+            return Object.keys(base.order).some(b => base.order[b].includes(k));
+        });
+        return next;
+    }
+
+    function applyLayout(cfg) {
+        const layout = normalizeLayout(cfg);
+        Object.keys(blockContainers).forEach(block => {
+            const container = blockContainers[block];
+            if (!container) return;
+            const byKey = new Map();
+            Array.from(container.querySelectorAll('[data-card-key]')).forEach(card => {
+                const key = String(card.getAttribute('data-card-key') || '');
+                if (key) byKey.set(key, card);
+            });
+            const order = Array.isArray(layout.order?.[block]) ? layout.order[block] : [];
+            order.forEach(k => {
+                const el = byKey.get(String(k));
+                if (el) container.appendChild(el);
+            });
+            byKey.forEach((el, k) => {
+                const hidden = layout.hiddenKeys.includes(String(k));
+                el.classList.toggle('hidden', hidden);
+            });
+        });
+        return layout;
+    }
+
+    let currentLayout = normalizeLayout(readLayout() || getDefaultLayoutFromDom());
+    currentLayout = applyLayout(currentLayout);
+
+    let isEditing = false;
+    let draftLayout = null;
+    let editManageMode = false;
+    let editSelected = null;
+
+    function getCardTitleByKey(blockKey, cardKey) {
+        const container = blockContainers[blockKey];
+        if (!container) return String(cardKey || 'KPI');
+        const card = Array.from(container.querySelectorAll('[data-card-key]')).find(c => String(c.getAttribute('data-card-key') || '') === String(cardKey));
+        if (!card) return String(cardKey || 'KPI');
+        const t = card.querySelector('.text-sm.font-medium.text-gray-500');
+        return String(t?.textContent || '').trim() || String(cardKey || 'KPI');
+    }
+
+    function renderEditModal() {
+        if (!modalEdit || !editList || !draftLayout) return;
+
+        editList.innerHTML = '';
+        if (btnToggleManage) btnToggleManage.textContent = editManageMode ? 'Volver a mover KPIs' : 'Agregar/Eliminar KPIs';
+        const blocks = [
+            { key: 'general', title: 'Estado general del negocio' },
+            { key: 'alerts', title: 'Alertas y riesgos' },
+            { key: 'activity', title: 'Actividad comercial' },
+            { key: 'rankings', title: 'Rankings simples' }
+        ];
+
+        const makeTile = function (blockKey, k) {
+            const isHidden = Array.isArray(draftLayout.hiddenKeys) && draftLayout.hiddenKeys.includes(String(k));
+            const tile = document.createElement('button');
+            tile.type = 'button';
+            tile.setAttribute('data-edit-block', String(blockKey));
+            tile.setAttribute('data-edit-key', String(k));
+            const isSelected = !!editSelected && String(editSelected.block) === String(blockKey) && String(editSelected.key) === String(k);
+            tile.className = 'aspect-square w-full rounded-xl border text-left p-3 transition select-none flex flex-col justify-between ' 
+                + (isHidden ? 'border-dashed border-gray-300 bg-gray-50 text-gray-500' : 'border-gray-200 bg-white hover:border-gray-300')
+                + (isSelected ? ' ring-2 ring-blue-300' : '');
+
+            const head = document.createElement('div');
+            head.className = 'flex items-start justify-between gap-2';
+
+            const title = document.createElement('div');
+            title.className = 'text-sm font-semibold leading-snug break-words';
+            title.textContent = getCardTitleByKey(blockKey, k);
+
+            const badge = document.createElement('div');
+            badge.className = 'shrink-0 text-[11px] px-2 py-0.5 rounded-full border font-semibold ' + (isHidden ? 'bg-gray-100 border-gray-200 text-gray-600' : 'bg-emerald-50 border-emerald-100 text-emerald-700');
+            badge.textContent = isHidden ? 'invisible' : 'visible';
+
+            head.appendChild(title);
+            head.appendChild(badge);
+            tile.appendChild(head);
+
+            const hint = document.createElement('div');
+            hint.className = 'mt-2 text-xs text-gray-500';
+            hint.textContent = editManageMode ? (isHidden ? 'Click para agregar' : 'Click para eliminar') : (isSelected ? 'Click en otra caja para mover' : 'Click para seleccionar (o arrastrá)');
+            tile.appendChild(hint);
+
+            if (!editManageMode && !isHidden) {
+                tile.draggable = true;
+                tile.addEventListener('click', function () {
+                    const key = String(k);
+                    if (!editSelected) {
+                        editSelected = { block: String(blockKey), key: key };
+                        renderEditModal();
+                        return;
+                    }
+                    if (String(editSelected.block) !== String(blockKey)) {
+                        editSelected = { block: String(blockKey), key: key };
+                        renderEditModal();
+                        return;
+                    }
+                    const fromKey = String(editSelected.key);
+                    const toKey = key;
+                    if (!fromKey || !toKey) return;
+                    if (fromKey === toKey) {
+                        editSelected = null;
+                        renderEditModal();
+                        return;
+                    }
+                    const arr = Array.isArray(draftLayout.order?.[blockKey]) ? draftLayout.order[blockKey].slice() : [];
+                    const fromIdx = arr.indexOf(fromKey);
+                    const toIdx = arr.indexOf(toKey);
+                    if (fromIdx < 0 || toIdx < 0) {
+                        editSelected = null;
+                        renderEditModal();
+                        return;
+                    }
+                    arr.splice(fromIdx, 1);
+                    const insertAt = fromIdx < toIdx ? (toIdx) : (toIdx);
+                    arr.splice(insertAt, 0, fromKey);
+                    draftLayout.order[blockKey] = arr;
+                    editSelected = null;
+                    applyLayout(draftLayout);
+                    renderEditModal();
+                });
+                tile.addEventListener('dragstart', function (e) {
+                    try {
+                        e.dataTransfer.setData('text/plain', JSON.stringify({ block: String(blockKey), key: String(k) }));
+                        e.dataTransfer.effectAllowed = 'move';
+                    } catch (err) {
+                    }
+                });
+                tile.addEventListener('dragover', function (e) {
+                    e.preventDefault();
+                    tile.classList.add('ring-2', 'ring-blue-200');
+                });
+                tile.addEventListener('dragleave', function () {
+                    tile.classList.remove('ring-2', 'ring-blue-200');
+                });
+                tile.addEventListener('drop', function (e) {
+                    e.preventDefault();
+                    tile.classList.remove('ring-2', 'ring-blue-200');
+                    let raw = '';
+                    try { raw = e.dataTransfer.getData('text/plain'); } catch (err) { raw = ''; }
+                    if (!raw) return;
+                    let payload = null;
+                    try { payload = JSON.parse(raw); } catch (err) { payload = null; }
+                    if (!payload) return;
+                    if (String(payload.block) !== String(blockKey)) return;
+                    const fromKey = String(payload.key);
+                    const toKey = String(k);
+                    if (!fromKey || !toKey || fromKey === toKey) return;
+
+                    const arr = Array.isArray(draftLayout.order?.[blockKey]) ? draftLayout.order[blockKey].slice() : [];
+                    const fromIdx = arr.indexOf(fromKey);
+                    const toIdx = arr.indexOf(toKey);
+                    if (fromIdx < 0 || toIdx < 0) return;
+                    arr.splice(fromIdx, 1);
+                    const insertAt = fromIdx < toIdx ? toIdx : toIdx;
+                    arr.splice(insertAt, 0, fromKey);
+                    draftLayout.order[blockKey] = arr;
+                    editSelected = null;
+                    applyLayout(draftLayout);
+                    renderEditModal();
+                });
+            }
+
+            if (editManageMode) {
+                tile.addEventListener('click', function () {
+                    const key = String(k);
+                    const hidden = Array.isArray(draftLayout.hiddenKeys) ? draftLayout.hiddenKeys.slice() : [];
+                    const isNowHidden = hidden.includes(key);
+                    if (isNowHidden) {
+                        const i = hidden.indexOf(key);
+                        if (i >= 0) hidden.splice(i, 1);
+                    } else {
+                        hidden.push(key);
+                    }
+                    draftLayout.hiddenKeys = hidden;
+                    editSelected = null;
+                    applyLayout(draftLayout);
+                    renderEditModal();
+                });
+            }
+
+            return tile;
+        };
+
+        blocks.forEach(b => {
+            const section = document.createElement('div');
+            section.className = 'border border-gray-200 rounded-xl overflow-hidden bg-white';
+
+            const head = document.createElement('div');
+            head.className = 'px-4 py-3 bg-gray-50 flex items-center justify-between gap-3';
+            const hTitle = document.createElement('div');
+            hTitle.className = 'text-sm font-semibold text-gray-900';
+            hTitle.textContent = b.title;
+            const hHint = document.createElement('div');
+            hHint.className = 'text-xs text-gray-500';
+            hHint.textContent = editManageMode ? 'Click en una caja para agregar/eliminar' : 'Arrastrá una caja sobre otra para reordenar';
+            head.appendChild(hTitle);
+            head.appendChild(hHint);
+            section.appendChild(head);
+
+            const grid = document.createElement('div');
+            grid.className = 'p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3';
+            const order = Array.isArray(draftLayout.order?.[b.key]) ? draftLayout.order[b.key].slice() : [];
+            const keysToShow = editManageMode ? order : order.filter(k => !draftLayout.hiddenKeys.includes(String(k)));
+            keysToShow.forEach(k => {
+                grid.appendChild(makeTile(b.key, k));
+            });
+            section.appendChild(grid);
+            editList.appendChild(section);
+        });
+    }
+
+    function openEdit() {
+        if (!modalEdit || !editList) return;
+        isEditing = true;
+        draftLayout = deepClone(currentLayout);
+        editManageMode = false;
+        editSelected = null;
+        if (btnEdit) btnEdit.classList.add('hidden');
+        if (btnSave) btnSave.classList.add('hidden');
+        if (btnCancel) btnCancel.classList.add('hidden');
+
+        renderEditModal();
+        modalEdit.classList.remove('hidden');
+    }
+
+    function closeEdit() {
+        if (modalEdit) modalEdit.classList.add('hidden');
+    }
+
+    function exitEditMode(save) {
+        if (save) {
+            currentLayout = normalizeLayout(draftLayout || currentLayout);
+            currentLayout = applyLayout(currentLayout);
+            writeLayout(currentLayout);
+        } else {
+            currentLayout = applyLayout(currentLayout);
+        }
+        draftLayout = null;
+        isEditing = false;
+        editManageMode = false;
+        editSelected = null;
+        closeEdit();
+        if (btnEdit) btnEdit.classList.remove('hidden');
+        if (btnSave) btnSave.classList.add('hidden');
+        if (btnCancel) btnCancel.classList.add('hidden');
+    }
 
     function isPromise(x) {
         return !!x && typeof x.then === 'function';
@@ -272,6 +713,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const v = String(raw || '').trim();
         if (!v) return null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+            const parts = v.split('-').map(x => parseInt(x, 10));
+            const y = parts[0];
+            const m = parts[1];
+            const d = parts[2];
+            if (!y || !m || !d) return null;
+            const dtIso = new Date(y, m - 1, d);
+            return isNaN(dtIso.getTime()) ? null : dtIso;
+        }
         if (v.includes('/')) {
             const [d, m, y] = v.split('/').map(x => parseInt(x, 10));
             if (!d || !m || !y) return null;
@@ -284,7 +734,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function parseRangoFechas(raw) {
         const txt = String(raw || '').trim();
-        const normalized = txt.replace(/\s+a\s+/i, ' - ').replace(/\s+to\s+/i, ' - ');
+        const normalized = txt
+            .replace(/\s+(?:a|al|hasta)\s+/ig, ' - ')
+            .replace(/\s+to\s+/ig, ' - ')
+            .replace(/\s*[–—]\s*/g, ' - ');
         const parts = normalized.split(' - ').map(p => p.trim()).filter(Boolean);
         if (parts.length !== 2) return null;
         const a = parseFecha(parts[0]);
@@ -296,7 +749,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function setSkeleton(on) {
-        const sks = [skKpiTotalSales, skKpiTotalExpenses, skKpiEstimatedResult, skKpiInventoryValue, skKpiLowStock, skKpiDebtors, skKpiCustomersTotal, skKpiDebtTotal, skKpiBestCustomer];
+        const sks = [
+            skKpiTotalSales,
+            skKpiTotalExpenses,
+            skKpiEstimatedResult,
+            skKpiCash,
+            skKpiAlertsTotal,
+            skKpiStockCritical,
+            skKpiDebtors,
+            skKpiSalesToday,
+            skKpiAvgTicket,
+            skKpiBestCustomer,
+            skKpiTopProduct
+        ];
         sks.forEach(el => {
             if (!el) return;
             el.classList.toggle('hidden', !on);
@@ -305,6 +770,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setEmpty(on) {
         if (emptyState) emptyState.classList.toggle('hidden', !on);
+    }
+
+    function applyUpcomingFilter(range) {
+        const wrap = document.getElementById('dashboard-upcoming-alerts');
+        if (!wrap) return;
+        const rows = Array.from(wrap.querySelectorAll('[data-event-date]'));
+        if (!rows.length) return;
+
+        const r = range && range.from && range.to ? range : getRangeOrDefault();
+        const from = new Date(r.from.getTime());
+        const to = new Date(r.to.getTime());
+        from.setHours(0, 0, 0, 0);
+        to.setHours(23, 59, 59, 999);
+
+        let visible = 0;
+        rows.forEach(el => {
+            const raw = String(el.getAttribute('data-event-date') || '').trim();
+            const dt = parseFecha(raw);
+            const ok = !!dt && dt >= from && dt <= to;
+            el.classList.toggle('hidden', !ok);
+            if (ok) visible += 1;
+        });
+
+        const card = document.getElementById('dashboard-upcoming-card');
+        if (card) card.classList.toggle('hidden', visible === 0);
     }
 
     function getRangeOrDefault() {
@@ -330,24 +820,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function sumExpensesTotal(list) {
         return (Array.isArray(list) ? list : []).reduce((acc, e) => acc + (parseFloat(e?.valor || '0') || 0), 0);
-    }
-
-    function calculateInventoryMetrics(products, lots) {
-        const ps = Array.isArray(products) ? products : [];
-        const ls = Array.isArray(lots) ? lots : [];
-        let inventoryValue = 0;
-        let lowStockProducts = 0;
-        ps.forEach(p => {
-            const rel = ls.filter(l => String(l?.product_id) === String(p?.id));
-            const stock = rel.reduce((acc, l) => acc + (parseFloat(l?.qty_available || '0') || 0), 0);
-            const costSum = rel.reduce((acc, l) => acc + ((parseFloat(l?.qty_available || '0') || 0) * (parseFloat(l?.unit_cost || '0') || 0)), 0);
-            const avg = stock > 0 ? (costSum / stock) : 0;
-            inventoryValue += stock * avg;
-            const min = (parseFloat(p?.min_stock || '0') || 0);
-            if (min > 0 && stock <= min) lowStockProducts += 1;
-            if (min <= 0 && stock <= 0) lowStockProducts += 1;
-        });
-        return { inventoryValue, lowStockProducts };
     }
 
     function calculateDebtorsFromSales(sales) {
@@ -377,87 +849,54 @@ document.addEventListener('DOMContentLoaded', function() {
         return out;
     }
 
-    function calculateChartsData(range, sales, expenses) {
-        const from = range.from;
-        const to = range.to;
+    function fmtMonthKey(d) {
+        const yy = String(d.getFullYear());
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        return yy + '-' + mm;
+    }
 
-        function categoryWithEmoji(catRaw) {
-            const c = String(catRaw || '').trim();
-            if (!c) return 'Sin categoría';
-            if (/^[^A-Za-z0-9\s]/.test(c)) return c;
-            const map = {
-                'Servicios públicos': '💡 Servicios públicos',
-                'Gastos operativos': '🧾 Gastos operativos',
-                'Arriendo': '🏠 Arriendo',
-                'Nómina': '🧑‍💼 Nómina',
-                'Transportes': '🚚 Transportes',
-                'Mantenimiento y reparaciones': '🛠️ Mantenimiento y reparaciones',
-                'Muebles, equipos o maquinarias': '🪑 Muebles, equipos o maquinarias',
-                'Inventario': '📦 Inventario',
-                'Otro': '🏷️ Otro'
-            };
-            return map[c] || c;
+    function bucketByMonth(from, to) {
+        const out = [];
+        const d = new Date(from.getFullYear(), from.getMonth(), 1);
+        const end = new Date(to.getFullYear(), to.getMonth(), 1);
+        while (d <= end) {
+            out.push(fmtMonthKey(d));
+            d.setMonth(d.getMonth() + 1);
         }
+        return out;
+    }
 
-        const labels = bucketByDay(from, to);
-        const salesBy = {};
-        const expBy = {};
-        labels.forEach(k => {
-            salesBy[k] = 0;
-            expBy[k] = 0;
-        });
-
-        (Array.isArray(sales) ? sales : []).forEach(s => {
-            const dt = normalizeSalesDate(s);
-            if (!dt) return;
-            if (dt < from || dt > to) return;
-            const k = fmtDateYmd(dt);
-            if (!(k in salesBy)) return;
-            salesBy[k] += (parseFloat(s?.total || '0') || 0);
-        });
-
-        (Array.isArray(expenses) ? expenses : []).forEach(e => {
-            const dt = normalizeExpenseDate(e);
-            if (!dt) return;
-            if (dt < from || dt > to) return;
-            const k = fmtDateYmd(dt);
-            if (!(k in expBy)) return;
-            expBy[k] += (parseFloat(e?.valor || '0') || 0);
-        });
-
-        const salesSeries = labels.map(k => salesBy[k] || 0);
-        const expSeries = labels.map(k => expBy[k] || 0);
-        const marginSeries = labels.map((k, idx) => (salesSeries[idx] || 0) - (expSeries[idx] || 0));
-
-        const catSum = {};
-        (Array.isArray(expenses) ? expenses : []).forEach(e => {
-            const dt = normalizeExpenseDate(e);
-            if (!dt) return;
-            if (dt < from || dt > to) return;
-            const cat = categoryWithEmoji(e?.categoria || e?.category || 'Sin categoría');
-            catSum[cat] = (catSum[cat] || 0) + (parseFloat(e?.valor || '0') || 0);
-        });
-        const topCats = Object.entries(catSum)
-            .sort((a, b) => (b[1] || 0) - (a[1] || 0))
-            .slice(0, 5);
-
-        return {
-            salesExpenses: { labels, salesSeries, expSeries, marginSeries },
-            topExpenseCats: topCats
-        };
+    function chooseBucket(range) {
+        const ms = range.to.getTime() - range.from.getTime();
+        const days = Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+        if (days > 62) return { kind: 'month', labels: bucketByMonth(range.from, range.to) };
+        return { kind: 'day', labels: bucketByDay(range.from, range.to) };
     }
 
     function tryGetAllData() {
         if (!window.StorageService) {
             return Promise.resolve({ sales: [], expenses: [], products: [], lots: [], customers: [], suppliers: [] });
         }
+
+        function safe(p, fallback) {
+            return Promise.resolve(p).catch(function () { return fallback; });
+        }
+
         const s = (typeof window.StorageService.getSales === 'function') ? window.StorageService.getSales() : [];
         const e = (typeof window.StorageService.getExpenses === 'function') ? window.StorageService.getExpenses() : [];
         const p = (typeof window.StorageService.getInventoryProducts === 'function') ? window.StorageService.getInventoryProducts() : [];
         const l = (typeof window.StorageService.getInventoryLots === 'function') ? window.StorageService.getInventoryLots() : [];
         const c = (typeof window.StorageService.getCustomers === 'function') ? window.StorageService.getCustomers() : [];
         const sup = (typeof window.StorageService.getSuppliers === 'function') ? window.StorageService.getSuppliers() : [];
-        return Promise.all([Promise.resolve(s), Promise.resolve(e), Promise.resolve(p), Promise.resolve(l), Promise.resolve(c), Promise.resolve(sup)]).then(function (vals) {
+
+        return Promise.all([
+            safe(s, []),
+            safe(e, []),
+            safe(p, []),
+            safe(l, []),
+            safe(c, []),
+            safe(sup, [])
+        ]).then(function (vals) {
             return {
                 sales: Array.isArray(vals[0]) ? vals[0] : [],
                 expenses: Array.isArray(vals[1]) ? vals[1] : [],
@@ -470,14 +909,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     let lastSummary = null;
-    let _salesExpensesChart = null;
-    let _topExpenseCatsChart = null;
+    let _evolutionChart = null;
 
     function destroyCharts() {
-        if (_salesExpensesChart && typeof _salesExpensesChart.destroy === 'function') _salesExpensesChart.destroy();
-        if (_topExpenseCatsChart && typeof _topExpenseCatsChart.destroy === 'function') _topExpenseCatsChart.destroy();
-        _salesExpensesChart = null;
-        _topExpenseCatsChart = null;
+        if (_evolutionChart && typeof _evolutionChart.destroy === 'function') _evolutionChart.destroy();
+        _evolutionChart = null;
     }
 
     function renderCharts(chartsData) {
@@ -488,139 +924,293 @@ document.addEventListener('DOMContentLoaded', function() {
 
         destroyCharts();
 
-        const salesExpensesCanvas = document.getElementById('salesExpensesChart');
-        const topCatsCanvas = document.getElementById('topExpenseCategoriesChart');
+        const canvas = document.getElementById('evolutionChart');
+        if (!canvas) return;
 
-        if (salesExpensesCanvas) {
-            const ctx = salesExpensesCanvas.getContext('2d');
-            _salesExpensesChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: chartsData.salesExpenses.labels,
-                    datasets: [
-                        {
-                            label: 'Ventas',
-                            data: chartsData.salesExpenses.salesSeries,
-                            backgroundColor: 'rgba(59, 130, 246, 0.35)',
-                            borderColor: 'rgba(59, 130, 246, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'Gastos',
-                            data: chartsData.salesExpenses.expSeries,
-                            backgroundColor: 'rgba(239, 68, 68, 0.25)',
-                            borderColor: 'rgba(239, 68, 68, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'Margen',
-                            data: chartsData.salesExpenses.marginSeries,
-                            backgroundColor: 'rgba(16, 185, 129, 0.25)',
-                            borderColor: 'rgba(16, 185, 129, 1)',
-                            borderWidth: 1
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom' },
-                        tooltip: {
-                            callbacks: {
-                                label: function (ctx) {
-                                    const v = ctx.parsed?.y ?? 0;
-                                    return String(ctx.dataset.label || '') + ': ' + formatearMoneda(v);
-                                }
+        const ctx = canvas.getContext('2d');
+        const series = chartsData?.evolution || {};
+        const labels = Array.isArray(series.labels) ? series.labels : [];
+
+        _evolutionChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Ventas',
+                        data: Array.isArray(series.salesSeries) ? series.salesSeries : [],
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        tension: 0.25
+                    },
+                    {
+                        label: 'Gastos',
+                        data: Array.isArray(series.expensesSeries) ? series.expensesSeries : [],
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.10)',
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        tension: 0.25
+                    },
+                    {
+                        label: 'Resultado',
+                        data: Array.isArray(series.resultSeries) ? series.resultSeries : [],
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.10)',
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        tension: 0.25
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                const v = ctx.parsed?.y ?? 0;
+                                return String(ctx.dataset.label || '') + ': ' + formatearMoneda(v);
                             }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function (value) { return '$' + Number(value || 0).toLocaleString('es-AR'); }
                         }
                     },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function (value) { return '$' + Number(value || 0).toLocaleString('es-AR'); }
-                            }
-                        },
-                        x: {
-                            ticks: { maxRotation: 0, autoSkip: true }
-                        }
+                    x: {
+                        ticks: { maxRotation: 0, autoSkip: true }
                     }
                 }
-            });
-        }
-
-        if (topCatsCanvas) {
-            const ctx = topCatsCanvas.getContext('2d');
-            const labels = (chartsData.topExpenseCats || []).map(([k]) => k);
-            const values = (chartsData.topExpenseCats || []).map(([, v]) => v);
-            _topExpenseCatsChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: values,
-                        backgroundColor: [
-                            'rgba(59, 130, 246, 0.85)',
-                            'rgba(16, 185, 129, 0.85)',
-                            'rgba(245, 158, 11, 0.85)',
-                            'rgba(139, 92, 246, 0.85)',
-                            'rgba(156, 163, 175, 0.85)'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom' },
-                        tooltip: {
-                            callbacks: {
-                                label: function (ctx) {
-                                    const v = ctx.parsed ?? 0;
-                                    return String(ctx.label || '') + ': ' + formatearMoneda(v);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
+            }
+        });
     }
 
-    function calculateDashboardKPIs(payload, range) {
-        const sales = Array.isArray(payload?.sales) ? payload.sales : [];
-        const expenses = Array.isArray(payload?.expenses) ? payload.expenses : [];
-        const products = Array.isArray(payload?.products) ? payload.products : [];
-        const lots = Array.isArray(payload?.lots) ? payload.lots : [];
-        const customers = Array.isArray(payload?.customers) ? payload.customers : [];
+    function safeNum(v) {
+        const n = parseFloat(String(v ?? '').replace(',', '.'));
+        return isNaN(n) ? 0 : n;
+    }
 
-        const salesInRange = sales.filter(s => {
+    function toStartOfDay(d) {
+        const x = new Date(d.getTime());
+        x.setHours(0, 0, 0, 0);
+        return x;
+    }
+
+    function toEndOfDay(d) {
+        const x = new Date(d.getTime());
+        x.setHours(23, 59, 59, 999);
+        return x;
+    }
+
+    function salesInRange(allSales, range) {
+        return (Array.isArray(allSales) ? allSales : []).filter(s => {
             const dt = normalizeSalesDate(s);
             if (!dt) return false;
             return dt >= range.from && dt <= range.to;
         });
-        const expInRange = expenses.filter(e => {
+    }
+
+    function expensesInRange(allExpenses, range) {
+        return (Array.isArray(allExpenses) ? allExpenses : []).filter(e => {
             const dt = normalizeExpenseDate(e);
             if (!dt) return false;
             return dt >= range.from && dt <= range.to;
         });
+    }
 
-        const totalSales = sumSalesTotal(salesInRange);
-        const totalExpenses = sumExpensesTotal(expInRange);
-        const estimatedResult = totalSales - totalExpenses;
-        const inv = calculateInventoryMetrics(products, lots);
-        const debtors = calculateDebtorsFromSales(salesInRange);
-        const debtTotal = Array.from(debtors.debtorsMap.values()).reduce((acc, v) => acc + (parseFloat(v || 0) || 0), 0);
+    function buildAvgCostByProduct(products, lots) {
+        const ps = Array.isArray(products) ? products : [];
+        const ls = Array.isArray(lots) ? lots : [];
+        const map = new Map();
+        ps.forEach(p => {
+            const rel = ls.filter(l => String(l?.product_id) === String(p?.id));
+            const stock = rel.reduce((acc, l) => acc + safeNum(l?.qty_available), 0);
+            const costSum = rel.reduce((acc, l) => acc + (safeNum(l?.qty_available) * safeNum(l?.unit_cost)), 0);
+            const avg = stock > 0 ? (costSum / stock) : 0;
+            map.set(String(p?.id || ''), avg);
+        });
+        return map;
+    }
+
+    function estimateCmvFromSales(sales, avgCostByProduct) {
+        const list = Array.isArray(sales) ? sales : [];
+        return list.reduce((acc, s) => {
+            const items = Array.isArray(s?.items) ? s.items : [];
+            const cmvVenta = items.reduce((a2, it) => {
+                const pid = String(it?.product_id || '').trim();
+                if (!pid) return a2;
+                const qty = safeNum(it?.cantidad);
+                const avg = safeNum(avgCostByProduct.get(pid) || 0);
+                return a2 + (qty * avg);
+            }, 0);
+            return acc + cmvVenta;
+        }, 0);
+    }
+
+    function computeCashAndBanks(sales, expenses) {
+        const cashMethods = new Set(['Efectivo']);
+        const bankMethods = new Set(['Débito', 'Crédito', 'Transferencia']);
+
+        const sumBy = (arr, getterMethod, getterAmount) => (Array.isArray(arr) ? arr : []).reduce((acc, x) => {
+            const m = String(getterMethod(x) || '').trim() || 'Efectivo';
+            const val = safeNum(getterAmount(x));
+            if (cashMethods.has(m)) acc.cash += val;
+            else if (bankMethods.has(m)) acc.banks += val;
+            return acc;
+        }, { cash: 0, banks: 0 });
+
+        const salesAgg = sumBy(sales, (s) => s?.payment_method, (s) => s?.total);
+        const expAgg = sumBy(expenses, (e) => e?.forma_pago, (e) => e?.valor);
+
+        const cash = (salesAgg.cash || 0) - (expAgg.cash || 0);
+        const banks = (salesAgg.banks || 0) - (expAgg.banks || 0);
+        return { cash, banks, total: cash + banks };
+    }
+
+    function computeOutOfRangeExpenses(expenses) {
+        const vals = (Array.isArray(expenses) ? expenses : []).map(e => safeNum(e?.valor)).filter(v => v > 0);
+        if (!vals.length) return 0;
+        const avg = vals.reduce((a, v) => a + v, 0) / vals.length;
+        const thr = avg * 3;
+        return vals.filter(v => v > thr).length;
+    }
+
+    function computeStockCritical(products, lots) {
+        const ps = Array.isArray(products) ? products : [];
+        const ls = Array.isArray(lots) ? lots : [];
+
+        let criticalCount = 0;
+        let topName = '';
+        let topGap = -Infinity;
+
+        ps.forEach(p => {
+            const rel = ls.filter(l => String(l?.product_id) === String(p?.id));
+            const stock = rel.reduce((acc, l) => acc + safeNum(l?.qty_available), 0);
+            const min = safeNum(p?.min_stock);
+            const isCritical = (min > 0 && stock <= min) || (min <= 0 && stock <= 0);
+            if (!isCritical) return;
+            criticalCount += 1;
+
+            const gap = (min > 0) ? (min - stock) : (0 - stock);
+            if (gap > topGap) {
+                topGap = gap;
+                topName = String(p?.name || p?.nombre || '').trim() || '—';
+            }
+        });
+
+        return { criticalCount, topName };
+    }
+
+    function computeTopProductByQty(sales) {
+        const map = new Map();
+        (Array.isArray(sales) ? sales : []).forEach(s => {
+            const items = Array.isArray(s?.items) ? s.items : [];
+            items.forEach(it => {
+                const pid = String(it?.product_id || '').trim();
+                const nm = String(it?.nombre || '').trim();
+                const key = pid || nm;
+                if (!key) return;
+                map.set(key, (map.get(key) || 0) + safeNum(it?.cantidad));
+            });
+        });
+        let bestKey = '';
+        let bestQty = 0;
+        map.forEach((q, k) => {
+            if (q > bestQty) { bestQty = q; bestKey = k; }
+        });
+        return { key: bestKey, qty: bestQty };
+    }
+
+    function computeEvolution(range, payload, avgCostByProduct) {
+        const bucket = chooseBucket(range);
+        const labels = bucket.labels;
+        const salesBy = {};
+        const expBy = {};
+        const cmvBy = {};
+        labels.forEach(k => { salesBy[k] = 0; expBy[k] = 0; cmvBy[k] = 0; });
+
+        (Array.isArray(payload?.sales) ? payload.sales : []).forEach(s => {
+            const dt = normalizeSalesDate(s);
+            if (!dt || dt < range.from || dt > range.to) return;
+            const k = (bucket.kind === 'month') ? fmtMonthKey(dt) : fmtDateYmd(dt);
+            if (!(k in salesBy)) return;
+            salesBy[k] += safeNum(s?.total);
+            const items = Array.isArray(s?.items) ? s.items : [];
+            const cmv = items.reduce((acc, it) => {
+                const pid = String(it?.product_id || '').trim();
+                if (!pid) return acc;
+                const qty = safeNum(it?.cantidad);
+                const avg = safeNum(avgCostByProduct.get(pid) || 0);
+                return acc + (qty * avg);
+            }, 0);
+            cmvBy[k] += cmv;
+        });
+
+        (Array.isArray(payload?.expenses) ? payload.expenses : []).forEach(e => {
+            const dt = normalizeExpenseDate(e);
+            if (!dt || dt < range.from || dt > range.to) return;
+            const k = (bucket.kind === 'month') ? fmtMonthKey(dt) : fmtDateYmd(dt);
+            if (!(k in expBy)) return;
+            expBy[k] += safeNum(e?.valor);
+        });
+
+        const salesSeries = labels.map(k => salesBy[k] || 0);
+        const expensesSeries = labels.map(k => expBy[k] || 0);
+        const resultSeries = labels.map((k, idx) => (salesSeries[idx] || 0) - (cmvBy[k] || 0) - (expensesSeries[idx] || 0));
+
+        return { kind: bucket.kind, labels, salesSeries, expensesSeries, resultSeries };
+    }
+
+    function calculateDashboardKPIs(payload, range) {
+        const salesAll = Array.isArray(payload?.sales) ? payload.sales : [];
+        const expensesAll = Array.isArray(payload?.expenses) ? payload.expenses : [];
+        const products = Array.isArray(payload?.products) ? payload.products : [];
+        const lots = Array.isArray(payload?.lots) ? payload.lots : [];
+        const customers = Array.isArray(payload?.customers) ? payload.customers : [];
+
+        const salesRange = salesInRange(salesAll, range);
+        const expRange = expensesInRange(expensesAll, range);
+
+        const totalSales = sumSalesTotal(salesRange);
+        const totalExpenses = sumExpensesTotal(expRange);
+
+        const avgCostByProduct = buildAvgCostByProduct(products, lots);
+        const cmv = estimateCmvFromSales(salesRange, avgCostByProduct);
+        const estimatedResult = totalSales - cmv - totalExpenses;
+        const estimatedMarginPct = totalSales > 0 ? ((estimatedResult / totalSales) * 100) : 0;
+
+        const caja = computeCashAndBanks(salesRange, expRange);
+
+        const debtors = calculateDebtorsFromSales(salesRange);
+        const debtTotal = Array.from(debtors.debtorsMap.values()).reduce((acc, v) => acc + safeNum(v), 0);
+
+        const stockCrit = computeStockCritical(products, lots);
+        const expensesOutOfRange = computeOutOfRangeExpenses(expRange);
+
+        const today = new Date();
+        const todayRange = { from: toStartOfDay(today), to: toEndOfDay(today) };
+        const salesToday = salesInRange(salesAll, todayRange);
+        const salesTodayTotal = sumSalesTotal(salesToday);
+        const salesTodayCount = salesToday.length;
+
+        const avgTicket = salesRange.length > 0 ? (totalSales / salesRange.length) : 0;
 
         const bestMap = new Map();
-        salesInRange.forEach(s => {
+        salesRange.forEach(s => {
             const name = String(s?.customer_name || s?.cliente || s?.customer || '').trim();
             const id = String(s?.customer_id || s?.customerId || '').trim();
             const key = id || name;
             if (!key) return;
-            const total = (parseFloat(s?.total || '0') || 0);
+            const total = safeNum(s?.total);
             bestMap.set(key, (bestMap.get(key) || 0) + total);
         });
         let bestCustomerKey = '';
@@ -634,45 +1224,84 @@ document.addEventListener('DOMContentLoaded', function() {
         let bestCustomerName = '';
         if (bestCustomerKey) {
             const fromCustomers = customers.find(c => String(c?.id || '') === String(bestCustomerKey)) || null;
-            if (fromCustomers) {
-                bestCustomerName = (String(fromCustomers?.first_name || '') + ' ' + String(fromCustomers?.last_name || '')).trim();
-            } else {
-                bestCustomerName = String(bestCustomerKey);
-            }
+            if (fromCustomers) bestCustomerName = (String(fromCustomers?.first_name || '') + ' ' + String(fromCustomers?.last_name || '')).trim();
+            else bestCustomerName = String(bestCustomerKey);
         }
+
+        const topProd = computeTopProductByQty(salesRange);
+        const topProdName = topProd.key ? String(topProd.key) : '';
+
+        const alertsTotal = (stockCrit.criticalCount || 0) + (debtors.debtorsCount || 0) + (expensesOutOfRange || 0);
+        const evolution = computeEvolution(range, payload, avgCostByProduct);
 
         return {
             totalSales,
             totalExpenses,
             estimatedResult,
-            inventoryValue: inv.inventoryValue,
-            lowStockProducts: inv.lowStockProducts,
+            estimatedMarginPct,
+            cmv,
+            cash: caja.cash,
+            banks: caja.banks,
+            totalAvailable: caja.total,
+            alertsTotal,
+            alertStock: stockCrit.criticalCount,
+            alertDebtors: debtors.debtorsCount,
+            alertExpenses: expensesOutOfRange,
+            stockCriticalCount: stockCrit.criticalCount,
+            stockCriticalTop: stockCrit.topName,
             debtorsCount: debtors.debtorsCount,
-            customersTotal: customers.length,
-            debtTotal: debtTotal,
-            bestCustomerName: bestCustomerName,
-            bestCustomerAmount: bestCustomerAmount,
-            periodLabel: String(dashRange?.value || '').trim() || '—'
+            debtTotal,
+            salesTodayTotal,
+            salesTodayCount,
+            avgTicket,
+            bestCustomerName,
+            bestCustomerAmount,
+            topProductName: topProdName,
+            topProductQty: topProd.qty,
+            periodLabel: String(dashRange?.value || '').trim() || '—',
+            evolution
         };
     }
 
     function renderKPIs(kpis) {
         if (kpiTotalSales) kpiTotalSales.textContent = formatearMoneda(kpis.totalSales);
         if (kpiTotalExpenses) kpiTotalExpenses.textContent = formatearMoneda(kpis.totalExpenses);
-        if (kpiInventoryValue) kpiInventoryValue.textContent = formatearMoneda(kpis.inventoryValue);
-        if (kpiLowStock) kpiLowStock.textContent = String(kpis.lowStockProducts || 0);
-        if (kpiDebtors) kpiDebtors.textContent = String(kpis.debtorsCount || 0);
-        if (kpiCustomersTotal) kpiCustomersTotal.textContent = String(kpis.customersTotal || 0);
-        if (kpiDebtTotal) kpiDebtTotal.textContent = formatearMoneda(kpis.debtTotal || 0);
-        if (kpiBestCustomer) kpiBestCustomer.textContent = String(kpis.bestCustomerName || '—');
-        if (kpiBestCustomerAmount) kpiBestCustomerAmount.textContent = kpis.bestCustomerName ? ('Monto: ' + formatearMoneda(kpis.bestCustomerAmount || 0)) : '—';
-        if (kpiBestCustomerAmountCard) kpiBestCustomerAmountCard.textContent = kpis.bestCustomerName ? formatearMoneda(kpis.bestCustomerAmount || 0) : '—';
+
         if (kpiEstimatedResult) {
             kpiEstimatedResult.textContent = formatearMoneda(kpis.estimatedResult);
             const pos = kpis.estimatedResult >= 0;
             kpiEstimatedResult.classList.toggle('text-emerald-700', pos);
             kpiEstimatedResult.classList.toggle('text-red-700', !pos);
         }
+        if (kpiEstimatedMargin) {
+            if (kpis.totalSales > 0) kpiEstimatedMargin.textContent = (kpis.estimatedMarginPct >= 0 ? '+' : '') + kpis.estimatedMarginPct.toFixed(1) + '%';
+            else kpiEstimatedMargin.textContent = '—';
+        }
+
+        if (kpiCash) kpiCash.textContent = formatearMoneda(kpis.cash);
+        if (kpiBanks) kpiBanks.textContent = formatearMoneda(kpis.banks);
+        if (kpiTotalAvailable) kpiTotalAvailable.textContent = formatearMoneda(kpis.totalAvailable);
+
+        if (kpiAlertsTotal) kpiAlertsTotal.textContent = String(kpis.alertsTotal || 0);
+        if (kpiAlertStock) kpiAlertStock.textContent = String(kpis.alertStock || 0);
+        if (kpiAlertDebtors) kpiAlertDebtors.textContent = String(kpis.alertDebtors || 0);
+        if (kpiAlertExpenses) kpiAlertExpenses.textContent = String(kpis.alertExpenses || 0);
+
+        if (kpiStockCriticalCount) kpiStockCriticalCount.textContent = String(kpis.stockCriticalCount || 0);
+        if (kpiStockCriticalTop) kpiStockCriticalTop.textContent = String(kpis.stockCriticalTop || '—');
+
+        if (kpiDebtors) kpiDebtors.textContent = String(kpis.debtorsCount || 0);
+        if (kpiDebtTotal) kpiDebtTotal.textContent = formatearMoneda(kpis.debtTotal || 0);
+
+        if (kpiSalesTodayTotal) kpiSalesTodayTotal.textContent = formatearMoneda(kpis.salesTodayTotal || 0);
+        if (kpiSalesTodayCount) kpiSalesTodayCount.textContent = String(kpis.salesTodayCount || 0);
+        if (kpiAvgTicket) kpiAvgTicket.textContent = formatearMoneda(kpis.avgTicket || 0);
+
+        if (kpiBestCustomer) kpiBestCustomer.textContent = String(kpis.bestCustomerName || '—');
+        if (kpiBestCustomerAmount) kpiBestCustomerAmount.textContent = kpis.bestCustomerName ? formatearMoneda(kpis.bestCustomerAmount || 0) : '—';
+
+        if (kpiTopProduct) kpiTopProduct.textContent = String(kpis.topProductName || '—');
+        if (kpiTopProductQty) kpiTopProductQty.textContent = String(kpis.topProductQty || 0);
     }
 
     function calcAndRender() {
@@ -682,26 +1311,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
         return tryGetAllData().then(function (payload) {
             const kpis = calculateDashboardKPIs(payload, range);
-            const chartsData = calculateChartsData(range, payload.sales, payload.expenses);
 
-            const hasAny = (kpis.totalSales > 0) || (kpis.totalExpenses > 0);
+            const hasAny = (kpis.totalSales > 0) || (kpis.totalExpenses > 0) || (kpis.salesTodayTotal > 0);
             setEmpty(!hasAny);
 
-            if (chartSalesExpensesSubtitle) {
-                chartSalesExpensesSubtitle.textContent = (String(dashRange?.value || '').trim() || 'Período actual');
+            if (chartEvolutionSubtitle) {
+                const p = (String(dashRange?.value || '').trim() || 'Período actual');
+                const freq = (kpis?.evolution?.kind === 'month') ? 'Mensual' : 'Diario';
+                chartEvolutionSubtitle.textContent = p + ' · ' + freq;
             }
 
             renderKPIs(kpis);
-            renderCharts(chartsData);
+            renderCharts({ evolution: kpis.evolution });
+
+            applyUpcomingFilter(range);
 
             lastSummary = {
                 period: String(dashRange?.value || '').trim() || '—',
                 timestamp: new Date().toISOString(),
-                kpis,
-                chartsData
+                kpis
             };
 
             return null;
+        }).catch(function () {
+            setEmpty(true);
         }).finally(function () {
             setSkeleton(false);
         });
@@ -722,87 +1355,178 @@ document.addEventListener('DOMContentLoaded', function() {
         return s;
     }
 
-    function exportCsv() {
-        const s = lastSummary || {};
-        const se = s?.chartsData?.salesExpenses || {};
-        const labels = Array.isArray(se.labels) ? se.labels : [];
-        const salesSeries = Array.isArray(se.salesSeries) ? se.salesSeries : [];
-        const expSeries = Array.isArray(se.expSeries) ? se.expSeries : [];
-        const marginSeries = Array.isArray(se.marginSeries) ? se.marginSeries : [];
-
-        if (!labels.length) return;
-
-        const header = ['Fecha', 'Ventas', 'Gastos', 'Margen'];
-        const lines = [header.map(escapeCsvCell).join(';')];
-        labels.forEach((d, idx) => {
-            lines.push([
-                String(d || ''),
-                String(salesSeries[idx] ?? 0),
-                String(expSeries[idx] ?? 0),
-                String(marginSeries[idx] ?? ((salesSeries[idx] || 0) - (expSeries[idx] || 0)))
-            ].map(escapeCsvCell).join(';'));
-        });
-        const blob = new Blob(["\ufeff" + lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
+    function downloadBlob(blob, filename) {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'dashboard_' + String(s.period || 'todo').replace(/\s+/g, '_').replace(/\//g, '-') + '.csv';
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         a.remove();
         window.setTimeout(function () { URL.revokeObjectURL(a.href); }, 500);
     }
 
+    function exportExcel() {
+        const s = lastSummary || {};
+        const k = s?.kpis || {};
+        const evo = k?.evolution || {};
+        const labels = Array.isArray(evo.labels) ? evo.labels : [];
+        const salesSeries = Array.isArray(evo.salesSeries) ? evo.salesSeries : [];
+        const expSeries = Array.isArray(evo.expensesSeries) ? evo.expensesSeries : [];
+        const resSeries = Array.isArray(evo.resultSeries) ? evo.resultSeries : [];
+
+        const businessLogoUrl = "{% if business and business.logo_filename %}{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}{% else %}{% endif %}";
+        const zentraLogoUrl = "{{ url_for('static', filename='images/zentra-consultora-horizontal.png.png') }}";
+        const period = String(s.period || '—');
+        const exportedAt = new Date().toLocaleString('es-AR');
+
+        const rowsEvolution = labels.map((d, idx) => {
+            return '<tr>'
+                + '<td>' + String(d || '') + '</td>'
+                + '<td style="text-align:right">' + String(salesSeries[idx] ?? 0) + '</td>'
+                + '<td style="text-align:right">' + String(expSeries[idx] ?? 0) + '</td>'
+                + '<td style="text-align:right">' + String(resSeries[idx] ?? 0) + '</td>'
+                + '</tr>';
+        }).join('');
+
+        const html = ''
+            + '<html><head><meta charset="utf-8" />'
+            + '<style>'
+            + 'body{font-family:Arial,Helvetica,sans-serif;color:#111}h1{font-size:18px;margin:0}h2{font-size:14px;margin:18px 0 8px 0}'
+            + 'table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #e5e7eb;padding:6px}th{background:#f9fafb;text-align:left}'
+            + '.num{text-align:right}'
+            + '</style></head><body>'
+            + '<table><tr>'
+            + '<td style="border:none;width:20%">'
+            + (businessLogoUrl ? '<img src="' + businessLogoUrl + '" style="height:38px;object-fit:contain" />' : '')
+            + '</td>'
+            + '<td style="border:none;text-align:center;width:60%">'
+            + '<div><b>Informe del período</b></div>'
+            + '<div>Período: ' + period + '</div>'
+            + '<div style="color:#666;font-size:11px">Exportado: ' + exportedAt + '</div>'
+            + '</td>'
+            + '<td style="border:none;text-align:right;width:20%">'
+            + '<img src="' + zentraLogoUrl + '" style="height:38px;object-fit:contain" />'
+            + '</td>'
+            + '</tr></table>'
+
+            + '<h2>Bloque 1 — Estado general del negocio</h2>'
+            + '<table>'
+            + '<tr><th>KPI</th><th class="num">Valor</th></tr>'
+            + '<tr><td>Ventas del período</td><td class="num">' + String(k.totalSales ?? 0) + '</td></tr>'
+            + '<tr><td>Gastos del período</td><td class="num">' + String(k.totalExpenses ?? 0) + '</td></tr>'
+            + '<tr><td>CMV estimado</td><td class="num">' + String(k.cmv ?? 0) + '</td></tr>'
+            + '<tr><td>Resultado estimado</td><td class="num">' + String(k.estimatedResult ?? 0) + '</td></tr>'
+            + '<tr><td>Caja (efectivo)</td><td class="num">' + String(k.cash ?? 0) + '</td></tr>'
+            + '<tr><td>Bancos</td><td class="num">' + String(k.banks ?? 0) + '</td></tr>'
+            + '<tr><td>Total disponible</td><td class="num">' + String(k.totalAvailable ?? 0) + '</td></tr>'
+            + '</table>'
+
+            + '<h2>Bloque 2 — Alertas y riesgos</h2>'
+            + '<table>'
+            + '<tr><th>Alerta</th><th class="num">Cantidad</th></tr>'
+            + '<tr><td>Stock bajo / crítico</td><td class="num">' + String(k.stockCriticalCount ?? 0) + '</td></tr>'
+            + '<tr><td>{{ label_customers }} deudores</td><td class="num">' + String(k.debtorsCount ?? 0) + '</td></tr>'
+            + '<tr><td>Gastos fuera de rango</td><td class="num">' + String(k.alertExpenses ?? 0) + '</td></tr>'
+            + '</table>'
+
+            + '<h2>Bloque 3 — Actividad comercial</h2>'
+            + '<table>'
+            + '<tr><th>KPI</th><th class="num">Valor</th></tr>'
+            + '<tr><td>Ventas hoy</td><td class="num">' + String(k.salesTodayTotal ?? 0) + '</td></tr>'
+            + '<tr><td>Cantidad de ventas hoy</td><td class="num">' + String(k.salesTodayCount ?? 0) + '</td></tr>'
+            + '<tr><td>Ticket promedio (período)</td><td class="num">' + String(k.avgTicket ?? 0) + '</td></tr>'
+            + '</table>'
+
+            + '<h2>Bloque 4 — Ventas, Gastos y Resultado – Evolución</h2>'
+            + '<table>'
+            + '<tr><th>Fecha</th><th class="num">Ventas</th><th class="num">Gastos</th><th class="num">Resultado</th></tr>'
+            + rowsEvolution
+            + '</table>'
+
+            + '<h2>Bloque 5 — Rankings simples</h2>'
+            + '<table>'
+            + '<tr><th>Ranking</th><th>Detalle</th></tr>'
+            + '<tr><td>Mejor {{ label_customers|lower }}</td><td>' + String(k.bestCustomerName || '—') + ' (' + String(k.bestCustomerAmount ?? 0) + ')</td></tr>'
+            + '<tr><td>{{ label_products }} más vendido</td><td>' + String(k.topProductName || '—') + ' (' + String(k.topProductQty ?? 0) + ')</td></tr>'
+            + '</table>'
+            + '</body></html>';
+
+        const blob = new Blob(["\ufeff" + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        const filename = 'Informe_del_periodo_' + period.replace(/\s+/g, '_').replace(/\//g, '-') + '.xls';
+        downloadBlob(blob, filename);
+    }
+
     function exportPdfPrint() {
         const s = lastSummary || {};
         const w = window.open('', '_blank');
         if (!w) return;
-        const logoUrl = "{{ url_for('static', filename='images/zentra-consultora-horizontal.png.png') }}";
+        const businessLogoUrl = "{% if business and business.logo_filename %}{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}{% else %}{% endif %}";
+        const zentraLogoUrl = "{{ url_for('static', filename='images/zentra-consultora-horizontal.png.png') }}";
         const exportedAt = new Date();
         const exportedAtLabel = exportedAt.toLocaleString('es-AR');
 
-        const se = s?.chartsData?.salesExpenses || {};
-        const labels = Array.isArray(se.labels) ? se.labels : [];
-        const salesSeries = Array.isArray(se.salesSeries) ? se.salesSeries : [];
-        const expSeries = Array.isArray(se.expSeries) ? se.expSeries : [];
-        const marginSeries = Array.isArray(se.marginSeries) ? se.marginSeries : [];
-
-        const totals = labels.reduce((acc, _d, idx) => {
-            acc.sales += (parseFloat(salesSeries[idx] || 0) || 0);
-            acc.exp += (parseFloat(expSeries[idx] || 0) || 0);
-            acc.margin += (parseFloat(marginSeries[idx] || ((salesSeries[idx] || 0) - (expSeries[idx] || 0))) || 0);
-            return acc;
-        }, { sales: 0, exp: 0, margin: 0 });
+        const k = s?.kpis || {};
+        const evo = k?.evolution || {};
+        const labels = Array.isArray(evo.labels) ? evo.labels : [];
+        const salesSeries = Array.isArray(evo.salesSeries) ? evo.salesSeries : [];
+        const expSeries = Array.isArray(evo.expensesSeries) ? evo.expensesSeries : [];
+        const resSeries = Array.isArray(evo.resultSeries) ? evo.resultSeries : [];
 
         const rowsHtml = labels.map((d, idx) => {
-            const vSales = parseFloat(salesSeries[idx] || 0) || 0;
-            const vExp = parseFloat(expSeries[idx] || 0) || 0;
-            const vMargin = parseFloat(marginSeries[idx] || (vSales - vExp)) || 0;
+            const vSales = safeNum(salesSeries[idx] || 0);
+            const vExp = safeNum(expSeries[idx] || 0);
+            const vRes = safeNum(resSeries[idx] || 0);
             return ''
                 + '<tr>'
                 +   '<td>' + String(d || '') + '</td>'
                 +   '<td class="num">' + formatearMoneda(vSales) + '</td>'
                 +   '<td class="num">' + formatearMoneda(vExp) + '</td>'
-                +   '<td class="num">' + formatearMoneda(vMargin) + '</td>'
+                +   '<td class="num">' + formatearMoneda(vRes) + '</td>'
                 + '</tr>';
         }).join('');
 
         const html = ''
             + '<!doctype html><html lang="es"><head><meta charset="utf-8" />'
-            + '<title>Exportar dashboard</title>'
+            + '<title>Informe del período</title>'
             + '<style>body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:#111}h1{font-size:18px;margin:0 0 6px 0}p{margin:0 0 14px 0;color:#555;font-size:12px}.muted{color:#666;font-size:11px}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}th,td{border:1px solid #e5e7eb;padding:8px;text-align:left}th{background:#f9fafb}td.num{text-align:right}tfoot td{font-weight:700}</style>'
             + '</head><body>'
             + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">'
-            + '  <div>'
-            + '    <h1>Informe de Dashboard</h1>'
+            + '  <div style="width:25%">'
+            + (businessLogoUrl ? '    <img src="' + businessLogoUrl + '" alt="Logo" style="height:38px;object-fit:contain" />' : '')
+            + '  </div>'
+            + '  <div style="flex:1;text-align:center">'
+            + '    <h1>Informe del período</h1>'
             + '    <p>Período: ' + String(s.period || '—') + '</p>'
             + '    <p class="muted">Exportado: ' + exportedAtLabel + '</p>'
             + '  </div>'
-            + '  <img src="' + logoUrl + '" alt="Zentral" style="height:38px;object-fit:contain" />'
+            + '  <div style="width:25%;text-align:right">'
+            + '    <img src="' + zentraLogoUrl + '" alt="Zentra" style="height:38px;object-fit:contain" />'
+            + '  </div>'
             + '</div>'
+
             + '<table>'
-            + '  <thead><tr><th>Fecha</th><th>Ventas</th><th>Gastos</th><th>Margen</th></tr></thead>'
+            + '  <thead><tr><th>Bloque 1 — Estado general</th><th class="num">Valor</th></tr></thead>'
+            + '  <tbody>'
+            + '    <tr><td>Ventas del período</td><td class="num">' + formatearMoneda(k.totalSales || 0) + '</td></tr>'
+            + '    <tr><td>Gastos del período</td><td class="num">' + formatearMoneda(k.totalExpenses || 0) + '</td></tr>'
+            + '    <tr><td>CMV estimado</td><td class="num">' + formatearMoneda(k.cmv || 0) + '</td></tr>'
+            + '    <tr><td>Resultado estimado</td><td class="num">' + formatearMoneda(k.estimatedResult || 0) + '</td></tr>'
+            + '    <tr><td>Caja disponible (total)</td><td class="num">' + formatearMoneda(k.totalAvailable || 0) + '</td></tr>'
+            + '  </tbody>'
+            + '</table>'
+
+            + '<table>'
+            + '  <thead><tr><th>Bloque 3 — Actividad comercial</th><th class="num">Valor</th></tr></thead>'
+            + '  <tbody>'
+            + '    <tr><td>Ventas hoy</td><td class="num">' + formatearMoneda(k.salesTodayTotal || 0) + '</td></tr>'
+            + '    <tr><td>Cantidad de ventas hoy</td><td class="num">' + String(k.salesTodayCount || 0) + '</td></tr>'
+            + '    <tr><td>Ticket promedio (período)</td><td class="num">' + formatearMoneda(k.avgTicket || 0) + '</td></tr>'
+            + '  </tbody>'
+            + '</table>'
+
+            + '<table>'
+            + '  <thead><tr><th>Bloque 4 — Evolución</th><th class="num">Ventas</th><th class="num">Gastos</th><th class="num">Resultado</th></tr></thead>'
             + '  <tbody>' + rowsHtml + '</tbody>'
-            + '  <tfoot><tr><td>Total</td><td class="num">' + formatearMoneda(totals.sales) + '</td><td class="num">' + formatearMoneda(totals.exp) + '</td><td class="num">' + formatearMoneda(totals.margin) + '</td></tr></tfoot>'
             + '</table>'
             + '<p class="muted" style="margin-top:14px">Informe generado por Zentral – Zentra Consultora</p>'
             + '<script>window.onload=function(){window.print();}<\/script>'
@@ -831,7 +1555,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (btnExport) btnExport.addEventListener('click', function () { openExport(); });
     if (btnCloseExport) btnCloseExport.addEventListener('click', function () { closeExport(); });
     if (btnCancelExport) btnCancelExport.addEventListener('click', function () { closeExport(); });
-    if (btnExportXls) btnExportXls.addEventListener('click', function () { exportCsv(); closeExport(); });
+    if (btnExportXls) btnExportXls.addEventListener('click', function () { exportExcel(); closeExport(); });
     if (btnExportPdf) btnExportPdf.addEventListener('click', function () { exportPdfPrint(); closeExport(); });
     if (modalExport) {
         modalExport.addEventListener('click', function (e) {
@@ -840,12 +1564,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (kpiWrap) {
-        kpiWrap.addEventListener('click', function (e) {
-            const card = e.target.closest('[data-href]');
+    if (dashboardRoot) {
+        dashboardRoot.addEventListener('click', function (e) {
+            const el = e.target;
+            if (!el || typeof el.closest !== 'function') return;
+            const card = el.closest('[data-href]');
             if (!card) return;
             const href = card.getAttribute('data-href');
             if (href) window.location.href = href;
+        });
+    }
+
+    if (btnEdit) btnEdit.addEventListener('click', function () { openEdit(); });
+    if (btnSave) btnSave.addEventListener('click', function () { exitEditMode(true); });
+    if (btnCancel) btnCancel.addEventListener('click', function () { exitEditMode(false); });
+    if (btnCloseEdit) btnCloseEdit.addEventListener('click', function () { exitEditMode(false); });
+    if (btnCancelEdit) btnCancelEdit.addEventListener('click', function () { exitEditMode(false); });
+    if (btnSaveEdit) btnSaveEdit.addEventListener('click', function () { exitEditMode(true); });
+    if (btnToggleManage) {
+        btnToggleManage.addEventListener('click', function () {
+            if (!isEditing || !draftLayout) return;
+            editManageMode = !editManageMode;
+            btnToggleManage.textContent = editManageMode ? 'Volver a mover KPIs' : 'Agregar/Eliminar KPIs';
+            renderEditModal();
+        });
+    }
+    if (modalEdit) {
+        modalEdit.addEventListener('click', function (e) {
+            const target = e.target;
+            if (target && target === modalEdit.firstElementChild) exitEditMode(false);
         });
     }
 
@@ -856,5 +1603,4 @@ document.addEventListener('DOMContentLoaded', function() {
     calcAndRender();
 });
 </script>
-{% endblock %}
 {% endblock %}
