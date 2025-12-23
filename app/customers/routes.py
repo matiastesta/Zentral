@@ -52,8 +52,7 @@ def _serialize_customer(row: Customer):
 @module_required('customers')
 def index():
     """Listado básico de clientes (dummy)."""
-    customers = []
-    return render_template("customers/list.html", title="Clientes", customers=customers)
+    return render_template("customers/list.html", title="Clientes")
 
 
 @bp.get('/api/customers')

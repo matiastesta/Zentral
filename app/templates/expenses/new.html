@@ -5,9 +5,9 @@
     <div class="flex items-start justify-between gap-3">
         <div>
             <h1 id="titulo-egreso" class="text-2xl font-bold text-gray-900">Nuevo gasto</h1>
-            <p class="mt-1 text-sm text-gray-600">Cargá un egreso con categoría, proveedor y forma de pago. Vista simulada.</p>
+            <p class="mt-1 text-sm text-gray-600">Cargá un egreso con categoría, proveedor y forma de pago.</p>
         </div>
-        <a href="{{ url_for('expenses.index') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+        <a id="link-volver-historial" href="{{ url_for('expenses.index') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
             <i class="fas fa-arrow-left mr-2"></i> Volver al historial
         </a>
     </div>
@@ -16,13 +16,12 @@
 <div class="bg-white rounded-lg shadow border border-gray-200">
     <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <div>
-            <h2 class="text-sm font-semibold text-gray-900">Datos del egreso</h2>
-            <p class="text-xs text-gray-500">Se guarda en el navegador (localStorage). No afecta la base de datos.</p>
+            <h2 class="text-sm font-semibold text-gray-900">Datos del gasto</h2>
+            <p class="text-xs text-gray-500">Completá los datos para registrar el gasto.</p>
         </div>
-        <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700">Simulado</span>
     </div>
 
-    <div class="p-4 space-y-4">
+    <div class="p-4 space-y-3">
         <input id="egreso-id" type="hidden" value="">
 
         <div class="grid grid-cols-1 lg:grid-cols-6 gap-3">
@@ -33,63 +32,104 @@
             <div class="lg:col-span-2">
                 <label class="block text-xs font-medium text-gray-600 mb-1">Categoría</label>
                 <select id="egreso-categoria" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                    <option value="Servicios públicos">💡 Servicios públicos</option>
-                    <option value="Gastos operativos">🧾 Gastos operativos</option>
-                    <option value="Arriendo">🏠 Arriendo</option>
-                    <option value="Nómina">🧑‍💼 Nómina</option>
-                    <option value="Transportes">🚚 Transportes</option>
-                    <option value="Mantenimiento y reparaciones">🛠️ Mantenimiento y reparaciones</option>
-                    <option value="Muebles, equipos o maquinarias">🪑 Muebles, equipos o maquinarias</option>
-                    <option value="Otro">🏷️ Otro</option>
+                    <option value="Servicios públicos">Servicios públicos</option>
+                    <option value="Gastos operativos">Gastos operativos</option>
+                    <option value="Arriendo">Arriendo</option>
+                    <option value="Nómina">Nómina</option>
+                    <option value="Transportes">Transportes</option>
+                    <option value="Mantenimiento y reparaciones">Mantenimiento y reparaciones</option>
+                    <option value="Muebles, equipos o maquinarias">Muebles, equipos o maquinarias</option>
+                    <option value="Otro">Otro</option>
                 </select>
-                <div class="mt-2 flex flex-col gap-2">
-                    <div class="text-[11px] text-gray-500">
-                        ℹ️ Las compras que ingresan a inventario deben registrarse desde el módulo de Inventario.
+                <p id="categoria-desc" class="mt-1 text-xs text-gray-500"></p>
+
+                <div id="wrap-egreso-categoria-otro" class="mt-2 hidden">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Especificar categoría</label>
+                    <input id="egreso-categoria-otro" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Publicidad">
+                    <div class="mt-2 flex items-center gap-2">
+                        <input id="egreso-categoria-guardar" type="checkbox" class="rounded">
+                        <label for="egreso-categoria-guardar" class="text-xs text-gray-600">Guardar para futuros usos</label>
                     </div>
-                    <a href="{{ url_for('inventory.index') }}" class="inline-flex items-center justify-center px-3 py-2 text-[11px] font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 w-full sm:w-max">
-                        <i class="fas fa-boxes mr-2 text-gray-500"></i> Ir a Inventario
-                    </a>
-                </div>
-            </div>
-            <div id="wrap-egreso-categoria-otro" class="lg:col-span-2 hidden">
-                <label class="block text-xs font-medium text-gray-600 mb-1">Especificar categoría</label>
-                <input id="egreso-categoria-otro" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Publicidad">
-                <div class="mt-2 flex items-center gap-2">
-                    <input id="egreso-categoria-guardar" type="checkbox" class="rounded">
-                    <label for="egreso-categoria-guardar" class="text-xs text-gray-600">Guardar para futuros usos</label>
                 </div>
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Valor ($)</label>
                 <input id="egreso-valor" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: 12000">
             </div>
+
+            <div id="wrap-egreso-proveedor" class="lg:col-span-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor</label>
+                <div class="relative" id="wrap-egreso-proveedor-autocomplete">
+                    <input id="egreso-proveedor-input" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="Buscar y seleccionar proveedor" autocomplete="off">
+                    <input id="egreso-proveedor-id" type="hidden" value="">
+                    <div id="egreso-proveedor-dd" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-auto max-h-56"></div>
+                </div>
+                <div class="mt-2 grid grid-cols-2 gap-2 w-full">
+                    <a id="link-crear-proveedor" href="{{ url_for('suppliers.new') }}" class="w-full text-center px-3 py-1.5 text-xs font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50">Crear proveedor</a>
+                    <button id="btn-seleccionar-proveedor" type="button" class="w-full px-3 py-1.5 text-xs font-medium rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">Seleccionar proveedor</button>
+                </div>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-6 gap-3">
-            <div class="lg:col-span-3">
+            <div class="lg:col-span-4">
                 <label class="block text-xs font-medium text-gray-600 mb-1">Nota</label>
                 <input id="egreso-nota" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Observación del egreso">
             </div>
-            <div>
+            <div class="lg:col-span-2">
                 <label class="block text-xs font-medium text-gray-600 mb-1">Forma de pago</label>
                 <select id="egreso-forma-pago" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                    <option value="Efectivo">💵 Efectivo</option>
-                    <option value="Transferencia">🏦 Transferencia</option>
-                    <option value="Débito">💳 Débito</option>
-                    <option value="Crédito">💳 Crédito</option>
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Débito">Débito</option>
+                    <option value="Crédito">Crédito</option>
+                    <option value="Cuenta corriente">Cuenta corriente</option>
                 </select>
             </div>
-            <div id="wrap-egreso-proveedor" class="lg:col-span-2">
-                <div class="flex items-center justify-between">
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor</label>
-                    <a id="link-crear-proveedor" href="{{ url_for('suppliers.new') }}" class="text-[11px] text-blue-600 hover:text-blue-800">Crear proveedor</a>
+        </div>
+
+        <div class="-mt-1">
+            <div class="border rounded-lg p-4 bg-gray-50">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-900">Pago al proveedor</div>
+                        <div class="mt-0.5 text-xs text-gray-500">Elegí si se paga hoy o queda pendiente como cuenta corriente.</div>
+                    </div>
                 </div>
-                <div class="relative" id="wrap-egreso-proveedor-autocomplete">
-                    <input id="egreso-proveedor-input" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="🚚 Buscar y seleccionar proveedor" autocomplete="off">
-                    <input id="egreso-proveedor-id" type="hidden" value="">
-                    <div id="egreso-proveedor-dd" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden"></div>
+                <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <label class="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 bg-white cursor-pointer hover:bg-gray-50">
+                        <input id="egreso-paymode-full" type="radio" name="egreso-paymode" value="full" class="rounded" checked>
+                        <div>
+                            <div class="text-sm font-medium text-gray-900">Pago completo</div>
+                            <div class="text-[11px] text-gray-500">Se registra y se paga al instante.</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 bg-white cursor-pointer hover:bg-gray-50">
+                        <input id="egreso-paymode-cc" type="radio" name="egreso-paymode" value="cc" class="rounded">
+                        <div>
+                            <div class="text-sm font-medium text-gray-900">Cuenta corriente</div>
+                            <div class="text-[11px] text-gray-500">Se registra la compra y se paga más adelante.</div>
+                        </div>
+                    </label>
                 </div>
-                <p class="mt-1 text-xs text-gray-500">Tip: escribí para buscar. Si no existe, crealo en su legajo y volvés con el proveedor seleccionado.</p>
+
+                <div id="panel-egreso-cc" class="hidden mt-3 grid grid-cols-1 md:grid-cols-6 gap-3">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Plazo de pago (días)</label>
+                        <input id="egreso-cc-days" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="30">
+                        <div class="mt-1 text-[11px] text-gray-500">Días hasta el primer vencimiento.</div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Cuotas</label>
+                        <input id="egreso-cc-installments" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="1">
+                        <div class="mt-1 text-[11px] text-gray-500">Cuotas mensuales a partir del primer vencimiento.</div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Resumen</label>
+                        <div id="egreso-cc-summary" class="w-full px-3 py-2 text-sm border rounded-md bg-white text-gray-700"></div>
+                        <div class="mt-1 text-[11px] text-gray-500">Estimación según fecha y valor.</div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -112,7 +152,7 @@
             <div class="lg:col-span-4">
                 <label class="block text-xs font-medium text-gray-600 mb-1">Adjuntar comprobante (opcional)</label>
                 <input id="egreso-comprobante" type="file" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                <p class="mt-1 text-xs text-gray-500">Se guardan solo metadatos en modo dummy.</p>
+                <p class="mt-1 text-xs text-gray-500">El archivo se guarda y queda disponible para descargar desde el historial.</p>
             </div>
         </div>
 
@@ -140,21 +180,19 @@
                 <div class="lg:col-span-3">
                     <div class="flex items-center justify-between">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Empleado</label>
-                        <button id="btn-crear-empleado" type="button" class="text-[11px] text-blue-600 hover:text-blue-800">Crear empleado</button>
+                        <a id="link-crear-empleado" href="{{ url_for('employees.new') }}" class="text-[11px] text-blue-600 hover:text-blue-800">Crear empleado</a>
                     </div>
                     <select id="egreso-empleado" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
                         <option value="">— Seleccionar —</option>
                     </select>
-                    <p class="mt-1 text-xs text-gray-500">Se guarda en el navegador (dummy).</p>
+                    <p class="mt-1 text-xs text-gray-500">Seleccioná un empleado para asociarlo al gasto.</p>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Período (desde)</label>
-                    <input id="egreso-periodo-desde" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Período (hasta)</label>
-                    <input id="egreso-periodo-hasta" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
+                <div class="lg:col-span-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Período (desde / hasta)</label>
+                    <input id="egreso-periodo-rango" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="dd/mm/aaaa a dd/mm/aaaa" autocomplete="off">
+                    <input id="egreso-periodo-desde" type="date" class="hidden" value="">
+                    <input id="egreso-periodo-hasta" type="date" class="hidden" value="">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Tipo de pago</label>
@@ -166,104 +204,58 @@
                     </select>
                 </div>
             </div>
+        </div>
 
-            <div id="wrap-egreso-empleado-nuevo" class="mt-3 hidden space-y-3 border rounded-lg p-4 bg-white">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h4 class="text-sm font-semibold text-gray-900">Alta de empleado</h4>
-                        <p class="text-xs text-gray-500">Separado por datos obligatorios y complementarios.</p>
-                    </div>
-                    <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700">Simulado</span>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
-                    <div class="md:col-span-2">
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
-                        <input id="empleado-nombre" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Apellido</label>
-                        <input id="empleado-apellido" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de incorporación</label>
-                        <input id="empleado-incorporo" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Forma de pago habitual</label>
-                        <select id="empleado-forma-pago" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                            <option>Efectivo</option>
-                            <option>Transferencia</option>
-                            <option>Débito</option>
-                            <option>Crédito</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Tipo de contratación</label>
-                        <select id="empleado-contrato" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                            <option>Fijo</option>
-                            <option>Eventual</option>
-                            <option>Freelance / por horas</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div>
-                    <button id="btn-toggle-empleado-comp" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">Datos complementarios</button>
-                </div>
-
-                <div id="empleado-comp" class="hidden border rounded-lg p-4 bg-gray-50 space-y-3">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de nacimiento</label>
-                            <input id="empleado-nacimiento" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Documento / ID</label>
-                            <input id="empleado-doc" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Teléfono</label>
-                            <input id="empleado-tel" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
-                            <input id="empleado-email" type="email" class="w-full px-3 py-2 text-sm border rounded-md">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Dirección</label>
-                            <input id="empleado-direccion" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Puesto / rol</label>
-                            <input id="empleado-rol" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Salario de referencia</label>
-                            <input id="empleado-salario" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Notas internas</label>
-                            <input id="empleado-notas" type="text" class="w-full px-3 py-2 text-sm border rounded-md">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex flex-col md:flex-row gap-2 justify-end">
-                    <button id="btn-cancelar-empleado" type="button" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50">Cancelar</button>
-                    <button id="btn-guardar-empleado" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">Guardar empleado</button>
-                </div>
+        <div class="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 flex items-start justify-between gap-3">
+            <div>
+                <div class="font-medium text-gray-700">Compras para inventario</div>
+                <div class="mt-0.5">Las compras que ingresan a inventario deben registrarse desde el módulo de Inventario.</div>
             </div>
+            <a href="{{ url_for('inventory.index') }}" class="inline-flex items-center px-3 py-2 text-xs font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50 whitespace-nowrap">
+                <i class="fas fa-boxes mr-2 text-gray-500"></i> Ir a Inventario
+            </a>
         </div>
 
         <div class="flex flex-col md:flex-row gap-2 justify-end">
-            <a href="{{ url_for('expenses.index') }}" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-center">Cancelar</a>
-            <button id="btn-guardar-egreso" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">Guardar egreso (dummy)</button>
+            <a id="link-cancelar-egreso" href="{{ url_for('expenses.index') }}" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-center">Cancelar</a>
+            <button id="btn-remito-egreso" type="button" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50">🧾 Remito</button>
+            <button id="btn-guardar-egreso" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Guardar gasto</button>
+        </div>
+    </div>
+</div>
+
+<div id="proveedor-modal" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-blue-950/60"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div id="proveedor-modal-panel" class="w-full max-w-2xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden" style="background-color: var(--brand-color, #0d1067);">
+            <div class="px-4 py-3 flex items-center justify-between text-white">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-search text-white/90"></i>
+                    <div class="font-semibold">Seleccionar proveedor</div>
+                </div>
+                <button id="proveedor-modal-close" type="button" class="px-2 py-1 rounded-md hover:bg-white/10" aria-label="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="px-4 pb-4">
+                <div class="bg-white/10 rounded-xl p-3">
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-3 flex items-center text-white/70">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <input id="proveedor-modal-search" type="text" class="w-full pl-10 pr-3 py-2 text-sm rounded-lg bg-white/95 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/60" placeholder="Buscar proveedor por nombre o categoría...">
+                    </div>
+                </div>
+
+                <div class="mt-3 rounded-xl bg-white overflow-hidden border border-white/20">
+                    <div id="proveedor-modal-list" class="max-h-[360px] overflow-auto divide-y divide-gray-100"></div>
+                </div>
+
+                <div class="mt-3 flex justify-end gap-2">
+                    <button id="proveedor-modal-cancel" type="button" class="px-4 py-2 text-sm font-medium rounded-md border border-white/20 text-white hover:bg-white/10">Cancelar</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -274,21 +266,39 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const titulo = document.getElementById('titulo-egreso');
+    const linkVolverHistorial = document.getElementById('link-volver-historial');
+    const linkCancelarEgreso = document.getElementById('link-cancelar-egreso');
 
     const inputId = document.getElementById('egreso-id');
     const inputFecha = document.getElementById('egreso-fecha');
     const selectCategoria = document.getElementById('egreso-categoria');
+    const categoriaDesc = document.getElementById('categoria-desc');
     const wrapOtro = document.getElementById('wrap-egreso-categoria-otro');
     const inputOtro = document.getElementById('egreso-categoria-otro');
     const checkGuardarCategoria = document.getElementById('egreso-categoria-guardar');
     const inputValor = document.getElementById('egreso-valor');
     const inputNota = document.getElementById('egreso-nota');
     const selectPago = document.getElementById('egreso-forma-pago');
+
+    const radioPayFull = document.getElementById('egreso-paymode-full');
+    const radioPayCc = document.getElementById('egreso-paymode-cc');
+    const panelCc = document.getElementById('panel-egreso-cc');
+    const inputCcDays = document.getElementById('egreso-cc-days');
+    const inputCcInstallments = document.getElementById('egreso-cc-installments');
+    const ccSummary = document.getElementById('egreso-cc-summary');
+
     const wrapProveedor = document.getElementById('wrap-egreso-proveedor');
     const linkCrearProveedor = document.getElementById('link-crear-proveedor');
+    const btnSeleccionarProveedor = document.getElementById('btn-seleccionar-proveedor');
     const inputProveedor = document.getElementById('egreso-proveedor-input');
     const inputProveedorId = document.getElementById('egreso-proveedor-id');
     const ddProveedor = document.getElementById('egreso-proveedor-dd');
+
+    const proveedorModal = document.getElementById('proveedor-modal');
+    const proveedorModalClose = document.getElementById('proveedor-modal-close');
+    const proveedorModalCancel = document.getElementById('proveedor-modal-cancel');
+    const proveedorModalSearch = document.getElementById('proveedor-modal-search');
+    const proveedorModalList = document.getElementById('proveedor-modal-list');
 
     const selectTipo = document.getElementById('egreso-tipo');
     const selectFrecuencia = document.getElementById('egreso-frecuencia');
@@ -300,45 +310,360 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const panelNomina = document.getElementById('panel-nomina');
     const selectEmpleado = document.getElementById('egreso-empleado');
-    const btnCrearEmpleado = document.getElementById('btn-crear-empleado');
-    const wrapEmpleadoNuevo = document.getElementById('wrap-egreso-empleado-nuevo');
-
+    const inputPeriodoRango = document.getElementById('egreso-periodo-rango');
     const inputPeriodoDesde = document.getElementById('egreso-periodo-desde');
     const inputPeriodoHasta = document.getElementById('egreso-periodo-hasta');
     const selectTipoPagoNomina = document.getElementById('egreso-tipo-pago');
 
-    const empleadoNombre = document.getElementById('empleado-nombre');
-    const empleadoApellido = document.getElementById('empleado-apellido');
-    const empleadoIncorporo = document.getElementById('empleado-incorporo');
-    const empleadoFormaPago = document.getElementById('empleado-forma-pago');
-    const empleadoContrato = document.getElementById('empleado-contrato');
-
-    const btnToggleEmpleadoComp = document.getElementById('btn-toggle-empleado-comp');
-    const panelEmpleadoComp = document.getElementById('empleado-comp');
-    const empleadoNacimiento = document.getElementById('empleado-nacimiento');
-    const empleadoDoc = document.getElementById('empleado-doc');
-    const empleadoTel = document.getElementById('empleado-tel');
-    const empleadoEmail = document.getElementById('empleado-email');
-    const empleadoDireccion = document.getElementById('empleado-direccion');
-    const empleadoRol = document.getElementById('empleado-rol');
-    const empleadoSalario = document.getElementById('empleado-salario');
-    const empleadoNotas = document.getElementById('empleado-notas');
-
-    const btnCancelarEmpleado = document.getElementById('btn-cancelar-empleado');
-    const btnGuardarEmpleado = document.getElementById('btn-guardar-empleado');
-
+    const linkCrearEmpleado = document.getElementById('link-crear-empleado');
+    const btnRemito = document.getElementById('btn-remito-egreso');
     const btnGuardar = document.getElementById('btn-guardar-egreso');
 
     const baseListUrl = "{{ url_for('expenses.index') }}";
     const suppliersNewUrl = "{{ url_for('suppliers.new') }}";
+    const employeesNewUrl = "{{ url_for('employees.new') }}";
 
     function parseNumeroSeguro(v) {
         const n = parseFloat(String(v || '').replace(',', '.'));
         return isNaN(n) ? 0 : n;
     }
 
+    function formatDateDDMMYYYY(d) {
+        try {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yy = String(d.getFullYear());
+            return dd + '/' + mm + '/' + yy;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function syncPeriodoRangoFromHidden() {
+        if (!inputPeriodoRango) return;
+        const d1 = String(inputPeriodoDesde?.value || '').trim();
+        const d2 = String(inputPeriodoHasta?.value || '').trim();
+        if (!d1 || !d2) {
+            inputPeriodoRango.value = '';
+            return;
+        }
+        try {
+            const a = dt_date_from_iso(d1);
+            const b = dt_date_from_iso(d2);
+            if (a && b) {
+                inputPeriodoRango.value = formatDateDDMMYYYY(a) + ' a ' + formatDateDDMMYYYY(b);
+            }
+        } catch (e) {
+        }
+    }
+
+    function dt_date_from_iso(s) {
+        const raw = String(s || '').trim();
+        if (!raw) return null;
+        try {
+            const parts = raw.split('-').map(x => parseInt(x, 10));
+            if (parts.length !== 3) return null;
+            return new Date(parts[0], parts[1] - 1, parts[2]);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function addDays(d, days) {
+        try {
+            const x = new Date(d.getTime());
+            x.setDate(x.getDate() + (parseInt(days || 0, 10) || 0));
+            return x;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function toIsoDate(d) {
+        try {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return y + '-' + m + '-' + dd;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function isCcMode() {
+        return !!(radioPayCc && radioPayCc.checked);
+    }
+
+    function syncCcSummary() {
+        if (!ccSummary) return;
+        const fecha = String(inputFecha?.value || '').trim();
+        const base = dt_date_from_iso(fecha);
+        const total = parseNumeroSeguro(inputValor?.value);
+        const days = Math.max(1, parseInt(inputCcDays?.value || 30, 10) || 30);
+        const inst = Math.max(1, parseInt(inputCcInstallments?.value || 1, 10) || 1);
+        const firstDue = base ? addDays(base, days) : null;
+        const per = inst > 0 ? (total / inst) : total;
+        const dueLabel = firstDue ? toIsoDate(firstDue) : '—';
+        ccSummary.textContent = '1° venc.: ' + dueLabel + ' · ' + inst + ' cuota(s) · aprox. $' + per.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function syncPayModeUi() {
+        const cc = isCcMode();
+        if (panelCc) panelCc.classList.toggle('hidden', !cc);
+        if (selectPago) {
+            if (cc) {
+                selectPago.value = 'Cuenta corriente';
+                selectPago.setAttribute('disabled', 'disabled');
+            } else {
+                selectPago.removeAttribute('disabled');
+                if (selectPago.value === 'Cuenta corriente') selectPago.value = 'Efectivo';
+            }
+        }
+        syncCcSummary();
+    }
+
+    let proveedoresCache = null;
+    function loadProveedoresCache() {
+        if (Array.isArray(proveedoresCache)) return Promise.resolve(proveedoresCache);
+        const res = leerProveedores();
+        if (isPromise(res)) {
+            return res.then(function (list) {
+                proveedoresCache = Array.isArray(list) ? list : [];
+                return proveedoresCache;
+            }).catch(function () {
+                proveedoresCache = [];
+                return proveedoresCache;
+            });
+        }
+        proveedoresCache = Array.isArray(res) ? res : [];
+        return Promise.resolve(proveedoresCache);
+    }
+
+    function openProveedorModal() {
+        if (!proveedorModal) return;
+        hideProveedorDd();
+        try {
+            const nav = document.querySelector('nav[data-brand-color]');
+            const brand = nav ? String(nav.getAttribute('data-brand-color') || '').trim() : '';
+            if (brand) {
+                const panel = document.getElementById('proveedor-modal-panel');
+                if (panel) panel.style.setProperty('--brand-color', brand);
+            }
+        } catch (e) {
+        }
+        proveedorModal.classList.remove('hidden');
+        if (proveedorModalSearch) proveedorModalSearch.value = '';
+        loadProveedoresCache().then(function () {
+            renderProveedorModalList('');
+            if (proveedorModalSearch) proveedorModalSearch.focus();
+        });
+    }
+
+    function closeProveedorModal() {
+        if (!proveedorModal) return;
+        proveedorModal.classList.add('hidden');
+    }
+
+    function normalizeSupplierCats(s) {
+        const cats = s && Array.isArray(s.categories) ? s.categories : [];
+        return cats.map(x => String(x || '').trim()).filter(Boolean);
+    }
+
+    function isInventorySupplier(s) {
+        const cats = normalizeSupplierCats(s).map(x => x.toLowerCase());
+        return cats.includes('inventario');
+    }
+
+    function getSelectedCategoriaForSupplierFilter() {
+        const c = String(selectCategoria?.value || '').trim();
+        if (!c) return '';
+        if (c === 'Nómina') return '';
+        if (c === 'Otro') {
+            const o = String(inputOtro?.value || '').trim();
+            return o || '';
+        }
+        return c;
+    }
+
+    function supplierMatchesSelectedCategory(s) {
+        const cat = getSelectedCategoriaForSupplierFilter();
+        if (!cat) return true;
+        const cats = normalizeSupplierCats(s).map(x => x.toLowerCase());
+        return cats.includes(String(cat).toLowerCase());
+    }
+
+    function validateSelectedSupplierAgainstCategory() {
+        const sid = String(inputProveedorId?.value || '').trim();
+        if (!sid) return;
+        const cat = getSelectedCategoriaForSupplierFilter();
+        if (!cat) return;
+
+        loadProveedoresCache().then(function (list) {
+            const found = (Array.isArray(list) ? list : []).find(x => String(x?.id || '').trim() === sid);
+            if (!found) return;
+            if (supplierMatchesSelectedCategory(found)) return;
+
+            setProveedorSeleccionado('', '');
+            try { hideProveedorDd(); } catch (e) {}
+            try { closeProveedorModal(); } catch (e) {}
+            if (window.showAlertModal) {
+                window.showAlertModal(
+                    'El proveedor seleccionado no pertenece a la categoría “' + cat + '”. Seleccioná un proveedor dentro de esa categoría.',
+                    'Atención',
+                    'Proveedor incompatible'
+                );
+            }
+        });
+    }
+
+    function renderProveedorModalList(q) {
+        if (!proveedorModalList) return;
+        const query = String(q || '').trim().toLowerCase();
+        const list = Array.isArray(proveedoresCache) ? proveedoresCache : [];
+        const cat = getSelectedCategoriaForSupplierFilter();
+        const filtered = list
+            .filter(s => (s?.status || 'Active') !== 'Discontinued')
+            .filter(s => !isInventorySupplier(s))
+            .filter(supplierMatchesSelectedCategory)
+            .filter(s => {
+                if (!query) return true;
+                const name = String(s?.name || '').toLowerCase();
+                const cats = normalizeSupplierCats(s).join(' ').toLowerCase();
+                return name.includes(query) || cats.includes(query);
+            })
+            .slice(0, 300);
+
+        proveedorModalList.innerHTML = '';
+
+        const head = document.createElement('div');
+        head.className = 'sticky top-0 z-10 bg-gray-50 px-4 py-2 text-[11px] font-semibold text-gray-500 uppercase grid grid-cols-2 gap-3';
+        head.innerHTML = '<div>Proveedor</div><div>Categorías</div>';
+        proveedorModalList.appendChild(head);
+
+        if (!filtered.length) {
+            const empty = document.createElement('div');
+            empty.className = 'px-4 py-6 text-sm text-center text-gray-500';
+            empty.textContent = cat ? ('No hay proveedores en la categoría “' + cat + '”.') : 'Sin resultados.';
+            proveedorModalList.appendChild(empty);
+            return;
+        }
+
+        filtered.forEach(function (s) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'w-full text-left px-4 py-3 hover:bg-gray-50 grid grid-cols-2 gap-3';
+            const cats = normalizeSupplierCats(s);
+            const catsLabel = cats.length ? cats.join(' · ') : '—';
+            btn.innerHTML = ''
+                + '<div class="text-[11px] leading-4 font-semibold text-gray-900">' + String(s?.name || 'Proveedor') + '</div>'
+                + '<div class="text-[9px] leading-4 text-gray-600">' + catsLabel + '</div>';
+            btn.addEventListener('click', function () {
+                setProveedorSeleccionado(s?.id || '', s?.name || '');
+                closeProveedorModal();
+                markDirty();
+            });
+            proveedorModalList.appendChild(btn);
+        });
+    }
+
     function isPromise(x) {
         return !!x && typeof x.then === 'function';
+    }
+
+    let isDirty = false;
+    function markDirty() {
+        isDirty = true;
+    }
+
+    function confirmLeave(nextHref) {
+        const go = function () {
+            isDirty = false;
+            if (nextHref) window.location.href = nextHref;
+        };
+        const msg = isDirty
+            ? 'Tenés cambios sin guardar. ¿Querés volver al historial igualmente?'
+            : '¿Querés volver al historial?';
+        if (window.confirmModal) {
+            window.confirmModal(
+                msg,
+                'Volver al historial',
+                'Confirmación requerida',
+                { okText: 'Volver', cancelText: 'Cancelar' }
+            ).then(function (ok) {
+                if (!ok) return;
+                go();
+            });
+            return;
+        }
+
+        const ok = confirm(msg);
+        if (!ok) return;
+        go();
+    }
+
+    function setCategoriaDescripcion() {
+        if (!categoriaDesc) return;
+        const c = String(selectCategoria?.value || '').trim();
+        const map = {
+            'Servicios públicos': 'Luz, agua, gas, internet, impuestos y servicios esenciales.',
+            'Gastos operativos': 'Insumos, compras menores y gastos del día a día del negocio.',
+            'Arriendo': 'Alquiler del local, depósito u otros espacios de trabajo.',
+            'Nómina': 'Pagos de sueldos, adelantos, bonos y horas extra del personal.',
+            'Transportes': 'Fletes, envíos, movilidad y traslados relacionados al negocio.',
+            'Mantenimiento y reparaciones': 'Arreglos, mantenimiento de equipos/instalaciones y repuestos.',
+            'Muebles, equipos o maquinarias': 'Compra de equipamiento, maquinaria, herramientas o muebles.',
+            'Otro': 'Categoría personalizada para gastos no contemplados.'
+        };
+        categoriaDesc.textContent = map[c] || '';
+    }
+
+    async function apiJson(url, options) {
+        const res = await fetch(url, {
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            ...(options || {})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || (data && data.ok === false)) {
+            const msg = (data && (data.message || data.error)) ? (data.message || data.error) : ('HTTP ' + res.status);
+            throw new Error(msg);
+        }
+        return data;
+    }
+
+    function triggerDownload(url) {
+        const href = String(url || '').trim();
+        if (!href) return;
+        const a = document.createElement('a');
+        a.href = href;
+        a.rel = 'noopener';
+        a.target = '_self';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }
+
+    async function uploadExpenseAttachment(expenseId, fileInput) {
+        const eid = String(expenseId || '').trim();
+        if (!eid) return null;
+        if (!fileInput || !fileInput.files || !fileInput.files.length) return null;
+
+        const fd = new FormData();
+        fd.append('file', fileInput.files[0]);
+
+        const res = await fetch('/expenses/api/expenses/' + encodeURIComponent(eid) + '/attachments', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: fd
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || (data && data.ok === false)) {
+            const msg = (data && (data.message || data.error)) ? (data.message || data.error) : ('HTTP ' + res.status);
+            throw new Error(msg);
+        }
+        return data;
     }
 
     const cashflowChannel = (function () {
@@ -353,11 +678,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const payload = { ...(evt || {}), __ts: Date.now() };
         try {
             if (cashflowChannel) cashflowChannel.postMessage(payload);
-        } catch (e) {
-        }
-        try {
-            window.localStorage.setItem('zentral_cashflow_ping', JSON.stringify(payload));
-            window.localStorage.removeItem('zentral_cashflow_ping');
         } catch (e) {
         }
     }
@@ -429,7 +749,14 @@ document.addEventListener('DOMContentLoaded', function () {
             if (window.StorageService && typeof window.StorageService.getAdapter === 'function') {
                 const a = window.StorageService.getAdapter();
                 if (a && typeof a.saveExpenseCategories === 'function') {
-                    return a.saveExpenseCategories(Array.isArray(arr) ? arr : []);
+                    const payload = (Array.isArray(arr) ? arr : []).map(function (x) {
+                        if (x && typeof x === 'object') return x;
+                        const name = String(x || '').trim();
+                        if (!name) return null;
+                        const id = ('cat_' + name.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_\-]/g, '').slice(0, 48));
+                        return { id, name };
+                    }).filter(Boolean);
+                    return a.saveExpenseCategories(payload);
                 }
             }
         } catch (e) {
@@ -469,11 +796,44 @@ document.addEventListener('DOMContentLoaded', function () {
         ddProveedor.innerHTML = '';
     }
 
+    function openProveedorDdWithList(list) {
+        if (!ddProveedor) return;
+        const items = (Array.isArray(list) ? list : [])
+            .filter(s => (s?.status || 'Active') !== 'Discontinued')
+            .filter(s => !isInventorySupplier(s))
+            .filter(supplierMatchesSelectedCategory)
+            .slice(0, 12);
+        ddProveedor.innerHTML = '';
+        items.forEach(s => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'w-full text-left px-3 py-2 text-sm hover:bg-gray-50';
+            btn.textContent = String(s?.name || 'Proveedor');
+            btn.addEventListener('click', function () {
+                setProveedorSeleccionado(s?.id || '', s?.name || '');
+                hideProveedorDd();
+                markDirty();
+            });
+            ddProveedor.appendChild(btn);
+        });
+
+        if (!items.length) {
+            const empty = document.createElement('div');
+            empty.className = 'px-3 py-2 text-xs text-gray-500';
+            empty.textContent = 'No hay proveedores cargados.';
+            ddProveedor.appendChild(empty);
+        }
+        ddProveedor.classList.remove('hidden');
+    }
+
     function showProveedorDd(items, query) {
         if (!ddProveedor) return;
         ddProveedor.innerHTML = '';
         const q = String(query || '').trim();
-        items.forEach(s => {
+        items
+            .filter(s => !isInventorySupplier(s))
+            .filter(supplierMatchesSelectedCategory)
+            .forEach(s => {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'w-full text-left px-3 py-2 text-sm hover:bg-gray-50';
@@ -525,6 +885,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const apply = function (suppliers) {
             const items = (Array.isArray(suppliers) ? suppliers : [])
                 .filter(s => (s?.status || 'Active') !== 'Discontinued')
+                .filter(supplierMatchesSelectedCategory)
                 .filter(s => String(s?.name || '').toLowerCase().includes(q))
                 .slice(0, 10);
             showProveedorDd(items, q);
@@ -583,28 +944,16 @@ document.addEventListener('DOMContentLoaded', function () {
             const current = (selectCategoria.value || '').trim();
             const all = base.slice();
             (Array.isArray(custom) ? custom : []).forEach(c => {
-                const name = String(c || '').trim();
+                const name = (c && typeof c === 'object') ? String(c.name || '').trim() : String(c || '').trim();
                 if (!name) return;
                 if (all.includes(name)) return;
                 all.splice(all.length - 1, 0, name);
             });
 
-            const icon = {
-                'Servicios públicos': '💡',
-                'Gastos operativos': '🧾',
-                'Arriendo': '🏠',
-                'Nómina': '🧑‍💼',
-                'Transportes': '🚚',
-                'Mantenimiento y reparaciones': '🛠️',
-                'Muebles, equipos o maquinarias': '🪑',
-                'Otro': '🏷️'
-            };
-
             selectCategoria.innerHTML = '';
             all.forEach(c => {
                 const opt = document.createElement('option');
-                const ico = icon[c] || '';
-                opt.textContent = ico ? (ico + ' ' + c) : c;
+                opt.textContent = c;
                 opt.value = c;
                 selectCategoria.appendChild(opt);
             });
@@ -662,117 +1011,191 @@ document.addEventListener('DOMContentLoaded', function () {
         if (panelCampos) panelCampos.classList.toggle('hidden', !esOtro);
     }
 
+    if (inputPeriodoRango && window.flatpickr) {
+        inputPeriodoRango.setAttribute('readonly', 'readonly');
+        flatpickr(inputPeriodoRango, {
+            mode: 'range',
+            dateFormat: 'd/m/Y',
+            locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es',
+            allowInput: false,
+            onChange: function (selectedDates) {
+                if (!Array.isArray(selectedDates) || selectedDates.length !== 2) return;
+                const a = selectedDates[0];
+                const b = selectedDates[1];
+                const isoA = a ? (a.getFullYear() + '-' + String(a.getMonth() + 1).padStart(2, '0') + '-' + String(a.getDate()).padStart(2, '0')) : '';
+                const isoB = b ? (b.getFullYear() + '-' + String(b.getMonth() + 1).padStart(2, '0') + '-' + String(b.getDate()).padStart(2, '0')) : '';
+                if (inputPeriodoDesde) inputPeriodoDesde.value = isoA;
+                if (inputPeriodoHasta) inputPeriodoHasta.value = isoB;
+                markDirty();
+            }
+        });
+    }
+
     function cargarDesdeId(id) {
-        const res = leerEgresos();
-        const apply = function (egresos) {
-            const list = Array.isArray(egresos) ? egresos : [];
-            const found = list.find(x => String(x?.id) === String(id));
-            if (!found) return;
+        const eid = String(id || '').trim();
+        if (!eid) return;
+        apiJson('/expenses/api/expenses/' + encodeURIComponent(eid))
+            .then(function (data) {
+                const found = data && data.item ? data.item : null;
+                if (!found) return;
 
-            const categoriaRaw = (found.categoria === 'Compra de productos e insumos') ? 'Gastos operativos' : found.categoria;
+                const categoriaRaw = (found.categoria === 'Compra de productos e insumos') ? 'Gastos operativos' : found.categoria;
 
-            if (titulo) titulo.textContent = 'Editar gasto';
-            if (inputId) inputId.value = String(found.id);
-            if (inputFecha) inputFecha.value = found.fecha || '';
+                if (titulo) titulo.textContent = 'Editar gasto';
+                if (inputId) inputId.value = String(found.id || '');
+                if (inputFecha) inputFecha.value = found.fecha || '';
 
-            if (selectCategoria) {
-            const categoriasBase = [
-                'Servicios públicos','Gastos operativos','Arriendo','Nómina','Transportes','Mantenimiento y reparaciones','Muebles, equipos o maquinarias','Otro'
-            ];
-            const esOtro = !categoriasBase.includes(categoriaRaw);
-            if (esOtro) {
-                selectCategoria.value = 'Otro';
-                if (wrapOtro) wrapOtro.classList.remove('hidden');
-                if (inputOtro) inputOtro.value = categoriaRaw;
-            } else {
-                selectCategoria.value = categoriaRaw;
-            }
-        }
+                if (selectCategoria) {
+                    const categoriasBase = [
+                        'Servicios públicos','Gastos operativos','Arriendo','Nómina','Transportes','Mantenimiento y reparaciones','Muebles, equipos o maquinarias','Otro'
+                    ];
+                    const esOtro = !categoriasBase.includes(categoriaRaw);
+                    if (esOtro) {
+                        selectCategoria.value = 'Otro';
+                        if (wrapOtro) wrapOtro.classList.remove('hidden');
+                        if (inputOtro) inputOtro.value = categoriaRaw;
+                    } else {
+                        selectCategoria.value = categoriaRaw;
+                    }
+                }
 
-            aplicarVisibilidadPorCategoria();
-            poblarEmpleados();
+                aplicarVisibilidadPorCategoria();
+                poblarEmpleados();
 
-            if (inputValor) inputValor.value = String(parseNumeroSeguro(found.valor));
-            if (inputNota) inputNota.value = found.nota || '';
-            if (selectPago) selectPago.value = found.forma_pago || 'Efectivo';
-            if (selectTipo) selectTipo.value = found.tipo_gasto || 'Variable';
-            if (selectFrecuencia) selectFrecuencia.value = found.frecuencia || 'Único';
-            if (found.supplier_id) {
-                setProveedorSeleccionado(String(found.supplier_id), found.supplier_name || found.proveedor || '');
-            }
-            if (selectEmpleado) selectEmpleado.value = found.employee_id || '';
-            if (inputPeriodoDesde) inputPeriodoDesde.value = found.payroll_period_from || '';
-            if (inputPeriodoHasta) inputPeriodoHasta.value = found.payroll_period_to || '';
-            if (selectTipoPagoNomina) selectTipoPagoNomina.value = found.payroll_payment_type || 'Sueldo';
+                if (inputValor) inputValor.value = String(parseNumeroSeguro(found.valor));
+                if (inputNota) inputNota.value = found.nota || '';
+                if (selectPago) selectPago.value = found.forma_pago || 'Efectivo';
 
-            if (panelCampos && camposWrap) {
-                camposWrap.innerHTML = '';
-                const cf = Array.isArray(found.custom_fields) ? found.custom_fields : [];
-                cf.forEach(x => {
-                    camposWrap.appendChild(crearCampoRow(x?.key || '', x?.value || ''));
-                });
-            }
-        };
-        if (isPromise(res)) res.then(apply);
-        else apply(res);
+                const cc = !!(found?.meta && found.meta.supplier_cc && found.meta.supplier_cc.enabled);
+                if (radioPayFull && radioPayCc) {
+                    radioPayCc.checked = cc;
+                    radioPayFull.checked = !cc;
+                }
+                if (inputCcDays) inputCcDays.value = String(parseInt(found?.meta?.supplier_cc?.terms_days || 30, 10) || 30);
+                if (inputCcInstallments) inputCcInstallments.value = String(parseInt(found?.meta?.supplier_cc?.installments || 1, 10) || 1);
+                syncPayModeUi();
+
+                if (selectTipo) selectTipo.value = found.type || found.expense_type || 'Variable';
+                if (selectFrecuencia) selectFrecuencia.value = found.frequency || 'Único';
+                if (found.supplier_id) {
+                    setProveedorSeleccionado(String(found.supplier_id), found.supplier_name || found.proveedor || '');
+                }
+                if (selectEmpleado) selectEmpleado.value = found.employee_id || '';
+                if (inputPeriodoDesde) inputPeriodoDesde.value = found.period_from || '';
+                if (inputPeriodoHasta) inputPeriodoHasta.value = found.period_to || '';
+                syncPeriodoRangoFromHidden();
+                if (selectTipoPagoNomina) selectTipoPagoNomina.value = (found?.meta?.payroll_payment_type || found.payroll_payment_type || 'Sueldo');
+
+                if (panelCampos && camposWrap) {
+                    camposWrap.innerHTML = '';
+                    const cf = Array.isArray(found.custom_fields) ? found.custom_fields : [];
+                    cf.forEach(x => {
+                        camposWrap.appendChild(crearCampoRow(x?.key || '', x?.value || ''));
+                    });
+                }
+
+                isDirty = false;
+            })
+            .catch(function () {
+            });
     }
 
     function cargarParaDuplicar(id) {
-        const res = leerEgresos();
-        const apply = function (egresos) {
-            const list = Array.isArray(egresos) ? egresos : [];
-            const found = list.find(x => String(x?.id) === String(id));
-            if (!found) return;
+        const eid = String(id || '').trim();
+        if (!eid) return;
+        apiJson('/expenses/api/expenses/' + encodeURIComponent(eid))
+            .then(function (data) {
+                const found = data && data.item ? data.item : null;
+                if (!found) return;
 
-        const categoriaRaw = (found.categoria === 'Compra de productos e insumos') ? 'Gastos operativos' : found.categoria;
+                const categoriaRaw = (found.categoria === 'Compra de productos e insumos') ? 'Gastos operativos' : found.categoria;
 
-            if (titulo) titulo.textContent = 'Nuevo gasto (duplicado)';
-            if (inputId) inputId.value = '';
-            if (inputFecha) inputFecha.value = '{{ today }}';
+                if (titulo) titulo.textContent = 'Nuevo gasto (duplicado)';
+                if (inputId) inputId.value = '';
+                if (inputFecha) inputFecha.value = '{{ today }}';
 
-        if (selectCategoria) {
-            const categoriasBase = [
-                'Servicios públicos','Gastos operativos','Arriendo','Nómina','Transportes','Mantenimiento y reparaciones','Muebles, equipos o maquinarias','Otro'
-            ];
-            const esOtro = !categoriasBase.includes(categoriaRaw);
-            if (esOtro) {
-                selectCategoria.value = 'Otro';
-                if (wrapOtro) wrapOtro.classList.remove('hidden');
-                if (inputOtro) inputOtro.value = categoriaRaw;
-            } else {
-                selectCategoria.value = categoriaRaw;
-            }
-        }
+                if (selectCategoria) {
+                    const categoriasBase = [
+                        'Servicios públicos','Gastos operativos','Arriendo','Nómina','Transportes','Mantenimiento y reparaciones','Muebles, equipos o maquinarias','Otro'
+                    ];
+                    const esOtro = !categoriasBase.includes(categoriaRaw);
+                    if (esOtro) {
+                        selectCategoria.value = 'Otro';
+                        if (wrapOtro) wrapOtro.classList.remove('hidden');
+                        if (inputOtro) inputOtro.value = categoriaRaw;
+                    } else {
+                        selectCategoria.value = categoriaRaw;
+                    }
+                }
 
-        aplicarVisibilidadPorCategoria();
+                aplicarVisibilidadPorCategoria();
 
-        if (selectPago) selectPago.value = found.forma_pago || 'Efectivo';
-        if (selectTipo) selectTipo.value = found.tipo_gasto || 'Variable';
-        if (selectFrecuencia) selectFrecuencia.value = found.frecuencia || 'Único';
+                if (selectPago) selectPago.value = found.forma_pago || 'Efectivo';
 
-            if (found.supplier_id) {
-                setProveedorSeleccionado(String(found.supplier_id), found.supplier_name || found.proveedor || '');
-            }
-        };
-        if (isPromise(res)) res.then(apply);
-        else apply(res);
+                const cc = !!(found?.meta && found.meta.supplier_cc && found.meta.supplier_cc.enabled);
+                if (radioPayFull && radioPayCc) {
+                    radioPayCc.checked = cc;
+                    radioPayFull.checked = !cc;
+                }
+                if (inputCcDays) inputCcDays.value = String(parseInt(found?.meta?.supplier_cc?.terms_days || 30, 10) || 30);
+                if (inputCcInstallments) inputCcInstallments.value = String(parseInt(found?.meta?.supplier_cc?.installments || 1, 10) || 1);
+                syncPayModeUi();
+
+                if (selectTipo) selectTipo.value = found.type || found.expense_type || 'Variable';
+                if (selectFrecuencia) selectFrecuencia.value = found.frequency || 'Único';
+
+                if (found.supplier_id) {
+                    setProveedorSeleccionado(String(found.supplier_id), found.supplier_name || found.proveedor || '');
+                }
+
+                if (selectEmpleado) selectEmpleado.value = found.employee_id || '';
+                if (inputPeriodoDesde) inputPeriodoDesde.value = found.period_from || '';
+                if (inputPeriodoHasta) inputPeriodoHasta.value = found.period_to || '';
+                syncPeriodoRangoFromHidden();
+                if (selectTipoPagoNomina) selectTipoPagoNomina.value = (found?.meta?.payroll_payment_type || found.payroll_payment_type || 'Sueldo');
+
+                isDirty = false;
+            })
+            .catch(function () {
+            });
     }
 
-    function guardarDesdeForm() {
-        const id = (inputId?.value || '').trim() || String(Date.now());
+    function guardarDesdeForm(opts) {
+        const o = (opts && typeof opts === 'object') ? opts : {};
+        const redirectAfter = (o.redirect !== false);
+        const downloadRemito = (o.downloadRemito === true);
+
+        const id = (inputId?.value || '').trim() || '';
         const fecha = (inputFecha?.value || '').trim();
         const categoria = (selectCategoria?.value || '').trim();
         const categoriaOtro = (inputOtro?.value || '').trim();
         const categoriaFinal = categoria === 'Otro' ? (categoriaOtro || 'Otro') : categoria;
         const valor = parseNumeroSeguro(inputValor?.value);
         const nota = (inputNota?.value || '').trim();
-        const formaPago = (selectPago?.value || '').trim();
+        const payMode = isCcMode() ? 'cc' : 'full';
+        const formaPago = (payMode === 'cc') ? 'Cuenta corriente' : ((selectPago?.value || '').trim());
 
         const tipoGasto = (selectTipo?.value || 'Variable').trim();
         const frecuencia = (selectFrecuencia?.value || 'Único').trim();
         const customFields = leerCamposPersonalizadosDesdeUI();
 
         const supplierId = (inputProveedorId?.value || '').trim();
+
+        const ccDays = Math.max(1, parseInt(inputCcDays?.value || 30, 10) || 30);
+        const ccInst = Math.max(1, parseInt(inputCcInstallments?.value || 1, 10) || 1);
+
+        if (payMode === 'cc') {
+            if (!supplierId) {
+                if (window.showAlertModal) window.showAlertModal('Seleccioná un proveedor para usar cuenta corriente.', 'Atención', 'Validación requerida');
+                else alert('Seleccioná un proveedor para usar cuenta corriente.');
+                return;
+            }
+            if (!(valor > 0)) {
+                if (window.showAlertModal) window.showAlertModal('Ingresá un valor mayor a 0 para registrar cuenta corriente.', 'Atención', 'Validación requerida');
+                else alert('Ingresá un valor mayor a 0 para registrar cuenta corriente.');
+                return;
+            }
+        }
 
         let employeeId = '';
         let employeeName = '';
@@ -797,11 +1220,13 @@ document.addEventListener('DOMContentLoaded', function () {
             payrollPaymentType = (selectTipoPagoNomina?.value || 'Sueldo').trim();
 
             if (!employeeId) {
-                alert('Seleccioná un empleado para registrar Nómina.');
+                if (window.showAlertModal) window.showAlertModal('Seleccioná un empleado para registrar Nómina.', 'Atención', 'Validación requerida');
+                else alert('Seleccioná un empleado para registrar Nómina.');
                 return;
             }
             if (!payrollPeriodFrom || !payrollPeriodTo) {
-                alert('Completá el período de pago (desde / hasta).');
+                if (window.showAlertModal) window.showAlertModal('Completá el período de pago (desde / hasta).', 'Atención', 'Validación requerida');
+                else alert('Completá el período de pago (desde / hasta).');
                 return;
             }
         }
@@ -814,9 +1239,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     const currentRes = leerCategoriasPersonalizadas();
                     const apply = function (current) {
                         const arr = Array.isArray(current) ? current : [];
-                        const exists = arr.some(x => String(x || '').trim().toLowerCase() === name.toLowerCase());
+                        const exists = arr.some(x => {
+                            const n = (x && typeof x === 'object') ? String(x.name || '').trim() : String(x || '').trim();
+                            return n.toLowerCase() === name.toLowerCase();
+                        });
                         if (!exists) {
-                            arr.push(name);
+                            const id = ('cat_' + name.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_\-]/g, '').slice(0, 48));
+                            arr.push({ id, name });
                             const saveRes = guardarCategoriasPersonalizadas(arr);
                             if (isPromise(saveRes)) saveRes.then(function () { poblarCategorias(); });
                             else poblarCategorias();
@@ -828,8 +1257,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        const receipt = leerAttachmentsMeta(inputComprobante);
-
         const basePayload = {
             id,
             fecha,
@@ -837,18 +1264,24 @@ document.addEventListener('DOMContentLoaded', function () {
             valor,
             nota,
             forma_pago: formaPago,
-            tipo_gasto: tipoGasto,
-            frecuencia,
-            comprobante: receipt,
+            type: tipoGasto,
+            frequency: frecuencia,
             custom_fields: customFields,
             proveedor: '',
             supplier_id: supplierId || '',
             supplier_name: '',
             employee_id: employeeId,
             employee_name: employeeName,
-            payroll_period_from: payrollPeriodFrom,
-            payroll_period_to: payrollPeriodTo,
-            payroll_payment_type: payrollPaymentType
+            period_from: payrollPeriodFrom,
+            period_to: payrollPeriodTo,
+            meta: {
+                payroll_payment_type: payrollPaymentType,
+                supplier_cc: (payMode === 'cc') ? {
+                    enabled: true,
+                    terms_days: ccDays,
+                    installments: ccInst
+                } : { enabled: false }
+            }
         };
 
         const suppliersRes = leerProveedores();
@@ -863,44 +1296,43 @@ document.addEventListener('DOMContentLoaded', function () {
                 supplier_name: supplierName || ''
             };
 
-            try {
-                if (window.StorageService && typeof window.StorageService.upsertExpense === 'function') {
-                    const res = window.StorageService.upsertExpense(payload);
-                    const afterUpsert = function () {
-                        if (String(payload?.forma_pago || '').trim() === 'Efectivo') {
-                            emitCashflowChanged({ kind: 'expense', fecha: payload.fecha, forma_pago: payload.forma_pago, created_at: Date.now() });
-                        }
-                        window.location.href = baseListUrl;
-                    };
-                    if (isPromise(res)) {
-                        res.then(afterUpsert);
-                        return;
-                    }
-                    afterUpsert();
-                    return;
-                }
-            } catch (e) {
-                // fallback
-            }
+            const isEdit = !!String(payload.id || '').trim();
+            const url = isEdit
+                ? ('/expenses/api/expenses/' + encodeURIComponent(String(payload.id)))
+                : '/expenses/api/expenses';
+            const method = isEdit ? 'PUT' : 'POST';
 
-            const egRes = leerEgresos();
-            const applySave = function (egresos) {
-                const arr = Array.isArray(egresos) ? egresos : [];
-                const idx = arr.findIndex(x => String(x?.id) === String(id));
-                if (idx >= 0) arr[idx] = payload;
-                else arr.push(payload);
-                const saveRes = guardarEgresos(arr);
-                const after = function () {
+            apiJson(url, {
+                method: method,
+                body: JSON.stringify(payload)
+            }).then(function (data) {
+                const savedId = String((data && data.item && data.item.id) ? data.item.id : payload.id).trim();
+                const afterAll = function () {
                     if (String(payload?.forma_pago || '').trim() === 'Efectivo') {
                         emitCashflowChanged({ kind: 'expense', fecha: payload.fecha, forma_pago: payload.forma_pago, created_at: Date.now() });
                     }
-                    window.location.href = baseListUrl;
+                    if (inputId && savedId) inputId.value = savedId;
+                    if (downloadRemito && savedId) {
+                        triggerDownload('/expenses/api/expenses/' + encodeURIComponent(savedId) + '/remito.pdf');
+                    }
+                    if (redirectAfter) window.location.href = baseListUrl;
                 };
-                if (isPromise(saveRes)) saveRes.then(after);
-                else after();
-            };
-            if (isPromise(egRes)) egRes.then(applySave);
-            else applySave(egRes);
+
+                if (inputComprobante && inputComprobante.files && inputComprobante.files.length) {
+                    uploadExpenseAttachment(savedId, inputComprobante)
+                        .then(function () { afterAll(); })
+                        .catch(function (e) {
+                            if (window.showAlertModal) window.showAlertModal('El gasto se guardó, pero no se pudo subir el archivo. ' + String(e && e.message ? e.message : ''), 'Atención', 'Error');
+                            else alert('El gasto se guardó, pero no se pudo subir el archivo.');
+                            afterAll();
+                        });
+                    return;
+                }
+                afterAll();
+            }).catch(function (e) {
+                if (window.showAlertModal) window.showAlertModal('No se pudo guardar el gasto. ' + String(e && e.message ? e.message : ''), 'Atención', 'Error');
+                else alert('No se pudo guardar el gasto.');
+            });
         };
 
         if (isPromise(suppliersRes)) suppliersRes.then(finalize);
@@ -910,6 +1342,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (selectCategoria) {
         selectCategoria.addEventListener('change', function() {
             aplicarVisibilidadPorCategoria();
+            setCategoriaDescripcion();
+            markDirty();
+            validateSelectedSupplierAgainstCategory();
         });
     }
 
@@ -923,14 +1358,78 @@ document.addEventListener('DOMContentLoaded', function () {
         linkCrearProveedor.addEventListener('click', function (ev) {
             ev.preventDefault();
             const returnTo = window.location.pathname + window.location.search;
-            window.location.href = suppliersNewUrl + '?return_to=' + encodeURIComponent(returnTo);
+            const cat = getSelectedCategoriaForSupplierFilter();
+            const qs = ['return_to=' + encodeURIComponent(returnTo)];
+            if (cat) qs.push('prefill_category=' + encodeURIComponent(cat));
+            window.location.href = suppliersNewUrl + '?' + qs.join('&');
         });
+    }
+
+    if (btnSeleccionarProveedor) {
+        btnSeleccionarProveedor.addEventListener('click', function () {
+            openProveedorModal();
+        });
+    }
+
+    if (proveedorModalClose) proveedorModalClose.addEventListener('click', closeProveedorModal);
+    if (proveedorModalCancel) proveedorModalCancel.addEventListener('click', closeProveedorModal);
+    if (proveedorModal) {
+        proveedorModal.addEventListener('click', function (ev) {
+            const panel = proveedorModal.querySelector('.max-w-2xl');
+            if (panel && panel.contains(ev.target)) return;
+            closeProveedorModal();
+        });
+    }
+    if (proveedorModalSearch) {
+        proveedorModalSearch.addEventListener('input', function () {
+            renderProveedorModalList(proveedorModalSearch.value || '');
+        });
+    }
+
+    if (linkCrearEmpleado) {
+        linkCrearEmpleado.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            const returnTo = window.location.pathname + window.location.search;
+            window.location.href = employeesNewUrl + '?return_to=' + encodeURIComponent(returnTo);
+        });
+    }
+
+    function applyReturnedEmployee() {
+        if (!selectEmpleado) return;
+        const params = new URLSearchParams(window.location.search);
+        const returnedEmployeeId = params.get('employee_id');
+        const returnedEmployeeName = params.get('employee_name');
+        if (!returnedEmployeeId) return;
+
+        const ensure = function () {
+            const exists = Array.from(selectEmpleado.options || []).some(o => String(o.value) === String(returnedEmployeeId));
+            if (!exists) {
+                const opt = document.createElement('option');
+                opt.value = String(returnedEmployeeId);
+                opt.textContent = String(returnedEmployeeName || 'Empleado');
+                selectEmpleado.appendChild(opt);
+            }
+            selectEmpleado.value = String(returnedEmployeeId);
+        };
+
+        try {
+            const res = leerEmpleados();
+            const apply = function () {
+                try { poblarEmpleados(); } catch (e) {}
+                ensure();
+            };
+            if (isPromise(res)) res.then(apply).catch(ensure);
+            else apply();
+        } catch (e) {
+            ensure();
+        }
     }
 
     if (inputProveedor) {
         inputProveedor.addEventListener('input', function () {
             if (inputProveedorId) inputProveedorId.value = '';
             actualizarProveedorDd();
+            markDirty();
         });
         inputProveedor.addEventListener('focus', function () {
             actualizarProveedorDd();
@@ -948,87 +1447,79 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!wrap.contains(ev.target)) hideProveedorDd();
     });
 
-    function abrirPanelEmpleado(abrir) {
-        if (!wrapEmpleadoNuevo) return;
-        if (abrir) {
-            wrapEmpleadoNuevo.classList.remove('hidden');
-            if (empleadoNombre) empleadoNombre.focus();
-        } else {
-            wrapEmpleadoNuevo.classList.add('hidden');
-        }
+    if (linkVolverHistorial) {
+        linkVolverHistorial.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            confirmLeave(baseListUrl);
+        });
     }
 
-    function validarEmpleadoNuevo() {
-        const n = (empleadoNombre?.value || '').trim();
-        const a = (empleadoApellido?.value || '').trim();
-        const h = (empleadoIncorporo?.value || '').trim();
-        const pm = (empleadoFormaPago?.value || '').trim();
-        const ct = (empleadoContrato?.value || '').trim();
-        if (!n || !a || !h || !pm || !ct) return false;
-        return true;
+    if (linkCancelarEgreso) {
+        linkCancelarEgreso.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            confirmLeave(baseListUrl);
+        });
     }
 
-    function guardarEmpleadoNuevo() {
-        if (!validarEmpleadoNuevo()) {
-            alert('Completá los campos obligatorios del empleado: Nombre, Apellido, Fecha de incorporación, Forma de pago habitual y Tipo de contratación.');
+    window.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Escape') return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (proveedorModal && !proveedorModal.classList.contains('hidden')) {
+            closeProveedorModal();
             return;
         }
+        if (ddProveedor && !ddProveedor.classList.contains('hidden')) {
+            hideProveedorDd();
+            return;
+        }
+        confirmLeave(baseListUrl);
+    }, true);
 
-        const id = String(Date.now());
-        const payload = {
-            id,
-            first_name: (empleadoNombre?.value || '').trim(),
-            last_name: (empleadoApellido?.value || '').trim(),
-            hire_date: (empleadoIncorporo?.value || '').trim(),
-            default_payment_method: (empleadoFormaPago?.value || '').trim(),
-            contract_type: (empleadoContrato?.value || '').trim(),
-            birth_date: (empleadoNacimiento?.value || '').trim(),
-            document_id: (empleadoDoc?.value || '').trim(),
-            phone: (empleadoTel?.value || '').trim(),
-            email: (empleadoEmail?.value || '').trim(),
-            address: (empleadoDireccion?.value || '').trim(),
-            role: (empleadoRol?.value || '').trim(),
-            reference_salary: parseNumeroSeguro(empleadoSalario?.value),
-            notes: (empleadoNotas?.value || '').trim()
-        };
-
-        const arr = leerEmpleados();
-        arr.push(payload);
-        guardarEmpleados(arr);
-        poblarEmpleados();
-        if (selectEmpleado) selectEmpleado.value = String(id);
-        abrirPanelEmpleado(false);
+    try {
+        history.pushState({ __egreso_new: true }, '', window.location.href);
+    } catch (e) {
     }
 
-    if (btnCrearEmpleado) {
-        btnCrearEmpleado.addEventListener('click', function() {
-            abrirPanelEmpleado(true);
-        });
-    }
+    window.addEventListener('popstate', function () {
+        confirmLeave(baseListUrl);
+        try {
+            history.pushState({ __egreso_new: true }, '', window.location.href);
+        } catch (e) {
+        }
+    });
 
-    if (btnCancelarEmpleado) {
-        btnCancelarEmpleado.addEventListener('click', function() {
-            abrirPanelEmpleado(false);
-        });
-    }
-
-    if (btnGuardarEmpleado) {
-        btnGuardarEmpleado.addEventListener('click', function() {
-            guardarEmpleadoNuevo();
-        });
-    }
-
-    if (btnToggleEmpleadoComp && panelEmpleadoComp) {
-        btnToggleEmpleadoComp.addEventListener('click', function() {
-            panelEmpleadoComp.classList.toggle('hidden');
-        });
-    }
+    [inputFecha, selectCategoria, inputOtro, checkGuardarCategoria, inputValor, inputNota, selectPago, selectTipo, selectFrecuencia, inputComprobante,
+     inputPeriodoRango, inputPeriodoDesde, inputPeriodoHasta, selectTipoPagoNomina, selectEmpleado].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('change', markDirty);
+        el.addEventListener('input', markDirty);
+    });
 
     if (btnGuardar) {
         btnGuardar.addEventListener('click', function() {
-            guardarDesdeForm();
+            isDirty = false;
+            guardarDesdeForm({ redirect: true });
         });
     }
+
+    if (btnRemito) {
+        btnRemito.addEventListener('click', function () {
+            guardarDesdeForm({ redirect: false, downloadRemito: true });
+        });
+    }
+
+    [radioPayFull, radioPayCc, inputCcDays, inputCcInstallments, inputFecha, inputValor].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('change', function () {
+            syncPayModeUi();
+            markDirty();
+        });
+        el.addEventListener('input', function () {
+            syncPayModeUi();
+            markDirty();
+        });
+    });
 
     const params = new URLSearchParams(window.location.search);
     const returnedSupplierId = params.get('supplier_id');
@@ -1039,6 +1530,10 @@ document.addEventListener('DOMContentLoaded', function () {
     poblarCategorias();
     poblarEmpleados();
     aplicarVisibilidadPorCategoria();
+    setCategoriaDescripcion();
+    syncPayModeUi();
+
+    applyReturnedEmployee();
 
     if (returnedSupplierId) {
         setProveedorSeleccionado(returnedSupplierId, returnedSupplierName || '');

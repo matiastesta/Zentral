@@ -116,6 +116,8 @@ class Category(db.Model):
     name = db.Column(db.String(255), nullable=False, index=True)
     parent_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True, index=True)
 
+    active = db.Column(db.Boolean, nullable=False, default=True)
+
     parent = db.relationship('Category', remote_side=[id], backref='children')
 
 
@@ -133,10 +135,16 @@ class Product(db.Model):
     internal_code = db.Column(db.String(64), nullable=True, unique=True, index=True)
     barcode = db.Column(db.String(64), nullable=True, unique=True, index=True)
 
+    image_filename = db.Column(db.String(255), nullable=True)
+
     unit_name = db.Column(db.String(32), nullable=True)
     uses_lots = db.Column(db.Boolean, nullable=False, default=True)
     method = db.Column(db.String(16), nullable=False, default='FIFO')
     min_stock = db.Column(db.Float, nullable=False, default=0.0)
+    reorder_point = db.Column(db.Float, nullable=False, default=0.0)
+
+    primary_supplier_id = db.Column(db.String(64), nullable=True, index=True)
+    primary_supplier_name = db.Column(db.String(255), nullable=True)
 
     active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -155,6 +163,7 @@ class InventoryLot(db.Model):
     unit_cost = db.Column(db.Float, nullable=False, default=0.0)
 
     received_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    supplier_id = db.Column(db.String(64), nullable=True, index=True)
     supplier_name = db.Column(db.String(255), nullable=True)
     expiration_date = db.Column(db.Date, nullable=True, index=True)
     lot_code = db.Column(db.String(64), nullable=True, index=True)
@@ -194,6 +203,9 @@ class Sale(db.Model):
     status = db.Column(db.String(16), nullable=False, default='Completada')
     payment_method = db.Column(db.String(32), nullable=False, default='Efectivo')
     notes = db.Column(db.Text, nullable=True)
+
+    is_gift = db.Column(db.Boolean, nullable=False, default=False)
+    gift_code = db.Column(db.String(64), nullable=True)
 
     total = db.Column(db.Float, nullable=False, default=0.0)
     discount_general_pct = db.Column(db.Float, nullable=False, default=0.0)
@@ -291,6 +303,7 @@ class Employee(db.Model):
     last_name = db.Column(db.String(255), nullable=True)
     name = db.Column(db.String(255), nullable=True, index=True)
     hire_date = db.Column(db.Date, nullable=True, index=True)
+    inactive_date = db.Column(db.Date, nullable=True)
     default_payment_method = db.Column(db.String(32), nullable=True)
     contract_type = db.Column(db.String(64), nullable=True)
     status = db.Column(db.String(16), nullable=False, default='Active')

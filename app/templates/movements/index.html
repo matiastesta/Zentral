@@ -3,13 +3,13 @@
 {% block content %}
 <div class="mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Movimientos</h1>
-    <p class="mt-1 text-sm text-gray-600">Consulta el historial de ventas y egresos con filtros avanzados.</p>
+    <p class="mt-1 text-sm text-gray-600">Consulta el historial de ingresos y egresos con filtros avanzados.</p>
 </div>
 
 <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
     <div class="border-b border-gray-200">
         <nav class="flex -mb-px" aria-label="Tabs">
-            <button id="tab-mov-ventas" type="button" class="px-4 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-600">Ventas</button>
+            <button id="tab-mov-ventas" type="button" class="px-4 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-600">Ingresos</button>
             <button id="tab-mov-egresos" type="button" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Egresos</button>
             <button id="tab-mov-arqueo" type="button" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Arqueo</button>
             <div class="flex-1"></div>
@@ -21,54 +21,90 @@
 
     <div class="p-4">
         <div id="panel-mov-ventas" class="space-y-3">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <input id="mov-ventas-q" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Buscar por ticket o nota">
-                <input id="mov-ventas-range" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="📅 Período" readonly>
-                <select id="mov-ventas-pago" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                    <option value="">Pago (todas)</option>
-                    <option>Efectivo</option>
-                    <option>Transferencia</option>
-                    <option>Débito</option>
-                    <option>Crédito</option>
-                </select>
-            </div>
             <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
-                <table class="min-w-full divide-y divide-gray-200">
+                <table class="min-w-full table-fixed divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Ticket</th>
-                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
-                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Total</th>
-                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">Pago</th>
+                            <th class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Ticket</th>
+                            <th class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                            <th class="w-40 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Tipo</th>
+                            <th class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Total</th>
+                            <th class="w-32 px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">Pago</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Notas</th>
+                        </tr>
+                        <tr class="text-[11px] bg-white align-middle">
+                            <th class="px-4 py-1">
+                                <input id="mov-ventas-q" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="Ticket / nota">
+                            </th>
+                            <th class="px-4 py-1">
+                                <input id="mov-ventas-range" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white" placeholder="📅 Período" readonly>
+                            </th>
+                            <th class="px-4 py-1">
+                                <select id="mov-ventas-tipo" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
+                                    <option value="">Tipo (todos)</option>
+                                    <option value="Venta">Venta</option>
+                                    <option value="CobroCC">Cobro cuenta corriente</option>
+                                </select>
+                            </th>
+                            <th class="px-4 py-1"></th>
+                            <th class="px-4 py-1">
+                                <select id="mov-ventas-pago" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
+                                    <option value="">Pago (todas)</option>
+                                    <option>Efectivo</option>
+                                    <option>Transferencia</option>
+                                    <option>Débito</option>
+                                    <option>Crédito</option>
+                                </select>
+                            </th>
+                            <th class="px-4 py-1"></th>
                         </tr>
                     </thead>
                     <tbody id="mov-ventas-tbody" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
+                        <tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
         <div id="panel-mov-egresos" class="space-y-3 hidden">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <input id="mov-egresos-q" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Buscar por categoría o nota">
-                <input id="mov-egresos-range" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="📅 Período" readonly>
-                <select id="mov-egresos-origin" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                    <option value="">Origen (todos)</option>
-                    <option value="manual">✍️ Manual</option>
-                    <option value="inventory">📦 Inventario</option>
-                </select>
-            </div>
             <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
-                <table class="min-w-full divide-y divide-gray-200">
+                <table class="min-w-full table-fixed divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
-                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
-                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Valor</th>
-                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Origen</th>
+                            <th class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                            <th class="w-56 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
+                            <th class="w-56 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Proveedor</th>
+                            <th class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Valor</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nota</th>
+                        </tr>
+                        <tr class="text-[11px] bg-white align-middle">
+                            <th class="px-4 py-1">
+                                <input id="mov-egresos-range" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white" placeholder="📅 Período" readonly>
+                            </th>
+                            <th class="px-4 py-1">
+                                <div class="relative">
+                                    <button id="mov-egresos-cat-btn" type="button" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white text-left">Categoría (todas)</button>
+                                    <div id="mov-egresos-cat-menu" class="hidden absolute left-0 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-lg z-20">
+                                        <div class="p-2 border-b border-gray-100">
+                                            <input id="mov-egresos-cat-search" type="text" class="w-full px-2 py-1 border rounded-md text-xs text-gray-600" placeholder="Buscar categoría">
+                                        </div>
+                                        <div id="mov-egresos-cat-items" class="max-h-56 overflow-auto py-1"></div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-1">
+                                <div class="relative">
+                                    <button id="mov-egresos-sup-btn" type="button" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white text-left">Proveedor (todos)</button>
+                                    <div id="mov-egresos-sup-menu" class="hidden absolute left-0 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-lg z-20">
+                                        <div class="p-2 border-b border-gray-100">
+                                            <input id="mov-egresos-sup-search" type="text" class="w-full px-2 py-1 border rounded-md text-xs text-gray-600" placeholder="Buscar proveedor">
+                                        </div>
+                                        <div id="mov-egresos-sup-items" class="max-h-56 overflow-auto py-1"></div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-1"></th>
+                            <th class="px-4 py-1"></th>
                         </tr>
                     </thead>
                     <tbody id="mov-egresos-tbody" class="bg-white divide-y divide-gray-200">
@@ -81,7 +117,7 @@
         <div id="panel-mov-arqueo" class="space-y-3 hidden">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <input id="mov-arqueo-range" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="📅 Período" readonly>
-                <div class="text-sm text-gray-600 flex items-center">Arqueos guardados desde Ventas.</div>
+                <div class="text-sm text-gray-600 flex items-center">Arqueos guardados desde Ingresos.</div>
             </div>
             <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -153,9 +189,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const fVentasQ = document.getElementById('mov-ventas-q');
     const fVentasRange = document.getElementById('mov-ventas-range');
     const fVentasPago = document.getElementById('mov-ventas-pago');
-    const fEgresosQ = document.getElementById('mov-egresos-q');
+    const fVentasTipo = document.getElementById('mov-ventas-tipo');
     const fEgresosRange = document.getElementById('mov-egresos-range');
-    const fEgresosOrigin = document.getElementById('mov-egresos-origin');
+    const fEgresosCatBtn = document.getElementById('mov-egresos-cat-btn');
+    const fEgresosCatMenu = document.getElementById('mov-egresos-cat-menu');
+    const fEgresosCatItems = document.getElementById('mov-egresos-cat-items');
+    const fEgresosCatSearch = document.getElementById('mov-egresos-cat-search');
+    const fEgresosSupBtn = document.getElementById('mov-egresos-sup-btn');
+    const fEgresosSupMenu = document.getElementById('mov-egresos-sup-menu');
+    const fEgresosSupItems = document.getElementById('mov-egresos-sup-items');
+    const fEgresosSupSearch = document.getElementById('mov-egresos-sup-search');
     const fArqueoRange = document.getElementById('mov-arqueo-range');
 
     const btnExport = document.getElementById('btn-export-mov');
@@ -173,6 +216,16 @@ document.addEventListener('DOMContentLoaded', function () {
     function formatearMoneda(valor) {
         const numero = isNaN(valor) ? 0 : valor;
         return '$' + numero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function fmtFecha(v) {
+        try {
+            if (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') {
+                return window.formatFechaDisplay(v);
+            }
+        } catch (e) {
+        }
+        return String(v ?? '');
     }
 
     function parseNumeroSeguro(v) {
@@ -198,6 +251,139 @@ document.addEventListener('DOMContentLoaded', function () {
         a.setHours(0,0,0,0);
         b.setHours(23,59,59,999);
         return { from: a, to: b };
+    }
+
+    function normKey(v) {
+        return String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    }
+
+    let egresosCatsAll = [];
+    let egresosSupsAll = [];
+    let egresosCatsSelected = new Set();
+    let egresosSupsSelected = new Set();
+
+    function buildUniqueSorted(arr) {
+        const seen = new Map();
+        (Array.isArray(arr) ? arr : []).forEach(function (raw) {
+            const label = String(raw || '').replace(/\s+/g, ' ').trim();
+            if (!label) return;
+            const k = normKey(label);
+            if (!k) return;
+            if (!seen.has(k)) seen.set(k, label);
+        });
+        return Array.from(seen.entries())
+            .map(([k, label]) => ({ k, label }))
+            .sort((a, b) => String(a.label).localeCompare(String(b.label), 'es'));
+    }
+
+    function setDropdownOpen(menu, open) {
+        if (!menu) return;
+        menu.classList.toggle('hidden', !open);
+    }
+
+    function updateCatsButtonLabel() {
+        if (!fEgresosCatBtn) return;
+        const total = egresosCatsAll.length;
+        const selCount = egresosCatsSelected.size;
+        if (!selCount || selCount >= total) {
+            fEgresosCatBtn.textContent = 'Categoría (todas)';
+            return;
+        }
+        if (selCount === 1) {
+            const only = Array.from(egresosCatsSelected)[0];
+            const match = egresosCatsAll.find(x => x.k === only);
+            fEgresosCatBtn.textContent = match ? match.label : '1 seleccionada';
+            return;
+        }
+        fEgresosCatBtn.textContent = String(selCount) + ' seleccionadas';
+    }
+
+    function updateSupsButtonLabel() {
+        if (!fEgresosSupBtn) return;
+        const total = egresosSupsAll.length;
+        const selCount = egresosSupsSelected.size;
+        if (!selCount || selCount >= total) {
+            fEgresosSupBtn.textContent = 'Proveedor (todos)';
+            return;
+        }
+        if (selCount === 1) {
+            const only = Array.from(egresosSupsSelected)[0];
+            const match = egresosSupsAll.find(x => x.k === only);
+            fEgresosSupBtn.textContent = match ? match.label : '1 seleccionado';
+            return;
+        }
+        fEgresosSupBtn.textContent = String(selCount) + ' seleccionados';
+    }
+
+    function renderCatsItems() {
+        if (!fEgresosCatItems) return;
+        const q = normKey(fEgresosCatSearch?.value || '');
+        const items = egresosCatsAll.filter(it => !q || it.k.includes(q) || normKey(it.label).includes(q));
+        const total = egresosCatsAll.length;
+        const selCount = egresosCatsSelected.size;
+        const allOn = (!selCount || selCount >= total);
+        const html = [];
+        html.push('<label class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">'
+            + '<input type="checkbox" class="eg-cat-all" ' + (allOn ? 'checked' : '') + ' />'
+            + '<span>Todas</span>'
+            + '</label>');
+        if (!items.length) {
+            html.push('<div class="px-3 py-2 text-xs text-gray-400">Sin resultados.</div>');
+        } else {
+            items.forEach(function (it) {
+                const checked = allOn ? true : egresosCatsSelected.has(it.k);
+                html.push('<label class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">'
+                    + '<input type="checkbox" class="eg-cat-opt" data-k="' + it.k.replace(/"/g, '&quot;') + '" ' + (checked ? 'checked' : '') + ' />'
+                    + '<span class="truncate">' + String(it.label) + '</span>'
+                    + '</label>');
+            });
+        }
+        fEgresosCatItems.innerHTML = html.join('');
+    }
+
+    function renderSupsItems() {
+        if (!fEgresosSupItems) return;
+        const q = normKey(fEgresosSupSearch?.value || '');
+        const items = egresosSupsAll.filter(it => !q || it.k.includes(q) || normKey(it.label).includes(q));
+        const total = egresosSupsAll.length;
+        const selCount = egresosSupsSelected.size;
+        const allOn = (!selCount || selCount >= total);
+        const html = [];
+        html.push('<label class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">'
+            + '<input type="checkbox" class="eg-sup-all" ' + (allOn ? 'checked' : '') + ' />'
+            + '<span>Todos</span>'
+            + '</label>');
+        if (!items.length) {
+            html.push('<div class="px-3 py-2 text-xs text-gray-400">Sin resultados.</div>');
+        } else {
+            items.forEach(function (it) {
+                const checked = allOn ? true : egresosSupsSelected.has(it.k);
+                html.push('<label class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">'
+                    + '<input type="checkbox" class="eg-sup-opt" data-k="' + it.k.replace(/"/g, '&quot;') + '" ' + (checked ? 'checked' : '') + ' />'
+                    + '<span class="truncate">' + String(it.label) + '</span>'
+                    + '</label>');
+            });
+        }
+        fEgresosSupItems.innerHTML = html.join('');
+    }
+
+    function updateEgresosFilterOptions(allExpenses) {
+        const all = Array.isArray(allExpenses) ? allExpenses : [];
+        const cats = buildUniqueSorted(all.map(e => e?.categoria || ''));
+        const sups = buildUniqueSorted(all.map(e => e?.supplier_name || e?.proveedor || ''));
+
+        egresosCatsAll = cats;
+        egresosSupsAll = sups;
+
+        const catsKeys = new Set(cats.map(x => x.k));
+        egresosCatsSelected = new Set(Array.from(egresosCatsSelected).filter(k => catsKeys.has(k)));
+        const supsKeys = new Set(sups.map(x => x.k));
+        egresosSupsSelected = new Set(Array.from(egresosSupsSelected).filter(k => supsKeys.has(k)));
+
+        updateCatsButtonLabel();
+        updateSupsButtonLabel();
+        renderCatsItems();
+        renderSupsItems();
     }
 
     function openExport() { if (modalExport) modalExport.classList.remove('hidden'); }
@@ -301,8 +487,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const q = String(fVentasQ?.value || '').trim().toLowerCase();
         const rango = parseRangoFechas(fVentasRange?.value);
         const pago = String(fVentasPago?.value || '').trim();
+        const tipo = String(fVentasTipo?.value || '').trim();
 
-        tbodyVentas.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
+        tbodyVentas.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
         getSalesFromApi(rango, function (sales) {
 
             let list = Array.isArray(sales) ? sales.slice() : [];
@@ -310,15 +497,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 const txt = (String(s?.ticket || '') + ' ' + String(s?.notes || '')).toLowerCase();
                 if (q && !txt.includes(q)) return false;
                 if (pago && String(s?.payment_method || '') !== pago) return false;
+                if (tipo) {
+                    const st = String(s?.type || s?.sale_type || '').trim();
+                    if (tipo === 'CobroCC') {
+                        if (st !== 'CobroCC') return false;
+                    } else if (tipo === 'Venta') {
+                        if (st === 'CobroCC') return false;
+                    } else {
+                        if (st !== tipo) return false;
+                    }
+                }
                 const dt = parseFecha(s?.fecha || s?.date || '');
                 if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
                 return true;
             });
             list.sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
 
+            const labelTipo = function (s) {
+                const t = String(s?.type || s?.sale_type || '').trim();
+                if (t === 'CobroCC') return 'Cobro CC';
+                if (t) return t;
+                return 'Venta';
+            };
+
             lastRendered = list.map(s => ({
                 Ticket: s?.ticket || '',
-                Fecha: s?.fecha || '',
+                Fecha: fmtFecha(s?.fecha || s?.date || ''),
+                Tipo: labelTipo(s),
                 Total: formatearMoneda(parseFloat(s?.total || 0) || 0),
                 Pago: s?.payment_method || '',
                 Notas: s?.notes || ''
@@ -326,7 +531,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             tbodyVentas.innerHTML = '';
             if (!list.length) {
-                tbodyVentas.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+                tbodyVentas.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
                 return;
             }
             list.forEach(s => {
@@ -334,7 +539,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 tr.className = 'hover:bg-gray-50';
                 tr.innerHTML = ''
                     + '<td class="px-4 py-3 text-sm text-gray-900">' + String(s?.ticket || '') + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(s?.fecha || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(s?.fecha || s?.date || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + labelTipo(s) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(s?.payment_method || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + String(s?.notes || '') + '</td>';
@@ -346,15 +552,21 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderEgresos() {
         if (!tbodyEgresos) return;
         getExpenses(function (egresos) {
-            const q = String(fEgresosQ?.value || '').trim().toLowerCase();
+            updateEgresosFilterOptions(egresos);
+
             const rango = parseRangoFechas(fEgresosRange?.value);
-            const origin = String(fEgresosOrigin?.value || '').trim();
 
             let list = Array.isArray(egresos) ? egresos.slice() : [];
             list = list.filter(e => {
-                const txt = (String(e?.categoria || '') + ' ' + String(e?.nota || '')).toLowerCase();
-                if (q && !txt.includes(q)) return false;
-                if (origin && String(e?.origin || '') !== origin) return false;
+                const catKey = normKey(e?.categoria || '');
+                if (egresosCatsSelected.size && egresosCatsSelected.size < egresosCatsAll.length) {
+                    if (!egresosCatsSelected.has(catKey)) return false;
+                }
+
+                const supKey = normKey(e?.supplier_name || e?.proveedor || '');
+                if (egresosSupsSelected.size && egresosSupsSelected.size < egresosSupsAll.length) {
+                    if (!egresosSupsSelected.has(supKey)) return false;
+                }
                 const dt = parseFecha(e?.fecha || '');
                 if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
                 return true;
@@ -362,10 +574,10 @@ document.addEventListener('DOMContentLoaded', function () {
             list.sort((a, b) => String(b?.fecha || '').localeCompare(String(a?.fecha || '')));
 
             lastRendered = list.map(e => ({
-                Fecha: e?.fecha || '',
+                Fecha: fmtFecha(e?.fecha || ''),
                 Categoría: e?.categoria || '',
+                Proveedor: e?.supplier_name || e?.proveedor || '',
                 Valor: formatearMoneda(parseFloat(e?.valor || 0) || 0),
-                Origen: e?.origin || '',
                 Nota: e?.nota || ''
             }));
 
@@ -378,10 +590,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
                 tr.innerHTML = ''
-                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.fecha || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(e?.fecha || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-900">' + String(e?.categoria || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.supplier_name || e?.proveedor || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(e?.valor || 0) || 0) + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.origin || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.nota || '') + '</td>';
                 tbodyEgresos.appendChild(tr);
             });
@@ -400,7 +612,7 @@ document.addEventListener('DOMContentLoaded', function () {
             historico.sort((a, b) => String(b?.date || '').localeCompare(String(a?.date || '')));
 
             lastRendered = historico.map(r => ({
-                Fecha: r?.date || '',
+                Fecha: fmtFecha(r?.date || ''),
                 Responsable: (r?.employee_name || ''),
                 Apertura: formatearMoneda(parseNumeroSeguro(r?.opening_amount)),
                 Efectivo_dia: formatearMoneda(parseNumeroSeguro(r?.cash_day_amount)),
@@ -416,7 +628,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
                 tr.innerHTML = ''
-                    + '<td class="px-4 py-3 text-sm text-gray-700">' + String(r?.date || '-') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-700">' + fmtFecha(r?.date || '-') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-700">' + String(r?.employee_name || '-') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.opening_amount)) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.cash_day_amount)) + '</td>'
@@ -452,8 +664,107 @@ document.addEventListener('DOMContentLoaded', function () {
     if (tabEgresos) tabEgresos.addEventListener('click', function () { setTab('egresos'); });
     if (tabArqueo) tabArqueo.addEventListener('click', function () { setTab('arqueo'); });
 
-    [fVentasQ, fVentasPago].forEach(el => { if (el) el.addEventListener('input', renderVentas); if (el) el.addEventListener('change', renderVentas); });
-    [fEgresosQ, fEgresosOrigin].forEach(el => { if (el) el.addEventListener('input', renderEgresos); if (el) el.addEventListener('change', renderEgresos); });
+    [fVentasQ, fVentasPago, fVentasTipo].forEach(el => { if (el) el.addEventListener('input', renderVentas); if (el) el.addEventListener('change', renderVentas); });
+
+    if (fEgresosCatBtn && fEgresosCatMenu) {
+        fEgresosCatBtn.addEventListener('click', function () {
+            const open = fEgresosCatMenu.classList.contains('hidden');
+            setDropdownOpen(fEgresosCatMenu, open);
+            if (open) {
+                try { setDropdownOpen(fEgresosSupMenu, false); } catch (e) { }
+                try { fEgresosCatSearch?.focus?.(); } catch (e) { }
+            }
+        });
+    }
+
+    if (fEgresosSupBtn && fEgresosSupMenu) {
+        fEgresosSupBtn.addEventListener('click', function () {
+            const open = fEgresosSupMenu.classList.contains('hidden');
+            setDropdownOpen(fEgresosSupMenu, open);
+            if (open) {
+                try { setDropdownOpen(fEgresosCatMenu, false); } catch (e) { }
+                try { fEgresosSupSearch?.focus?.(); } catch (e) { }
+            }
+        });
+    }
+
+    if (fEgresosCatSearch) {
+        fEgresosCatSearch.addEventListener('input', function () { renderCatsItems(); });
+    }
+    if (fEgresosSupSearch) {
+        fEgresosSupSearch.addEventListener('input', function () { renderSupsItems(); });
+    }
+
+    if (fEgresosCatItems) {
+        fEgresosCatItems.addEventListener('change', function (ev) {
+            const t = ev && ev.target ? ev.target : null;
+            if (!t) return;
+            if (t.classList.contains('eg-cat-all')) {
+                egresosCatsSelected = new Set();
+            }
+            if (t.classList.contains('eg-cat-opt')) {
+                const k = String(t.getAttribute('data-k') || '').trim();
+                if (!k) return;
+                if (!egresosCatsSelected.size || egresosCatsSelected.size >= egresosCatsAll.length) {
+                    egresosCatsSelected = new Set(egresosCatsAll.map(x => x.k));
+                }
+                if (t.checked) {
+                    egresosCatsSelected.add(k);
+                } else {
+                    egresosCatsSelected.delete(k);
+                }
+            }
+            updateCatsButtonLabel();
+            renderCatsItems();
+            try { renderEgresos(); } catch (e) { }
+        });
+    }
+
+    if (fEgresosSupItems) {
+        fEgresosSupItems.addEventListener('change', function (ev) {
+            const t = ev && ev.target ? ev.target : null;
+            if (!t) return;
+            if (t.classList.contains('eg-sup-all')) {
+                egresosSupsSelected = new Set();
+            }
+            if (t.classList.contains('eg-sup-opt')) {
+                const k = String(t.getAttribute('data-k') || '').trim();
+                if (!k) return;
+                if (!egresosSupsSelected.size || egresosSupsSelected.size >= egresosSupsAll.length) {
+                    egresosSupsSelected = new Set(egresosSupsAll.map(x => x.k));
+                }
+                if (t.checked) {
+                    egresosSupsSelected.add(k);
+                } else {
+                    egresosSupsSelected.delete(k);
+                }
+            }
+            updateSupsButtonLabel();
+            renderSupsItems();
+            try { renderEgresos(); } catch (e) { }
+        });
+    }
+
+    document.addEventListener('click', function (ev) {
+        const t = ev && ev.target ? ev.target : null;
+        if (!t) return;
+        try {
+            if (fEgresosCatMenu && !fEgresosCatMenu.classList.contains('hidden')) {
+                if (!fEgresosCatMenu.contains(t) && !fEgresosCatBtn.contains(t)) {
+                    setDropdownOpen(fEgresosCatMenu, false);
+                }
+            }
+        } catch (e) {
+        }
+        try {
+            if (fEgresosSupMenu && !fEgresosSupMenu.classList.contains('hidden')) {
+                if (!fEgresosSupMenu.contains(t) && !fEgresosSupBtn.contains(t)) {
+                    setDropdownOpen(fEgresosSupMenu, false);
+                }
+            }
+        } catch (e) {
+        }
+    });
 
     if (fVentasRange && window.flatpickr) {
         flatpickr(fVentasRange, { mode: 'range', dateFormat: 'd/m/Y', locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es', allowInput: false,

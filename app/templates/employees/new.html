@@ -5,7 +5,7 @@
     <div class="flex items-start justify-between gap-3">
         <div>
             <h1 id="titulo-empleado" class="text-2xl font-bold text-gray-900">Nuevo empleado</h1>
-            <p class="mt-1 text-sm text-gray-600">Alta y edición de empleados en modo dummy (localStorage).</p>
+            <p class="mt-1 text-sm text-gray-600">Alta y edición de empleados.</p>
         </div>
         <a href="{{ url_for('employees.index') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
             <i class="fas fa-arrow-left mr-2"></i> Volver al listado
@@ -19,7 +19,6 @@
             <h2 class="text-sm font-semibold text-gray-900">Datos del empleado</h2>
             <p class="text-xs text-gray-500">Separado por obligatorios y complementarios para carga rápida.</p>
         </div>
-        <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700">Simulado</span>
     </div>
 
     <div class="p-4 space-y-4">
@@ -116,7 +115,7 @@
 
         <div class="flex flex-col md:flex-row gap-2 justify-end pt-2">
             <a href="{{ url_for('employees.index') }}" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-center">Cancelar</a>
-            <button id="btn-save-employee" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Guardar empleado (dummy)</button>
+            <button id="btn-save-employee" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Guardar empleado</button>
         </div>
     </div>
 </div>
@@ -127,6 +126,8 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const baseListUrl = "{{ url_for('employees.index') }}";
+    const params = new URLSearchParams(window.location.search);
+    const returnTo = params.get('return_to');
 
     const titulo = document.getElementById('titulo-empleado');
     const inputId = document.getElementById('employee-id');
@@ -157,58 +158,55 @@ document.addEventListener('DOMContentLoaded', function () {
         return isNaN(n) ? 0 : n;
     }
 
-    function leerEmpleados() {
-        try {
-            if (window.StorageService && typeof window.StorageService.getEmployees === 'function') {
-                return window.StorageService.getEmployees();
-            }
-        } catch (e) {
-        }
-        return [];
-    }
-
-    function guardarEmpleados(arr) {
-        try {
-            if (window.StorageService && typeof window.StorageService.saveEmployees === 'function') {
-                return window.StorageService.saveEmployees(Array.isArray(arr) ? arr : []);
-            }
-        } catch (e) {
-        }
-        return null;
-    }
-
     function isPromise(x) {
         return !!x && typeof x.then === 'function';
     }
 
+    async function apiJson(url, options) {
+        const res = await fetch(url, {
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            ...(options || {})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || (data && data.ok === false)) {
+            const msg = (data && (data.message || data.error)) ? (data.message || data.error) : ('HTTP ' + res.status);
+            throw new Error(msg);
+        }
+        return data;
+    }
+
     function cargarDesdeId(id) {
-        const res = leerEmpleados();
-        const apply = function (list) {
-            const arr = Array.isArray(list) ? list : [];
-            const found = arr.find(e => String(e?.id) === String(id));
-            if (!found) return;
+        const eid = String(id || '').trim();
+        if (!eid) return;
+        apiJson('/employees/api/employees/' + encodeURIComponent(eid))
+            .then(function (data) {
+                const found = (data && data.item) ? data.item : null;
+                if (!found) return;
 
-            if (titulo) titulo.textContent = 'Editar empleado';
-            if (inputId) inputId.value = String(found.id);
+                if (titulo) titulo.textContent = 'Editar empleado';
+                if (inputId) inputId.value = String(found.id);
 
-            if (firstName) firstName.value = found.first_name || '';
-            if (lastName) lastName.value = found.last_name || '';
-            if (hireDate) hireDate.value = found.hire_date || '';
-            if (payment) payment.value = found.default_payment_method || 'Efectivo';
-            if (contract) contract.value = found.contract_type || 'Fijo';
-            if (status) status.value = found.status || 'Active';
-            if (role) role.value = found.role || '';
+                if (firstName) firstName.value = found.first_name || '';
+                if (lastName) lastName.value = found.last_name || '';
+                if (hireDate) hireDate.value = found.hire_date || '';
+                if (payment) payment.value = found.default_payment_method || 'Efectivo';
+                if (contract) contract.value = found.contract_type || 'Fijo';
+                if (status) status.value = found.status || 'Active';
+                if (role) role.value = found.role || '';
 
-            if (birth) birth.value = found.birth_date || '';
-            if (doc) doc.value = found.document_id || '';
-            if (phone) phone.value = found.phone || '';
-            if (email) email.value = found.email || '';
-            if (address) address.value = found.address || '';
-            if (salary) salary.value = String(parseNumeroSeguro(found.reference_salary));
-            if (notes) notes.value = found.notes || '';
-        };
-        if (isPromise(res)) res.then(apply).catch(() => apply([]));
-        else apply(res);
+                if (birth) birth.value = found.birth_date || '';
+                if (doc) doc.value = found.document_id || '';
+                if (phone) phone.value = found.phone || '';
+                if (email) email.value = found.email || '';
+                if (address) address.value = found.address || '';
+                if (salary) salary.value = String(parseNumeroSeguro(found.reference_salary));
+                if (notes) notes.value = found.notes || '';
+            })
+            .catch(function () {
+            });
     }
 
     function validar() {
@@ -223,11 +221,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function guardar() {
         if (!validar()) {
-            alert('Completá los campos obligatorios: Nombre, Apellido, Fecha de incorporación, Forma de pago habitual y Tipo de contratación.');
+            if (window.showAlertModal) window.showAlertModal('Completá los campos obligatorios: Nombre, Apellido, Fecha de incorporación, Forma de pago habitual y Tipo de contratación.', 'Atención', 'Validación requerida');
+            else if (window.alert) window.alert('Completá los campos obligatorios: Nombre, Apellido, Fecha de incorporación, Forma de pago habitual y Tipo de contratación.');
             return;
         }
 
-        const id = (inputId?.value || '').trim() || String(Date.now());
+        const id = (inputId?.value || '').trim() || '';
         const payload = {
             id,
             first_name: (firstName?.value || '').trim(),
@@ -246,19 +245,35 @@ document.addEventListener('DOMContentLoaded', function () {
             notes: (notes?.value || '').trim()
         };
 
-        const res = leerEmpleados();
-        const apply = function (list) {
-            const arr = Array.isArray(list) ? list.slice() : [];
-            const idx = arr.findIndex(e => String(e?.id) === String(id));
-            if (idx >= 0) arr[idx] = payload;
-            else arr.push(payload);
-            const saveRes = guardarEmpleados(arr);
-            Promise.resolve(saveRes).finally(function () {
-                window.location.href = baseListUrl;
-            });
-        };
-        if (isPromise(res)) res.then(apply).catch(() => apply([]));
-        else apply(res);
+        const isEdit = !!String(payload.id || '').trim();
+        const url = isEdit
+            ? ('/employees/api/employees/' + encodeURIComponent(String(payload.id)))
+            : '/employees/api/employees';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        apiJson(url, {
+            method: method,
+            body: JSON.stringify(payload)
+        }).then(function (data) {
+            const item = (data && data.item) ? data.item : null;
+            const savedId = String(item && item.id ? item.id : payload.id).trim();
+            const fn = String(item && item.first_name ? item.first_name : payload.first_name).trim();
+            const ln = String(item && item.last_name ? item.last_name : payload.last_name).trim();
+            const fullName = (fn + ' ' + ln).trim();
+            if (returnTo) {
+                const sep = returnTo.includes('?') ? '&' : '?';
+                const next = returnTo
+                    + sep
+                    + 'employee_id=' + encodeURIComponent(String(savedId))
+                    + '&employee_name=' + encodeURIComponent(fullName);
+                window.location.href = next;
+                return;
+            }
+            window.location.href = baseListUrl;
+        }).catch(function (e) {
+            if (window.showAlertModal) window.showAlertModal('No se pudo guardar el empleado. ' + String(e && e.message ? e.message : ''), 'Atención', 'Error');
+            else alert('No se pudo guardar el empleado.');
+        });
     }
 
     if (btnToggle && panelExtra) {
@@ -273,7 +288,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
     if (id) {
         cargarDesdeId(id);

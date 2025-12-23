@@ -20,3 +20,6 @@ email-validator==2.0.0.post2
 # Utilidades
 python-dateutil==2.8.2
 pytz==2023.3
+
+# PDFs
+reportlab==4.0.8

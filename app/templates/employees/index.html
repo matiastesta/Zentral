@@ -2,66 +2,255 @@
 {% block title %}Empleados{% endblock %}
 {% block content %}
 <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Empleados</h1>
-    <p class="mt-1 text-sm text-gray-600">Gestioná tu nómina y los datos administrativos de tu equipo (modo dummy).</p>
+    <div class="flex items-center gap-2">
+        <h1 class="text-2xl font-bold text-gray-900">Empleados</h1>
+        <button type="button" class="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-gray-100 text-gray-600" data-kpi-toggle="employees" data-kpi-key="employees" data-kpi-target="#kpi-section-employees" aria-expanded="true" aria-label="Mostrar/ocultar KPIs">
+            <i data-kpi-toggle-icon class="fas fa-chevron-down"></i>
+        </button>
+    </div>
+    <p class="mt-1 text-sm text-gray-600">Gestioná tu nómina y los datos administrativos de tu equipo.</p>
 </div>
 
-<div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Total de empleados</p>
-        <p id="employees-total" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+
+<div id="kpi-section-employees" class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-4">
+    <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center" title="Cantidad total de empleados registrados en el sistema.">
+        <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-indigo-50 text-indigo-700">
+            <i class="fas fa-users"></i>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Total de empleados</p>
+            <p id="employees-total" class="text-lg font-semibold text-gray-900">0</p>
+        </div>
     </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Activos</p>
-        <p id="employees-active" class="mt-2 text-2xl font-semibold text-green-600">0</p>
+
+    <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center" title="Empleados activos sobre el total.">
+        <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-green-50 text-green-700">
+            <i class="fas fa-user-check"></i>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Empleados activos</p>
+            <p id="employees-active" class="text-lg font-semibold text-green-600">0</p>
+            <div id="employees-active-sub" class="mt-0.5 text-[11px] text-gray-500"></div>
+        </div>
     </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Altas recientes</p>
-        <p class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+
+    <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center" title="Total estimado de costo salarial del mes en curso.">
+        <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-blue-50 text-blue-700">
+            <i class="fas fa-wallet"></i>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Costo de nómina (mes)</p>
+            <p id="employees-payroll" class="text-lg font-semibold text-gray-900">$0,00</p>
+        </div>
+    </div>
+
+    <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center" title="Altas y bajas registradas durante el mes en curso.">
+        <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-amber-50 text-amber-800">
+            <i class="fas fa-exchange-alt"></i>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Altas / bajas (mes)</p>
+            <p id="employees-moves" class="text-lg font-semibold text-gray-900">0 / 0</p>
+        </div>
     </div>
 </div>
 
-<div class="flex flex-col justify-between gap-2 mb-4 md:flex-row md:items-start">
-    <div class="flex-1">
-        <div class="flex flex-col gap-2">
-            <div class="flex flex-col sm:flex-row gap-2">
-                <input id="employees-search" type="text" placeholder="Buscar por nombre, rol, documento o email" class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <select id="employees-status" class="w-full sm:w-48 px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">Todos</option>
-                    <option value="Active">Activos</option>
-                    <option value="Inactive">Inactivos</option>
-                </select>
+<div class="bg-white rounded-lg shadow border border-gray-200 overflow-visible">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-3">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Listado de empleados</h2>
+            <p class="text-xs text-gray-500">Revisá datos administrativos, rol, contratación y forma de pago. Usá la búsqueda y el filtro de estado para ubicar cada registro.</p>
+        </div>
+        <div class="flex gap-2 justify-end">
+            <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
+                <i class="fas fa-file-export mr-2"></i> Exportar
+            </button>
+            <a href="{{ url_for('employees.new') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                <i class="fas fa-plus mr-2"></i> Nuevo empleado
+            </a>
+        </div>
+    </div>
+    <div class="overflow-hidden rounded-b-lg">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Empleado</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Puesto</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Contratación</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Forma de pago</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase" title="Fecha de ingreso al negocio">Ingreso</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Estado</th>
+                    <th class="px-4 py-3"></th>
+                </tr>
+                <tr class="text-[11px] bg-white align-middle">
+                    <th class="px-4 py-2">
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-3 flex items-center text-gray-400">
+                                <i class="fas fa-search text-[11px]"></i>
+                            </div>
+                            <input id="employees-search" type="text" placeholder="Buscar..." class="w-full pl-9 pr-3 py-1 text-xs border rounded-md text-gray-600" />
+                        </div>
+                    </th>
+                    <th class="px-4 py-2">
+                        <select id="employees-role" class="w-full px-2 py-1 text-xs border rounded-md text-gray-600 bg-white">
+                            <option value="">Puesto: todos</option>
+                        </select>
+                    </th>
+                    <th class="px-4 py-2">
+                        <select id="employees-contract" class="w-full px-2 py-1 text-xs border rounded-md text-gray-600 bg-white">
+                            <option value="">Contratación: todas</option>
+                        </select>
+                    </th>
+                    <th class="px-4 py-2"></th>
+                    <th class="px-4 py-2"></th>
+                    <th class="px-4 py-2">
+                        <select id="employees-status" class="w-full px-2 py-1 text-xs border rounded-md text-gray-600 bg-white">
+                            <option value="">Estado: todos</option>
+                            <option value="Active">Activos</option>
+                            <option value="Inactive">Inactivos</option>
+                        </select>
+                    </th>
+                    <th class="px-4 py-2"></th>
+                </tr>
+            </thead>
+            <tbody id="employees-tbody" class="bg-white divide-y divide-gray-200">
+                <tr>
+                    <td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay empleados registrados.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="employee-actions-menu" class="hidden fixed w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[9999]">
+    <div class="py-1 text-[11px]">
+        <button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="legajo">Ver legajo</button>
+        <button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="edit">Editar</button>
+        <button id="employee-actions-deactivate" type="button" class="w-full text-left px-3 py-2 text-red-700 hover:bg-red-50" data-action="deactivate">Dar de baja</button>
+    </div>
+</div>
+
+<div id="modal-employee-legajo" class="hidden fixed inset-0 z-50" style="z-index:60;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-5xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="min-w-0">
+                    <h3 id="emp-legajo-title" class="text-base font-semibold text-gray-900 truncate">Legajo del empleado</h3>
+                    <p id="emp-legajo-subtitle" class="text-xs text-gray-500 truncate">—</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btn-edit-emp-legajo" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
+                        <i class="fas fa-pen mr-2"></i> Editar
+                    </button>
+                    <button id="btn-close-emp-legajo" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Datos</div>
+                        <div class="mt-2 space-y-1 text-sm text-gray-800">
+                            <div><span class="text-gray-500">Nombre:</span> <span id="emp-legajo-fullname">—</span></div>
+                            <div><span class="text-gray-500">Teléfono:</span> <span id="emp-legajo-phone">—</span></div>
+                            <div><span class="text-gray-500">Email:</span> <span id="emp-legajo-email">—</span></div>
+                            <div><span class="text-gray-500">Documento:</span> <span id="emp-legajo-doc">—</span></div>
+                            <div><span class="text-gray-500">Cumpleaños:</span> <span id="emp-legajo-bday">—</span></div>
+                            <div><span class="text-gray-500">Dirección:</span> <span id="emp-legajo-address">—</span></div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Laboral</div>
+                        <div class="mt-2 space-y-1 text-sm text-gray-800">
+                            <div><span class="text-gray-500">Puesto:</span> <span id="emp-legajo-role">—</span></div>
+                            <div><span class="text-gray-500">Contratación:</span> <span id="emp-legajo-contract">—</span></div>
+                            <div><span class="text-gray-500">Forma de pago:</span> <span id="emp-legajo-paymethod">—</span></div>
+                            <div><span class="text-gray-500">Ingreso:</span> <span id="emp-legajo-hire">—</span></div>
+                            <div><span class="text-gray-500">Salario ref.:</span> <span id="emp-legajo-salary">—</span></div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Estado</div>
+                        <div class="mt-2 space-y-1 text-sm text-gray-800">
+                            <div><span class="text-gray-500">Estado:</span> <span id="emp-legajo-status">—</span></div>
+                            <div><span class="text-gray-500">Fecha de baja:</span> <span id="emp-legajo-inactive">—</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                    <div class="flex items-center justify-between gap-2">
+                        <div>
+                            <div class="text-xs font-semibold text-gray-700">Pagos</div>
+                            <div class="text-[11px] text-gray-500">Se muestran los últimos pagos (gastos de nómina) asociados al empleado.</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center">
+                            <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                                <i class="fas fa-calendar-alt"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs uppercase tracking-wide text-gray-500">Pagado (mes)</p>
+                                <p id="emp-legajo-kpi-month" class="text-lg font-semibold text-gray-900">$0,00</p>
+                            </div>
+                        </div>
+
+                        <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center">
+                            <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-indigo-50 text-indigo-700">
+                                <i class="fas fa-money-bill-wave"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs uppercase tracking-wide text-gray-500">Total histórico</p>
+                                <p id="emp-legajo-kpi-all" class="text-lg font-semibold text-gray-900">$0,00</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-xs">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Pago</th>
+                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Total</th>
+                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Período</th>
+                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nota</th>
+                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Egreso</th>
+                                </tr>
+                            </thead>
+                            <tbody id="emp-legajo-payments" class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="6" class="px-3 py-4 text-sm text-gray-500 text-center">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="emp-legajo-more-wrap" class="mt-3 flex justify-center">
+                        <button id="btn-emp-legajo-more" type="button" class="hidden inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                            Ver más
+                        </button>
+                    </div>
+                </div>
+
+                <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                    <div class="text-xs font-semibold text-gray-700">Observaciones internas</div>
+                    <div id="emp-legajo-notes" class="mt-2 text-sm text-gray-700 whitespace-pre-wrap">—</div>
+                </div>
+            </div>
+
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-close-emp-legajo-2" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cerrar</button>
             </div>
         </div>
     </div>
-    <div class="flex gap-2 justify-end">
-        <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
-            <i class="fas fa-file-export mr-2"></i> Exportar
-        </button>
-        <a href="{{ url_for('employees.new') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
-            <i class="fas fa-plus mr-2"></i> Nuevo empleado
-        </a>
-    </div>
-</div>
-
-<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
-    <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-            <tr>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Empleado</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Rol</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Contratación</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Forma de pago</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Ingreso</th>
-                <th class="px-4 py-3"></th>
-            </tr>
-        </thead>
-        <tbody id="employees-tbody" class="bg-white divide-y divide-gray-200">
-            <tr>
-                <td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay empleados registrados.</td>
-            </tr>
-        </tbody>
-    </table>
 </div>
 {% endblock %}
 
@@ -72,42 +261,348 @@ document.addEventListener('DOMContentLoaded', function () {
     const tbody = document.getElementById('employees-tbody');
     const inputSearch = document.getElementById('employees-search');
     const selectStatus = document.getElementById('employees-status');
+    const selectContract = document.getElementById('employees-contract');
+    const selectRole = document.getElementById('employees-role');
     const elTotal = document.getElementById('employees-total');
     const elActive = document.getElementById('employees-active');
+    const elActiveSub = document.getElementById('employees-active-sub');
+    const elPayroll = document.getElementById('employees-payroll');
+    const elMoves = document.getElementById('employees-moves');
+
+    const employeeActionsMenu = document.getElementById('employee-actions-menu');
+    const employeeActionsDeactivate = document.getElementById('employee-actions-deactivate');
+    let employeeActionsId = '';
+    let employeeActionsCanDeactivate = false;
+
+    const modalEmpLegajo = document.getElementById('modal-employee-legajo');
+    const btnCloseEmpLegajo = document.getElementById('btn-close-emp-legajo');
+    const btnCloseEmpLegajo2 = document.getElementById('btn-close-emp-legajo-2');
+    const btnEditEmpLegajo = document.getElementById('btn-edit-emp-legajo');
+    const empLegajoTitle = document.getElementById('emp-legajo-title');
+    const empLegajoSubtitle = document.getElementById('emp-legajo-subtitle');
+    const empLegajoFullname = document.getElementById('emp-legajo-fullname');
+    const empLegajoPhone = document.getElementById('emp-legajo-phone');
+    const empLegajoEmail = document.getElementById('emp-legajo-email');
+    const empLegajoDoc = document.getElementById('emp-legajo-doc');
+    const empLegajoBday = document.getElementById('emp-legajo-bday');
+    const empLegajoAddress = document.getElementById('emp-legajo-address');
+    const empLegajoRole = document.getElementById('emp-legajo-role');
+    const empLegajoContract = document.getElementById('emp-legajo-contract');
+    const empLegajoPaymethod = document.getElementById('emp-legajo-paymethod');
+    const empLegajoHire = document.getElementById('emp-legajo-hire');
+    const empLegajoSalary = document.getElementById('emp-legajo-salary');
+    const empLegajoStatus = document.getElementById('emp-legajo-status');
+    const empLegajoInactive = document.getElementById('emp-legajo-inactive');
+    const empLegajoPayments = document.getElementById('emp-legajo-payments');
+    const empLegajoNotes = document.getElementById('emp-legajo-notes');
+    const empLegajoKpiMonth = document.getElementById('emp-legajo-kpi-month');
+    const empLegajoKpiAll = document.getElementById('emp-legajo-kpi-all');
+    const wrapEmpLegajoMore = document.getElementById('emp-legajo-more-wrap');
+    const btnEmpLegajoMore = document.getElementById('btn-emp-legajo-more');
+
+    let legajoEmployeeId = '';
+    let legajoPaymentsOffset = 0;
+    let legajoPaymentsHasMore = false;
+    let legajoPaymentsLoading = false;
+    const legajoPaymentsLimit = 20;
 
     const editBaseUrl = "{{ url_for('employees.new') }}";
-
-    function leerEmpleados() {
-        try {
-            if (window.StorageService && typeof window.StorageService.getEmployees === 'function') {
-                return window.StorageService.getEmployees();
-            }
-        } catch (e) {
-        }
-        return [];
-    }
-
-    function guardarEmpleados(arr) {
-        try {
-            if (window.StorageService && typeof window.StorageService.saveEmployees === 'function') {
-                return window.StorageService.saveEmployees(Array.isArray(arr) ? arr : []);
-            }
-        } catch (e) {
-        }
-        return null;
-    }
+    const expenseEditUrl = "{{ url_for('expenses.new') }}";
 
     function isPromise(x) {
         return !!x && typeof x.then === 'function';
     }
 
-    function deleteEmployee(id) {
+    async function apiJson(url, options) {
+        const res = await fetch(url, {
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            ...(options || {})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || (data && data.ok === false)) {
+            const msg = (data && (data.message || data.error)) ? (data.message || data.error) : ('HTTP ' + res.status);
+            throw new Error(msg);
+        }
+        return data;
+    }
+
+    function leerEmpleados() {
+        return apiJson('/employees/api/employees?limit=5000')
+            .then(d => (Array.isArray(d.items) ? d.items : []))
+            .catch(() => []);
+    }
+
+    function deactivateEmployee(id) {
         const eid = String(id || '').trim();
         if (!eid) return Promise.resolve(null);
         return fetch('/employees/api/employees/' + encodeURIComponent(eid), {
             method: 'DELETE',
             credentials: 'same-origin'
         }).then(r => r.json()).catch(() => null);
+    }
+
+    function buildSelectOptions(selectEl, placeholder, values) {
+        if (!selectEl) return;
+        const current = String(selectEl.value || '').trim();
+        const list = Array.from(new Set((values || []).map(v => String(v || '').trim()).filter(Boolean))).sort(function (a, b) {
+            return a.localeCompare(b);
+        });
+        selectEl.innerHTML = '';
+        const opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = placeholder;
+        selectEl.appendChild(opt0);
+        list.forEach(function (v) {
+            const opt = document.createElement('option');
+            opt.value = v;
+            opt.textContent = v;
+            selectEl.appendChild(opt);
+        });
+        if (current && list.includes(current)) {
+            selectEl.value = current;
+        }
+    }
+
+    function fmtMoney(n) {
+        const num = isNaN(n) ? 0 : n;
+        return '$' + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function openModal(el) { if (el) el.classList.remove('hidden'); }
+    function closeModal(el) { if (el) el.classList.add('hidden'); }
+
+    function hideEmployeeActionsMenu() {
+        if (!employeeActionsMenu) return;
+        employeeActionsMenu.classList.add('hidden');
+        employeeActionsMenu.style.left = '';
+        employeeActionsMenu.style.top = '';
+        employeeActionsMenu.style.visibility = '';
+        employeeActionsId = '';
+        employeeActionsCanDeactivate = false;
+    }
+
+    function openEmployeeActionsMenu(btnEl, id, canDeactivate) {
+        if (!employeeActionsMenu || !btnEl) return;
+        employeeActionsId = String(id || '').trim();
+        employeeActionsCanDeactivate = !!canDeactivate;
+        if (employeeActionsDeactivate) {
+            employeeActionsDeactivate.classList.toggle('hidden', !employeeActionsCanDeactivate);
+        }
+
+        employeeActionsMenu.classList.remove('hidden');
+        employeeActionsMenu.style.visibility = 'hidden';
+
+        const rect = btnEl.getBoundingClientRect();
+        const pad = 8;
+        window.requestAnimationFrame(function () {
+            const mw = employeeActionsMenu.offsetWidth || 176;
+            const mh = employeeActionsMenu.offsetHeight || 120;
+            let left = rect.right - mw;
+            let top = rect.bottom + 6;
+
+            if (left < pad) left = pad;
+            if (left + mw > window.innerWidth - pad) left = Math.max(pad, window.innerWidth - mw - pad);
+            if (top + mh > window.innerHeight - pad) {
+                top = rect.top - mh - 6;
+            }
+            if (top < pad) top = pad;
+
+            employeeActionsMenu.style.left = left + 'px';
+            employeeActionsMenu.style.top = top + 'px';
+            employeeActionsMenu.style.visibility = 'visible';
+        });
+    }
+
+    function badgeEstadoHtml(v) {
+        const st = String(v || 'Active');
+        const cls = classEstado(st);
+        const label = labelEstado(st);
+        return '<span class="text-[11px] px-2 py-0.5 rounded-full ' + cls + '">' + label + '</span>';
+    }
+
+    function syncEmpLegajoMoreBtn() {
+        if (!btnEmpLegajoMore) return;
+        btnEmpLegajoMore.classList.toggle('hidden', !legajoPaymentsHasMore || legajoPaymentsLoading);
+        btnEmpLegajoMore.disabled = !!legajoPaymentsLoading;
+    }
+
+    function renderLegajoTotals(totals) {
+        const t = totals && typeof totals === 'object' ? totals : {};
+        const m = parseFloat(t.month_total || 0) || 0;
+        const a = parseFloat(t.all_total || 0) || 0;
+        if (empLegajoKpiMonth) empLegajoKpiMonth.textContent = fmtMoney(m);
+        if (empLegajoKpiAll) empLegajoKpiAll.textContent = fmtMoney(a);
+    }
+
+    function escapeHtml(s) {
+        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function renderPaymentsRows(payments, append) {
+        if (!empLegajoPayments) return;
+        const list = Array.isArray(payments) ? payments : [];
+        if (!append) empLegajoPayments.innerHTML = '';
+        if (!list.length && !append) {
+            empLegajoPayments.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-sm text-gray-500 text-center">Sin pagos registrados.</td></tr>';
+            return;
+        }
+        list.forEach(function (x) {
+            const tr = document.createElement('tr');
+            const date = x.date ? fmtFecha(x.date) : '—';
+            const method = escapeHtml(x.payment_method || '—') || '—';
+            const amt = fmtMoney(parseFloat(x.amount || 0) || 0);
+            const prFrom = String(x.period_from || '').trim();
+            const prTo = String(x.period_to || '').trim();
+            const period = (prFrom || prTo)
+                ? ((prFrom ? fmtFecha(prFrom) : '—') + ' a ' + (prTo ? fmtFecha(prTo) : '—'))
+                : '—';
+            const note = escapeHtml(x.note || '—') || '—';
+            const href = expenseEditUrl + '?id=' + encodeURIComponent(String(x.id || ''));
+            tr.innerHTML = ''
+                + '<td class="px-3 py-2 text-sm text-gray-700">' + date + '</td>'
+                + '<td class="px-3 py-2 text-sm text-gray-700">' + method + '</td>'
+                + '<td class="px-3 py-2 text-sm text-right text-gray-700">' + amt + '</td>'
+                + '<td class="px-3 py-2 text-sm text-gray-600">' + escapeHtml(period) + '</td>'
+                + '<td class="px-3 py-2 text-sm text-gray-600">' + note + '</td>'
+                + '<td class="px-3 py-2 text-sm text-right">'
+                +   '<a class="text-blue-600 hover:text-blue-800 text-xs font-medium" href="' + href + '">Ver egreso</a>'
+                + '</td>';
+            empLegajoPayments.appendChild(tr);
+        });
+    }
+
+    function renderEmployeeLegajo(payload) {
+        const p = payload && typeof payload === 'object' ? payload : {};
+        const e = p.employee && typeof p.employee === 'object' ? p.employee : {};
+        const payments = Array.isArray(p.payments) ? p.payments : [];
+
+        legajoEmployeeId = String(e.id || '').trim();
+        const full = String(e.name || ((String(e.first_name || '') + ' ' + String(e.last_name || '')).trim()) || 'Empleado').trim();
+        const role = String(e.role || '—').trim() || '—';
+        const contract = String(e.contract_type || '—').trim() || '—';
+        const payMethod = String(e.default_payment_method || '—').trim() || '—';
+        const hire = e.hire_date ? fmtFecha(e.hire_date) : '—';
+        const inactive = e.inactive_date ? fmtFecha(e.inactive_date) : '—';
+        const salary = (parseFloat(e.reference_salary || 0) || 0) > 0 ? fmtMoney(parseFloat(e.reference_salary || 0) || 0) : '—';
+
+        if (empLegajoTitle) empLegajoTitle.textContent = 'Legajo · ' + full;
+        if (empLegajoSubtitle) empLegajoSubtitle.textContent = (legajoEmployeeId ? ('ID ' + legajoEmployeeId + ' · ') : '') + role;
+
+        if (empLegajoFullname) empLegajoFullname.textContent = full || '—';
+        if (empLegajoPhone) empLegajoPhone.textContent = String(e.phone || '—') || '—';
+        if (empLegajoEmail) empLegajoEmail.textContent = String(e.email || '—') || '—';
+        if (empLegajoDoc) empLegajoDoc.textContent = String(e.document_id || '—') || '—';
+        if (empLegajoBday) empLegajoBday.textContent = e.birth_date ? fmtFecha(e.birth_date) : '—';
+        if (empLegajoAddress) empLegajoAddress.textContent = String(e.address || '—') || '—';
+
+        if (empLegajoRole) empLegajoRole.textContent = role;
+        if (empLegajoContract) empLegajoContract.textContent = contract;
+        if (empLegajoPaymethod) empLegajoPaymethod.textContent = payMethod;
+        if (empLegajoHire) empLegajoHire.textContent = hire;
+        if (empLegajoSalary) empLegajoSalary.textContent = salary;
+
+        if (empLegajoStatus) empLegajoStatus.innerHTML = badgeEstadoHtml(e.status || (e.active ? 'Active' : 'Inactive'));
+        if (empLegajoInactive) empLegajoInactive.textContent = inactive;
+
+        if (empLegajoNotes) empLegajoNotes.textContent = String(e.notes || '—') || '—';
+
+        renderLegajoTotals(p.totals);
+        legajoPaymentsOffset = parseInt(p.offset || 0, 10) || 0;
+        const got = Array.isArray(p.payments) ? p.payments.length : 0;
+        legajoPaymentsOffset = legajoPaymentsOffset + got;
+        legajoPaymentsHasMore = !!p.has_more;
+        renderPaymentsRows(payments, false);
+        syncEmpLegajoMoreBtn();
+    }
+
+    function fetchEmployeeLegajoPage(eid, offset, limit) {
+        const qs = '?offset=' + encodeURIComponent(String(offset || 0)) + '&limit=' + encodeURIComponent(String(limit || legajoPaymentsLimit));
+        return apiJson('/employees/api/employees/' + encodeURIComponent(eid) + '/legajo' + qs);
+    }
+
+    function loadMoreEmpLegajoPayments() {
+        const eid = String(legajoEmployeeId || '').trim();
+        if (!eid || !legajoPaymentsHasMore || legajoPaymentsLoading) return;
+        legajoPaymentsLoading = true;
+        syncEmpLegajoMoreBtn();
+        fetchEmployeeLegajoPage(eid, legajoPaymentsOffset, legajoPaymentsLimit)
+            .then(function (data) {
+                const p = data && typeof data === 'object' ? data : {};
+                const payments = Array.isArray(p.payments) ? p.payments : [];
+                renderLegajoTotals(p.totals);
+                renderPaymentsRows(payments, true);
+                legajoPaymentsHasMore = !!p.has_more;
+                legajoPaymentsOffset = (parseInt(p.offset || 0, 10) || legajoPaymentsOffset) + payments.length;
+            })
+            .catch(function () {
+            })
+            .finally(function () {
+                legajoPaymentsLoading = false;
+                syncEmpLegajoMoreBtn();
+            });
+    }
+
+    function openEmployeeLegajo(id) {
+        const eid = String(id || '').trim();
+        if (!eid) return;
+        legajoEmployeeId = eid;
+        legajoPaymentsOffset = 0;
+        legajoPaymentsHasMore = false;
+        legajoPaymentsLoading = false;
+        if (empLegajoTitle) empLegajoTitle.textContent = 'Legajo del empleado';
+        if (empLegajoSubtitle) empLegajoSubtitle.textContent = 'Cargando...';
+        if (empLegajoKpiMonth) empLegajoKpiMonth.textContent = '$0,00';
+        if (empLegajoKpiAll) empLegajoKpiAll.textContent = '$0,00';
+        if (empLegajoPayments) empLegajoPayments.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-sm text-gray-500 text-center">Cargando...</td></tr>';
+        syncEmpLegajoMoreBtn();
+        openModal(modalEmpLegajo);
+        fetchEmployeeLegajoPage(eid, 0, legajoPaymentsLimit)
+            .then(function (data) {
+                renderEmployeeLegajo(data);
+            })
+            .catch(function (e) {
+                if (empLegajoSubtitle) empLegajoSubtitle.textContent = String(e && e.message ? e.message : 'No se pudo cargar');
+                if (empLegajoPayments) empLegajoPayments.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-sm text-gray-500 text-center">No se pudo cargar el historial.</td></tr>';
+            });
+    }
+
+    function closeAllRowMenus() {
+        const menus = document.querySelectorAll('.menu-employee-acciones');
+        menus.forEach(m => m.classList.add('hidden'));
+    }
+
+    function confirmDeactivateEmployee(id) {
+        const eid = String(id || '').trim();
+        if (!eid) return;
+        if (window.confirmModal) {
+            window.confirmModal(
+                '¿Dar de baja empleado? No se elimina el registro, solo se marca como inactivo.',
+                'Dar de baja empleado',
+                'Confirmación requerida',
+                { okText: 'Dar de baja', cancelText: 'Cancelar' }
+            ).then(function (ok) {
+                if (!ok) return;
+                deactivateEmployee(eid).finally(function () {
+                    render();
+                });
+            });
+            return;
+        }
+        const ok = confirm('¿Dar de baja empleado? No se elimina el registro, solo se marca como inactivo.');
+        if (!ok) return;
+        deactivateEmployee(eid).finally(function () {
+            render();
+        });
+    }
+
+    function parseIsoDateSafe(s) {
+        const raw = String(s || '').trim();
+        if (!raw) return null;
+        const t = Date.parse(raw);
+        return isNaN(t) ? null : new Date(t);
     }
 
     function labelEstado(v) {
@@ -120,20 +615,43 @@ document.addEventListener('DOMContentLoaded', function () {
         return 'text-green-700 bg-green-50';
     }
 
+    function fmtFecha(v) {
+        try {
+            if (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') {
+                return window.formatFechaDisplay(v);
+            }
+        } catch (e) {
+        }
+        return String(v ?? '');
+    }
+
     function render() {
         if (!tbody) return;
 
         const q = (inputSearch?.value || '').trim().toLowerCase();
         const status = (selectStatus?.value || '').trim();
+        const contract = (selectContract?.value || '').trim();
+        const role = (selectRole?.value || '').trim();
 
-        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
 
         const res = leerEmpleados();
         const apply = function (employees) {
             let list = Array.isArray(employees) ? employees.slice() : [];
 
+            buildSelectOptions(selectContract, 'Contratación: todas', list.map(e => e?.contract_type || ''));
+            buildSelectOptions(selectRole, 'Puesto: todos', list.map(e => e?.role || ''));
+
             if (status) {
                 list = list.filter(e => String(e?.status || 'Active') === status);
+            }
+
+            if (contract) {
+                list = list.filter(e => String(e?.contract_type || '').trim() === contract);
+            }
+
+            if (role) {
+                list = list.filter(e => String(e?.role || '').trim() === role);
             }
 
             if (q) {
@@ -151,13 +669,39 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const all = Array.isArray(employees) ? employees : [];
-            if (elTotal) elTotal.textContent = String(all.length);
-            if (elActive) elActive.textContent = String(all.filter(e => String(e?.status || 'Active') === 'Active').length);
+            const total = all.length;
+            const activeCount = all.filter(e => String(e?.status || (e?.active ? 'Active' : 'Inactive')) === 'Active').length;
+            const pct = total > 0 ? Math.round((activeCount / total) * 100) : 0;
+
+            if (elTotal) elTotal.textContent = String(total);
+            if (elActive) elActive.textContent = String(activeCount);
+            if (elActiveSub) elActiveSub.textContent = total > 0 ? ('(' + pct + '%)') : '';
+
+            const payroll = all.reduce(function (acc, e) {
+                const isActive = String(e?.status || (e?.active ? 'Active' : 'Inactive')) === 'Active';
+                if (!isActive) return acc;
+                const v = parseFloat(e?.reference_salary || 0) || 0;
+                return acc + (v > 0 ? v : 0);
+            }, 0);
+            if (elPayroll) elPayroll.textContent = fmtMoney(payroll);
+
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            const hires = all.filter(function (e) {
+                const d = parseIsoDateSafe(e?.hire_date);
+                return d && d >= monthStart && d < monthEnd;
+            }).length;
+            const leavers = all.filter(function (e) {
+                const d = parseIsoDateSafe(e?.inactive_date);
+                return d && d >= monthStart && d < monthEnd;
+            }).length;
+            if (elMoves) elMoves.textContent = String(hires) + ' / ' + String(leavers);
 
             tbody.innerHTML = '';
             if (!list.length) {
                 const tr = document.createElement('tr');
-                tr.innerHTML = '<td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados.</td>';
+                tr.innerHTML = '<td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados.</td>';
                 tbody.appendChild(tr);
                 return;
             }
@@ -171,21 +715,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 const statusLabel = labelEstado(e?.status || 'Active');
                 const statusClass = classEstado(e?.status || 'Active');
 
+                const isActive = String(e?.status || 'Active') === 'Active';
+
                 tr.innerHTML = `
                     <td class="px-4 py-3 text-sm text-gray-900">
-                        <div class="flex items-center justify-between gap-2">
-                            <span>${fullName}</span>
-                            <span class="text-[11px] px-2 py-0.5 rounded-full ${statusClass}">${statusLabel}</span>
-                        </div>
+                        <span>${fullName}</span>
                     </td>
                     <td class="px-4 py-3 text-sm text-gray-500">${e?.role || '-'}</td>
                     <td class="px-4 py-3 text-sm text-gray-500">${e?.contract_type || '-'}</td>
                     <td class="px-4 py-3 text-sm text-gray-500">${e?.default_payment_method || '-'}</td>
-                    <td class="px-4 py-3 text-sm text-gray-500">${e?.hire_date || '-'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-500">${fmtFecha(e?.hire_date || '-')}</td>
+                    <td class="px-4 py-3 text-sm text-gray-500"><span class="text-[11px] px-2 py-0.5 rounded-full ${statusClass}">${statusLabel}</span></td>
                     <td class="px-4 py-3 text-sm text-right">
-                        <div class="inline-flex gap-3">
-                            <button type="button" class="btn-edit text-blue-600 hover:text-blue-800 text-xs font-medium" data-id="${e?.id}">Editar</button>
-                            <button type="button" class="btn-del text-red-600 hover:text-red-800 text-xs font-medium" data-id="${e?.id}">Eliminar</button>
+                        <div class="relative inline-block text-left">
+                            <button type="button" class="btn-employee-menu inline-flex items-center justify-center h-8 w-8 rounded-full hover:bg-gray-100" data-id="${e?.id}" data-active="${isActive ? '1' : '0'}" aria-label="Acciones">
+                                <i class="fas fa-ellipsis-v text-gray-500 text-xs"></i>
+                            </button>
                         </div>
                     </td>
                 `;
@@ -198,28 +743,80 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (tbody) {
         tbody.addEventListener('click', function (ev) {
-            const btnEdit = ev.target.closest('.btn-edit');
-            if (btnEdit) {
-                const id = btnEdit.getAttribute('data-id');
-                if (id) window.location.href = editBaseUrl + '?id=' + encodeURIComponent(id);
+            const menuBtn = ev.target.closest('.btn-employee-menu');
+            if (menuBtn) {
+                ev.stopPropagation();
+                const id = String(menuBtn.getAttribute('data-id') || '').trim();
+                const canDeactivate = String(menuBtn.getAttribute('data-active') || '') === '1';
+                openEmployeeActionsMenu(menuBtn, id, canDeactivate);
                 return;
             }
+        });
+    }
 
-            const btnDel = ev.target.closest('.btn-del');
-            if (btnDel) {
-                const id = btnDel.getAttribute('data-id');
-                if (!id) return;
-                const ok = confirm('¿Eliminar empleado? Esta acción no se puede deshacer.');
-                if (!ok) return;
-                deleteEmployee(id).finally(function () {
-                    render();
-                });
-            }
+    if (employeeActionsMenu) {
+        employeeActionsMenu.addEventListener('click', function (ev) {
+            const btn = ev.target.closest('[data-action]');
+            if (!btn) return;
+            ev.stopPropagation();
+            const action = String(btn.getAttribute('data-action') || '').trim();
+            const id = String(employeeActionsId || '').trim();
+            hideEmployeeActionsMenu();
+            if (!id) return;
+            if (action === 'legajo') openEmployeeLegajo(id);
+            if (action === 'edit') window.location.href = editBaseUrl + '?id=' + encodeURIComponent(id);
+            if (action === 'deactivate') confirmDeactivateEmployee(id);
+        });
+    }
+
+    document.addEventListener('click', function (ev) {
+        const t = ev.target;
+        const insideMenu = t && t.closest ? t.closest('#employee-actions-menu') : null;
+        const onBtn = t && t.closest ? t.closest('.btn-employee-menu') : null;
+        if (insideMenu || onBtn) return;
+        hideEmployeeActionsMenu();
+    });
+
+    window.addEventListener('scroll', function () {
+        hideEmployeeActionsMenu();
+    }, true);
+
+    window.addEventListener('resize', function () {
+        hideEmployeeActionsMenu();
+    });
+
+    if (btnEditEmpLegajo) {
+        btnEditEmpLegajo.addEventListener('click', function () {
+            if (!legajoEmployeeId) return;
+            window.location.href = editBaseUrl + '?id=' + encodeURIComponent(legajoEmployeeId);
+        });
+    }
+
+    [btnCloseEmpLegajo, btnCloseEmpLegajo2].forEach(function (b) {
+        if (!b) return;
+        b.addEventListener('click', function () {
+            closeModal(modalEmpLegajo);
+        });
+    });
+
+    if (modalEmpLegajo) {
+        modalEmpLegajo.addEventListener('click', function (ev) {
+            const panel = modalEmpLegajo.querySelector('.max-w-5xl');
+            if (panel && panel.contains(ev.target)) return;
+            closeModal(modalEmpLegajo);
+        });
+    }
+
+    if (btnEmpLegajoMore) {
+        btnEmpLegajoMore.addEventListener('click', function () {
+            loadMoreEmpLegajoPayments();
         });
     }
 
     if (inputSearch) inputSearch.addEventListener('input', render);
     if (selectStatus) selectStatus.addEventListener('change', render);
+    if (selectContract) selectContract.addEventListener('change', render);
+    if (selectRole) selectRole.addEventListener('change', render);
 
     render();
 });

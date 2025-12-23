@@ -3,9 +3,10 @@ from uuid import uuid4
 
 from flask import jsonify, render_template, request
 from flask_login import login_required
+from sqlalchemy import and_, func, or_
 
 from app import db
-from app.models import Employee
+from app.models import Employee, Expense
 from app.permissions import module_required
 from app.employees import bp
 
@@ -28,6 +29,7 @@ def _serialize_employee(row: Employee):
         'last_name': row.last_name or '',
         'name': (row.name or full_name or '').strip(),
         'hire_date': row.hire_date.isoformat() if row.hire_date else '',
+        'inactive_date': row.inactive_date.isoformat() if getattr(row, 'inactive_date', None) else '',
         'default_payment_method': row.default_payment_method or '',
         'contract_type': row.contract_type or '',
         'status': row.status or ('Active' if row.active else 'Inactive'),
@@ -104,6 +106,17 @@ def _apply_employee_payload(row: Employee, payload: dict):
     else:
         row.active = (status != 'Inactive')
 
+    now_active = bool(getattr(row, 'active', True))
+    if not now_active:
+        row.status = 'Inactive'
+        if not getattr(row, 'inactive_date', None):
+            row.inactive_date = dt_date.today()
+    else:
+        if status == 'Inactive':
+            row.status = 'Active'
+        if getattr(row, 'inactive_date', None):
+            row.inactive_date = None
+
 
 @bp.get('/api/employees')
 @login_required
@@ -140,6 +153,97 @@ def get_employee_api(employee_id):
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     return jsonify({'ok': True, 'item': _serialize_employee(row)})
+
+
+@bp.get('/api/employees/<employee_id>/legajo')
+@login_required
+@module_required('employees')
+def employee_legajo_api(employee_id):
+    eid = str(employee_id or '').strip()
+    row = db.session.get(Employee, eid)
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    full_name = (str(row.name or '').strip() or (str(row.first_name or '').strip() + ' ' + str(row.last_name or '').strip()).strip()).strip()
+
+    limit = int(request.args.get('limit') or 20)
+    offset = int(request.args.get('offset') or 0)
+    if limit <= 0 or limit > 200:
+        limit = 20
+    if offset < 0:
+        offset = 0
+
+    if full_name:
+        match_filter = or_(
+            Expense.employee_id == eid,
+            and_(Expense.employee_id.is_(None), Expense.employee_name.ilike(full_name))
+        )
+    else:
+        match_filter = (Expense.employee_id == eid)
+    category_filter = or_(Expense.category.ilike('%nomina%'), Expense.category.ilike('%nómina%'))
+
+    base_query = db.session.query(Expense).filter(match_filter).filter(category_filter)
+
+    today = dt_date.today()
+    month_start = today.replace(day=1)
+    if month_start.month == 12:
+        month_end = dt_date(month_start.year + 1, 1, 1)
+    else:
+        month_end = dt_date(month_start.year, month_start.month + 1, 1)
+
+    all_total = (
+        db.session.query(func.coalesce(func.sum(Expense.amount), 0.0))
+        .filter(match_filter)
+        .filter(category_filter)
+        .scalar()
+    )
+    month_total = (
+        db.session.query(func.coalesce(func.sum(Expense.amount), 0.0))
+        .filter(match_filter)
+        .filter(category_filter)
+        .filter(Expense.expense_date >= month_start)
+        .filter(Expense.expense_date < month_end)
+        .scalar()
+    )
+
+    q = (
+        base_query
+        .order_by(Expense.expense_date.desc(), Expense.created_at.desc())
+        .offset(offset)
+        .limit(limit + 1)
+    )
+    rows = q.all()
+    has_more = len(rows) > limit
+    if has_more:
+        rows = rows[:limit]
+
+    payments = []
+    for e in rows:
+        payments.append({
+            'id': e.id,
+            'date': e.expense_date.isoformat() if e.expense_date else '',
+            'amount': float(e.amount or 0.0),
+            'payment_method': str(e.payment_method or '').strip() or '—',
+            'note': str(e.note or e.description or '').strip() or '—',
+            'category': str(e.category or '').strip() or '',
+            'period_from': e.period_from.isoformat() if getattr(e, 'period_from', None) else '',
+            'period_to': e.period_to.isoformat() if getattr(e, 'period_to', None) else '',
+        })
+
+    return jsonify({
+        'ok': True,
+        'employee': _serialize_employee(row),
+        'payments': payments,
+        'offset': offset,
+        'limit': limit,
+        'has_more': bool(has_more),
+        'totals': {
+            'month_total': float(month_total or 0.0),
+            'all_total': float(all_total or 0.0),
+            'month_start': month_start.isoformat(),
+            'month_end': month_end.isoformat(),
+        }
+    })
 
 
 @bp.post('/api/employees')
@@ -193,13 +297,16 @@ def delete_employee_api(employee_id):
     row = db.session.get(Employee, eid)
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
+    row.active = False
+    row.status = 'Inactive'
+    if not getattr(row, 'inactive_date', None):
+        row.inactive_date = dt_date.today()
     try:
-        db.session.delete(row)
         db.session.commit()
     except Exception:
         db.session.rollback()
         return jsonify({'ok': False, 'error': 'db_error'}), 400
-    return jsonify({'ok': True})
+    return jsonify({'ok': True, 'item': _serialize_employee(row)})
 
 
 @bp.post('/api/employees/bulk')

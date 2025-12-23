@@ -17,9 +17,8 @@
     <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <div>
             <h2 class="text-sm font-semibold text-gray-900">Datos obligatorios</h2>
-            <p class="text-xs text-gray-500">Con estos datos ya podés usar el proveedor en Gastos. Guardado simulado en localStorage.</p>
+            <p class="text-xs text-gray-500">Con estos datos ya podés usar el proveedor en Gastos.</p>
         </div>
-        <span class="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700">Simulado</span>
     </div>
 
     <div class="p-4 space-y-4">
@@ -53,6 +52,7 @@
             <div id="supplier-categories" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Servicios públicos" class="rounded"> <span>Servicios públicos</span></label>
                 <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Compra de productos e insumos" class="rounded"> <span>Compra de productos e insumos</span></label>
+                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Inventario" class="rounded"> <span>Inventario</span></label>
                 <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Arriendo" class="rounded"> <span>Arriendo</span></label>
                 <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Nómina" class="rounded"> <span>Nómina</span></label>
                 <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Transportes" class="rounded"> <span>Transportes</span></label>
@@ -143,7 +143,7 @@
                     <div class="md:col-span-2">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Adjuntar archivos</label>
                         <input id="supplier-attachments" type="file" multiple class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                        <p class="mt-1 text-xs text-gray-500">Se guardan solo metadatos en modo dummy.</p>
+                        <p class="mt-1 text-xs text-gray-500">Se guarda la información del archivo (nombre, tipo y tamaño).</p>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 mb-1">Notas internas</label>
@@ -155,7 +155,7 @@
 
         <div class="flex flex-col md:flex-row gap-2 justify-end pt-2">
             <a href="{{ url_for('suppliers.index') }}" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-center">Cancelar</a>
-            <button id="btn-guardar-proveedor" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Guardar proveedor (dummy)</button>
+            <button id="btn-guardar-proveedor" type="button" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Guardar proveedor</button>
         </div>
     </div>
 </div>
@@ -168,6 +168,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const baseListUrl = "{{ url_for('suppliers.index') }}";
     const params = new URLSearchParams(window.location.search);
     const returnTo = params.get('return_to');
+    const prefillCategory = params.get('prefill_category');
 
     const titulo = document.getElementById('titulo-proveedor');
     const inputId = document.getElementById('supplier-id');
@@ -194,28 +195,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const btnGuardar = document.getElementById('btn-guardar-proveedor');
 
+    let lastLoadedMetaObj = {};
+
     function isPromise(x) {
         return !!x && typeof x.then === 'function';
     }
 
-    function leerSuppliers() {
-        try {
-            if (window.StorageService && typeof window.StorageService.getSuppliers === 'function') {
-                return window.StorageService.getSuppliers();
-            }
-        } catch (e) {
+    async function apiJson(url, options) {
+        const res = await fetch(url, {
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            ...(options || {})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || (data && data.ok === false)) {
+            const msg = (data && (data.message || data.error)) ? (data.message || data.error) : ('HTTP ' + res.status);
+            throw new Error(msg);
         }
-        return [];
-    }
-
-    function guardarSuppliers(arr) {
-        try {
-            if (window.StorageService && typeof window.StorageService.saveSuppliers === 'function') {
-                return window.StorageService.saveSuppliers(Array.isArray(arr) ? arr : []);
-            }
-        } catch (e) {
-        }
-        return null;
+        return data;
     }
 
     function getSelectedCategories() {
@@ -244,11 +243,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function cargarDesdeId(id) {
-        const res = leerSuppliers();
-        const apply = function (list) {
-            const arr = Array.isArray(list) ? list : [];
-            const found = arr.find(s => String(s?.id) === String(id));
-            if (!found) return;
+        const sid = String(id || '').trim();
+        if (!sid) return;
+        apiJson('/suppliers/api/suppliers/' + encodeURIComponent(sid))
+            .then(function (data) {
+                const found = (data && data.item) ? data.item : null;
+                if (!found) return;
 
             if (titulo) titulo.textContent = 'Editar proveedor';
             if (inputId) inputId.value = String(found.id);
@@ -268,9 +268,18 @@ document.addEventListener('DOMContentLoaded', function () {
             if (preferredChannel) preferredChannel.value = found.preferred_contact_channel || '';
 
             if (notes) notes.value = found.notes || '';
-        };
-        if (isPromise(res)) res.then(apply).catch(() => apply([]));
-        else apply(res);
+
+            lastLoadedMetaObj = {};
+            const rawMeta = String(found.meta_json || '').trim();
+            if (rawMeta) {
+                try {
+                    const parsed = JSON.parse(rawMeta);
+                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) lastLoadedMetaObj = parsed;
+                } catch (e) {
+                }
+            }
+        }).catch(function () {
+        });
     }
 
     function validarObligatorios() {
@@ -283,11 +292,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function guardarProveedor() {
         if (!validarObligatorios()) {
-            alert('Completá los campos obligatorios: Nombre y al menos 1 categoría.');
+            if (window.showAlertModal) window.showAlertModal('Completá los campos obligatorios: Nombre y al menos 1 categoría.', 'Atención', 'Validación requerida');
+            else alert('Completá los campos obligatorios: Nombre y al menos 1 categoría.');
             return;
         }
 
-        const id = (inputId?.value || '').trim() || String(Date.now());
+        const id = (inputId?.value || '').trim() || '';
 
         const payload = {
             id,
@@ -303,32 +313,44 @@ document.addEventListener('DOMContentLoaded', function () {
             email: (email?.value || '').trim(),
             address: (address?.value || '').trim(),
             preferred_contact_channel: (preferredChannel?.value || '').trim(),
-            attachments: readAttachmentsMeta(),
             notes: (notes?.value || '').trim()
         };
 
-        const res = leerSuppliers();
-        const apply = function (list) {
-            const arr = Array.isArray(list) ? list.slice() : [];
-            const idx = arr.findIndex(s => String(s?.id) === String(id));
-            if (idx >= 0) {
-                arr[idx] = { ...arr[idx], ...payload };
-            } else {
-                arr.push(payload);
+        const filesMeta = readAttachmentsMeta();
+        const metaObj = (lastLoadedMetaObj && typeof lastLoadedMetaObj === 'object' && !Array.isArray(lastLoadedMetaObj))
+            ? { ...lastLoadedMetaObj }
+            : {};
+        if (filesMeta.length) metaObj.attachments = filesMeta;
+        if (Object.keys(metaObj).length) {
+            try {
+                payload.meta_json = JSON.stringify(metaObj);
+            } catch (e) {
             }
-            const saveRes = guardarSuppliers(arr);
-            Promise.resolve(saveRes).finally(function () {
-                if (returnTo) {
-                    const sep = returnTo.includes('?') ? '&' : '?';
-                    const next = returnTo + sep + 'supplier_id=' + encodeURIComponent(String(id)) + '&supplier_name=' + encodeURIComponent(payload.name || '');
-                    window.location.href = next;
-                    return;
-                }
-                window.location.href = baseListUrl;
-            });
-        };
-        if (isPromise(res)) res.then(apply).catch(() => apply([]));
-        else apply(res);
+        }
+
+        const isEdit = !!String(payload.id || '').trim();
+        const url = isEdit
+            ? ('/suppliers/api/suppliers/' + encodeURIComponent(String(payload.id)))
+            : '/suppliers/api/suppliers';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        apiJson(url, {
+            method: method,
+            body: JSON.stringify(payload)
+        }).then(function (data) {
+            const savedId = String((data && data.item && data.item.id) ? data.item.id : payload.id).trim();
+            const savedName = String((data && data.item && data.item.name) ? data.item.name : payload.name).trim();
+            if (returnTo) {
+                const sep = returnTo.includes('?') ? '&' : '?';
+                const next = returnTo + sep + 'supplier_id=' + encodeURIComponent(String(savedId)) + '&supplier_name=' + encodeURIComponent(savedName || '');
+                window.location.href = next;
+                return;
+            }
+            window.location.href = baseListUrl;
+        }).catch(function (e) {
+            if (window.showAlertModal) window.showAlertModal('No se pudo guardar el proveedor. ' + String(e && e.message ? e.message : ''), 'Atención', 'Error');
+            else alert('No se pudo guardar el proveedor.');
+        });
     }
 
     if (btnToggle && panelComp) {
@@ -346,6 +368,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const id = params.get('id');
     if (id) {
         cargarDesdeId(id);
+    } else {
+        const cat = String(prefillCategory || '').trim();
+        if (cat) {
+            setSelectedCategories([cat]);
+        }
     }
 });
 </script>

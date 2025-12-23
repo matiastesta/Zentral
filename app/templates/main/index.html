@@ -819,7 +819,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function sumExpensesTotal(list) {
-        return (Array.isArray(list) ? list : []).reduce((acc, e) => acc + (parseFloat(e?.valor || '0') || 0), 0);
+        return (Array.isArray(list) ? list : []).reduce((acc, e) => {
+            if (e && e.meta && e.meta.supplier_cc_payment === true) return acc;
+            return acc + (parseFloat(e?.valor || '0') || 0);
+        }, 0);
     }
 
     function calculateDebtorsFromSales(sales) {
@@ -1077,7 +1080,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function computeOutOfRangeExpenses(expenses) {
-        const vals = (Array.isArray(expenses) ? expenses : []).map(e => safeNum(e?.valor)).filter(v => v > 0);
+        const vals = (Array.isArray(expenses) ? expenses : [])
+            .filter(e => !(e && e.meta && e.meta.supplier_cc_payment === true))
+            .map(e => safeNum(e?.valor))
+            .filter(v => v > 0);
         if (!vals.length) return 0;
         const avg = vals.reduce((a, v) => a + v, 0) / vals.length;
         const thr = avg * 3;

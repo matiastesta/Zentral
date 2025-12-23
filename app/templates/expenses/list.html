@@ -1,107 +1,153 @@
 {% extends 'base.html' %}
 {% block title %}Gastos{% endblock %}
 {% block content %}
-<div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Gastos y Egresos</h1>
-    <p class="mt-1 text-sm text-gray-600">Controla los costos fijos y variables de tu negocio.</p>
-</div>
-
-<!-- Filtros y acciones -->
-<div class="flex flex-col justify-between gap-2 mb-4 md:flex-row md:items-start">
-    <div class="flex-1"></div>
-    <div class="flex gap-2 justify-end">
-        <button id="btn-export-egresos" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
-            <i class="fas fa-file-export mr-2"></i> Exportar
-        </button>
-        <a href="{{ url_for('expenses.new') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">
-            <i class="fas fa-plus mr-2"></i> Nuevo gasto
-        </a>
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <div class="flex items-center gap-2">
+                <h1 class="text-2xl font-bold text-gray-900">Gastos y Egresos</h1>
+                <button type="button" class="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-gray-100 text-gray-600" data-kpi-toggle="expenses" data-kpi-key="expenses" data-kpi-target="#kpi-section-expenses" aria-expanded="true" aria-label="Mostrar/ocultar KPIs">
+                    <i data-kpi-toggle-icon class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <p class="mt-1 text-sm text-gray-600">Controla los costos fijos y variables de tu negocio.</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="{{ url_for('expenses.new') }}" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">
+                <i class="fas fa-plus mr-2"></i> Nuevo gasto
+            </a>
+        </div>
     </div>
-</div>
 
-<!-- Resumen de gastos -->
-<div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2">
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Gastos de hoy</p>
-        <p class="mt-2 text-2xl font-semibold text-gray-900">$0,00</p>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Este mes</p>
-        <p class="mt-2 text-2xl font-semibold text-gray-900">$0,00</p>
-    </div>
-</div>
+    <div id="kpi-section-expenses" class="grid grid-cols-1 md:grid-cols-4 gap-2 items-stretch">
+        <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center">
+            <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-indigo-50 text-indigo-700">
+                <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <div>
+                <p class="text-xs uppercase tracking-wide text-gray-500">Gastos de hoy</p>
+                <p id="kpi-gastos-hoy" class="text-lg font-semibold text-gray-900">$0,00</p>
+            </div>
+        </div>
 
-<!-- Tabla de gastos -->
-<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
-    <table class="min-w-full divide-y divide-gray-200">
+        <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center">
+            <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-blue-50 text-blue-700">
+                <i class="fas fa-receipt"></i>
+            </div>
+            <div>
+                <p class="text-xs uppercase tracking-wide text-gray-500">Cantidad de gastos de hoy</p>
+                <p id="kpi-cant-gastos-hoy" class="text-lg font-semibold text-gray-900">0</p>
+            </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center">
+            <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                <i class="fas fa-calendar-alt"></i>
+            </div>
+            <div>
+                <p class="text-xs uppercase tracking-wide text-gray-500">Gastos del mes</p>
+                <p id="kpi-gastos-mes" class="text-lg font-semibold text-gray-900">$0,00</p>
+            </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col">
+            <div class="text-center">
+                <p class="text-xs uppercase tracking-wide text-gray-500">Top categorías (mes)</p>
+            </div>
+            <div class="mt-1 flex items-center gap-2" style="min-height:78px">
+                <div class="relative flex items-center justify-start" style="width:78px;height:78px">
+                    <svg id="kpi-top-cats-pie" viewBox="0 0 120 120" width="78" height="78" class="block"></svg>
+                    <div id="kpi-top-cats-tooltip" class="hidden absolute top-0 left-0 pointer-events-none bg-white border border-gray-200 shadow-lg rounded-md px-2 py-1 text-[11px] text-gray-800"></div>
+                </div>
+                <div id="kpi-top-cats-legend" class="flex-1 space-y-0.5 text-[8px] leading-[1.05] overflow-hidden"></div>
+            </div>
+        </div>
+    </div>
+
+<!-- Historial de gastos -->
+<div id="historial-egresos" class="bg-white rounded-xl shadow overflow-visible">
+    <div class="px-4 py-3 border-b border-gray-100 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Historial de movimientos</h2>
+            <p class="text-xs text-gray-500">Gastos recientes.</p>
+        </div>
+        <div class="flex flex-wrap gap-2 text-[11px]">
+            <button id="btn-export-egresos" type="button" class="px-3 py-1 rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 inline-flex items-center gap-2">
+                <span>Exportar</span>
+                <i class="fas fa-file-export text-[10px]"></i>
+            </button>
+        </div>
+    </div>
+    <table class="min-w-full divide-y divide-gray-200 text-xs">
         <thead class="bg-gray-50">
-            <tr>
-                <th id="th-sort-fecha" class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none">
+            <tr class="text-xs">
+                <th id="th-sort-fecha" class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom cursor-pointer select-none">
                     <span class="inline-flex items-center gap-1">
                         <span>Fecha</span>
                         <span id="sort-fecha" class="text-[10px] text-gray-400"></span>
                     </span>
                 </th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
-                <th id="th-sort-valor" class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">
+                <th class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Categoría</th>
+                <th id="th-sort-valor" class="px-3 py-2 text-right text-gray-600 font-semibold align-bottom cursor-pointer select-none">
                     <span class="inline-flex items-center gap-1 justify-end w-full">
                         <span>Valor</span>
                         <span id="sort-valor" class="text-[10px] text-gray-400"></span>
                     </span>
                 </th>
-                <th id="th-sort-proveedor" class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none">
+                <th id="th-sort-proveedor" class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom cursor-pointer select-none">
                     <span class="inline-flex items-center gap-1">
                         <span>Proveedor</span>
                         <span id="sort-proveedor" class="text-[10px] text-gray-400"></span>
                     </span>
                 </th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nota</th>
-                <th class="px-4 py-3"></th>
+                <th class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Nota</th>
+                <th class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Archivo</th>
+                <th class="px-3 py-2 text-right text-gray-600 font-semibold align-bottom"></th>
             </tr>
-            <tr>
-                <th class="px-4 pb-3">
-                    <div class="relative">
-                        <input id="filtro-rango-egresos" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="📅 Período" readonly>
+            <tr class="text-[11px] bg-white align-middle">
+                <th class="px-3 py-1">
+                    <div class="inline-block min-w-[110px] max-w-[140px] w-full">
+                        <input id="filtro-rango-egresos" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="dd/mm/aaaa - dd/mm/aaaa" readonly>
                     </div>
                 </th>
-                <th class="px-4 pb-3">
-                    <select id="filtro-categoria-egresos" class="w-full px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">🗂️ Todas</option>
-                        <option value="Servicios públicos">💡 Servicios públicos</option>
-                        <option value="Gastos operativos">🧾 Gastos operativos</option>
-                        <option value="Arriendo">🏠 Arriendo</option>
-                        <option value="Nómina">🧑‍💼 Nómina</option>
-                        <option value="Transportes">🚚 Transportes</option>
-                        <option value="Mantenimiento y reparaciones">🛠️ Mantenimiento y reparaciones</option>
-                        <option value="Muebles, equipos o maquinarias">🪑 Muebles, equipos o maquinarias</option>
-                        <option value="Otro">🏷️ Otro</option>
+                <th class="px-3 py-1">
+                    <select id="filtro-categoria-egresos" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
+                        <option value="">Todas</option>
+                        <option value="Servicios públicos">Servicios públicos</option>
+                        <option value="Gastos operativos">Gastos operativos</option>
+                        <option value="Arriendo">Arriendo</option>
+                        <option value="Nómina">Nómina</option>
+                        <option value="Transportes">Transportes</option>
+                        <option value="Mantenimiento y reparaciones">Mantenimiento y reparaciones</option>
+                        <option value="Muebles, equipos o maquinarias">Muebles, equipos o maquinarias</option>
+                        <option value="Otro">Otro</option>
                     </select>
                 </th>
-                <th class="px-4 pb-3"></th>
-                <th class="px-4 pb-3">
+                <th class="px-3 py-1"></th>
+                <th class="px-3 py-1">
                     <div class="relative" id="wrap-filtro-proveedor-egresos">
-                        <input id="filtro-proveedor-egresos" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="🚚 Proveedor" autocomplete="off">
+                        <input id="filtro-proveedor-egresos" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="Buscar proveedor" autocomplete="off">
                         <input id="filtro-proveedor-egresos-id" type="hidden" value="">
                         <div id="filtro-proveedor-egresos-dd" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden"></div>
                     </div>
                 </th>
-                <th class="px-4 pb-3"></th>
-                <th class="px-4 pb-3"></th>
+                <th class="px-3 py-1"></th>
+                <th class="px-3 py-1"></th>
+                <th class="px-3 py-1"></th>
             </tr>
         </thead>
         <tbody id="egresos-tbody" class="bg-white divide-y divide-gray-200">
             <tr>
-                <td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay gastos registrados. Usa el botón "Nuevo gasto" para cargarlos.</td>
+                <td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay gastos registrados. Usa el botón "Nuevo gasto" para cargarlos.</td>
             </tr>
         </tbody>
     </table>
+
+    <div class="hidden">
+        <span id="egresos-total-periodo">$0,00</span>
+    </div>
 </div>
 
-<div class="mt-3 flex justify-end">
-    <div class="text-sm text-gray-600">
-        <span class="font-medium text-gray-800">Total del período mostrado:</span>
-        <span id="egresos-total-periodo" class="ml-1 font-semibold text-gray-900">$0,00</span>
-    </div>
 </div>
 
 <div id="modal-export-egresos" class="hidden fixed inset-0 z-50">
@@ -119,18 +165,39 @@
             </div>
             <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button id="btn-export-egresos-pdf" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
-                    <div class="text-2xl">📄</div>
+                    <div class="text-3xl leading-none select-none">📄</div>
                     <div class="mt-2 font-semibold text-gray-900">Exportar a PDF</div>
                     <div class="text-xs text-gray-500">Ideal para imprimir o enviar.</div>
                 </button>
                 <button id="btn-export-egresos-xls" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
-                    <div class="text-2xl">📊</div>
+                    <div class="text-3xl leading-none select-none">📊</div>
                     <div class="mt-2 font-semibold text-gray-900">Exportar a Excel</div>
                     <div class="text-xs text-gray-500">Descarga un CSV compatible.</div>
                 </button>
             </div>
             <div class="px-5 py-4 border-t border-gray-100 flex justify-end">
                 <button id="btn-cancel-export-egresos" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-preview-egreso" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Archivo adjunto</h3>
+                    <p class="text-xs text-gray-500">Vista previa del comprobante asociado al gasto.</p>
+                </div>
+                <button id="btn-close-preview-egreso" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="preview-egreso-body" class="p-5 text-sm text-gray-700"></div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end">
+                <button id="btn-cancel-preview-egreso" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cerrar</button>
             </div>
         </div>
     </div>
@@ -144,12 +211,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const tbody = document.getElementById('egresos-tbody');
     const elTotalPeriodo = document.getElementById('egresos-total-periodo');
 
+    const kpiGastosHoy = document.getElementById('kpi-gastos-hoy');
+    const kpiCantGastosHoy = document.getElementById('kpi-cant-gastos-hoy');
+    const kpiGastosMes = document.getElementById('kpi-gastos-mes');
+    const kpiTopCatsPie = document.getElementById('kpi-top-cats-pie');
+    const kpiTopCatsTooltip = document.getElementById('kpi-top-cats-tooltip');
+    const kpiTopCatsLegend = document.getElementById('kpi-top-cats-legend');
+
     const btnExport = document.getElementById('btn-export-egresos');
     const modalExport = document.getElementById('modal-export-egresos');
     const btnCloseExport = document.getElementById('btn-close-export-egresos');
     const btnCancelExport = document.getElementById('btn-cancel-export-egresos');
     const btnExportPdf = document.getElementById('btn-export-egresos-pdf');
     const btnExportXls = document.getElementById('btn-export-egresos-xls');
+
+    const modalPreview = document.getElementById('modal-preview-egreso');
+    const previewBody = document.getElementById('preview-egreso-body');
+    const btnClosePreview = document.getElementById('btn-close-preview-egreso');
+    const btnCancelPreview = document.getElementById('btn-cancel-preview-egreso');
 
     const filtroRango = document.getElementById('filtro-rango-egresos');
     const filtroCategoria = document.getElementById('filtro-categoria-egresos');
@@ -176,9 +255,204 @@ document.addEventListener('DOMContentLoaded', function () {
         return '$' + numero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    function fmtFecha(v) {
+        try {
+            if (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') {
+                return window.formatFechaDisplay(v);
+            }
+        } catch (e) {
+        }
+        return String(v ?? '');
+    }
+
     function parseNumeroSeguro(v) {
         const n = parseFloat(String(v || '').replace(',', '.'));
         return isNaN(n) ? 0 : n;
+    }
+
+    function isSameDay(a, b) {
+        if (!a || !b) return false;
+        return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
+
+    function updateKpis(allEgresos) {
+        const list = Array.isArray(allEgresos) ? allEgresos : [];
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const month = now.getMonth();
+        const year = now.getFullYear();
+
+        let totalHoy = 0;
+        let countHoy = 0;
+        let totalMes = 0;
+        const cats = {};
+
+        list.forEach(e => {
+            if (e && e.meta && e.meta.supplier_cc_payment === true) return;
+            const dt = parseFechaEgreso(e?.fecha);
+            if (!dt) return;
+            const val = parseNumeroSeguro(e?.valor);
+            if (!(val > 0)) return;
+
+            if (isSameDay(dt, today)) {
+                totalHoy += val;
+                countHoy += 1;
+            }
+
+            if (dt.getFullYear() === year && dt.getMonth() === month) {
+                totalMes += val;
+                const c = String(e?.categoria || 'Sin categoría').trim() || 'Sin categoría';
+                cats[c] = (cats[c] || 0) + val;
+            }
+        });
+
+        if (kpiGastosHoy) kpiGastosHoy.textContent = formatearMoneda(totalHoy);
+        if (kpiCantGastosHoy) kpiCantGastosHoy.textContent = String(countHoy);
+        if (kpiGastosMes) kpiGastosMes.textContent = formatearMoneda(totalMes);
+
+        if (kpiTopCatsTooltip) {
+            kpiTopCatsTooltip.classList.add('hidden');
+        }
+
+        if (!kpiTopCatsPie) return;
+
+        const entriesAll = Object.keys(cats).map(k => ({ cat: k, total: cats[k] }));
+        entriesAll.sort((a, b) => (b.total - a.total));
+
+        if (!entriesAll.length || !(totalMes > 0)) {
+            kpiTopCatsPie.innerHTML = '';
+            if (kpiTopCatsLegend) kpiTopCatsLegend.innerHTML = '<div class="text-gray-500">Sin datos</div>';
+            const empty = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            empty.setAttribute('x', '60');
+            empty.setAttribute('y', '64');
+            empty.setAttribute('text-anchor', 'middle');
+            empty.setAttribute('font-size', '11');
+            empty.setAttribute('fill', '#6b7280');
+            empty.textContent = 'Sin datos';
+            kpiTopCatsPie.appendChild(empty);
+            return;
+        }
+
+        const maxSlices = 6;
+        const main = entriesAll.slice(0, maxSlices - 1);
+        const rest = entriesAll.slice(maxSlices - 1);
+        const otrosTotal = rest.reduce((acc, x) => acc + (x.total || 0), 0);
+        const entries = otrosTotal > 0 ? main.concat([{ cat: 'Otros', total: otrosTotal }]) : main;
+
+        const palette = ['#4f46e5', '#2563eb', '#059669', '#d97706', '#db2777', '#0ea5e9', '#7c3aed', '#16a34a'];
+        const cx = 60;
+        const cy = 60;
+        const r = 44;
+
+        const svgNS = 'http://www.w3.org/2000/svg';
+        kpiTopCatsPie.innerHTML = '';
+
+        const bg = document.createElementNS(svgNS, 'circle');
+        bg.setAttribute('cx', String(cx));
+        bg.setAttribute('cy', String(cy));
+        bg.setAttribute('r', String(r));
+        bg.setAttribute('fill', '#f3f4f6');
+        kpiTopCatsPie.appendChild(bg);
+
+        const polar = function (angleDeg) {
+            const a = (angleDeg - 90) * Math.PI / 180;
+            return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+        };
+
+        const tooltip = function (evt, label) {
+            if (!kpiTopCatsTooltip) return;
+            const box = kpiTopCatsPie.getBoundingClientRect();
+            const x = (evt.clientX - box.left);
+            const y = (evt.clientY - box.top);
+            kpiTopCatsTooltip.textContent = label;
+            const maxX = Math.max(0, box.width - 10);
+            const maxY = Math.max(0, box.height - 10);
+            kpiTopCatsTooltip.style.transform = 'translate(' + Math.min(maxX, Math.max(0, x + 10)) + 'px,' + Math.min(maxY, Math.max(0, y + 10)) + 'px)';
+            kpiTopCatsTooltip.classList.remove('hidden');
+        };
+
+        const hideTooltip = function () {
+            if (!kpiTopCatsTooltip) return;
+            kpiTopCatsTooltip.classList.add('hidden');
+        };
+
+        if (kpiTopCatsLegend) kpiTopCatsLegend.innerHTML = '';
+
+        const maxLegendItems = 3;
+
+        let start = 0;
+        entries.forEach((item, idx) => {
+            const frac = (item.total || 0) / totalMes;
+            const sweep = frac * 360;
+            const end = start + sweep;
+            const pct = frac * 100;
+            const pctTxt = (Math.round(pct * 10) / 10).toFixed(1).replace(/\.0$/, '') + '%';
+            const label = String(item.cat) + ' · ' + pctTxt + ' · ' + formatearMoneda(item.total || 0);
+
+            if (kpiTopCatsLegend && idx < maxLegendItems) {
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-1 text-[11px] leading-4';
+                row.innerHTML = ''
+                    + '<div class="min-w-0 flex items-center gap-1 flex-1">'
+                    +   '<span class="h-1.5 w-1.5 rounded-full" style="background-color:' + palette[idx % palette.length] + '"></span>'
+                    +   '<span class="truncate text-gray-700 flex-1">' + String(item.cat) + '</span>'
+                    + '</div>'
+                    + '<span class="text-gray-500 w-9 shrink-0 text-right tabular-nums">' + pctTxt + '</span>';
+                kpiTopCatsLegend.appendChild(row);
+            }
+
+            if (sweep >= 359.99) {
+                const full = document.createElementNS(svgNS, 'circle');
+                full.setAttribute('cx', String(cx));
+                full.setAttribute('cy', String(cy));
+                full.setAttribute('r', String(r));
+                full.setAttribute('fill', palette[idx % palette.length]);
+                full.setAttribute('stroke', '#ffffff');
+                full.setAttribute('stroke-width', '1');
+                full.style.cursor = 'pointer';
+                full.addEventListener('mousemove', function (evt) { tooltip(evt, label); });
+                full.addEventListener('mouseenter', function (evt) { tooltip(evt, label); });
+                full.addEventListener('mouseleave', function () { hideTooltip(); });
+                kpiTopCatsPie.appendChild(full);
+            } else {
+                const p1 = polar(start);
+                const p2 = polar(end);
+                const large = sweep > 180 ? '1' : '0';
+                const path = document.createElementNS(svgNS, 'path');
+                const d = [
+                    'M', cx, cy,
+                    'L', p1.x.toFixed(2), p1.y.toFixed(2),
+                    'A', r, r, 0, large, 1, p2.x.toFixed(2), p2.y.toFixed(2),
+                    'Z'
+                ].join(' ');
+                path.setAttribute('d', d);
+                path.setAttribute('fill', palette[idx % palette.length]);
+                path.setAttribute('stroke', '#ffffff');
+                path.setAttribute('stroke-width', '1');
+                path.style.cursor = 'pointer';
+                path.addEventListener('mousemove', function (evt) { tooltip(evt, label); });
+                path.addEventListener('mouseenter', function (evt) { tooltip(evt, label); });
+                path.addEventListener('mouseleave', function () { hideTooltip(); });
+                kpiTopCatsPie.appendChild(path);
+            }
+            start = end;
+        });
+
+        const hole = document.createElementNS(svgNS, 'circle');
+        hole.setAttribute('cx', String(cx));
+        hole.setAttribute('cy', String(cy));
+        hole.setAttribute('r', '22');
+        hole.setAttribute('fill', '#ffffff');
+        kpiTopCatsPie.appendChild(hole);
+
+        const centerText = document.createElementNS(svgNS, 'text');
+        centerText.setAttribute('x', String(cx));
+        centerText.setAttribute('y', String(cy + 4));
+        centerText.setAttribute('text-anchor', 'middle');
+        centerText.setAttribute('font-size', '10');
+        centerText.setAttribute('fill', '#111827');
+        centerText.textContent = 'Mes';
+        kpiTopCatsPie.appendChild(centerText);
     }
 
     function iconoCategoria(categoria) {
@@ -204,14 +478,74 @@ document.addEventListener('DOMContentLoaded', function () {
         return [];
     }
 
-    function guardarEgresos(arr) {
-        try {
-            if (window.StorageService && typeof window.StorageService.saveExpenses === 'function') {
-                window.StorageService.saveExpenses(Array.isArray(arr) ? arr : []);
-                return;
-            }
-        } catch (e) {
+    function deleteEgresoById(id) {
+        const eid = String(id || '').trim();
+        if (!eid) return;
+
+        fetch('/expenses/api/expenses/' + encodeURIComponent(eid), {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        })
+            .then(r => r.json().catch(() => ({})))
+            .then(function (data) {
+                if (data && data.ok === true) {
+                    renderTabla();
+                    return;
+                }
+                if (window.showAlertModal) window.showAlertModal('No se pudo eliminar el gasto. Intentá nuevamente.', 'Atención', 'Error');
+                else alert('No se pudo eliminar el gasto.');
+            })
+            .catch(function () {
+                if (window.showAlertModal) window.showAlertModal('No se pudo eliminar el gasto. Revisá tu conexión e intentá nuevamente.', 'Atención', 'Error');
+                else alert('No se pudo eliminar el gasto.');
+            });
+    }
+
+    function openPreviewEgreso(files) {
+        if (!modalPreview || !previewBody) return;
+        const list = Array.isArray(files) ? files : [];
+
+        if (!list.length) {
+            previewBody.innerHTML = '<div class="text-sm text-gray-600">Este gasto no tiene archivos adjuntos.</div>';
+        } else {
+            const rows = list.map(function (f) {
+                const name = String(f?.name || 'Archivo');
+                const type = String(f?.type || '').trim();
+                const size = (typeof f?.size === 'number') ? f.size : parseInt(f?.size || 0, 10) || 0;
+                const sizeKb = size ? Math.round(size / 1024) : 0;
+                const url = String(f?.url || f?.data_url || '').trim();
+                const openLink = url ? ('<a class="text-indigo-700 hover:underline" href="' + url.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener">Descargar</a>') : '<span class="text-gray-400">—</span>';
+
+                return ''
+                    + '<tr class="border-b border-gray-100">'
+                    + '<td class="py-2 pr-2 text-gray-900">' + name.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>'
+                    + '<td class="py-2 pr-2 text-gray-500">' + (type ? type.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '—') + '</td>'
+                    + '<td class="py-2 pr-2 text-gray-500">' + (sizeKb ? (String(sizeKb) + ' KB') : '—') + '</td>'
+                    + '<td class="py-2 text-right">' + openLink + '</td>'
+                    + '</tr>';
+            }).join('');
+
+            previewBody.innerHTML = ''
+                + '<div class="overflow-auto">'
+                + '<table class="w-full text-xs">'
+                + '<thead><tr class="text-gray-600">'
+                + '<th class="text-left font-semibold py-2 pr-2">Nombre</th>'
+                + '<th class="text-left font-semibold py-2 pr-2">Tipo</th>'
+                + '<th class="text-left font-semibold py-2 pr-2">Tamaño</th>'
+                + '<th class="text-right font-semibold py-2">Acción</th>'
+                + '</tr></thead>'
+                + '<tbody>' + rows + '</tbody>'
+                + '</table>'
+                + '</div>';
         }
+
+        modalPreview.classList.remove('hidden');
+    }
+
+    function closePreviewEgreso() {
+        if (!modalPreview) return;
+        modalPreview.classList.add('hidden');
+        if (previewBody) previewBody.innerHTML = '';
     }
 
     function leerSuppliers() {
@@ -362,10 +696,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const s = String(status || '').trim();
         if (!s) return '';
         if (s === 'Pending' || s === 'Pendiente') {
-            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-yellow-50 text-yellow-700">⏳ Pendiente</span>';
+            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-yellow-50 text-yellow-700"><i class="fas fa-clock text-[10px]"></i> Pendiente</span>';
         }
         if (s === 'Paid' || s === 'Pagado') {
-            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-50 text-green-700">✅ Pagado</span>';
+            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-50 text-green-700"><i class="fas fa-check-circle text-[10px]"></i> Pagado</span>';
         }
         return '';
     }
@@ -373,12 +707,12 @@ document.addEventListener('DOMContentLoaded', function () {
     function badgeOrigen(origin) {
         const o = String(origin || '').trim();
         if (!o || o === 'Manual' || o === 'manual') {
-            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700">✍️ Manual</span>';
+            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700"><i class="fas fa-pen text-[10px]"></i> Manual</span>';
         }
         if (o === 'Inventory' || o === 'inventory') {
-            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700">📦 Inventario</span>';
+            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700"><i class="fas fa-box text-[10px]"></i> Inventario</span>';
         }
-        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700">🔗 ' + o + '</span>';
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700"><i class="fas fa-link text-[10px]"></i> ' + o + '</span>';
     }
 
     function escapeHtml(v) {
@@ -396,9 +730,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!createdAt && !originRef) return '';
         const titleParts = [];
         if (originRef) titleParts.push('Ref: ' + originRef);
-        if (createdAt) titleParts.push('Creado: ' + createdAt);
+        if (createdAt) titleParts.push('Creado: ' + fmtFecha(createdAt));
         const title = escapeHtml(titleParts.join(' | '));
-        return '<span class="ml-2 text-gray-400" title="' + title + '">🧾</span>';
+        return '<span class="ml-2 text-gray-400" title="' + title + '"><i class="fas fa-receipt"></i></span>';
     }
 
     function countAdjuntos(e) {
@@ -428,7 +762,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const res = leerEgresos();
         const apply = function (arr) {
-        let egresos = Array.isArray(arr) ? arr.slice() : [];
+        const egresosAll = Array.isArray(arr) ? arr.slice() : [];
+        updateKpis(egresosAll);
+        let egresos = egresosAll.slice();
 
         const rango = parseRangoFechas(filtroRango?.value);
         if (rango) {
@@ -477,51 +813,47 @@ document.addEventListener('DOMContentLoaded', function () {
         tbody.innerHTML = '';
         if (!egresos.length) {
             const tr = document.createElement('tr');
-            tr.innerHTML = '<td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay gastos registrados. Usa el botón "Nuevo gasto" para cargarlos.</td>';
+            tr.innerHTML = '<td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay gastos registrados. Usa el botón "Nuevo gasto" para cargarlos.</td>';
             tbody.appendChild(tr);
             return;
         }
 
-        let lastGroupKey = '';
         egresos.forEach(e => {
-            const dt = parseFechaEgreso(e?.fecha);
-            const key = dt ? dt.toISOString().slice(0, 10) : 'sin-fecha';
-            if (key !== lastGroupKey) {
-                lastGroupKey = key;
-                const trGroup = document.createElement('tr');
-                trGroup.className = 'bg-gray-50';
-                const lblDia = dt ? labelDia(dt) : '';
-                const lblFecha = dt ? formatFechaLabel(dt) : '-';
-                const title = (lblDia ? (lblDia + ' – ') : '') + lblFecha;
-                trGroup.innerHTML = `<td colspan="6" class="px-4 py-2 text-xs font-semibold text-gray-700">📅 ${title}</td>`;
-                tbody.appendChild(trGroup);
-            }
-
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-gray-50 group';
-
-            const estado = badgeEstadoPago(e?.payment_status || e?.estado_pago || e?.estado || '');
-            const origen = badgeOrigen(e?.origin || '');
             const adjCount = countAdjuntos(e);
-            const adjIcon = adjCount ? `<span class="ml-2 text-gray-400" title="${adjCount} archivo adjunto">📎</span>` : '';
-            const traceHint = buildTraceHint(e);
-            const badges = (estado || origen) ? `<div class="mt-1 flex flex-wrap gap-1">${estado || ''}${origen || ''}</div>` : '';
+
+            const files = Array.isArray(e?.comprobante) ? e.comprobante : [];
+            const fileBtn = adjCount
+                ? ('<button type="button" class="btn-egreso-file inline-flex items-center gap-1 text-indigo-700 hover:text-indigo-900" data-id="' + String(e?.id || '') + '"><i class="fas fa-paperclip"></i><span class="text-[11px]">Ver (' + String(adjCount) + ')</span></button>')
+                : '<span class="text-gray-400">—</span>';
+
             tr.innerHTML = `
-                <td class="px-4 py-3 text-sm text-gray-500">${e?.fecha || '-'}</td>
-                <td class="px-4 py-3 text-sm text-gray-700">
+                <td class="px-3 py-2 text-xs text-gray-500">${fmtFecha(e?.fecha || '-')}</td>
+                <td class="px-3 py-2 text-xs text-gray-700">
                     <span class="inline-flex items-center gap-2">
                         <i class="fas ${iconoCategoria(e?.categoria)} text-gray-400"></i>
-                        <span>${e?.categoria || '-'}</span>${traceHint}
+                        <span>${e?.categoria || '-'}</span>
                     </span>
-                    ${badges}
                 </td>
-                <td class="px-4 py-3 text-sm text-right text-gray-900">${formatearMoneda(parseNumeroSeguro(e?.valor))}</td>
-                <td class="px-4 py-3 text-sm text-gray-900">${e?.supplier_name || e?.proveedor || '-'}</td>
-                <td class="px-4 py-3 text-sm text-gray-500">${(e?.nota || '')}${adjIcon}</td>
-                <td class="px-4 py-3 text-sm text-right">
-                    <div class="inline-flex gap-3 justify-end">
-                        <button type="button" class="btn-duplicar-egreso text-gray-600 hover:text-gray-900 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity" data-id="${e?.id}">Duplicar</button>
-                        <button type="button" class="btn-editar-egreso text-blue-600 hover:text-blue-800 text-xs font-medium" data-id="${e?.id}">Editar</button>
+                <td class="px-3 py-2 text-xs text-right text-gray-700">${formatearMoneda(parseNumeroSeguro(e?.valor))}</td>
+                <td class="px-3 py-2 text-xs text-gray-700">${e?.supplier_name || e?.proveedor || '-'}</td>
+                <td class="px-3 py-2 text-xs text-gray-500">${(e?.nota || '')}</td>
+                <td class="px-3 py-2 text-xs text-gray-500">${fileBtn}</td>
+                <td class="px-3 py-2 text-xs text-right">
+                    <div class="inline-flex items-center justify-end gap-1">
+                        <button type="button" class="btn-egreso-remito h-8 w-8 inline-flex items-center justify-center rounded-full hover:bg-gray-100" title="Descargar remito" data-id="${e?.id}">🧾</button>
+                        <div class="relative inline-block text-left">
+                            <button type="button" class="btn-egreso-menu inline-flex items-center justify-center h-8 w-8 rounded-full hover:bg-gray-100" data-id="${e?.id}">
+                                <i class="fas fa-ellipsis-v text-gray-500 text-xs"></i>
+                            </button>
+                            <div class="menu-egreso-acciones hidden origin-top-right absolute right-0 mt-1 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                                <div class="py-1 text-[11px]">
+                                    <button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="edit" data-id="${e?.id}">Editar</button>
+                                    <button type="button" class="w-full text-left px-3 py-2 text-red-700 hover:bg-red-50" data-action="delete" data-id="${e?.id}">Eliminar</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </td>
             `;
@@ -534,11 +866,64 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (tbody) {
         tbody.addEventListener('click', function(e) {
-            const btnEdit = e.target.closest('.btn-editar-egreso');
-            if (!btnEdit) return;
-            const id = btnEdit.getAttribute('data-id');
-            if (!id) return;
-            window.location.href = newUrl + '?id=' + encodeURIComponent(id);
+            const btnRemito = e.target.closest('.btn-egreso-remito');
+            if (btnRemito) {
+                const id = btnRemito.getAttribute('data-id');
+                if (!id) return;
+                window.location.href = '/expenses/api/expenses/' + encodeURIComponent(String(id)) + '/remito.pdf';
+                return;
+            }
+
+            const btnMenu = e.target.closest('.btn-egreso-menu');
+            if (btnMenu) {
+                const root = btnMenu.parentElement;
+                const menu = root ? root.querySelector('.menu-egreso-acciones') : null;
+                if (!menu) return;
+                const isOpen = !menu.classList.contains('hidden');
+                Array.from(document.querySelectorAll('.menu-egreso-acciones')).forEach(m => m.classList.add('hidden'));
+                if (!isOpen) menu.classList.remove('hidden');
+                return;
+            }
+
+            const act = e.target.closest('.menu-egreso-acciones button[data-action]');
+            if (act) {
+                const action = act.getAttribute('data-action');
+                const id = act.getAttribute('data-id');
+                Array.from(document.querySelectorAll('.menu-egreso-acciones')).forEach(m => m.classList.add('hidden'));
+                if (!id) return;
+                if (action === 'edit') {
+                    window.location.href = newUrl + '?id=' + encodeURIComponent(id);
+                    return;
+                }
+                if (action === 'delete') {
+                    if (window.confirmModal) {
+                        window.confirmModal(
+                            '¿Eliminar gasto? Esta acción no se puede deshacer.',
+                            'Eliminar gasto',
+                            'Confirmación requerida',
+                            { okText: 'Eliminar', cancelText: 'Cancelar' }
+                        ).then(function (ok) {
+                            if (!ok) return;
+                            deleteEgresoById(id);
+                        });
+                        return;
+                    }
+                    const ok = confirm('¿Eliminar gasto? Esta acción no se puede deshacer.');
+                    if (!ok) return;
+                    deleteEgresoById(id);
+                    return;
+                }
+                return;
+            }
+
+            const btnFile = e.target.closest('.btn-egreso-file');
+            if (btnFile) {
+                const id = btnFile.getAttribute('data-id');
+                if (!id) return;
+                const eg = (Array.isArray(lastRendered) ? lastRendered : []).find(x => String(x?.id || '') === String(id));
+                openPreviewEgreso(eg?.comprobante || []);
+                return;
+            }
         });
     }
 
@@ -549,6 +934,23 @@ document.addEventListener('DOMContentLoaded', function () {
             const id = btnDup.getAttribute('data-id');
             if (!id) return;
             window.location.href = newUrl + '?duplicate_id=' + encodeURIComponent(id);
+        });
+    }
+
+    document.addEventListener('click', function (ev) {
+        const target = ev.target;
+        const anyMenu = target && target.closest ? target.closest('.menu-egreso-acciones') : null;
+        const anyBtn = target && target.closest ? target.closest('.btn-egreso-menu') : null;
+        if (anyMenu || anyBtn) return;
+        Array.from(document.querySelectorAll('.menu-egreso-acciones')).forEach(m => m.classList.add('hidden'));
+    });
+
+    if (btnClosePreview) btnClosePreview.addEventListener('click', function () { closePreviewEgreso(); });
+    if (btnCancelPreview) btnCancelPreview.addEventListener('click', function () { closePreviewEgreso(); });
+    if (modalPreview) {
+        modalPreview.addEventListener('click', function (e) {
+            const target = e.target;
+            if (target && target === modalPreview.firstElementChild) closePreviewEgreso();
         });
     }
 
@@ -634,13 +1036,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const lines = [header.map(escapeCsvCell).join(';')];
         rows.forEach(e => {
             lines.push([
-                e?.fecha || '',
+                fmtFecha(e?.fecha || ''),
                 e?.categoria || '',
                 String(parseNumeroSeguro(e?.valor)),
                 e?.supplier_name || e?.proveedor || '',
                 e?.origin || '',
                 e?.origin_ref || '',
-                e?.created_at || '',
+                fmtFecha(e?.created_at || ''),
                 e?.nota || ''
             ].map(escapeCsvCell).join(';'));
         });
@@ -665,13 +1067,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const rowsHtml = rows.map(function (e) {
             return ''
                 + '<tr>'
-                + '<td>' + String(e?.fecha || '') + '</td>'
+                + '<td>' + String(fmtFecha(e?.fecha || '')) + '</td>'
                 + '<td>' + String(e?.categoria || '') + '</td>'
                 + '<td class="num">' + String(formatearMoneda(parseNumeroSeguro(e?.valor)) || '') + '</td>'
                 + '<td>' + String(e?.supplier_name || e?.proveedor || '') + '</td>'
                 + '<td>' + String(e?.origin || '') + '</td>'
                 + '<td>' + String(e?.origin_ref || '') + '</td>'
-                + '<td>' + String(e?.created_at || '') + '</td>'
+                + '<td>' + String(fmtFecha(e?.created_at || '')) + '</td>'
                 + '<td>' + String(e?.nota || '') + '</td>'
                 + '</tr>';
         }).join('');

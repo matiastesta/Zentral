@@ -2,60 +2,248 @@
 {% block title %}Proveedores{% endblock %}
 {% block content %}
 <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Proveedores</h1>
+    <div class="flex items-center gap-2">
+        <h1 class="text-2xl font-bold text-gray-900">Proveedores</h1>
+        <button type="button" class="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-gray-100 text-gray-600" data-kpi-toggle="suppliers" data-kpi-key="suppliers" data-kpi-target="#kpi-section-suppliers" aria-expanded="true" aria-label="Mostrar/ocultar KPIs">
+            <i data-kpi-toggle-icon class="fas fa-chevron-down"></i>
+        </button>
+    </div>
     <p class="mt-1 text-sm text-gray-600">Gestiona tus proveedores y relaciona cada uno con tus productos o categorías.</p>
 </div>
 
-<div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Total de proveedores</p>
-        <p id="sup-total" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Activos</p>
-        <p id="sup-activos" class="mt-2 text-2xl font-semibold text-green-600">0</p>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Con compras recientes</p>
-        <p class="mt-2 text-2xl font-semibold text-gray-900">0</p>
-    </div>
-</div>
-
-<div class="flex flex-col justify-between gap-2 mb-4 md:flex-row md:items-start">
-    <div class="flex-1">
-        <div class="flex flex-col gap-2">
-            <div class="flex flex-col sm:flex-row gap-2">
-                <input id="sup-buscar" type="text" placeholder="Buscar proveedor" class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-            </div>
+<div id="kpi-section-suppliers" class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-4">
+    <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center">
+        <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-indigo-50 text-indigo-700">
+            <i class="fas fa-truck"></i>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Total de proveedores</p>
+            <p id="kpi-sup-total" class="text-lg font-semibold text-gray-900">0</p>
         </div>
     </div>
-    <div class="flex gap-2 justify-end">
-        <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
-            <i class="fas fa-file-export mr-2"></i> Exportar
-        </button>
-        <a href="{{ url_for('suppliers.new') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
-            <i class="fas fa-user-plus mr-2"></i> Nuevo proveedor
-        </a>
+
+    <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center">
+        <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-green-50 text-green-700">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Proveedores activos</p>
+            <p id="kpi-sup-active" class="text-lg font-semibold text-green-600">0</p>
+        </div>
+    </div>
+
+    <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center">
+        <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-blue-50 text-blue-700">
+            <i class="fas fa-receipt"></i>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Monto comprado (mes)</p>
+            <p id="kpi-sup-month-spend" class="text-lg font-semibold text-gray-900">$0,00</p>
+        </div>
+    </div>
+
+    <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center">
+        <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-red-50 text-red-700">
+            <i class="fas fa-wallet"></i>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Saldo a pagar</p>
+            <p id="kpi-sup-cc-due" class="text-lg font-semibold text-red-700">$0,00</p>
+        </div>
     </div>
 </div>
 
 <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-3">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Listado de proveedores</h2>
+            <p class="text-xs text-gray-500">Consultá la última compra, el gasto del mes y el saldo de cuenta corriente. Filtrá por categoría y estado para encontrar rápido lo que buscás.</p>
+        </div>
+        <div class="flex gap-2 justify-end">
+            <button class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">
+                <i class="fas fa-file-export mr-2"></i> Exportar
+            </button>
+            <a href="{{ url_for('suppliers.new') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                <i class="fas fa-user-plus mr-2"></i> Nuevo proveedor
+            </a>
+        </div>
+    </div>
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nombre</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Tipo</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Estado</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categorías asociadas</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Última compra</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Monto comprado (mes)</th>
+                <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Saldo cuenta corriente</th>
                 <th class="px-4 py-3"></th>
+            </tr>
+            <tr class="bg-white">
+                <th class="px-4 py-2">
+                    <input id="sup-filter-name" type="text" class="w-full px-2 py-1 text-xs border rounded-md text-gray-700" placeholder="Buscar...">
+                </th>
+                <th class="px-4 py-2">
+                    <div class="relative">
+                        <button id="sup-cat-btn" type="button" class="w-full px-2 py-1 text-xs border rounded-md bg-white text-gray-700 inline-flex items-center justify-between">
+                            <span id="sup-cat-btn-label" class="truncate">Categoría: todas</span>
+                            <i class="fas fa-chevron-down text-[10px] text-gray-400"></i>
+                        </button>
+                        <div id="sup-cat-items" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-auto max-h-56"></div>
+                    </div>
+                </th>
+                <th class="px-4 py-2">
+                    <div class="relative">
+                        <button id="sup-status-btn" type="button" class="w-full px-2 py-1 text-xs border rounded-md bg-white text-gray-700 inline-flex items-center justify-between">
+                            <span id="sup-status-btn-label" class="truncate">Estado: todos</span>
+                            <i class="fas fa-chevron-down text-[10px] text-gray-400"></i>
+                        </button>
+                        <div id="sup-status-items" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-auto max-h-56"></div>
+                    </div>
+                </th>
+                <th class="px-4 py-2"></th>
+                <th class="px-4 py-2"></th>
+                <th class="px-4 py-2"></th>
+                <th class="px-4 py-2"></th>
             </tr>
         </thead>
         <tbody id="sup-tbody" class="bg-white divide-y divide-gray-200">
             <tr>
-                <td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay proveedores cargados. Podés darlos de alta desde Proveedores o Egresos.</td>
+                <td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay proveedores cargados. Podés darlos de alta desde Proveedores o Egresos.</td>
             </tr>
         </tbody>
     </table>
+</div>
+
+<div id="modal-supplier-cc" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-start justify-center p-4 overflow-y-auto">
+        <div class="w-full max-w-5xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col my-4" style="max-height: calc(100vh - 2rem);">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Cuenta corriente</h3>
+                    <p id="supplier-cc-subtitle" class="text-xs text-gray-500">—</p>
+                </div>
+                <button id="btn-close-supplier-cc" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-4 overflow-y-auto flex-1">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div class="p-3 rounded-xl bg-gray-50 border border-gray-200">
+                        <div class="text-[11px] text-gray-500">Deuda total</div>
+                        <div id="cc-total-due" class="mt-1 text-xl font-semibold text-gray-900">$0,00</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-gray-50 border border-gray-200">
+                        <div class="text-[11px] text-gray-500">Deuda vencida</div>
+                        <div id="cc-overdue-due" class="mt-1 text-xl font-semibold text-red-700">$0,00</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-gray-50 border border-gray-200">
+                        <div class="text-[11px] text-gray-500">Próximo vencimiento</div>
+                        <div id="cc-next-due" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-gray-50 border border-gray-200">
+                        <div class="text-[11px] text-gray-500">Documentos abiertos</div>
+                        <div id="cc-open-items" class="mt-1 text-xl font-semibold text-gray-900">0</div>
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                        <div>
+                            <div class="text-sm font-semibold text-gray-900">Legajo</div>
+                            <div class="text-xs text-gray-500">Compras en cuenta corriente y su estado.</div>
+                        </div>
+                    </div>
+                    <div class="overflow-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-xs">
+                            <thead class="bg-white">
+                                <tr class="text-gray-600">
+                                    <th class="px-4 py-2 text-left font-semibold">Fecha</th>
+                                    <th class="px-4 py-2 text-left font-semibold">Categoría</th>
+                                    <th class="px-4 py-2 text-left font-semibold">Nota</th>
+                                    <th class="px-4 py-2 text-right font-semibold">Total</th>
+                                    <th class="px-4 py-2 text-right font-semibold">Pagado</th>
+                                    <th class="px-4 py-2 text-right font-semibold">Saldo</th>
+                                    <th class="px-4 py-2 text-left font-semibold">Estado</th>
+                                    <th class="px-4 py-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="cc-ledger-tbody" class="divide-y divide-gray-200 bg-white">
+                                <tr>
+                                    <td colspan="8" class="px-4 py-6 text-sm text-center text-gray-500">Seleccioná un proveedor.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                        <div>
+                            <div class="text-sm font-semibold text-gray-900">Transacciones</div>
+                            <div class="text-xs text-gray-500">Registro de compras y pagos realizados.</div>
+                        </div>
+                    </div>
+                    <div class="overflow-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-xs">
+                            <thead class="bg-white">
+                                <tr class="text-gray-600">
+                                    <th class="px-4 py-2 text-left font-semibold">Fecha</th>
+                                    <th class="px-4 py-2 text-left font-semibold">Tipo</th>
+                                    <th class="px-4 py-2 text-left font-semibold">Método</th>
+                                    <th class="px-4 py-2 text-right font-semibold">Importe</th>
+                                    <th class="px-4 py-2 text-left font-semibold">Documento</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cc-tx-tbody" class="divide-y divide-gray-200 bg-white">
+                                <tr>
+                                    <td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Seleccioná un proveedor.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl p-4 bg-gray-50">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <div class="text-sm font-semibold text-gray-900">Registrar pago</div>
+                            <div class="text-xs text-gray-500">Aplicá un pago a un documento de cuenta corriente.</div>
+                        </div>
+                        <div id="cc-pay-error" class="hidden text-xs text-red-700">No se pudo registrar el pago.</div>
+                    </div>
+                    <div class="mt-3 grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Documento</label>
+                            <select id="cc-pay-expense" class="w-full px-3 py-2 text-sm border rounded-md bg-white"></select>
+                        </div>
+                        <div class="md:col-span-1">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Importe</label>
+                            <input id="cc-pay-amount" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
+                        </div>
+                        <div class="md:col-span-1">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Método</label>
+                            <select id="cc-pay-method" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                                <option>Efectivo</option>
+                                <option>Transferencia</option>
+                                <option>Débito</option>
+                                <option>Crédito</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-1 flex justify-end">
+                            <button id="btn-cc-pay" type="button" class="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Pagar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-close-supplier-cc-2" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cerrar</button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -63,14 +251,66 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const elTotal = document.getElementById('sup-total');
-    const elActivos = document.getElementById('sup-activos');
-    const inputBuscar = document.getElementById('sup-buscar');
+    const elTotal = document.getElementById('kpi-sup-total');
+    const elActivos = document.getElementById('kpi-sup-active');
+    const elMonthSpend = document.getElementById('kpi-sup-month-spend');
+    const elCcDue = document.getElementById('kpi-sup-cc-due');
+    const inputBuscar = document.getElementById('sup-filter-name');
+    const btnCat = document.getElementById('sup-cat-btn');
+    const catBtnLabel = document.getElementById('sup-cat-btn-label');
+    const catItems = document.getElementById('sup-cat-items');
+    const btnStatus = document.getElementById('sup-status-btn');
+    const statusBtnLabel = document.getElementById('sup-status-btn-label');
+    const statusItems = document.getElementById('sup-status-items');
     const tbody = document.getElementById('sup-tbody');
+
+    const modalCc = document.getElementById('modal-supplier-cc');
+    const btnCloseCc = document.getElementById('btn-close-supplier-cc');
+    const btnCloseCc2 = document.getElementById('btn-close-supplier-cc-2');
+    const ccSubtitle = document.getElementById('supplier-cc-subtitle');
+    const ccTotal = document.getElementById('cc-total-due');
+    const ccOverdue = document.getElementById('cc-overdue-due');
+    const ccNext = document.getElementById('cc-next-due');
+    const ccOpenItems = document.getElementById('cc-open-items');
+    const ccTbody = document.getElementById('cc-ledger-tbody');
+    const ccPayExpense = document.getElementById('cc-pay-expense');
+    const ccPayAmount = document.getElementById('cc-pay-amount');
+    const ccPayMethod = document.getElementById('cc-pay-method');
+    const ccPayError = document.getElementById('cc-pay-error');
+    const btnPay = document.getElementById('btn-cc-pay');
+    const ccTxTbody = document.getElementById('cc-tx-tbody');
 
     const editBaseUrl = "{{ url_for('suppliers.new') }}";
 
+    let ccSupplierId = '';
+    let ccSupplierName = '';
+    let ccLedgerCache = null;
+
     function leerSuppliers() {
+        try {
+            return fetch('/suppliers/api/suppliers?limit=5000', { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    const items = (data && data.ok === true)
+                        ? (Array.isArray(data.items) ? data.items : [])
+                        : (Array.isArray(data && data.items) ? data.items : []);
+                    try {
+                        guardarSuppliers(items);
+                    } catch (e) {
+                    }
+                    return items;
+                })
+                .catch(function () {
+                    try {
+                        if (window.StorageService && typeof window.StorageService.getSuppliers === 'function') {
+                            return window.StorageService.getSuppliers();
+                        }
+                    } catch (e) {
+                    }
+                    return [];
+                });
+        } catch (e) {
+        }
         try {
             if (window.StorageService && typeof window.StorageService.getSuppliers === 'function') {
                 return window.StorageService.getSuppliers();
@@ -78,6 +318,26 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (e) {
         }
         return [];
+    }
+
+    function leerEgresos() {
+        try {
+            if (window.StorageService && typeof window.StorageService.getExpenses === 'function') {
+                return window.StorageService.getExpenses();
+            }
+        } catch (e) {
+        }
+        try {
+            return fetch('/expenses/api/expenses?limit=5000', { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data && data.ok === true) return Array.isArray(data.items) ? data.items : [];
+                    return Array.isArray(data && data.items) ? data.items : [];
+                })
+                .catch(function () { return []; });
+        } catch (e) {
+            return [];
+        }
     }
 
     function guardarSuppliers(arr) {
@@ -92,6 +352,417 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function isPromise(x) {
         return !!x && typeof x.then === 'function';
+    }
+
+    let catAllMode = true;
+    let catSelected = new Set();
+    let statusAllMode = true;
+    let statusSelected = new Set();
+
+    const statusOpts = [
+        { k: 'Active', label: 'Activo' },
+        { k: 'Inactive', label: 'Inactivo' },
+        { k: 'Discontinued', label: 'Dado de baja' },
+    ];
+
+    function renderMultiselectItems(container, allLabel, opts, selectedSet, clsAll, clsOpt, allMode) {
+        if (!container) return;
+        const allOn = !!allMode;
+        const html = [];
+        html.push('<label class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">'
+            + '<input type="checkbox" class="' + clsAll + '" ' + (allOn ? 'checked' : '') + ' />'
+            + '<span class="truncate">' + allLabel + '</span>'
+            + '</label>');
+        opts.forEach(function (it) {
+            const checked = allOn ? true : selectedSet.has(it.k);
+            html.push('<label class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">'
+                + '<input type="checkbox" class="' + clsOpt + '" data-k="' + String(it.k).replace(/\"/g, '&quot;') + '" ' + (checked ? 'checked' : '') + ' />'
+                + '<span class="truncate">' + String(it.label || it.k) + '</span>'
+                + '</label>');
+        });
+        container.innerHTML = html.join('');
+    }
+
+    function formatMultiLabel(prefix, opts, selectedSet, allMode) {
+        if (allMode) return prefix + ': todas';
+        const total = opts.length;
+        const sel = selectedSet.size;
+        if (!sel) return prefix + ': —';
+        if (sel === 1) {
+            const one = Array.from(selectedSet)[0];
+            const it = opts.find(x => x.k === one);
+            return prefix + ': ' + (it ? it.label : one);
+        }
+        if (sel === total) return prefix + ': todas';
+        return prefix + ': ' + sel + ' seleccionadas';
+    }
+
+    function closeSupplierFilterDropdowns() {
+        if (catItems) catItems.classList.add('hidden');
+        if (statusItems) statusItems.classList.add('hidden');
+    }
+
+    function syncSupplierFilterButtons(catOpts) {
+        if (catBtnLabel) catBtnLabel.textContent = formatMultiLabel('Categoría', catOpts, catSelected, catAllMode);
+        if (statusBtnLabel) statusBtnLabel.textContent = formatMultiLabel('Estado', statusOpts, statusSelected, statusAllMode);
+    }
+
+    function fmtMoney(n) {
+        const num = isNaN(n) ? 0 : n;
+        return '$' + num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function safeNum(v) {
+        const n = parseFloat(String(v ?? '').replace(',', '.'));
+        return isNaN(n) ? 0 : n;
+    }
+
+    function parseExpenseDate(exp) {
+        const e = exp && typeof exp === 'object' ? exp : {};
+        const iso = String(e.fecha || e.expense_date || e.date || '').trim();
+        if (iso) {
+            const t = Date.parse(iso);
+            if (!isNaN(t)) return new Date(t);
+        }
+        const createdAt = e.created_at;
+        if (typeof createdAt === 'number' && isFinite(createdAt)) return new Date(createdAt);
+        return null;
+    }
+
+    function fmtIsoDateOrDash(d) {
+        if (!d) return '—';
+        try {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return y + '-' + m + '-' + dd;
+        } catch (e) {
+            return '—';
+        }
+    }
+
+    function isCcPaymentExpense(exp) {
+        const e = exp && typeof exp === 'object' ? exp : {};
+        return !!(e.meta && e.meta.supplier_cc_payment === true);
+    }
+
+    function computeKpis(suppliers, expenses) {
+        const sups = Array.isArray(suppliers) ? suppliers : [];
+        const exps = Array.isArray(expenses) ? expenses : [];
+
+        const total = sups.length;
+        const activos = sups.filter(s => (s?.status || 'Active') === 'Active').length;
+
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+        const monthSpend = exps.reduce(function (acc, e) {
+            if (!e || typeof e !== 'object') return acc;
+            if (isCcPaymentExpense(e)) return acc;
+            const hasSupplier = String(e?.supplier_id || '').trim() || String(e?.supplier_name || e?.proveedor || '').trim();
+            if (!hasSupplier) return acc;
+            const dt = parseExpenseDate(e);
+            if (!dt) return acc;
+            if (!(dt >= monthStart && dt < monthEnd)) return acc;
+            return acc + safeNum(e?.valor ?? e?.amount);
+        }, 0);
+
+        const ccDue = exps.reduce(function (acc, e) {
+            if (!e || typeof e !== 'object') return acc;
+            if (isCcPaymentExpense(e)) return acc;
+            const hasSupplier = String(e?.supplier_id || '').trim() || String(e?.supplier_name || e?.proveedor || '').trim();
+            if (!hasSupplier) return acc;
+            const cc = (e.meta && typeof e.meta === 'object') ? e.meta.supplier_cc : null;
+            if (!cc || !cc.enabled) return acc;
+            const totalVal = safeNum(e?.valor ?? e?.amount);
+            const pays = Array.isArray(cc.payments) ? cc.payments : [];
+            const paid = pays.reduce(function (pacc, p) {
+                if (!p || typeof p !== 'object') return pacc;
+                return pacc + safeNum(p.amount);
+            }, 0);
+            const rem = Math.max(0, totalVal - paid);
+            return acc + rem;
+        }, 0);
+
+        if (elTotal) elTotal.textContent = String(total);
+        if (elActivos) elActivos.textContent = String(activos);
+        if (elMonthSpend) elMonthSpend.textContent = fmtMoney(monthSpend);
+        if (elCcDue) elCcDue.textContent = fmtMoney(ccDue);
+    }
+
+    function normName(v) {
+        return String(v || '').trim().toLowerCase();
+    }
+
+    function getSupplierKeyForExpense(e) {
+        const sid = String(e?.supplier_id || '').trim();
+        if (sid) return 'id:' + sid;
+        const nm = normName(e?.supplier_name || e?.proveedor || '');
+        if (nm) return 'name:' + nm;
+        return '';
+    }
+
+    function buildSupplierAgg(suppliers, expenses) {
+        const sups = Array.isArray(suppliers) ? suppliers : [];
+        const exps = Array.isArray(expenses) ? expenses : [];
+
+        const keysBySupplier = new Map();
+        sups.forEach(function (s) {
+            const id = String(s?.id || '').trim();
+            const nm = normName(s?.name || '');
+            const keys = [];
+            if (id) keys.push('id:' + id);
+            if (nm) keys.push('name:' + nm);
+            keysBySupplier.set(id || nm, keys);
+        });
+
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+        const map = new Map();
+        exps.forEach(function (e) {
+            if (!e || typeof e !== 'object') return;
+            if (isCcPaymentExpense(e)) return;
+            const k = getSupplierKeyForExpense(e);
+            if (!k) return;
+
+            const dt = parseExpenseDate(e);
+            const val = safeNum(e?.valor ?? e?.amount);
+            if (!(val > 0)) {
+                // for last purchase we still need date, even if amount 0 is ignored
+            }
+            if (!map.has(k)) {
+                map.set(k, { lastTs: 0, monthSpend: 0, ccDue: 0 });
+            }
+            const agg = map.get(k);
+
+            if (dt) {
+                agg.lastTs = Math.max(agg.lastTs || 0, dt.getTime() || 0);
+                if (dt >= monthStart && dt < monthEnd) {
+                    agg.monthSpend += val;
+                }
+            }
+
+            const cc = (e.meta && typeof e.meta === 'object') ? e.meta.supplier_cc : null;
+            if (cc && cc.enabled) {
+                const pays = Array.isArray(cc.payments) ? cc.payments : [];
+                const paid = pays.reduce(function (pacc, p) {
+                    if (!p || typeof p !== 'object') return pacc;
+                    return pacc + safeNum(p.amount);
+                }, 0);
+                const rem = Math.max(0, val - paid);
+                agg.ccDue += rem;
+            }
+        });
+
+        const bySupplierId = new Map();
+        sups.forEach(function (s) {
+            const id = String(s?.id || '').trim();
+            const nm = normName(s?.name || '');
+            const keys = [];
+            if (id) keys.push('id:' + id);
+            if (nm) keys.push('name:' + nm);
+
+            const merged = { lastTs: 0, monthSpend: 0, ccDue: 0 };
+            keys.forEach(function (k) {
+                const a = map.get(k);
+                if (!a) return;
+                merged.lastTs = Math.max(merged.lastTs || 0, a.lastTs || 0);
+                merged.monthSpend += (a.monthSpend || 0);
+                merged.ccDue += (a.ccDue || 0);
+            });
+            bySupplierId.set(id || nm, merged);
+        });
+
+        return bySupplierId;
+    }
+
+    function getPrimaryCategoryLabel(s) {
+        const cats = Array.isArray(s?.categories) ? s.categories : [];
+        const cleaned = cats.map(function (x) { return String(x || '').trim(); }).filter(Boolean);
+        if (!cleaned.length) return '—';
+        return cleaned[0];
+    }
+
+    function buildCategoryOptions(suppliers) {
+        const sups = Array.isArray(suppliers) ? suppliers : [];
+        const set = new Set();
+        sups.forEach(function (s) {
+            const cats = Array.isArray(s?.categories) ? s.categories : [];
+            cats.forEach(function (c) {
+                const v = String(c || '').trim();
+                if (v) set.add(v);
+            });
+        });
+        return Array.from(set.values()).sort(function (a, b) { return a.localeCompare(b); }).map(function (x) {
+            return { k: x, label: x };
+        });
+    }
+
+    async function apiJson(url, options) {
+        const res = await fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            ...(options || {})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || (data && data.ok === false)) {
+            const msg = (data && (data.message || data.error)) ? (data.message || data.error) : ('HTTP ' + res.status);
+            throw new Error(msg);
+        }
+        return data;
+    }
+
+    function openModalCc() {
+        if (!modalCc) return;
+        modalCc.classList.remove('hidden');
+    }
+
+    function closeModalCc() {
+        if (!modalCc) return;
+        modalCc.classList.add('hidden');
+        ccSupplierId = '';
+        ccSupplierName = '';
+        ccLedgerCache = null;
+    }
+
+    function badgeStatus(s) {
+        const st = String(s || '').trim();
+        if (st === 'paid') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[11px] font-medium">Pagado</span>';
+        if (st === 'overdue') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">Vencido</span>';
+        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[11px] font-medium">Pendiente</span>';
+    }
+
+    function badgeTxKind(k) {
+        const v = String(k || '').trim();
+        if (v === 'pago') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">Pago</span>';
+        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 text-[11px] font-medium">Compra</span>';
+    }
+
+    function renderCcLedger(payload) {
+        const p = payload && typeof payload === 'object' ? payload : {};
+        const summary = p.summary && typeof p.summary === 'object' ? p.summary : {};
+        const items = Array.isArray(p.items) ? p.items : [];
+
+        if (ccTotal) ccTotal.textContent = fmtMoney(parseFloat(summary.total_due || 0) || 0);
+        if (ccOverdue) ccOverdue.textContent = fmtMoney(parseFloat(summary.overdue_due || 0) || 0);
+        if (ccOpenItems) ccOpenItems.textContent = String(parseInt(summary.open_items || 0, 10) || 0);
+        if (ccNext) {
+            const d = String(summary.next_due_date || '').trim();
+            const a = parseFloat(summary.next_due_amount || 0) || 0;
+            ccNext.textContent = d ? (d + ' · ' + fmtMoney(a)) : '—';
+        }
+
+        if (ccPayExpense) {
+            ccPayExpense.innerHTML = '';
+            const open = items.filter(x => (parseFloat(x?.remaining || 0) || 0) > 0);
+            if (!open.length) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Sin deuda pendiente.';
+                ccPayExpense.appendChild(opt);
+            } else {
+                open.forEach(x => {
+                    const opt = document.createElement('option');
+                    opt.value = String(x?.expense_id || '');
+                    opt.textContent = (String(x?.date || '') || '—') + ' · ' + fmtMoney(parseFloat(x?.remaining || 0) || 0) + ' · ' + (String(x?.category || '') || 'Gasto');
+                    ccPayExpense.appendChild(opt);
+                });
+            }
+        }
+
+        if (!ccTbody) return;
+        ccTbody.innerHTML = '';
+        if (!items.length) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td colspan="8" class="px-4 py-6 text-sm text-center text-gray-500">No hay documentos en cuenta corriente para este proveedor.</td>';
+            ccTbody.appendChild(tr);
+            return;
+        }
+
+        items.forEach(x => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+            tr.innerHTML = ''
+                + '<td class="px-4 py-2 text-xs text-gray-500">' + String(x?.date || '—') + '</td>'
+                + '<td class="px-4 py-2 text-xs text-gray-700">' + String(x?.category || '—') + '</td>'
+                + '<td class="px-4 py-2 text-xs text-gray-500">' + String(x?.note || '') + '</td>'
+                + '<td class="px-4 py-2 text-xs text-right text-gray-700">' + fmtMoney(parseFloat(x?.amount || 0) || 0) + '</td>'
+                + '<td class="px-4 py-2 text-xs text-right text-gray-700">' + fmtMoney(parseFloat(x?.paid_total || 0) || 0) + '</td>'
+                + '<td class="px-4 py-2 text-xs text-right font-semibold ' + ((parseFloat(x?.remaining || 0) || 0) > 0 ? 'text-red-700' : 'text-gray-700') + '">' + fmtMoney(parseFloat(x?.remaining || 0) || 0) + '</td>'
+                + '<td class="px-4 py-2 text-xs">' + badgeStatus(x?.status) + '</td>'
+                + '<td class="px-4 py-2 text-xs text-right">'
+                + ((parseFloat(x?.remaining || 0) || 0) > 0 ? ('<button type="button" class="btn-cc-quickpay text-blue-700 hover:text-blue-900 text-xs font-medium" data-expense="' + String(x?.expense_id || '') + '">Pagar</button>') : '<span class="text-gray-400">—</span>')
+                + '</td>';
+            ccTbody.appendChild(tr);
+        });
+
+        if (ccTxTbody) {
+            ccTxTbody.innerHTML = '';
+            const txs = [];
+            items.forEach(function (doc) {
+                const docId = String(doc?.expense_id || '').trim();
+                const docLabel = (String(doc?.date || '') || '—') + ' · ' + (String(doc?.category || '') || 'Documento');
+                const list = Array.isArray(doc?.transactions) ? doc.transactions : [];
+                list.forEach(function (t) {
+                    txs.push({
+                        date: String(t?.date || '').trim(),
+                        kind: String(t?.kind || '').trim() || 'compra',
+                        method: String(t?.payment_method || '').trim() || '—',
+                        amount: parseFloat(t?.amount || 0) || 0,
+                        docId: docId,
+                        docLabel: docLabel
+                    });
+                });
+            });
+
+            txs.sort(function (a, b) {
+                return String(a.date || '').localeCompare(String(b.date || ''));
+            });
+
+            if (!txs.length) {
+                const tr0 = document.createElement('tr');
+                tr0.innerHTML = '<td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin transacciones.</td>';
+                ccTxTbody.appendChild(tr0);
+            } else {
+                txs.forEach(function (t) {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50';
+                    tr.innerHTML = ''
+                        + '<td class="px-4 py-2 text-xs text-gray-500">' + (t.date || '—') + '</td>'
+                        + '<td class="px-4 py-2 text-xs">' + badgeTxKind(t.kind) + '</td>'
+                        + '<td class="px-4 py-2 text-xs text-gray-700">' + (t.method || '—') + '</td>'
+                        + '<td class="px-4 py-2 text-xs text-right font-semibold ' + (t.kind === 'pago' ? 'text-blue-700' : 'text-gray-700') + '">' + fmtMoney(t.amount) + '</td>'
+                        + '<td class="px-4 py-2 text-xs text-gray-600">' + (t.docLabel || '') + '</td>';
+                    ccTxTbody.appendChild(tr);
+                });
+            }
+        }
+    }
+
+    function loadCcLedger() {
+        if (!ccSupplierId) return Promise.resolve(null);
+        if (ccTbody) {
+            ccTbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-sm text-center text-gray-500">Cargando...</td></tr>';
+        }
+        return apiJson('/suppliers/api/suppliers/' + encodeURIComponent(ccSupplierId) + '/cc-ledger')
+            .then(function (data) {
+                ccLedgerCache = data;
+                renderCcLedger(data);
+                return data;
+            })
+            .catch(function (e) {
+                if (ccTbody) {
+                    const msg = (e && e.message) ? String(e.message) : 'Error';
+                    ccTbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-sm text-center text-gray-500">No se pudo cargar la cuenta corriente. ' + msg.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td></tr>';
+                }
+                if (ccTxTbody) {
+                    ccTxTbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">No se pudo cargar el registro de transacciones.</td></tr>';
+                }
+                return null;
+            });
     }
 
     function deleteSupplier(id) {
@@ -124,25 +795,52 @@ document.addEventListener('DOMContentLoaded', function () {
     function render() {
         if (!tbody) return;
         const q = (inputBuscar?.value || '').trim().toLowerCase();
-        tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
 
-        const res = leerSuppliers();
-        const apply = function (suppliers) {
+        const supRes = leerSuppliers();
+        const expRes = leerEgresos();
+
+        const apply = function (suppliers, expenses) {
             let list = Array.isArray(suppliers) ? suppliers.slice() : [];
+            const expList = Array.isArray(expenses) ? expenses : [];
+
+            const catOpts = buildCategoryOptions(list);
+            syncSupplierFilterButtons(catOpts);
+            try {
+                renderMultiselectItems(catItems, 'Todas', catOpts, catSelected, 'sup-cat-all', 'sup-cat-opt', catAllMode);
+                renderMultiselectItems(statusItems, 'Todos', statusOpts, statusSelected, 'sup-st-all', 'sup-st-opt', statusAllMode);
+            } catch (e) {
+            }
+
+            computeKpis(list, expList);
+
+            const aggMap = buildSupplierAgg(list, expList);
+
+            if (!catAllMode && catSelected.size) {
+                list = list.filter(function (s) {
+                    const cats = Array.isArray(s?.categories) ? s.categories : [];
+                    const lower = cats.map(function (x) { return String(x || '').trim().toLowerCase(); });
+                    return Array.from(catSelected).some(function (k) {
+                        return lower.includes(String(k || '').toLowerCase());
+                    });
+                });
+            }
+
+            if (!statusAllMode && statusSelected.size) {
+                list = list.filter(function (s) {
+                    const st = String(s?.status || 'Active').trim();
+                    return statusSelected.has(st);
+                });
+            }
 
             if (q) {
                 list = list.filter(s => String(s?.name || '').toLowerCase().includes(q));
             }
 
-            const total = (Array.isArray(suppliers) ? suppliers : []).length;
-            const activos = (Array.isArray(suppliers) ? suppliers : []).filter(s => (s?.status || 'Active') === 'Active').length;
-            if (elTotal) elTotal.textContent = String(total);
-            if (elActivos) elActivos.textContent = String(activos);
-
             tbody.innerHTML = '';
             if (!list.length) {
                 const tr = document.createElement('tr');
-                tr.innerHTML = '<td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados para tu búsqueda.</td>';
+                tr.innerHTML = '<td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados para tu búsqueda.</td>';
                 tbody.appendChild(tr);
                 return;
             }
@@ -150,28 +848,55 @@ document.addEventListener('DOMContentLoaded', function () {
             list.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
 
             list.forEach(s => {
-                const cats = Array.isArray(s?.categories) ? s.categories : [];
-                const catsLabel = cats.length ? cats.join(', ') : '—';
                 const status = s?.status || 'Active';
+                const key = String(s?.id || '').trim() || normName(s?.name || '');
+                const agg = aggMap.get(key) || { lastTs: 0, monthSpend: 0, ccDue: 0 };
+                const last = agg.lastTs ? fmtIsoDateOrDash(new Date(agg.lastTs)) : '—';
+                const monthSpend = fmtMoney(agg.monthSpend || 0);
+                const ccDue = fmtMoney(agg.ccDue || 0);
+                const ccDueCls = (agg.ccDue || 0) > 0 ? 'text-red-700 font-semibold' : 'text-gray-500';
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
                 tr.innerHTML = `
                     <td class="px-4 py-3 text-sm text-gray-900">${s?.name || 'Proveedor'}</td>
-                    <td class="px-4 py-3 text-sm text-gray-500">${labelTipo(s?.supplier_type)}</td>
+                    <td class="px-4 py-3 text-sm text-gray-500">${getPrimaryCategoryLabel(s)}</td>
                     <td class="px-4 py-3 text-sm text-gray-500">
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${classEstado(status)}">${labelEstado(status)}</span>
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-500">${catsLabel}</td>
-                    <td class="px-4 py-3 text-sm text-right space-x-2">
-                        <button type="button" class="btn-editar-sup text-blue-600 hover:text-blue-800 text-xs font-medium" data-id="${s?.id}">Editar</button>
-                        <button type="button" class="btn-eliminar-sup text-red-600 hover:text-red-800 text-xs font-medium" data-id="${s?.id}">Eliminar</button>
+                    <td class="px-4 py-3 text-sm text-gray-500">${last}</td>
+                    <td class="px-4 py-3 text-sm text-right text-gray-700">${monthSpend}</td>
+                    <td class="px-4 py-3 text-sm text-right ${ccDueCls}">${ccDue}</td>
+                    <td class="px-4 py-3 text-sm text-right">
+                        <div class="relative inline-block text-left">
+                            <button type="button" class="btn-sup-menu inline-flex items-center justify-center h-8 w-8 rounded-full hover:bg-gray-100" data-id="${s?.id}" data-name="${String(s?.name || '').replace(/"/g, '&quot;')}">
+                                <i class="fas fa-ellipsis-v text-gray-500 text-xs"></i>
+                            </button>
+                            <div class="menu-sup-acciones hidden origin-top-right absolute right-0 mt-1 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                                <div class="py-1 text-[11px]">
+                                    <button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="cc" data-id="${s?.id}" data-name="${String(s?.name || '').replace(/"/g, '&quot;')}">Cuenta corriente</button>
+                                    <button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="edit" data-id="${s?.id}">Editar</button>
+                                    <button type="button" class="w-full text-left px-3 py-2 text-red-700 hover:bg-red-50" data-action="delete" data-id="${s?.id}">Eliminar</button>
+                                </div>
+                            </div>
+                        </div>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
         };
-        if (isPromise(res)) res.then(apply).catch(() => apply([]));
-        else apply(res);
+
+        if (isPromise(supRes) || isPromise(expRes)) {
+            Promise.all([
+                isPromise(supRes) ? supRes : Promise.resolve(supRes),
+                isPromise(expRes) ? expRes : Promise.resolve(expRes),
+            ]).then(function (vals) {
+                apply(vals[0], vals[1]);
+            }).catch(function () {
+                apply([], []);
+            });
+        } else {
+            apply(supRes, expRes);
+        }
     }
 
     if (inputBuscar) {
@@ -180,25 +905,179 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    if (btnCat && catItems) {
+        btnCat.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const open = !catItems.classList.contains('hidden');
+            closeSupplierFilterDropdowns();
+            if (!open) catItems.classList.remove('hidden');
+        });
+    }
+
+    if (btnStatus && statusItems) {
+        btnStatus.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const open = !statusItems.classList.contains('hidden');
+            closeSupplierFilterDropdowns();
+            if (!open) statusItems.classList.remove('hidden');
+        });
+    }
+
+    if (catItems) {
+        catItems.addEventListener('click', function (e) {
+            const all = e.target.closest('.sup-cat-all');
+            const opt = e.target.closest('.sup-cat-opt');
+            if (all) {
+                catAllMode = !catAllMode;
+                catSelected = new Set();
+                render();
+                return;
+            }
+            if (opt) {
+                const k = opt.getAttribute('data-k') || '';
+                if (catAllMode) {
+                    catAllMode = false;
+                    catSelected = new Set();
+                }
+                if (catSelected.has(k)) catSelected.delete(k);
+                else catSelected.add(k);
+                render();
+            }
+        });
+    }
+
+    if (statusItems) {
+        statusItems.addEventListener('click', function (e) {
+            const all = e.target.closest('.sup-st-all');
+            const opt = e.target.closest('.sup-st-opt');
+            if (all) {
+                statusAllMode = !statusAllMode;
+                statusSelected = new Set();
+                render();
+                return;
+            }
+            if (opt) {
+                const k = opt.getAttribute('data-k') || '';
+                if (statusAllMode) {
+                    statusAllMode = false;
+                    statusSelected = new Set();
+                }
+                if (statusSelected.has(k)) statusSelected.delete(k);
+                else statusSelected.add(k);
+                render();
+            }
+        });
+    }
+
     if (tbody) {
         tbody.addEventListener('click', function(e) {
-            const btnEdit = e.target.closest('.btn-editar-sup');
-            if (btnEdit) {
-                const id = btnEdit.getAttribute('data-id');
-                if (id) window.location.href = editBaseUrl + '?id=' + encodeURIComponent(id);
+            const btnMenu = e.target.closest('.btn-sup-menu');
+            if (btnMenu) {
+                const root = btnMenu.parentElement;
+                const menu = root ? root.querySelector('.menu-sup-acciones') : null;
+                if (!menu) return;
+                const isOpen = !menu.classList.contains('hidden');
+                document.querySelectorAll('.menu-sup-acciones').forEach(function (m) { m.classList.add('hidden'); });
+                if (!isOpen) menu.classList.remove('hidden');
                 return;
             }
 
-            const btnDel = e.target.closest('.btn-eliminar-sup');
-            if (btnDel) {
-                const id = btnDel.getAttribute('data-id');
-                if (!id) return;
-                const ok = confirm('¿Eliminar proveedor?');
-                if (!ok) return;
-                deleteSupplier(id).finally(function () {
-                    render();
-                });
+            const actionBtn = e.target.closest('[data-action]');
+            if (actionBtn) {
+                const action = actionBtn.getAttribute('data-action') || '';
+                const id = actionBtn.getAttribute('data-id') || '';
+                const name = actionBtn.getAttribute('data-name') || '';
+                document.querySelectorAll('.menu-sup-acciones').forEach(function (m) { m.classList.add('hidden'); });
+
+                if (action === 'cc') {
+                    ccSupplierId = id;
+                    ccSupplierName = name;
+                    if (ccSubtitle) ccSubtitle.textContent = (ccSupplierName ? (ccSupplierName + ' · ') : '') + ('ID: ' + ccSupplierId);
+                    if (ccPayError) ccPayError.classList.add('hidden');
+                    if (ccPayAmount) ccPayAmount.value = '';
+                    openModalCc();
+                    loadCcLedger();
+                    return;
+                }
+
+                if (action === 'edit') {
+                    if (id) window.location.href = editBaseUrl + '?id=' + encodeURIComponent(id);
+                    return;
+                }
+
+                if (action === 'delete') {
+                    if (!id) return;
+                    if (window.confirmModal) {
+                        window.confirmModal('¿Eliminar proveedor? Esta acción no se puede deshacer.', 'Eliminar proveedor', 'Confirmación requerida', { okText: 'Eliminar', cancelText: 'Cancelar' })
+                            .then(function (ok) {
+                                if (!ok) return;
+                                deleteSupplier(id).finally(function () {
+                                    render();
+                                });
+                            });
+                        return;
+                    }
+                    const ok = confirm('¿Eliminar proveedor?');
+                    if (!ok) return;
+                    deleteSupplier(id).finally(function () {
+                        render();
+                    });
+                }
             }
+        });
+    }
+
+    document.addEventListener('click', function (e) {
+        closeSupplierFilterDropdowns();
+        const inside = e.target && (e.target.closest('.menu-sup-acciones') || e.target.closest('.btn-sup-menu'));
+        if (inside) return;
+        document.querySelectorAll('.menu-sup-acciones').forEach(function (m) { m.classList.add('hidden'); });
+    });
+
+    if (ccTbody) {
+        ccTbody.addEventListener('click', function (e) {
+            const btn = e.target.closest('.btn-cc-quickpay');
+            if (!btn) return;
+            const expId = btn.getAttribute('data-expense') || '';
+            if (ccPayExpense && expId) ccPayExpense.value = expId;
+            if (ccPayAmount) ccPayAmount.focus();
+        });
+    }
+
+    if (btnPay) {
+        btnPay.addEventListener('click', function () {
+            if (ccPayError) ccPayError.classList.add('hidden');
+            const expId = String(ccPayExpense?.value || '').trim();
+            const amt = parseFloat(ccPayAmount?.value || 0) || 0;
+            const method = String(ccPayMethod?.value || 'Efectivo').trim() || 'Efectivo';
+            if (!ccSupplierId || !expId || !(amt > 0)) {
+                if (ccPayError) ccPayError.classList.remove('hidden');
+                return;
+            }
+            apiJson('/suppliers/api/suppliers/' + encodeURIComponent(ccSupplierId) + '/cc-payments', {
+                method: 'POST',
+                body: JSON.stringify({ expense_id: expId, amount: amt, payment_method: method })
+            }).then(function () {
+                if (ccPayAmount) ccPayAmount.value = '';
+                loadCcLedger();
+            }).catch(function () {
+                if (ccPayError) ccPayError.classList.remove('hidden');
+            });
+        });
+    }
+
+    [btnCloseCc, btnCloseCc2].forEach(function (b) {
+        if (!b) return;
+        b.addEventListener('click', function () {
+            closeModalCc();
+        });
+    });
+
+    if (modalCc) {
+        modalCc.addEventListener('click', function (ev) {
+            const panel = modalCc.querySelector('.max-w-5xl');
+            if (panel && panel.contains(ev.target)) return;
+            closeModalCc();
         });
     }
 

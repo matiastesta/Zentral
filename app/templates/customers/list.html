@@ -2,82 +2,107 @@
 {% block title %}{{ business.label_customers if business and business.label_customers else 'Clientes' }}{% endblock %}
 {% block content %}
 <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">{{ business.label_customers if business and business.label_customers else 'Clientes' }}</h1>
+    <div class="flex items-center gap-2">
+        <h1 class="text-2xl font-bold text-gray-900">{{ business.label_customers if business and business.label_customers else 'Clientes' }}</h1>
+        <button type="button" class="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-gray-100 text-gray-600" data-kpi-toggle="customers" data-kpi-key="customers" data-kpi-target="#kpi-section-customers" aria-expanded="true" aria-label="Mostrar/ocultar KPIs">
+            <i data-kpi-toggle-icon class="fas fa-chevron-down"></i>
+        </button>
+    </div>
     <p class="mt-1 text-sm text-gray-600">Centraliza la información de tus {{ label_customers|lower }} para mejorar el seguimiento y la fidelización.</p>
 </div>
 
 <!-- Resumen de clientes -->
-<div class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-4">
+<div id="kpi-section-customers" class="grid grid-cols-1 gap-4 mb-6 md:grid-cols-4">
     <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Total de {{ label_customers|lower }}</p>
-        <p id="kpi-clientes-total" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">{{ label_customers }} activos</p>
-        <p id="kpi-clientes-activos" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">{{ label_customers }} deudores</p>
-        <p id="kpi-clientes-deudores" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
-    </div>
-    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
-        <p class="text-sm font-medium text-gray-500">Deuda total</p>
-        <p id="kpi-clientes-deuda" class="mt-2 text-2xl font-semibold text-gray-900">$0,00</p>
-    </div>
-</div>
-
-<!-- Filtros y acciones -->
-<div class="flex flex-col justify-between gap-2 mb-4 md:flex-row md:items-start">
-    <div class="flex-1">
-        <div class="flex flex-col gap-2">
-            <div class="flex flex-col lg:flex-row gap-2">
-                <input id="clientes-search" type="text" placeholder="Buscar por nombre, email o teléfono" class="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <select id="clientes-filter-estado" class="w-full lg:w-56 px-3 py-2 text-sm border rounded-md bg-white">
-                    <option value="">Estado: todos</option>
-                    <option value="activo">Activo</option>
-                    <option value="inactivo">Inactivo</option>
-                    <option value="bloqueado">Bloqueado</option>
-                </select>
-                <select id="clientes-filter-clasificacion" class="w-full lg:w-64 px-3 py-2 text-sm border rounded-md bg-white">
-                    <option value="">Clasificación: todas</option>
-                    <option value="mejor_cliente">Mejor cliente</option>
-                    <option value="frecuente">Frecuente</option>
-                    <option value="ocasional">Ocasional</option>
-                    <option value="inactivo">Inactivo</option>
-                    <option value="deudor">Deudor</option>
-                </select>
-                <select id="clientes-filter-cc" class="w-full lg:w-72 px-3 py-2 text-sm border rounded-md bg-white">
-                    <option value="">Cuenta corriente: todas</option>
-                    <option value="con_cc">Con cuenta corriente</option>
-                    <option value="sin_cc">Sin cuenta corriente</option>
-                    <option value="deudores">Deudores</option>
-                    <option value="vencida">Cuenta corriente vencida</option>
-                </select>
+        <div class="h-full flex flex-col items-center justify-center text-center">
+            <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                <i class="fas fa-users text-sm"></i>
             </div>
+            <p class="mt-2 text-sm font-medium text-gray-500">Total de {{ label_customers|lower }} registrados</p>
+            <p id="kpi-clientes-total" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
         </div>
     </div>
-    <div class="flex gap-2 justify-end">
-        <button id="btn-config-alertas" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
-            <i class="fas fa-bell mr-2"></i> Alertas
-        </button>
-        <button id="btn-nuevo-cliente" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
-            <i class="fas fa-user-plus mr-2"></i> Nuevo cliente
-        </button>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <div class="h-full flex flex-col items-center justify-center text-center">
+            <div class="h-10 w-10 rounded-full bg-green-50 text-green-700 flex items-center justify-center">
+                <i class="fas fa-user-check text-sm"></i>
+            </div>
+            <p class="mt-2 text-sm font-medium text-gray-500">{{ label_customers }} activos</p>
+            <p id="kpi-clientes-activos" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+        </div>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <div class="h-full flex flex-col items-center justify-center text-center">
+            <div class="h-10 w-10 rounded-full bg-amber-50 text-amber-800 flex items-center justify-center">
+                <i class="fas fa-exclamation-triangle text-sm"></i>
+            </div>
+            <p class="mt-2 text-sm font-medium text-gray-500">{{ label_customers }} deudores</p>
+            <p id="kpi-clientes-deudores" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+            <div id="kpi-clientes-deudores-sub" class="mt-1 text-xs text-gray-500"></div>
+        </div>
+    </div>
+    <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
+        <div class="h-full flex flex-col items-center justify-center text-center">
+            <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">
+                <i class="fas fa-dollar-sign text-sm"></i>
+            </div>
+            <p class="mt-2 text-sm font-medium text-gray-500">Deuda total</p>
+            <p id="kpi-clientes-deuda" class="mt-2 text-2xl font-semibold text-gray-900">$0,00</p>
+        </div>
     </div>
 </div>
 
 <!-- Tabla de clientes -->
 <div class="bg-white rounded-lg shadow border border-gray-200 overflow-visible">
-    <table class="min-w-full divide-y divide-gray-200">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-3">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Listado de {{ label_customers|lower }}</h2>
+            <p class="text-xs text-gray-500">Visualizá el historial comercial y el estado de cuenta corriente. Usá los filtros para segmentar por clasificación y saldo.</p>
+        </div>
+        <div class="flex gap-2 justify-end">
+            <button id="btn-config-alertas" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                <i class="fas fa-sliders-h mr-2"></i> Configuración de CRM
+            </button>
+            <button id="btn-nuevo-cliente" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                <i class="fas fa-user-plus mr-2"></i> Nuevo cliente
+            </button>
+        </div>
+    </div>
+    <table class="min-w-full table-fixed divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
-                <th data-sort="nombre" class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none">Nombre y apellido</th>
-                <th data-sort="clasificacion" class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none">Clasificación</th>
-                <th data-sort="cantidad_compras" class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">Compras totales</th>
-                <th data-sort="monto_total_comprado" class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">Monto</th>
-                <th data-sort="saldo_actual" class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">Cuenta corriente</th>
+                <th data-sort="nombre" class="w-72 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none">Nombre y apellido</th>
+                <th data-sort="clasificacion" class="w-40 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none"><span id="clientes-th-clas-label">Clasificación</span></th>
+                <th data-sort="cantidad_compras" class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">Compras</th>
+                <th data-sort="monto_total_comprado" class="w-32 px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">Monto</th>
+                <th data-sort="saldo_actual" class="w-44 px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">Cuenta corriente</th>
                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Notas</th>
-                <th class="px-4 py-3"></th>
+                <th class="w-14 px-4 py-3"></th>
+            </tr>
+            <tr class="text-[11px] bg-white align-middle">
+                <th class="px-4 py-1">
+                    <input id="clientes-search" type="text" placeholder="Nombre, email o teléfono" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600">
+                </th>
+                <th class="px-4 py-1">
+                    <div class="relative">
+                        <button id="clientes-filter-clasificacion-btn" type="button" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white text-left">Clasificación: todas</button>
+                        <div id="clientes-filter-clasificacion-menu" class="hidden absolute left-0 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-lg z-20">
+                            <div id="clientes-filter-clasificacion-items" class="max-h-56 overflow-auto py-1"></div>
+                        </div>
+                    </div>
+                </th>
+                <th class="px-4 py-1"></th>
+                <th class="px-4 py-1"></th>
+                <th class="px-4 py-1">
+                    <div class="relative">
+                        <button id="clientes-filter-cc-btn" type="button" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white text-left">Cuenta corriente: todas</button>
+                        <div id="clientes-filter-cc-menu" class="hidden absolute left-0 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-lg z-20">
+                            <div id="clientes-filter-cc-items" class="max-h-56 overflow-auto py-1"></div>
+                        </div>
+                    </div>
+                </th>
+                <th class="px-4 py-1"></th>
+                <th class="px-4 py-1"></th>
             </tr>
         </thead>
         <tbody id="clientes-tbody" class="bg-white divide-y divide-gray-200">
@@ -127,7 +152,6 @@
                     <select id="cust-status" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
                         <option value="activo">Activo</option>
                         <option value="inactivo">Inactivo</option>
-                        <option value="bloqueado">Bloqueado</option>
                     </select>
                 </div>
                 <div class="md:col-span-2">
@@ -150,32 +174,109 @@
 
 <div id="modal-alerts" class="hidden fixed inset-0 z-50" style="z-index:70;">
     <div class="absolute inset-0 bg-black/40"></div>
-    <div class="relative h-full w-full flex items-center justify-center p-4">
-        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+    <div class="relative h-full w-full flex items-start justify-center p-4 overflow-y-auto">
+        <div class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col my-4" style="max-height: calc(100vh - 2rem);">
             <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
-                    <h3 class="text-base font-semibold text-gray-900">Alertas de cuenta corriente</h3>
-                    <p class="text-xs text-gray-500">Configura en cuántos días se considera vencida una cuenta corriente.</p>
+                    <h3 class="text-lg font-semibold text-gray-900">Configuración de CRM</h3>
+                    <p class="text-xs text-gray-500">Ajustá reglas de clasificación y alertas de cuenta corriente.</p>
                 </div>
                 <button id="btn-close-alerts" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Aviso</label>
-                    <input id="alerts-warn-10" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="10">
+            <div class="p-5 space-y-4 overflow-y-auto flex-1">
+                <div class="p-3 border border-gray-200 rounded-xl bg-gray-50">
+                    <div class="text-sm font-semibold text-gray-900">Clasificación de clientes</div>
+                    <div class="mt-1 text-[11px] text-gray-500">Reglas basadas en compras recientes y estado. El cliente “Mejor” siempre exige más compras que “Frecuente”.</div>
+                    <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Ventana de compra (días)</label>
+                            <input id="crm-recent-days" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="60">
+                            <div class="mt-1 text-[11px] text-gray-500">Ej.: 60 días = últimos 2 meses aprox.</div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Frecuente: compras mínimas</label>
+                            <input id="crm-freq-min" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="1">
+                            <div class="mt-1 text-[11px] text-gray-500">Si el cliente cumple esto en la ventana, es “Frecuente”.</div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Mejor cliente: compras mínimas</label>
+                            <input id="crm-best-min" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="2">
+                            <div class="mt-1 text-[11px] text-gray-500">Debe ser mayor que “Frecuente”.</div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Título (columna)</label>
+                            <input id="crm-label-clas-title" type="text" class="w-full px-3 py-2 text-sm border rounded-md" value="Clasificación">
+                            <div class="mt-1 text-[11px] text-gray-500">Se muestra como título en la tabla.</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 p-3 border border-gray-200 rounded-lg bg-white">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <div class="text-sm font-semibold text-gray-900">Vista previa</div>
+                                <div class="text-[11px] text-gray-500">Así se interpretan las reglas con tus valores actuales.</div>
+                            </div>
+                            <div class="h-8 w-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center flex-shrink-0">
+                                <i class="fas fa-eye text-xs"></i>
+                            </div>
+                        </div>
+                        <div id="crm-preview" class="mt-3 text-[11px] text-gray-700"></div>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Aviso fuerte</label>
-                    <input id="alerts-warn-15" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="15">
+
+                <div class="pt-2 border-t border-gray-100">
+                    <div class="p-3 border border-gray-200 rounded-xl bg-gray-50">
+                        <div class="text-xs font-semibold text-gray-800">Nombres de clasificaciones</div>
+                        <div class="mt-1 text-[11px] text-gray-500">Estos nombres se ven en la tabla y en el filtro de clasificación.</div>
+                        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Mejor cliente</label>
+                                <input id="crm-label-best" type="text" class="w-full px-3 py-2 text-sm border rounded-md" value="Mejor cliente">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Frecuente</label>
+                                <input id="crm-label-freq" type="text" class="w-full px-3 py-2 text-sm border rounded-md" value="Frecuente">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Inactivo</label>
+                                <input id="crm-label-inactive" type="text" class="w-full px-3 py-2 text-sm border rounded-md" value="Inactivo">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Deudor</label>
+                                <input id="crm-label-debtor" type="text" class="w-full px-3 py-2 text-sm border rounded-md" value="Deudor">
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Crítica</label>
-                    <input id="alerts-crit-30" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="30">
+
+                <div class="p-3 border border-gray-200 rounded-xl bg-gray-50">
+                    <div class="text-sm font-semibold text-gray-900">Alertas</div>
+                    <div class="mt-1 text-[11px] text-gray-500">Estas alertas se aplican sobre la cuenta corriente (según días de deuda).</div>
+                    <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Cuenta corriente vencida</label>
+                            <div class="flex items-center gap-2">
+                                <input id="crm-debt-overdue-days" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="30">
+                                <span class="text-xs text-gray-500">días</span>
+                            </div>
+                            <div class="mt-1 text-[11px] text-gray-500">Se considera “vencida” si supera este valor.</div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Cuenta corriente vencida crítica</label>
+                            <div class="flex items-center gap-2">
+                                <input id="crm-debt-critical-days" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="60">
+                                <span class="text-xs text-gray-500">días</span>
+                            </div>
+                            <div class="mt-1 text-[11px] text-gray-500">Debe ser mayor que “vencida”.</div>
+                        </div>
+                    </div>
                 </div>
+
+                <div id="crm-config-error" class="hidden p-3 rounded-lg border border-red-200 bg-red-50 text-[11px] text-red-700"></div>
             </div>
-            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2 bg-white">
                 <button id="btn-cancel-alerts" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
                 <button id="btn-save-alerts" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">Guardar</button>
             </div>
@@ -326,17 +427,22 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const KEY_CRM = 'clientes_crm_config';
     const KEY_ALERTS = 'clientes_alertas_config';
 
     const kpiTotal = document.getElementById('kpi-clientes-total');
     const kpiActivos = document.getElementById('kpi-clientes-activos');
     const kpiDeudores = document.getElementById('kpi-clientes-deudores');
     const kpiDeuda = document.getElementById('kpi-clientes-deuda');
+    const kpiDeudoresSub = document.getElementById('kpi-clientes-deudores-sub');
 
     const inputSearch = document.getElementById('clientes-search');
-    const filterEstado = document.getElementById('clientes-filter-estado');
-    const filterClas = document.getElementById('clientes-filter-clasificacion');
-    const filterCc = document.getElementById('clientes-filter-cc');
+    const filterClasBtn = document.getElementById('clientes-filter-clasificacion-btn');
+    const filterClasMenu = document.getElementById('clientes-filter-clasificacion-menu');
+    const filterClasItems = document.getElementById('clientes-filter-clasificacion-items');
+    const filterCcBtn = document.getElementById('clientes-filter-cc-btn');
+    const filterCcMenu = document.getElementById('clientes-filter-cc-menu');
+    const filterCcItems = document.getElementById('clientes-filter-cc-items');
     const tbody = document.getElementById('clientes-tbody');
     const btnNuevo = document.getElementById('btn-nuevo-cliente');
     const btnConfigAlertas = document.getElementById('btn-config-alertas');
@@ -360,9 +466,21 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnCloseAlerts = document.getElementById('btn-close-alerts');
     const btnCancelAlerts = document.getElementById('btn-cancel-alerts');
     const btnSaveAlerts = document.getElementById('btn-save-alerts');
-    const inputWarn10 = document.getElementById('alerts-warn-10');
-    const inputWarn15 = document.getElementById('alerts-warn-15');
-    const inputCrit30 = document.getElementById('alerts-crit-30');
+    const inputCrmRecentDays = document.getElementById('crm-recent-days');
+    const inputCrmDebtOverdueDays = document.getElementById('crm-debt-overdue-days');
+    const inputCrmDebtCriticalDays = document.getElementById('crm-debt-critical-days');
+    const inputCrmFreqMin = document.getElementById('crm-freq-min');
+    const inputCrmBestMin = document.getElementById('crm-best-min');
+    const inputCrmLabelClasTitle = document.getElementById('crm-label-clas-title');
+    const inputCrmLabelBest = document.getElementById('crm-label-best');
+    const inputCrmLabelFreq = document.getElementById('crm-label-freq');
+    const inputCrmLabelInactive = document.getElementById('crm-label-inactive');
+    const inputCrmLabelDebtor = document.getElementById('crm-label-debtor');
+
+    const crmPreview = document.getElementById('crm-preview');
+    const crmConfigError = document.getElementById('crm-config-error');
+
+    const thClasLabel = document.getElementById('clientes-th-clas-label');
 
     const modalLegajo = document.getElementById('modal-customer-legajo');
     const btnCloseLegajo = document.getElementById('btn-close-legajo');
@@ -412,23 +530,239 @@ document.addEventListener('DOMContentLoaded', function () {
     function ensureArray(x) { return Array.isArray(x) ? x : []; }
     function safeStr(v) { return String(v == null ? '' : v); }
 
+    function normKey(v) {
+        return safeStr(v).replace(/\s+/g, ' ').trim().toLowerCase();
+    }
+
+    function setDropdownOpen(menu, open) {
+        if (!menu) return;
+        menu.classList.toggle('hidden', !open);
+    }
+
+    let clasTitle = 'Clasificación';
+    let clasOpts = [
+        { k: 'mejor_cliente', label: 'Mejor cliente' },
+        { k: 'frecuente', label: 'Frecuente' },
+        { k: 'inactivo', label: 'Inactivo' },
+        { k: 'deudor', label: 'Deudor' },
+    ];
+    const ccOpts = [
+        { k: 'al_dia', label: 'Cuenta corriente al día' },
+        { k: 'vencida', label: 'Cuenta corriente vencida' },
+        { k: 'vencida_critica', label: 'Cuenta corriente vencida crítica' },
+        { k: 'sin_cc', label: 'Sin cuenta corriente' },
+    ];
+
+    let clasSelected = new Set();
+    let ccSelected = new Set();
+
+    let clasAllMode = true;
+    let ccAllMode = true;
+
+    function formatMultiLabel(allText, opts, selectedSet, pluralWord, allMode) {
+        const selCount = selectedSet.size;
+        if (allMode) return allText;
+        if (!selCount) return allText;
+        if (selCount === 1) {
+            const k = Array.from(selectedSet)[0];
+            const match = (Array.isArray(opts) ? opts : []).find(x => x.k === k);
+            return match ? match.label : ('1 ' + String(pluralWord || 'seleccionado'));
+        }
+        return String(selCount) + ' ' + String(pluralWord || 'seleccionados');
+    }
+
+    function renderMultiselectItems(container, allLabel, opts, selectedSet, clsAll, clsOpt, allMode) {
+        if (!container) return;
+        const total = opts.length;
+        const allOn = !!allMode;
+        const html = [];
+        html.push('<label class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">'
+            + '<input type="checkbox" class="' + clsAll + '" ' + (allOn ? 'checked' : '') + ' />'
+            + '<span>' + allLabel + '</span>'
+            + '</label>');
+        opts.forEach(function (it) {
+            const checked = allOn ? true : selectedSet.has(it.k);
+            html.push('<label class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">'
+                + '<input type="checkbox" class="' + clsOpt + '" data-k="' + String(it.k).replace(/"/g, '&quot;') + '" ' + (checked ? 'checked' : '') + ' />'
+                + '<span class="truncate">' + safeStr(it.label) + '</span>'
+                + '</label>');
+        });
+        container.innerHTML = html.join('');
+    }
+
+    function syncCustomersFilterButtons() {
+        if (filterClasBtn) {
+            filterClasBtn.textContent = formatMultiLabel(clasTitle + ': todas', clasOpts, clasSelected, 'seleccionadas', clasAllMode);
+        }
+        if (filterCcBtn) {
+            filterCcBtn.textContent = formatMultiLabel('Cuenta corriente: todas', ccOpts, ccSelected, 'seleccionadas', ccAllMode);
+        }
+    }
+
+    function setCrmError(msg) {
+        if (!crmConfigError) return;
+        const m = safeStr(msg).trim();
+        if (!m) {
+            crmConfigError.textContent = '';
+            crmConfigError.classList.add('hidden');
+            return;
+        }
+        crmConfigError.textContent = m;
+        crmConfigError.classList.remove('hidden');
+    }
+
+    function readCrmFormValues() {
+        const recentDays = Math.max(1, parseInt(inputCrmRecentDays?.value || 60, 10) || 60);
+        const overdueDays = Math.max(1, parseInt(inputCrmDebtOverdueDays?.value || 30, 10) || 30);
+        const criticalDays = Math.max(1, parseInt(inputCrmDebtCriticalDays?.value || 60, 10) || 60);
+        const freqMin = Math.max(1, parseInt(inputCrmFreqMin?.value || 1, 10) || 1);
+        const bestMin = Math.max(1, parseInt(inputCrmBestMin?.value || 2, 10) || 2);
+        const labels = {
+            clas_title: safeStr(inputCrmLabelClasTitle?.value || 'Clasificación').trim() || 'Clasificación',
+            best: safeStr(inputCrmLabelBest?.value || 'Mejor cliente').trim() || 'Mejor cliente',
+            freq: safeStr(inputCrmLabelFreq?.value || 'Frecuente').trim() || 'Frecuente',
+            inactive: safeStr(inputCrmLabelInactive?.value || 'Inactivo').trim() || 'Inactivo',
+            debtor: safeStr(inputCrmLabelDebtor?.value || 'Deudor').trim() || 'Deudor',
+        };
+        return {
+            recent_days: recentDays,
+            debt_overdue_days: overdueDays,
+            debt_critical_days: criticalDays,
+            freq_min_purchases: freqMin,
+            best_min_purchases: bestMin,
+            labels
+        };
+    }
+
+    function validateCrmConfig(cfg) {
+        const c = cfg && typeof cfg === 'object' ? cfg : readCrmFormValues();
+        if (!(c.best_min_purchases > c.freq_min_purchases)) {
+            return 'Para evitar solapamientos: "Mejor cliente: compras mínimas" debe ser mayor que "Frecuente: compras mínimas".';
+        }
+        if (!(c.debt_critical_days > c.debt_overdue_days)) {
+            return 'Para evitar solapamientos: "Vencida crítica" debe ser mayor que "Vencida".';
+        }
+        if (!safeStr(c.labels?.clas_title).trim()) return 'El título de clasificación no puede estar vacío.';
+        if (!safeStr(c.labels?.best).trim()) return 'El nombre de "Mejor cliente" no puede estar vacío.';
+        if (!safeStr(c.labels?.freq).trim()) return 'El nombre de "Frecuente" no puede estar vacío.';
+        if (!safeStr(c.labels?.inactive).trim()) return 'El nombre de "Inactivo" no puede estar vacío.';
+        if (!safeStr(c.labels?.debtor).trim()) return 'El nombre de "Deudor" no puede estar vacío.';
+        return '';
+    }
+
+    function renderCrmPreview(cfg) {
+        if (!crmPreview) return;
+        const c = cfg && typeof cfg === 'object' ? cfg : readCrmFormValues();
+        const title = safeStr(c.labels?.clas_title || 'Clasificación') || 'Clasificación';
+        const best = safeStr(c.labels?.best || 'Mejor cliente') || 'Mejor cliente';
+        const freq = safeStr(c.labels?.freq || 'Frecuente') || 'Frecuente';
+        const inactive = safeStr(c.labels?.inactive || 'Inactivo') || 'Inactivo';
+        const debtor = safeStr(c.labels?.debtor || 'Deudor') || 'Deudor';
+
+        const rows = [
+            { k: best, c1: '>= ' + safeStr(c.best_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'Sin CC vencida' },
+            { k: freq, c1: '>= ' + safeStr(c.freq_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'O con deuda sin vencer' },
+            { k: inactive, c1: 'No cumple Mejor/Frecuente', c2: 'O estado inactivo' },
+            { k: debtor, c1: 'CC vencida > ' + safeStr(c.debt_overdue_days) + ' días', c2: 'Crítica > ' + safeStr(c.debt_critical_days) + ' días' },
+        ];
+
+        const html = [];
+        html.push('<div class="overflow-x-auto">');
+        html.push('<table class="min-w-full text-[11px] border border-gray-200 rounded-md overflow-hidden">');
+        html.push('<thead class="bg-gray-50">');
+        html.push('<tr>'
+            + '<th class="px-2 py-2 text-left font-semibold text-gray-600">' + safeStr(title) + '</th>'
+            + '<th class="px-2 py-2 text-left font-semibold text-gray-600">1ra condición</th>'
+            + '<th class="px-2 py-2 text-left font-semibold text-gray-600">2da condición</th>'
+            + '</tr>');
+        html.push('</thead>');
+        html.push('<tbody class="bg-white">');
+        rows.forEach(function (r, idx) {
+            const rowCls = (idx % 2 === 0) ? 'bg-white' : 'bg-gray-50/50';
+            html.push('<tr class="' + rowCls + '">'
+                + '<td class="px-2 py-2 font-medium text-gray-800">' + safeStr(r.k) + '</td>'
+                + '<td class="px-2 py-2 text-gray-700">' + safeStr(r.c1) + '</td>'
+                + '<td class="px-2 py-2 text-gray-700">' + safeStr(r.c2) + '</td>'
+                + '</tr>');
+        });
+        html.push('</tbody></table></div>');
+        crmPreview.innerHTML = html.join('');
+
+        try {
+            if (filterClasBtn) filterClasBtn.textContent = safeStr(title) + ': todas';
+        } catch (e) {
+        }
+    }
+
     function openModal(el) { if (el) el.classList.remove('hidden'); }
     function closeModal(el) { if (el) el.classList.add('hidden'); }
 
-    function readAlertsConfig() {
+    function readCrmConfig() {
         try {
-            const raw = window.localStorage.getItem(KEY_ALERTS);
+            const raw = window.localStorage.getItem(KEY_CRM);
             const parsed = raw ? JSON.parse(raw) : null;
             if (parsed && typeof parsed === 'object') {
+                const overdue = Math.max(1, parseInt(parsed.debt_overdue_days || 30, 10) || 30);
+                const critical = Math.max(overdue, parseInt(parsed.debt_critical_days || 60, 10) || 60);
                 return {
-                    warn10: Math.max(1, parseInt(parsed.warn10 || 10, 10) || 10),
-                    warn15: Math.max(1, parseInt(parsed.warn15 || 15, 10) || 15),
-                    crit30: Math.max(1, parseInt(parsed.crit30 || 30, 10) || 30)
+                    recent_days: Math.max(1, parseInt(parsed.recent_days || 60, 10) || 60),
+                    debt_overdue_days: overdue,
+                    debt_critical_days: critical,
+                    freq_min_purchases: Math.max(1, parseInt(parsed.freq_min_purchases || 1, 10) || 1),
+                    best_min_purchases: Math.max(1, parseInt(parsed.best_min_purchases || 2, 10) || 2),
+                    labels: {
+                        clas_title: safeStr(parsed.labels?.clas_title || 'Clasificación') || 'Clasificación',
+                        best: safeStr(parsed.labels?.best || 'Mejor cliente') || 'Mejor cliente',
+                        freq: safeStr(parsed.labels?.freq || 'Frecuente') || 'Frecuente',
+                        inactive: safeStr(parsed.labels?.inactive || 'Inactivo') || 'Inactivo',
+                        debtor: safeStr(parsed.labels?.debtor || 'Deudor') || 'Deudor'
+                    }
                 };
             }
         } catch (e) {
         }
-        return { warn10: 10, warn15: 15, crit30: 30 };
+
+        // Migración desde config anterior de alertas (si existe)
+        try {
+            const rawOld = window.localStorage.getItem(KEY_ALERTS);
+            const old = rawOld ? JSON.parse(rawOld) : null;
+            const overdue = Math.max(1, parseInt(old?.warn15 || old?.warn10 || 15, 10) || 15);
+            const critical = Math.max(overdue, parseInt(old?.crit30 || 30, 10) || 30);
+            return {
+                recent_days: 60,
+                debt_overdue_days: overdue,
+                debt_critical_days: critical,
+                freq_min_purchases: 1,
+                best_min_purchases: 2,
+                labels: { clas_title: 'Clasificación', best: 'Mejor cliente', freq: 'Frecuente', inactive: 'Inactivo', debtor: 'Deudor' }
+            };
+        } catch (e) {
+        }
+
+        return {
+            recent_days: 60,
+            debt_overdue_days: 30,
+            debt_critical_days: 60,
+            freq_min_purchases: 1,
+            best_min_purchases: 2,
+            labels: { clas_title: 'Clasificación', best: 'Mejor cliente', freq: 'Frecuente', inactive: 'Inactivo', debtor: 'Deudor' }
+        };
+    }
+
+    function writeCrmConfig(cfg) {
+        try {
+            window.localStorage.setItem(KEY_CRM, JSON.stringify(cfg));
+        } catch (e) {
+        }
+    }
+
+    let crmCfgCache = null;
+    function getCrmCfg() {
+        if (!crmCfgCache) crmCfgCache = readCrmConfig();
+        return crmCfgCache;
+    }
+    function setCrmCfg(cfg) {
+        crmCfgCache = cfg && typeof cfg === 'object' ? cfg : null;
     }
 
     function saveSales(list) {
@@ -487,7 +821,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         legajoCustomerId = safeStr(c.id);
 
-        const joinDate = new Date(c.created_at || Date.now()).toISOString().slice(0, 10);
+        const joinDateRaw = new Date(c.created_at || Date.now()).toISOString().slice(0, 10);
+        const joinDate = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function')
+            ? window.formatFechaDisplay(joinDateRaw)
+            : joinDateRaw;
 
         if (legajoTitle) legajoTitle.textContent = 'Legajo · ' + safeStr(c.full_name || 'Cliente');
         if (legajoSubtitle) legajoSubtitle.textContent = 'ID ' + safeStr(c.id) + ' · ' + badgeClas(c).replace(/<[^>]*>/g, '').trim();
@@ -520,7 +857,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 legajoSales.innerHTML = '';
                 list.forEach(s => {
                     const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
-                    const fecha = ts ? new Date(ts).toISOString().slice(0, 10) : '—';
+                    const fechaRaw = ts ? new Date(ts).toISOString().slice(0, 10) : '—';
+                    const fecha = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function')
+                        ? window.formatFechaDisplay(fechaRaw)
+                        : fechaRaw;
                     const pago = safeStr(s?.payment_method || s?.forma_pago || (s?.on_account ? 'Cuenta corriente' : '') || '—');
                     const total = fmtMoney(parseFloat(s?.total || 0) || 0);
                     const due = fmtMoney(parseFloat(s?.due_amount || 0) || 0);
@@ -565,9 +905,13 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 outs.forEach(s => {
                     const due = parseFloat(s?.due_amount || 0) || 0;
+                    const fechaRaw = safeStr(s?.fecha || '');
+                    const fecha = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function')
+                        ? window.formatFechaDisplay(fechaRaw)
+                        : fechaRaw;
                     const opt = document.createElement('option');
                     opt.value = safeStr(s?.id);
-                    opt.textContent = safeStr(s?.ticket || '') + ' · ' + safeStr(s?.fecha || '') + ' · Deuda: ' + fmtMoney(due);
+                    opt.textContent = safeStr(s?.ticket || '') + ' · ' + fecha + ' · Deuda: ' + fmtMoney(due);
                     settleSale.appendChild(opt);
                 });
             }
@@ -616,9 +960,26 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    function writeAlertsConfig(cfg) {
+    function applyCrmLabelsToUi(cfg) {
+        const c = cfg && typeof cfg === 'object' ? cfg : readCrmConfig();
+        setCrmCfg(c);
+        const title = safeStr(c.labels?.clas_title || 'Clasificación') || 'Clasificación';
+        clasTitle = title;
+        clasOpts = [
+            { k: 'mejor_cliente', label: safeStr(c.labels?.best || 'Mejor cliente') || 'Mejor cliente' },
+            { k: 'frecuente', label: safeStr(c.labels?.freq || 'Frecuente') || 'Frecuente' },
+            { k: 'inactivo', label: safeStr(c.labels?.inactive || 'Inactivo') || 'Inactivo' },
+            { k: 'deudor', label: safeStr(c.labels?.debtor || 'Deudor') || 'Deudor' },
+        ];
         try {
-            window.localStorage.setItem(KEY_ALERTS, JSON.stringify(cfg));
+            const allowed = new Set(clasOpts.map(x => x.k));
+            clasSelected = new Set(Array.from(clasSelected).filter(k => allowed.has(k)));
+        } catch (e) {
+        }
+        if (thClasLabel) thClasLabel.textContent = title;
+        syncCustomersFilterButtons();
+        try {
+            renderMultiselectItems(filterClasItems, 'Todas', clasOpts, clasSelected, 'cust-cl-all', 'cust-cl-opt', clasAllMode);
         } catch (e) {
         }
     }
@@ -683,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', function () {
             birthday,
             address,
             notes,
-            status: (status === 'inactivo' || status === 'bloqueado') ? status : 'activo',
+            status: (status === 'inactivo') ? 'inactivo' : 'activo',
             created_at: createdAt
         };
     }
@@ -715,13 +1076,38 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function readCustomers() {
-        try {
-            if (window.StorageService && typeof window.StorageService.getCustomers === 'function') {
-                return window.StorageService.getCustomers();
+        const storageFallback = function () {
+            try {
+                if (window.StorageService && typeof window.StorageService.getCustomers === 'function') {
+                    const res = window.StorageService.getCustomers();
+                    if (isPromise(res)) {
+                        return Promise.resolve(res)
+                            .then(function (items) { return ensureArray(items); })
+                            .catch(function () { return []; });
+                    }
+                    return Promise.resolve(ensureArray(res));
+                }
+            } catch (e) {
             }
+            return Promise.resolve([]);
+        };
+
+        try {
+            return fetch('/customers/api/customers?limit=5000', { credentials: 'same-origin' })
+                .then(function (r) {
+                    if (!r || !r.ok) throw new Error('http_' + String(r ? r.status : '0'));
+                    return r.json();
+                })
+                .then(function (data) {
+                    if (data && data.ok === true) return ensureArray(data.items);
+                    return ensureArray((data && data.items) ? data.items : []);
+                })
+                .catch(function () {
+                    return storageFallback();
+                });
         } catch (e) {
+            return storageFallback();
         }
-        return [];
     }
 
     function saveCustomers(list) {
@@ -736,13 +1122,38 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function readSales() {
-        try {
-            if (window.StorageService && typeof window.StorageService.getSales === 'function') {
-                return window.StorageService.getSales();
+        const storageFallback = function () {
+            try {
+                if (window.StorageService && typeof window.StorageService.getSales === 'function') {
+                    const res = window.StorageService.getSales();
+                    if (isPromise(res)) {
+                        return Promise.resolve(res)
+                            .then(function (items) { return ensureArray(items); })
+                            .catch(function () { return []; });
+                    }
+                    return Promise.resolve(ensureArray(res));
+                }
+            } catch (e) {
             }
+            return Promise.resolve([]);
+        };
+
+        try {
+            return fetch('/sales/api/sales?limit=2000&include_replaced=1', { credentials: 'same-origin' })
+                .then(function (r) {
+                    if (!r || !r.ok) throw new Error('http_' + String(r ? r.status : '0'));
+                    return r.json();
+                })
+                .then(function (data) {
+                    if (data && data.ok === true) return ensureArray(data.items);
+                    return ensureArray((data && data.items) ? data.items : []);
+                })
+                .catch(function () {
+                    return storageFallback();
+                });
         } catch (e) {
+            return storageFallback();
         }
-        return [];
     }
 
     function computeP90(values) {
@@ -752,18 +1163,30 @@ document.addEventListener('DOMContentLoaded', function () {
         return arr[idx];
     }
 
-    function computeDerived(customers, sales) {
-        const alertsCfg = readAlertsConfig();
-        const salesArr = ensureArray(sales);
+    function computeDerived(customers, salesArr) {
+        const crm = getCrmCfg();
+        const sales = ensureArray(salesArr);
+        const nowTs = Date.now();
+        const winMs = Math.max(1, parseInt(crm?.recent_days || 60, 10) || 60) * 24 * 60 * 60 * 1000;
+        const freqMin = Math.max(1, parseInt(crm?.freq_min_purchases || 1, 10) || 1);
+        const bestMin = Math.max(1, parseInt(crm?.best_min_purchases || 2, 10) || 2);
+        const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
 
         const mapped = customers.map(c => {
             const cid = safeStr(c.id);
             const fullName = (safeStr(c.first_name) + ' ' + safeStr(c.last_name)).trim();
             const salesFor = salesArr.filter(s => safeStr(s?.customer_id) === cid || (!safeStr(s?.customer_id) && fullName && safeStr(s?.customer_name).toLowerCase() === fullName.toLowerCase()));
 
-            const cantidad = salesFor.length;
-            const totalComprado = salesFor.reduce((acc, s) => acc + (parseFloat(s?.total || 0) || 0), 0);
-            const ultimaTs = salesFor.reduce((acc, s) => {
+            const purchaseSales = salesFor.filter(s => {
+                const t = safeStr(s?.type || s?.sale_type).trim();
+                const total = parseFloat(s?.total || 0) || 0;
+                if (t === 'CobroCC') return false;
+                return total > 0;
+            });
+
+            const cantidad = purchaseSales.length;
+            const totalComprado = purchaseSales.reduce((acc, s) => acc + (parseFloat(s?.total || 0) || 0), 0);
+            const ultimaTs = purchaseSales.reduce((acc, s) => {
                 const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
                 return Math.max(acc, ts || 0);
             }, 0);
@@ -781,19 +1204,38 @@ document.addEventListener('DOMContentLoaded', function () {
             const diasDeuda = saldo > 0 ? (daysSince(lastImpagoTs) ?? 0) : 0;
 
             const diasUltCompra = ultimaTs ? (daysSince(ultimaTs) ?? 0) : null;
-            const isInactivo = (diasUltCompra != null) ? (diasUltCompra > 60) : false;
+            const recentPurchases = purchaseSales.filter(s => {
+                const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
+                if (!ts) return false;
+                return (nowTs - ts) <= winMs;
+            }).length;
 
-            let clas = 'ocasional';
-            if (saldo > 0) clas = 'deudor';
-            else if (isInactivo) clas = 'inactivo';
-            else if (freq >= 1) clas = 'frecuente';
+            const isOverdue = (saldo > 0) && (diasDeuda > overdueDays);
 
-            let alert = '';
-            if (saldo > 0) {
-                if (diasDeuda >= alertsCfg.crit30) alert = 'critica';
-                else if (diasDeuda >= alertsCfg.warn15) alert = 'warn15';
-                else if (diasDeuda >= alertsCfg.warn10) alert = 'warn10';
+            const forcedInactive = normKey(c?.status) === 'inactivo';
+
+            let clas = 'inactivo';
+            if (forcedInactive) {
+                clas = 'inactivo';
+            } else if (isOverdue) {
+                clas = 'deudor';
+            } else if (saldo > 0) {
+                // Tiene deuda pero no está vencida: se considera frecuente
+                clas = 'frecuente';
+            } else if (recentPurchases >= bestMin) {
+                clas = 'mejor_cliente';
+            } else if (recentPurchases >= freqMin) {
+                clas = 'frecuente';
+            } else {
+                clas = 'inactivo';
             }
+
+            const alert = isOverdue ? 'vencida' : '';
+
+            const ultimaCompraRaw = ultimaTs ? new Date(ultimaTs).toISOString().slice(0, 10) : '';
+            const ultimaCompra = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function')
+                ? window.formatFechaDisplay(ultimaCompraRaw)
+                : ultimaCompraRaw;
 
             return {
                 ...c,
@@ -801,7 +1243,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 cantidad_compras: cantidad,
                 monto_total_comprado: totalComprado,
                 ultima_compra_ts: ultimaTs,
-                ultima_compra: ultimaTs ? new Date(ultimaTs).toISOString().slice(0, 10) : '',
+                ultima_compra: ultimaCompra,
                 frecuencia_compra: freq,
                 saldo_actual: saldo,
                 tiene_cuenta_corriente: tieneCc,
@@ -811,30 +1253,37 @@ document.addEventListener('DOMContentLoaded', function () {
             };
         });
 
-        const p90 = computeP90(mapped.map(x => x.monto_total_comprado || 0));
-        return mapped.map(x => {
-            const mejor = (x.monto_total_comprado || 0) >= p90 && (x.monto_total_comprado || 0) > 0;
-            if (mejor && x.clasificacion !== 'deudor' && x.clasificacion !== 'inactivo') {
-                return { ...x, clasificacion: 'mejor_cliente' };
-            }
-            return x;
-        });
+        return mapped;
     }
 
     function applyFilters(list) {
         const q = safeStr(inputSearch?.value).trim().toLowerCase();
-        const st = safeStr(filterEstado?.value).trim();
-        const cl = safeStr(filterClas?.value).trim();
-        const cc = safeStr(filterCc?.value).trim();
+        const totalClas = clasOpts.length;
+        const totalCc = ccOpts.length;
 
         return ensureArray(list).filter(c => {
-            if (st && safeStr(c.status) !== st) return false;
-            if (cl && safeStr(c.clasificacion) !== cl) return false;
+            const clKey = normKey(c.clasificacion);
+            if (!clasAllMode && clasSelected.size) {
+                if (!clasSelected.has(clKey)) return false;
+            }
 
-            if (cc === 'con_cc' && !c.tiene_cuenta_corriente) return false;
-            if (cc === 'sin_cc' && c.tiene_cuenta_corriente) return false;
-            if (cc === 'deudores' && !(c.saldo_actual > 0)) return false;
-            if (cc === 'vencida' && !(c.alerta_cc === 'warn10' || c.alerta_cc === 'warn15' || c.alerta_cc === 'critica')) return false;
+            if (!ccAllMode && ccSelected.size) {
+                const crm = getCrmCfg();
+                const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
+                const criticalDays = Math.max(overdueDays, parseInt(crm?.debt_critical_days || 60, 10) || 60);
+                const has = function (k) {
+                    const saldo = (parseFloat(c.saldo_actual || 0) || 0);
+                    const dias = (parseInt(c.dias_deuda || 0, 10) || 0);
+                    const hasCc = !!c.tiene_cuenta_corriente;
+                    if (k === 'sin_cc') return !hasCc;
+                    if (k === 'al_dia') return hasCc && (saldo <= 0 || dias <= overdueDays);
+                    if (k === 'vencida') return (saldo > 0) && (dias > overdueDays) && (dias <= criticalDays);
+                    if (k === 'vencida_critica') return (saldo > 0) && (dias > criticalDays);
+                    return false;
+                };
+                const ok = Array.from(ccSelected).some(has);
+                if (!ok) return false;
+            }
 
             if (q) {
                 const hay = [
@@ -861,7 +1310,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (key === 'frecuencia_compra') return c.frecuencia_compra || 0;
             if (key === 'monto_total_comprado') return c.monto_total_comprado || 0;
             if (key === 'saldo_actual') return c.saldo_actual || 0;
-            if (key === 'estado') return safeStr(c.status);
             return 0;
         };
 
@@ -875,25 +1323,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function badgeEstado(status) {
         const s = safeStr(status);
-        if (s === 'bloqueado') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">Bloqueado</span>';
         if (s === 'inactivo') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">Inactivo</span>';
         return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[11px] font-medium">Activo</span>';
     }
 
     function badgeClas(c) {
+        const crm = getCrmCfg();
         const cls = safeStr(c.clasificacion);
-        if (cls === 'deudor') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">Deudor</span>';
-        if (cls === 'inactivo') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">Inactivo</span>';
-        if (cls === 'mejor_cliente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium">Mejor</span>';
-        if (cls === 'frecuente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">Frecuente</span>';
-        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-medium">Ocasional</span>';
+        const lblBest = safeStr(crm?.labels?.best || 'Mejor cliente') || 'Mejor cliente';
+        const lblFreq = safeStr(crm?.labels?.freq || 'Frecuente') || 'Frecuente';
+        const lblInactive = safeStr(crm?.labels?.inactive || 'Inactivo') || 'Inactivo';
+        const lblDebtor = safeStr(crm?.labels?.debtor || 'Deudor') || 'Deudor';
+        if (cls === 'deudor') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">' + lblDebtor + '</span>';
+        if (cls === 'inactivo') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">' + lblInactive + '</span>';
+        if (cls === 'mejor_cliente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium">' + lblBest + '</span>';
+        if (cls === 'frecuente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">' + lblFreq + '</span>';
+        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">' + lblInactive + '</span>';
     }
 
     function badgeAlerta(c) {
         if (!(c.saldo_actual > 0)) return '';
-        if (c.alerta_cc === 'critica') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[11px] font-medium">Crítica · ' + safeStr(c.dias_deuda) + 'd</span>';
-        if (c.alerta_cc === 'warn15') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-medium">Aviso · ' + safeStr(c.dias_deuda) + 'd</span>';
-        if (c.alerta_cc === 'warn10') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-[11px] font-medium">Aviso · ' + safeStr(c.dias_deuda) + 'd</span>';
+        const crm = getCrmCfg();
+        const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
+        const criticalDays = Math.max(overdueDays, parseInt(crm?.debt_critical_days || 60, 10) || 60);
+        const dias = (parseInt(c.dias_deuda || 0, 10) || 0);
+        if (dias > criticalDays) return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[11px] font-medium">Vencida crítica · ' + safeStr(dias) + 'd</span>';
+        if (dias > overdueDays) return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-medium">Vencida · ' + safeStr(dias) + 'd</span>';
         return '';
     }
 
@@ -906,14 +1361,24 @@ document.addEventListener('DOMContentLoaded', function () {
         const sorted = sortRows(filtered);
 
         const totalClientes = derived.length;
-        const activos = derived.filter(x => x.status === 'activo').length;
-        const deudores = derived.filter(x => (x.saldo_actual || 0) > 0).length;
+        const nowTs = Date.now();
+        const days30 = 30 * 24 * 60 * 60 * 1000;
+        const activos = derived.filter(x => (parseInt(x.ultima_compra_ts || 0, 10) || 0) > 0 && (nowTs - (parseInt(x.ultima_compra_ts || 0, 10) || 0)) <= days30).length;
+
+        const crm = getCrmCfg();
+        const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
+        const conDeuda = derived.filter(x => (x.saldo_actual || 0) > 0 && ((parseInt(x.dias_deuda || 0, 10) || 0) <= overdueDays)).length;
+        const conDeudaVencida = derived.filter(x => (x.saldo_actual || 0) > 0 && ((parseInt(x.dias_deuda || 0, 10) || 0) > overdueDays)).length;
+        const deudores = conDeuda + conDeudaVencida;
         const deudaTotal = derived.reduce((acc, x) => acc + (parseFloat(x.saldo_actual || 0) || 0), 0);
 
         if (kpiTotal) kpiTotal.textContent = safeStr(totalClientes);
         if (kpiActivos) kpiActivos.textContent = safeStr(activos);
         if (kpiDeudores) kpiDeudores.textContent = safeStr(deudores);
         if (kpiDeuda) kpiDeuda.textContent = fmtMoney(deudaTotal);
+        if (kpiDeudoresSub) {
+            kpiDeudoresSub.textContent = 'Con deuda: ' + safeStr(conDeuda) + ' · Con deuda vencida: ' + safeStr(conDeudaVencida);
+        }
 
         if (!sorted.length) {
             tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
@@ -963,6 +1428,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function loadAll() {
+        try {
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando...</td></tr>';
+            }
+        } catch (e) {
+        }
         const cRes = readCustomers();
         const sRes = readSales();
 
@@ -973,9 +1444,24 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         if (isPromise(cRes) || isPromise(sRes)) {
-            Promise.all([Promise.resolve(cRes), Promise.resolve(sRes)]).then(arr => {
-                apply(arr[0], arr[1]);
-            });
+            Promise.all([Promise.resolve(cRes), Promise.resolve(sRes)])
+                .then(function (arr) {
+                    apply(arr[0], arr[1]);
+                })
+                .catch(function () {
+                    try {
+                        cacheCustomers = [];
+                        cacheSales = [];
+                        render();
+                    } catch (e) {
+                    }
+                    try {
+                        if (tbody) {
+                            tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">No se pudieron cargar los datos.</td></tr>';
+                        }
+                    } catch (e) {
+                    }
+                });
         } else {
             apply(cRes, sRes);
         }
@@ -1089,10 +1575,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (btnConfigAlertas) {
             btnConfigAlertas.addEventListener('click', function () {
-                const cfg = readAlertsConfig();
-                if (inputWarn10) inputWarn10.value = safeStr(cfg.warn10);
-                if (inputWarn15) inputWarn15.value = safeStr(cfg.warn15);
-                if (inputCrit30) inputCrit30.value = safeStr(cfg.crit30);
+                const cfg = readCrmConfig();
+                setCrmCfg(cfg);
+                setCrmError('');
+                if (inputCrmRecentDays) inputCrmRecentDays.value = safeStr(cfg.recent_days);
+                if (inputCrmDebtOverdueDays) inputCrmDebtOverdueDays.value = safeStr(cfg.debt_overdue_days);
+                if (inputCrmDebtCriticalDays) inputCrmDebtCriticalDays.value = safeStr(cfg.debt_critical_days || Math.max(cfg.debt_overdue_days || 30, 60));
+                if (inputCrmFreqMin) inputCrmFreqMin.value = safeStr(cfg.freq_min_purchases);
+                if (inputCrmBestMin) inputCrmBestMin.value = safeStr(cfg.best_min_purchases);
+                if (inputCrmLabelClasTitle) inputCrmLabelClasTitle.value = safeStr(cfg.labels?.clas_title || 'Clasificación');
+                if (inputCrmLabelBest) inputCrmLabelBest.value = safeStr(cfg.labels?.best || 'Mejor cliente');
+                if (inputCrmLabelFreq) inputCrmLabelFreq.value = safeStr(cfg.labels?.freq || 'Frecuente');
+                if (inputCrmLabelInactive) inputCrmLabelInactive.value = safeStr(cfg.labels?.inactive || 'Inactivo');
+                if (inputCrmLabelDebtor) inputCrmLabelDebtor.value = safeStr(cfg.labels?.debtor || 'Deudor');
+                try { renderCrmPreview(readCrmFormValues()); } catch (e) { }
                 openModal(modalAlerts);
             });
         }
@@ -1100,16 +1596,39 @@ document.addEventListener('DOMContentLoaded', function () {
         if (btnCancelAlerts) btnCancelAlerts.addEventListener('click', function () { closeModal(modalAlerts); });
         if (btnSaveAlerts) {
             btnSaveAlerts.addEventListener('click', function () {
-                const cfg = {
-                    warn10: Math.max(1, parseInt(inputWarn10?.value || 10, 10) || 10),
-                    warn15: Math.max(1, parseInt(inputWarn15?.value || 15, 10) || 15),
-                    crit30: Math.max(1, parseInt(inputCrit30?.value || 30, 10) || 30)
-                };
-                writeAlertsConfig(cfg);
+                const cfg = readCrmFormValues();
+                const err = validateCrmConfig(cfg);
+                if (err) {
+                    setCrmError(err);
+                    return;
+                }
+                setCrmError('');
+                writeCrmConfig(cfg);
+                applyCrmLabelsToUi(cfg);
                 closeModal(modalAlerts);
                 render();
             });
         }
+
+        const onCrmInput = function () {
+            setCrmError('');
+            try { renderCrmPreview(readCrmFormValues()); } catch (e) { }
+        };
+        [
+            inputCrmRecentDays,
+            inputCrmDebtOverdueDays,
+            inputCrmDebtCriticalDays,
+            inputCrmFreqMin,
+            inputCrmBestMin,
+            inputCrmLabelClasTitle,
+            inputCrmLabelBest,
+            inputCrmLabelFreq,
+            inputCrmLabelInactive,
+            inputCrmLabelDebtor,
+        ].forEach(function (el) {
+            if (el) el.addEventListener('input', onCrmInput);
+            if (el) el.addEventListener('change', onCrmInput);
+        });
         if (modalAlerts) {
             modalAlerts.addEventListener('click', function (e) {
                 const target = e.target;
@@ -1139,9 +1658,85 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (inputSearch) inputSearch.addEventListener('input', function () { render(); });
-        if (filterEstado) filterEstado.addEventListener('change', function () { render(); });
-        if (filterClas) filterClas.addEventListener('change', function () { render(); });
-        if (filterCc) filterCc.addEventListener('change', function () { render(); });
+
+        if (filterClasItems) {
+            renderMultiselectItems(filterClasItems, 'Todas', clasOpts, clasSelected, 'cust-cl-all', 'cust-cl-opt', clasAllMode);
+        }
+        if (filterCcItems) {
+            renderMultiselectItems(filterCcItems, 'Todas', ccOpts, ccSelected, 'cust-cc-all', 'cust-cc-opt', ccAllMode);
+        }
+        syncCustomersFilterButtons();
+
+        if (filterClasBtn && filterClasMenu) {
+            filterClasBtn.addEventListener('click', function () {
+                const open = filterClasMenu.classList.contains('hidden');
+                setDropdownOpen(filterClasMenu, open);
+                if (open) {
+                    try { setDropdownOpen(filterCcMenu, false); } catch (e) { }
+                }
+            });
+        }
+        if (filterCcBtn && filterCcMenu) {
+            filterCcBtn.addEventListener('click', function () {
+                const open = filterCcMenu.classList.contains('hidden');
+                setDropdownOpen(filterCcMenu, open);
+                if (open) {
+                    try { setDropdownOpen(filterClasMenu, false); } catch (e) { }
+                }
+            });
+        }
+
+        if (filterClasItems) {
+            filterClasItems.addEventListener('change', function (ev) {
+                const t = ev && ev.target ? ev.target : null;
+                if (!t) return;
+                if (t.classList.contains('cust-cl-all')) {
+                    if (clasAllMode) {
+                        clasAllMode = false;
+                        clasSelected = new Set();
+                    } else {
+                        clasAllMode = true;
+                        clasSelected = new Set();
+                    }
+                }
+                if (t.classList.contains('cust-cl-opt')) {
+                    const k = String(t.getAttribute('data-k') || '').trim();
+                    if (!k) return;
+                    clasAllMode = false;
+                    if (t.checked) clasSelected.add(k);
+                    else clasSelected.delete(k);
+                }
+                renderMultiselectItems(filterClasItems, 'Todas', clasOpts, clasSelected, 'cust-cl-all', 'cust-cl-opt', clasAllMode);
+                syncCustomersFilterButtons();
+                render();
+            });
+        }
+
+        if (filterCcItems) {
+            filterCcItems.addEventListener('change', function (ev) {
+                const t = ev && ev.target ? ev.target : null;
+                if (!t) return;
+                if (t.classList.contains('cust-cc-all')) {
+                    if (ccAllMode) {
+                        ccAllMode = false;
+                        ccSelected = new Set();
+                    } else {
+                        ccAllMode = true;
+                        ccSelected = new Set();
+                    }
+                }
+                if (t.classList.contains('cust-cc-opt')) {
+                    const k = String(t.getAttribute('data-k') || '').trim();
+                    if (!k) return;
+                    ccAllMode = false;
+                    if (t.checked) ccSelected.add(k);
+                    else ccSelected.delete(k);
+                }
+                renderMultiselectItems(filterCcItems, 'Todas', ccOpts, ccSelected, 'cust-cc-all', 'cust-cc-opt', ccAllMode);
+                syncCustomersFilterButtons();
+                render();
+            });
+        }
 
         if (tbody) {
             tbody.addEventListener('click', function (e) {
@@ -1173,8 +1768,26 @@ document.addEventListener('DOMContentLoaded', function () {
         document.addEventListener('click', function () {
             closeAllRowMenus();
         });
+
+        document.addEventListener('click', function (ev) {
+            const t = ev && ev.target ? ev.target : null;
+            if (!t) return;
+            try {
+                if (filterClasMenu && !filterClasMenu.classList.contains('hidden')) {
+                    if (!filterClasMenu.contains(t) && !filterClasBtn.contains(t)) setDropdownOpen(filterClasMenu, false);
+                }
+            } catch (e) {
+            }
+            try {
+                if (filterCcMenu && !filterCcMenu.classList.contains('hidden')) {
+                    if (!filterCcMenu.contains(t) && !filterCcBtn.contains(t)) setDropdownOpen(filterCcMenu, false);
+                }
+            } catch (e) {
+            }
+        });
     }
 
+    applyCrmLabelsToUi(readCrmConfig());
     initSorting();
     initActions();
     loadAll();

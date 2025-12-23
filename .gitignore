@@ -47,6 +47,7 @@ Thumbs.db
 # Local development
 instance/
 .webassets-cache
+app/static/uploads/
 
 # Testing
 .coverage

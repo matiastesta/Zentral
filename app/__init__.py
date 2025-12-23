@@ -18,6 +18,19 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    try:
+        debug_env = str(os.environ.get('APP_DEBUG') or '').strip().lower() in ('1', 'true', 'yes', 'on')
+        reload_env = str(os.environ.get('APP_RELOAD') or '').strip().lower() in ('1', 'true', 'yes', 'on')
+        flask_debug_env = str(os.environ.get('FLASK_DEBUG') or '').strip().lower() in ('1', 'true', 'yes', 'on')
+        flask_env = str(os.environ.get('FLASK_ENV') or '').strip().lower()
+        is_dev = bool(app.config.get('DEBUG')) or str(app.config.get('ENV') or '').strip().lower() == 'development' or flask_env == 'development'
+        if debug_env or reload_env or flask_debug_env or is_dev:
+            app.config['TEMPLATES_AUTO_RELOAD'] = True
+            app.jinja_env.auto_reload = True
+            app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+    except Exception:
+        app.logger.exception('Failed to apply dev reload configuration')
+
     # Inicializar extensiones que no dependen de base de datos
     login_manager.init_app(app)
     babel.init_app(app)
@@ -65,6 +78,7 @@ def create_app(config_class=Config):
             from app.models import BusinessSettings
             return {"business": BusinessSettings.get_singleton()}
         except Exception:
+            app.logger.exception('Failed to inject business settings')
             return {"business": None}
 
     with app.app_context():
@@ -110,13 +124,21 @@ def create_app(config_class=Config):
                         ('sale_price', 'FLOAT'),
                         ('internal_code', 'VARCHAR(64)'),
                         ('barcode', 'VARCHAR(64)'),
+                        ('image_filename', 'VARCHAR(255)'),
                         ('unit_name', 'VARCHAR(32)'),
                         ('uses_lots', 'BOOLEAN'),
                         ('method', 'VARCHAR(16)'),
                         ('min_stock', 'FLOAT'),
+                        ('reorder_point', 'FLOAT'),
+                        ('primary_supplier_id', 'VARCHAR(64)'),
+                        ('primary_supplier_name', 'VARCHAR(255)'),
                         ('active', 'BOOLEAN'),
                         ('created_at', 'DATETIME'),
                         ('updated_at', 'DATETIME'),
+                    ])
+
+                    ensure_columns('category', [
+                        ('active', 'BOOLEAN'),
                     ])
 
                     ensure_columns('inventory_lot', [
@@ -124,6 +146,7 @@ def create_app(config_class=Config):
                         ('qty_available', 'FLOAT'),
                         ('unit_cost', 'FLOAT'),
                         ('received_at', 'DATETIME'),
+                        ('supplier_id', 'VARCHAR(64)'),
                         ('supplier_name', 'VARCHAR(255)'),
                         ('expiration_date', 'DATE'),
                         ('lot_code', 'VARCHAR(64)'),
@@ -159,11 +182,17 @@ def create_app(config_class=Config):
                         ('updated_at', 'DATETIME'),
                     ])
 
+                    ensure_columns('sale', [
+                        ('is_gift', 'BOOLEAN'),
+                        ('gift_code', 'VARCHAR(64)'),
+                    ])
+
                     ensure_columns('employee', [
                         ('first_name', 'VARCHAR(255)'),
                         ('last_name', 'VARCHAR(255)'),
                         ('name', 'VARCHAR(255)'),
                         ('hire_date', 'DATE'),
+                        ('inactive_date', 'DATE'),
                         ('default_payment_method', 'VARCHAR(32)'),
                         ('contract_type', 'VARCHAR(64)'),
                         ('status', 'VARCHAR(16)'),
@@ -228,13 +257,14 @@ def create_app(config_class=Config):
                     ])
                     db.session.commit()
             except Exception:
+                app.logger.exception('Failed to upgrade database schema')
                 db.session.rollback()
 
             # Ensure singleton business row exists (after schema upgrade)
             try:
                 BusinessSettings.get_singleton()
             except Exception:
-                pass
+                app.logger.exception('Failed to ensure BusinessSettings singleton exists')
 
             if db.session.query(User).count() == 0:
                 admin = User(username='admin', email='admin@local', role='admin', is_master=False)

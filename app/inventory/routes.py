@@ -1,12 +1,16 @@
 from datetime import date as dt_date, datetime
 
-from flask import jsonify, render_template, request
+import os
+from uuid import uuid4
+
+from flask import current_app, jsonify, render_template, request, url_for
 from flask_login import login_required
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from typing import Optional
+from werkzeug.utils import secure_filename
 
 from app import db
-from app.models import Category, InventoryLot, InventoryMovement, Product
+from app.models import Category, InventoryLot, InventoryMovement, Product, Supplier
 from app.permissions import module_required
 from app.inventory import bp
 
@@ -17,8 +21,7 @@ from app.inventory import bp
 @module_required('inventory')
 def index():
     """Inventario avanzado."""
-    items = []
-    return render_template('inventory/index.html', title='Inventario', items=items)
+    return render_template('inventory/index.html', title='Inventario')
 
 
 def _parse_date_iso(raw, fallback=None):
@@ -42,25 +45,118 @@ def _serialize_category(cat: Optional[Category]):
         'id': cat.id,
         'name': cat.name,
         'parent_id': cat.parent_id,
+        'active': bool(getattr(cat, 'active', True)),
     }
 
 
+def _image_url(p: Product):
+    filename = str(getattr(p, 'image_filename', '') or '').strip()
+    if not filename:
+        return ''
+    try:
+        return url_for('static', filename=f'uploads/{filename}')
+    except Exception:
+        return ''
+
+
 def _serialize_product(p: Product):
+    cat_obj = _serialize_category(p.category) if p.category else None
+    cat_name = ''
+    try:
+        cat_name = str((cat_obj or {}).get('name') or '').strip()
+    except Exception:
+        cat_name = ''
     return {
         'id': p.id,
         'name': p.name,
         'description': p.description or '',
         'category_id': p.category_id,
-        'category': _serialize_category(p.category) if p.category else None,
+        'category': cat_name,
+        'category_obj': cat_obj,
         'sale_price': p.sale_price,
         'internal_code': p.internal_code or '',
         'barcode': p.barcode or '',
+        'image_url': _image_url(p),
         'unit_name': p.unit_name or '',
         'uses_lots': bool(p.uses_lots),
         'method': p.method or 'FIFO',
         'min_stock': p.min_stock,
+        'reorder_point': getattr(p, 'reorder_point', 0.0) or 0.0,
+        'primary_supplier_id': str(getattr(p, 'primary_supplier_id', '') or ''),
+        'primary_supplier_name': getattr(p, 'primary_supplier_name', '') or '',
         'active': bool(p.active),
     }
+
+
+def _normalize_name(name: str) -> str:
+    return str(name or '').strip().lower()
+
+
+def _product_method_locked(product_id: int) -> bool:
+    has_lots = db.session.query(InventoryLot.id).filter(InventoryLot.product_id == int(product_id)).first() is not None
+    if has_lots:
+        return True
+    has_movements = db.session.query(InventoryMovement.id).filter(InventoryMovement.product_id == int(product_id)).first() is not None
+    return bool(has_movements)
+
+
+def _generate_unique_internal_code() -> str:
+    for _ in range(10):
+        code = 'SKU-' + uuid4().hex[:10].upper()
+        exists = db.session.query(Product.id).filter(Product.internal_code == code).first() is not None
+        if not exists:
+            return code
+    return 'SKU-' + uuid4().hex.upper()
+
+
+def _allowed_image(filename: str) -> bool:
+    ext = os.path.splitext(filename or '')[1].lower()
+    return ext in ('.png', '.jpg', '.jpeg')
+
+
+@bp.get('/api/categories')
+@login_required
+@module_required('inventory')
+def list_categories_api():
+    limit = int(request.args.get('limit') or 5000)
+    if limit <= 0 or limit > 10000:
+        limit = 5000
+    q = db.session.query(Category).filter(Category.parent_id == None)  # noqa: E711
+    active = (request.args.get('active') or '').strip()
+    if active in ('1', 'true', 'True'):
+        q = q.filter(Category.active == True)  # noqa: E712
+    q = q.order_by(Category.name.asc()).limit(limit)
+    rows = q.all()
+    return jsonify({'ok': True, 'items': [_serialize_category(r) for r in rows]})
+
+
+@bp.post('/api/categories')
+@login_required
+@module_required('inventory')
+def create_category_api():
+    payload = request.get_json(silent=True) or {}
+    name = str(payload.get('name') or '').strip()
+    if not name:
+        return jsonify({'ok': False, 'error': 'name_required'}), 400
+    norm = _normalize_name(name)
+    existing = db.session.query(Category).filter(func.lower(Category.name) == norm, Category.parent_id == None).first()  # noqa: E711
+    if existing:
+        return jsonify({'ok': False, 'error': 'already_exists', 'item': _serialize_category(existing)}), 400
+    row = Category(name=name, active=bool(payload.get('active', True)))
+    db.session.add(row)
+    db.session.commit()
+    return jsonify({'ok': True, 'item': _serialize_category(row)})
+
+
+@bp.get('/api/products/<int:product_id>/method_lock')
+@login_required
+@module_required('inventory')
+def get_product_method_lock(product_id: int):
+    row = db.session.get(Product, int(product_id))
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    locked = _product_method_locked(row.id)
+    return jsonify({'ok': True, 'locked': bool(locked)})
 
 
 def _serialize_lot(l: InventoryLot):
@@ -72,6 +168,7 @@ def _serialize_lot(l: InventoryLot):
         'qty_available': l.qty_available,
         'unit_cost': l.unit_cost,
         'received_at': l.received_at.isoformat() if l.received_at else None,
+        'supplier_id': str(getattr(l, 'supplier_id', '') or ''),
         'supplier_name': l.supplier_name or '',
         'expiration_date': l.expiration_date.isoformat() if l.expiration_date else None,
         'lot_code': l.lot_code or '',
@@ -145,32 +242,46 @@ def create_product():
     if not name:
         return jsonify({'ok': False, 'error': 'name_required'}), 400
 
-    cat_name = str(payload.get('category_name') or '').strip()
     cat_id = payload.get('category_id')
     category = None
-    if cat_id:
+    if cat_id is not None and cat_id != '':
         try:
             category = db.session.get(Category, int(cat_id))
         except Exception:
             category = None
-    if not category and cat_name:
-        category = db.session.query(Category).filter(Category.name == cat_name, Category.parent_id == None).first()  # noqa: E711
-        if not category:
-            category = Category(name=cat_name)
-            db.session.add(category)
-            db.session.flush()
+    if not category:
+        return jsonify({'ok': False, 'error': 'category_required'}), 400
+    if hasattr(category, 'active') and not bool(category.active):
+        return jsonify({'ok': False, 'error': 'category_inactive'}), 400
+
+    internal_code = str(payload.get('internal_code') or '').strip() or None
+    if not internal_code:
+        internal_code = _generate_unique_internal_code()
+
+    supplier_id = str(payload.get('primary_supplier_id') or '').strip() or None
+    supplier_name = str(payload.get('primary_supplier_name') or '').strip() or None
+    supplier_row = None
+    if supplier_id:
+        supplier_row = db.session.get(Supplier, supplier_id)
+        if not supplier_row:
+            return jsonify({'ok': False, 'error': 'supplier_not_found'}), 400
+        supplier_name = str(supplier_row.name or '').strip() or supplier_name
 
     row = Product(
         name=name,
         description=str(payload.get('description') or '').strip() or None,
         category_id=(category.id if category else None),
         sale_price=_num(payload.get('sale_price')),
-        internal_code=str(payload.get('internal_code') or '').strip() or None,
+        internal_code=internal_code,
         barcode=str(payload.get('barcode') or '').strip() or None,
+        image_filename=str(payload.get('image_filename') or '').strip() or None,
         unit_name=str(payload.get('unit_name') or '').strip() or None,
         uses_lots=bool(payload.get('uses_lots', True)),
         method=str(payload.get('method') or 'FIFO').strip() or 'FIFO',
         min_stock=_num(payload.get('min_stock')),
+        reorder_point=_num(payload.get('reorder_point')),
+        primary_supplier_id=supplier_id,
+        primary_supplier_name=supplier_name,
         active=bool(payload.get('active', True)),
     )
     db.session.add(row)
@@ -194,17 +305,52 @@ def update_product(product_id: int):
     if not name:
         return jsonify({'ok': False, 'error': 'name_required'}), 400
 
+    cat_id = payload.get('category_id')
+    category = None
+    if cat_id is not None and cat_id != '':
+        try:
+            category = db.session.get(Category, int(cat_id))
+        except Exception:
+            category = None
+    if category and hasattr(category, 'active') and not bool(category.active):
+        return jsonify({'ok': False, 'error': 'category_inactive'}), 400
+
     row.name = name
     row.description = str(payload.get('description') or '').strip() or None
+    if category:
+        row.category_id = category.id
     row.sale_price = _num(payload.get('sale_price') if payload.get('sale_price') is not None else row.sale_price)
-    row.internal_code = str(payload.get('internal_code') or '').strip() or None
+    if payload.get('internal_code') is not None:
+        row.internal_code = str(payload.get('internal_code') or '').strip() or None
     row.barcode = str(payload.get('barcode') or '').strip() or None
+    if payload.get('primary_supplier_id') is not None:
+        next_sid = str(payload.get('primary_supplier_id') or '').strip() or None
+        if next_sid:
+            srow = db.session.get(Supplier, next_sid)
+            if not srow:
+                return jsonify({'ok': False, 'error': 'supplier_not_found'}), 400
+            row.primary_supplier_id = next_sid
+            row.primary_supplier_name = str(srow.name or '').strip() or row.primary_supplier_name
+        else:
+            row.primary_supplier_id = None
+
+    if payload.get('primary_supplier_name') is not None:
+        next_name = str(payload.get('primary_supplier_name') or '').strip() or None
+        row.primary_supplier_name = next_name
+        if next_name is None:
+            row.primary_supplier_id = None
+    if payload.get('reorder_point') is not None:
+        row.reorder_point = _num(payload.get('reorder_point'))
     if payload.get('unit_name') is not None:
         row.unit_name = str(payload.get('unit_name') or '').strip() or None
     if payload.get('uses_lots') is not None:
         row.uses_lots = bool(payload.get('uses_lots'))
     if payload.get('method') is not None:
-        row.method = str(payload.get('method') or '').strip() or 'FIFO'
+        next_method = str(payload.get('method') or '').strip() or 'FIFO'
+        if next_method != (row.method or 'FIFO'):
+            if _product_method_locked(row.id):
+                return jsonify({'ok': False, 'error': 'method_locked'}), 400
+            row.method = next_method
     if payload.get('min_stock') is not None:
         row.min_stock = _num(payload.get('min_stock'))
     if payload.get('active') is not None:
@@ -212,6 +358,52 @@ def update_product(product_id: int):
 
     db.session.commit()
     return jsonify({'ok': True, 'item': _serialize_product(row)})
+
+
+@bp.post('/api/products/<int:product_id>/image')
+@login_required
+@module_required('inventory')
+def upload_product_image(product_id: int):
+    row = db.session.get(Product, int(product_id))
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    f = request.files.get('image')
+    if not f or not getattr(f, 'filename', ''):
+        return jsonify({'ok': False, 'error': 'file_required'}), 400
+    if not _allowed_image(f.filename):
+        return jsonify({'ok': False, 'error': 'invalid_file_type'}), 400
+
+    filename = secure_filename(f.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    safe_name = f'prod_{row.id}_{uuid4().hex[:10]}{ext}'
+    try:
+        upload_dir = current_app.config.get('UPLOAD_FOLDER') or os.path.join(current_app.root_path, 'static', 'uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+        path = os.path.join(upload_dir, safe_name)
+        f.save(path)
+    except Exception:
+        return jsonify({'ok': False, 'error': 'upload_failed'}), 400
+
+    row.image_filename = safe_name
+    db.session.commit()
+    return jsonify({'ok': True, 'item': _serialize_product(row)})
+
+
+@bp.delete('/api/products/<int:product_id>')
+@login_required
+@module_required('inventory')
+def delete_product(product_id: int):
+    row = db.session.get(Product, int(product_id))
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    has_lots = db.session.query(InventoryLot.id).filter(InventoryLot.product_id == row.id).first() is not None
+    has_movements = db.session.query(InventoryMovement.id).filter(InventoryMovement.product_id == row.id).first() is not None
+
+    # Para mantener integridad y UX consistente, se desactiva (no se elimina) desde la UI.
+    row.active = False
+    db.session.commit()
+    return jsonify({'ok': True, 'soft_deleted': True, 'had_history': bool(has_lots or has_movements)})
 
 
 @bp.post('/api/products/prices')
@@ -297,7 +489,13 @@ def create_lot():
         return jsonify({'ok': False, 'error': 'qty_required'}), 400
 
     unit_cost = _num(payload.get('unit_cost'))
+    supplier_id = str(payload.get('supplier_id') or '').strip() or None
     supplier_name = str(payload.get('supplier_name') or '').strip() or None
+    if supplier_id:
+        srow = db.session.get(Supplier, supplier_id)
+        if not srow:
+            return jsonify({'ok': False, 'error': 'supplier_not_found'}), 400
+        supplier_name = str(srow.name or '').strip() or supplier_name
     lot_code = str(payload.get('lot_code') or '').strip() or None
     note = str(payload.get('note') or '').strip() or None
     exp_raw = str(payload.get('expiration_date') or '').strip()
@@ -307,6 +505,7 @@ def create_lot():
         qty_initial=qty,
         qty_available=qty,
         unit_cost=unit_cost,
+        supplier_id=supplier_id,
         supplier_name=supplier_name,
         expiration_date=exp_dt,
         lot_code=lot_code,
@@ -335,6 +534,124 @@ def create_lot():
     db.session.add(mv)
     db.session.commit()
     return jsonify({'ok': True, 'item': _serialize_lot(row)})
+
+
+@bp.put('/api/lots/<int:lot_id>')
+@login_required
+@module_required('inventory')
+def update_lot(lot_id: int):
+    lot = db.session.get(InventoryLot, int(lot_id))
+    if not lot:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    payload = request.get_json(silent=True) or {}
+
+    qty_initial_raw = payload.get('qty_initial')
+    unit_cost_raw = payload.get('unit_cost')
+    wants_qty_cost_change = (qty_initial_raw is not None) or (unit_cost_raw is not None)
+
+    date_raw = payload.get('date')
+    wants_date_change = date_raw is not None
+
+    # Proteger consistencia: si el lote ya tuvo consumos, no permitimos cambiar cantidad/costo.
+    # FIFO/PEPS depende de received_at: si ya hay consumos u otros movimientos aplicados al lote,
+    # no se deben permitir cambios que alteren el orden o la magnitud del ingreso.
+    if wants_qty_cost_change or wants_date_change:
+        blocked = (
+            db.session.query(InventoryMovement.id)
+            .filter(InventoryMovement.lot_id == lot.id)
+            .filter(InventoryMovement.type.notin_(['purchase', 'return']))
+            .first()
+        )
+        if blocked:
+            return jsonify({'ok': False, 'error': 'lot_has_sales'}), 400
+
+        used_sale = (
+            db.session.query(InventoryMovement.id)
+            .filter(InventoryMovement.lot_id == lot.id)
+            .filter(InventoryMovement.type == 'sale')
+            .first()
+        )
+        if used_sale:
+            return jsonify({'ok': False, 'error': 'lot_has_sales'}), 400
+
+    qty_initial = None
+    unit_cost = None
+    if qty_initial_raw is not None:
+        qty_initial = _num(qty_initial_raw)
+        if qty_initial <= 0:
+            return jsonify({'ok': False, 'error': 'qty_required'}), 400
+    if unit_cost_raw is not None:
+        unit_cost = _num(unit_cost_raw)
+        if unit_cost < 0:
+            return jsonify({'ok': False, 'error': 'unit_cost_invalid'}), 400
+
+    supplier_id = str(payload.get('supplier_id') or '').strip() or None
+    supplier_name = str(payload.get('supplier_name') or '').strip() or None
+    if supplier_id:
+        srow = db.session.get(Supplier, supplier_id)
+        if not srow:
+            return jsonify({'ok': False, 'error': 'supplier_not_found'}), 400
+        supplier_name = str(srow.name or '').strip() or supplier_name
+
+    lot_code = str(payload.get('lot_code') or '').strip() or None
+    note = str(payload.get('note') or '').strip() or None
+
+    exp_raw = str(payload.get('expiration_date') or '').strip()
+    exp_dt = _parse_date_iso(exp_raw, None) if exp_raw else None
+
+    movement_date = _parse_date_iso(payload.get('date'), None)
+    if not movement_date:
+        return jsonify({'ok': False, 'error': 'date_required'}), 400
+
+    try:
+        received_at = datetime.combine(movement_date, datetime.min.time())
+    except Exception:
+        received_at = datetime.utcnow()
+
+    lot.supplier_id = supplier_id
+    lot.supplier_name = supplier_name
+    lot.lot_code = lot_code
+    lot.note = note
+    lot.expiration_date = exp_dt
+    lot.received_at = received_at
+
+    if qty_initial is not None:
+        lot.qty_initial = qty_initial
+        lot.qty_available = qty_initial
+    if unit_cost is not None:
+        lot.unit_cost = unit_cost
+
+    # Mantener consistencia: el movimiento de ingreso del lote define la fecha del ingreso.
+    try:
+        mv_update = {InventoryMovement.movement_date: movement_date}
+        if qty_initial is not None:
+            mv_update[InventoryMovement.qty_delta] = qty_initial
+        if unit_cost is not None:
+            mv_update[InventoryMovement.unit_cost] = unit_cost
+        if qty_initial is not None or unit_cost is not None:
+            q = qty_initial if qty_initial is not None else float(lot.qty_initial or 0)
+            c = unit_cost if unit_cost is not None else float(lot.unit_cost or 0)
+            mv_update[InventoryMovement.total_cost] = q * c
+
+        # Un lote puede venir de compra (purchase) o de devolución (return).
+        # Actualizamos el movimiento de ingreso correspondiente.
+        inbound = (
+            db.session.query(InventoryMovement)
+            .filter(InventoryMovement.lot_id == lot.id)
+            .filter(InventoryMovement.type.in_(['purchase', 'return']))
+        )
+        inbound.update(mv_update, synchronize_session=False)
+    except Exception:
+        current_app.logger.exception('Failed to update inbound movement for inventory lot')
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+
+    return jsonify({'ok': True, 'item': _serialize_lot(lot)})
 
 
 @bp.delete('/api/lots/<int:lot_id>')

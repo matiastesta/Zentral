@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %} - Zentral</title>
+    {% if business and business.logo_filename %}
+        <link rel="icon" type="image/png" href="{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}">
+        <link rel="apple-touch-icon" href="{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}">
+    {% else %}
+        <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230d1067'/%3E%3Ctext x='32' y='42' font-size='34' text-anchor='middle' fill='white' font-family='Arial'%3EZ%3C/text%3E%3C/svg%3E">
+    {% endif %}
     <!-- Tailwind CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <!-- Font Awesome -->
@@ -262,6 +268,53 @@
         </div>
     </footer>
 
+    <div id="modal-alert" class="hidden fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/40" data-close="1"></div>
+        <div class="relative h-full w-full flex items-center justify-center p-4">
+            <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-gray-300 overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div class="w-full text-center">
+                        <h3 id="alert-title" class="text-base font-semibold text-gray-900">Atención</h3>
+                        <p id="alert-subtitle" class="text-xs text-gray-500">—</p>
+                    </div>
+                    <button id="btn-close-alert" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-5">
+                    <div id="alert-message" class="text-sm text-gray-700 text-center"></div>
+                </div>
+                <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                    <button id="btn-ok-alert" type="button" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">Aceptar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-confirm" class="hidden fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/40" data-close="1"></div>
+        <div class="relative h-full w-full flex items-center justify-center p-4">
+            <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-gray-300 overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div class="w-full text-center">
+                        <h3 id="confirm-title" class="text-base font-semibold text-gray-900">Confirmar</h3>
+                        <p id="confirm-subtitle" class="text-xs text-gray-500">—</p>
+                    </div>
+                    <button id="btn-close-confirm" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-5">
+                    <div id="confirm-message" class="text-sm text-gray-700 text-center"></div>
+                </div>
+                <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                    <button id="btn-cancel-confirm" type="button" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                    <button id="btn-ok-confirm" type="button" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- flatpickr JS (date picker) -->
@@ -272,6 +325,153 @@
     <script src="{{ url_for('static', filename='js/services/storage_service.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block scripts %}{% endblock %}
+
+    <script>
+        (function () {
+            function getAlertEls() {
+                return {
+                    modal: document.getElementById('modal-alert'),
+                    title: document.getElementById('alert-title'),
+                    subtitle: document.getElementById('alert-subtitle'),
+                    message: document.getElementById('alert-message'),
+                    btnOk: document.getElementById('btn-ok-alert'),
+                    btnClose: document.getElementById('btn-close-alert'),
+                };
+            }
+
+            function getConfirmEls() {
+                return {
+                    modal: document.getElementById('modal-confirm'),
+                    title: document.getElementById('confirm-title'),
+                    subtitle: document.getElementById('confirm-subtitle'),
+                    message: document.getElementById('confirm-message'),
+                    btnOk: document.getElementById('btn-ok-confirm'),
+                    btnCancel: document.getElementById('btn-cancel-confirm'),
+                    btnClose: document.getElementById('btn-close-confirm'),
+                };
+            }
+
+            let confirmPromiseResolve = null;
+
+            window.formatFechaDisplay = function (raw) {
+                if (raw === null || raw === undefined) return '';
+                if (typeof raw === 'number' && isFinite(raw)) {
+                    const dnum = new Date(raw);
+                    if (isNaN(dnum.getTime())) return String(raw);
+                    const dd = String(dnum.getDate()).padStart(2, '0');
+                    const mm = String(dnum.getMonth() + 1).padStart(2, '0');
+                    const yy = String(dnum.getFullYear());
+                    return dd + '/' + mm + '/' + yy;
+                }
+
+                const v = String(raw || '').trim();
+                if (!v || v === '—' || v === '-') return v;
+                if (/^\d{2}\/\d{2}\/\d{4}/.test(v)) return v;
+                if (/^\d{4}-\d{2}-\d{2}/.test(v)) {
+                    const y = v.slice(0, 4);
+                    const m = v.slice(5, 7);
+                    const d = v.slice(8, 10);
+                    const restRaw = v.length > 10 ? v.slice(10) : '';
+                    const rest = restRaw && restRaw[0] === 'T' ? (' ' + restRaw.slice(1)) : restRaw;
+                    return d + '/' + m + '/' + y + rest;
+                }
+
+                const dt = new Date(v);
+                if (!isNaN(dt.getTime())) {
+                    const dd = String(dt.getDate()).padStart(2, '0');
+                    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                    const yy = String(dt.getFullYear());
+                    return dd + '/' + mm + '/' + yy;
+                }
+
+                return v;
+            };
+
+            window.closeAlertModal = function () {
+                const els = getAlertEls();
+                if (!els.modal) return;
+                els.modal.classList.add('hidden');
+            };
+
+            window.showAlertModal = function (message, title, subtitle) {
+                const els = getAlertEls();
+                const msg = String(message || '').trim();
+                const ttl = String(title || '').trim() || 'Atención';
+                const sub = String(subtitle || '').trim();
+                if (!els.modal || !els.message || !els.title) {
+                    alert(ttl + (msg ? (': ' + msg) : ''));
+                    return;
+                }
+                els.title.textContent = ttl;
+                if (els.subtitle) els.subtitle.textContent = sub || '—';
+                els.message.textContent = msg;
+                els.modal.classList.remove('hidden');
+            };
+
+            window.closeConfirmModal = function (result) {
+                const els = getConfirmEls();
+                if (!els.modal) return;
+                els.modal.classList.add('hidden');
+                if (confirmPromiseResolve) {
+                    const fn = confirmPromiseResolve;
+                    confirmPromiseResolve = null;
+                    fn(!!result);
+                }
+            };
+
+            window.confirmModal = function (message, title, subtitle, opts) {
+                const els = getConfirmEls();
+                const msg = String(message || '').trim();
+                const ttl = String(title || '').trim() || 'Confirmar';
+                const sub = String(subtitle || '').trim();
+                const o = (opts && typeof opts === 'object') ? opts : {};
+                const okLabel = String(o.okText || 'Confirmar');
+                const cancelLabel = String(o.cancelText || 'Cancelar');
+                if (!els.modal || !els.message || !els.title) {
+                    return Promise.resolve(window.confirm(ttl + (msg ? (': ' + msg) : '')));
+                }
+                els.title.textContent = ttl;
+                if (els.subtitle) els.subtitle.textContent = sub || '—';
+                els.message.textContent = msg;
+                if (els.btnOk) els.btnOk.textContent = okLabel;
+                if (els.btnCancel) els.btnCancel.textContent = cancelLabel;
+                els.modal.classList.remove('hidden');
+                return new Promise(function (resolve) {
+                    confirmPromiseResolve = resolve;
+                });
+            };
+
+            document.addEventListener('DOMContentLoaded', function () {
+                const els = getAlertEls();
+                if (!els.modal) return;
+                if (els.btnOk) els.btnOk.addEventListener('click', function () { window.closeAlertModal(); });
+                if (els.btnClose) els.btnClose.addEventListener('click', function () { window.closeAlertModal(); });
+                els.modal.addEventListener('click', function (e) {
+                    const target = e.target;
+                    if (target && target.getAttribute && target.getAttribute('data-close') === '1') window.closeAlertModal();
+                });
+                document.addEventListener('keydown', function (e) {
+                    if (!els.modal || els.modal.classList.contains('hidden')) return;
+                    if (e.key === 'Escape') window.closeAlertModal();
+                });
+
+                const cels = getConfirmEls();
+                if (cels.modal) {
+                    if (cels.btnOk) cels.btnOk.addEventListener('click', function () { window.closeConfirmModal(true); });
+                    if (cels.btnCancel) cels.btnCancel.addEventListener('click', function () { window.closeConfirmModal(false); });
+                    if (cels.btnClose) cels.btnClose.addEventListener('click', function () { window.closeConfirmModal(false); });
+                    cels.modal.addEventListener('click', function (e) {
+                        const target = e.target;
+                        if (target && target.getAttribute && target.getAttribute('data-close') === '1') window.closeConfirmModal(false);
+                    });
+                    document.addEventListener('keydown', function (e) {
+                        if (!cels.modal || cels.modal.classList.contains('hidden')) return;
+                        if (e.key === 'Escape') window.closeConfirmModal(false);
+                    });
+                }
+            });
+        })();
+    </script>
     
     <script>
         // Toggle mobile menu
@@ -309,6 +509,59 @@
                 });
             }
         });
+    </script>
+
+    <script>
+        (function () {
+            function getStorageKey(key) {
+                return 'kpi_collapsed_' + String(key || '').trim();
+            }
+
+            function readCollapsed(key) {
+                try {
+                    return localStorage.getItem(getStorageKey(key)) === '1';
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            function writeCollapsed(key, collapsed) {
+                try {
+                    localStorage.setItem(getStorageKey(key), collapsed ? '1' : '0');
+                } catch (e) {
+                }
+            }
+
+            function applyState(btn, target, key) {
+                if (!btn || !target) return;
+                const collapsed = readCollapsed(key);
+                target.classList.toggle('hidden', collapsed);
+                btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                const icon = btn.querySelector('[data-kpi-toggle-icon]') || btn.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-chevron-right', collapsed);
+                    icon.classList.toggle('fa-chevron-down', !collapsed);
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                document.querySelectorAll('[data-kpi-toggle]').forEach(function (btn) {
+                    const key = (btn.getAttribute('data-kpi-key') || btn.getAttribute('data-kpi-toggle') || '').trim();
+                    const targetSel = (btn.getAttribute('data-kpi-target') || '').trim();
+                    if (!key || !targetSel) return;
+                    const target = document.querySelector(targetSel);
+                    if (!target) return;
+
+                    applyState(btn, target, key);
+
+                    btn.addEventListener('click', function () {
+                        const willCollapse = !target.classList.contains('hidden');
+                        writeCollapsed(key, willCollapse);
+                        applyState(btn, target, key);
+                    });
+                });
+            });
+        })();
     </script>
 </body>
 </html>

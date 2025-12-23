@@ -1,7 +1,7 @@
 from datetime import date as dt_date, datetime
 from typing import Any, Dict, List
 
-from flask import jsonify, render_template, request
+from flask import current_app, jsonify, render_template, request, url_for
 from flask_login import login_required
 
 from app import db
@@ -16,8 +16,7 @@ from app.sales import bp
 @module_required('sales')
 def index():
     """Listado básico de ventas (dummy)."""
-    sales = []
-    return render_template("sales/list.html", title="Ventas", sales=sales)
+    return render_template("sales/list.html", title="Ventas")
 
 
 def _dt_to_ms(dt):
@@ -26,6 +25,7 @@ def _dt_to_ms(dt):
     try:
         return int(dt.timestamp() * 1000)
     except Exception:
+        current_app.logger.exception('Failed to convert datetime to milliseconds')
         return 0
 
 
@@ -33,6 +33,7 @@ def _parse_date_iso(raw, fallback=None):
     try:
         return dt_date.fromisoformat(str(raw).strip())
     except Exception:
+        current_app.logger.exception('Failed to parse date from iso format')
         return fallback
 
 
@@ -45,6 +46,10 @@ def _serialize_sale(row: Sale):
         'status': row.status,
         'payment_method': row.payment_method,
         'notes': row.notes or '',
+
+        'is_gift': bool(getattr(row, 'is_gift', False)),
+        'gift_code': (getattr(row, 'gift_code', None) or ''),
+
         'total': row.total,
         'discount_general_pct': row.discount_general_pct,
         'discount_general_amount': row.discount_general_amount,
@@ -72,12 +77,51 @@ def _serialize_sale(row: Sale):
     }
 
 
+def _make_gift_code(ticket: str, items_list: list) -> str:
+    t = str(ticket or '').strip()
+    digits = ''.join([ch for ch in t if ch.isdigit()])
+    if not digits:
+        digits = '0000'
+    letters = []
+    seen = set()
+    for it in (items_list if isinstance(items_list, list) else []):
+        d = it if isinstance(it, dict) else {}
+        name = str(d.get('nombre') or d.get('product_name') or '').strip()
+        ch = ''
+        for c in name:
+            if c.isalnum():
+                ch = c.upper()
+                break
+        if not ch:
+            continue
+        if ch in seen:
+            continue
+        seen.add(ch)
+        letters.append(ch)
+        if len(letters) >= 6:
+            break
+    suffix = ''.join(letters) or 'X'
+    return f"R{digits}{suffix}"
+
+
+def _image_url(p: Product):
+    filename = str(getattr(p, 'image_filename', '') or '').strip()
+    if not filename:
+        return ''
+    try:
+        return url_for('static', filename=f'uploads/{filename}')
+    except Exception:
+        current_app.logger.exception('Failed to generate image url')
+        return ''
+
+
 def _serialize_product_for_sales(p: Product):
     cat = None
     try:
         if getattr(p, 'category', None):
             cat = {'id': p.category.id, 'name': p.category.name, 'parent_id': p.category.parent_id}
     except Exception:
+        current_app.logger.exception('Failed to serialize product category')
         cat = None
     return {
         'id': p.id,
@@ -87,6 +131,7 @@ def _serialize_product_for_sales(p: Product):
         'category': cat,
         'category_name': (cat.get('name') if isinstance(cat, dict) else ''),
         'active': bool(p.active),
+        'image_url': _image_url(p),
     }
 
 
@@ -107,6 +152,7 @@ def list_sales():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
     include_replaced = str(request.args.get('include_replaced') or '').strip() in ('1', 'true', 'True')
+    exclude_cc = str(request.args.get('exclude_cc') or '').strip() in ('1', 'true', 'True')
     limit = int(request.args.get('limit') or 300)
     if limit <= 0 or limit > 2000:
         limit = 300
@@ -121,6 +167,8 @@ def list_sales():
         q = q.filter(Sale.sale_date <= d_to)
     if not include_replaced:
         q = q.filter(Sale.status != 'Reemplazada')
+    if exclude_cc:
+        q = q.filter(Sale.sale_type != 'CobroCC')
     q = q.order_by(Sale.sale_date.desc(), Sale.id.desc()).limit(limit)
     rows = q.all()
     return jsonify({'ok': True, 'items': [_serialize_sale(r) for r in rows]})
@@ -163,10 +211,51 @@ def list_lots_for_sales():
         try:
             q = q.filter(InventoryLot.product_id == int(product_id))
         except Exception:
+            current_app.logger.exception('Failed to filter lots by product id')
             return jsonify({'ok': True, 'items': []})
     q = q.order_by(InventoryLot.received_at.desc(), InventoryLot.id.desc()).limit(limit)
     rows = q.all()
     return jsonify({'ok': True, 'items': [_serialize_lot_for_sales(r) for r in rows]})
+
+
+@bp.get('/api/sales/debt-summary')
+@login_required
+@module_required('sales')
+def debt_summary():
+    customer_id = str(request.args.get('customer_id') or '').strip()
+    customer_name = str(request.args.get('customer_name') or '').strip()
+
+    q = db.session.query(Sale).filter(Sale.due_amount > 0)
+    if customer_id:
+        q = q.filter(Sale.customer_id == customer_id)
+    elif customer_name:
+        q = q.filter(Sale.customer_name == customer_name)
+    else:
+        return jsonify({'ok': True, 'saldo': 0.0, 'dias': 0}), 200
+
+    rows = q.all()
+    saldo = 0.0
+    last_ts = 0
+    for r in rows:
+        saldo += float(r.due_amount or 0.0)
+        ts = _dt_to_ms(r.created_at)
+        if ts and ts > last_ts:
+            last_ts = ts
+        try:
+            if r.sale_date:
+                dts = int(datetime.combine(r.sale_date, datetime.min.time()).timestamp() * 1000)
+                if dts > last_ts:
+                    last_ts = dts
+        except Exception:
+            current_app.logger.exception('Failed to compute last_ts for sales debt summary')
+
+    dias = 0
+    if saldo > 0 and last_ts:
+        try:
+            dias = max(0, int((datetime.utcnow().timestamp() * 1000 - last_ts) // (1000 * 60 * 60 * 24)))
+        except Exception:
+            current_app.logger.exception('Failed to compute dias for sales debt summary')
+    return jsonify({'ok': True, 'saldo': saldo, 'dias': dias}), 200
 
 
 @bp.post('/api/sales/settle')
@@ -183,6 +272,7 @@ def settle_sale_due_amount():
         try:
             row = db.session.get(Sale, int(sale_id))
         except Exception:
+            current_app.logger.exception('Failed to retrieve sale by id')
             row = None
     if not row and ticket:
         row = db.session.query(Sale).filter(Sale.ticket == ticket).first()
@@ -220,6 +310,7 @@ def settle_sale_due_amount():
         from flask_login import current_user
         payment_sale.created_by_user_id = int(getattr(current_user, 'id', 0) or 0) or None
     except Exception:
+        current_app.logger.exception('Failed to set created_by_user_id for payment sale')
         payment_sale.created_by_user_id = None
 
     row.paid_amount = float(row.paid_amount or 0.0) + abs(due)
@@ -234,6 +325,7 @@ def settle_sale_due_amount():
         db.session.commit()
     except Exception:
         db.session.rollback()
+        current_app.logger.exception('Failed to commit payment sale')
         return jsonify({'ok': False, 'error': 'db_error'}), 400
 
     return jsonify({'ok': True, 'item': _serialize_sale(row), 'payment': _serialize_sale(payment_sale)})
@@ -246,8 +338,6 @@ def create_exchange():
     payload = request.get_json(silent=True) or {}
     sale_date = _parse_date_iso(payload.get('fecha') or payload.get('date'), dt_date.today())
     payment_method = str(payload.get('payment_method') or 'Efectivo').strip() or 'Efectivo'
-
-    original_ticket = str(payload.get('original_ticket') or '').strip()
     notes = str(payload.get('notes') or '').strip() or None
 
     customer_id = str(payload.get('customer_id') or '').strip() or None
@@ -281,24 +371,43 @@ def create_exchange():
     if new_total < 0:
         new_total = abs(new_total)
 
-    # Reservar 2 tickets consecutivos (Devolución + Venta)
-    last_id = db.session.query(db.func.max(Sale.id)).scalar() or 0
-    return_ticket = '#' + str(int(last_id) + 1).zfill(4)
-    sale_ticket = '#' + str(int(last_id) + 2).zfill(4)
+    diff_to_pay = max(0.0, float(new_total or 0.0) - float(return_total or 0.0))
+    on_account = bool(payload.get('on_account'))
+    paid_amount = _num(payload.get('paid_amount'))
+    if paid_amount < 0:
+        paid_amount = 0.0
+    if paid_amount > diff_to_pay:
+        paid_amount = diff_to_pay
+    due_amount = max(0.0, diff_to_pay - paid_amount) if on_account else 0.0
+    if diff_to_pay <= 0:
+        paid_amount = 0.0
+        due_amount = 0.0
+        on_account = False
+    if not on_account:
+        paid_amount = diff_to_pay
+        due_amount = 0.0
 
-    # En una transacción: revertir ticket original (si existe), crear devolución + nueva venta
+    is_gift = bool(payload.get('is_gift'))
+    gift_code = str(payload.get('gift_code') or '').strip() or None
+
+    # En una transacción: registrar 2 movimientos (Devolución + Venta)
     try:
-        if original_ticket:
-            # revertimos inventario del ticket anterior para eliminar su impacto
-            _revert_inventory_for_ticket(original_ticket)
+        return_ticket = _next_exchange_ticket()
+        sale_ticket = _next_ticket()
+
+        base_notes = notes
+        rel_return = f"Relacionado a venta {sale_ticket}"
+        rel_sale = f"Relacionado a cambio {return_ticket}"
+        return_notes = (str(base_notes).strip() + ('\n' if str(base_notes).strip() else '') + rel_return) if base_notes else rel_return
+        sale_notes = (str(base_notes).strip() + ('\n' if str(base_notes).strip() else '') + rel_sale) if base_notes else rel_sale
 
         return_row = Sale(
             ticket=return_ticket,
             sale_date=sale_date,
-            sale_type='Devolucion',
-            status='Completada',
+            sale_type='Cambio',
+            status='Cambio',
             payment_method=payment_method,
-            notes=notes,
+            notes=return_notes,
             total=-abs(return_total),
             discount_general_pct=0.0,
             discount_general_amount=0.0,
@@ -310,24 +419,50 @@ def create_exchange():
             exchange_return_total=return_total,
             exchange_new_total=new_total,
         )
+
+        # Para la venta: el cliente "paga" con el crédito de la devolución + el pago real.
+        paid_cash = paid_amount
+        credit = min(float(return_total or 0.0), float(new_total or 0.0))
+        paid_for_sale = max(0.0, min(float(new_total or 0.0), float(credit) + float(paid_cash)))
+        due_for_sale = max(0.0, float(new_total or 0.0) - paid_for_sale)
+
         sale_row = Sale(
             ticket=sale_ticket,
             sale_date=sale_date,
             sale_type='Venta',
             status='Completada',
             payment_method=payment_method,
-            notes=notes,
+            notes=sale_notes,
             total=abs(new_total),
             discount_general_pct=0.0,
             discount_general_amount=0.0,
-            on_account=False,
-            paid_amount=0.0,
-            due_amount=0.0,
+            on_account=(due_for_sale > 0),
+            paid_amount=paid_for_sale,
+            due_amount=due_for_sale,
             customer_id=customer_id,
             customer_name=customer_name,
             exchange_return_total=return_total,
             exchange_new_total=new_total,
         )
+
+        try:
+            from flask_login import current_user
+            uid = int(getattr(current_user, 'id', 0) or 0) or None
+            return_row.created_by_user_id = uid
+            sale_row.created_by_user_id = uid
+        except Exception:
+            current_app.logger.exception('Failed to set created_by_user_id for exchange sales')
+            return_row.created_by_user_id = None
+            sale_row.created_by_user_id = None
+
+        try:
+            sale_row.is_gift = is_gift
+            if is_gift and not gift_code:
+                gift_code = _make_gift_code(sale_ticket, new_items_list)
+            sale_row.gift_code = gift_code
+        except Exception:
+            current_app.logger.exception('Failed to apply gift_code for sale (exchange flow)')
+
         db.session.add(return_row)
         db.session.add(sale_row)
         db.session.flush()
@@ -343,6 +478,7 @@ def create_exchange():
                 discount_pct=_num(d.get('descuento') if d.get('descuento') is not None else d.get('discount_pct')),
                 subtotal=_num(d.get('subtotal')),
             ))
+
         for it in new_items_list:
             d = it if isinstance(it, dict) else {}
             sale_row.items.append(SaleItem(
@@ -355,24 +491,21 @@ def create_exchange():
                 subtotal=_num(d.get('subtotal')),
             ))
 
-        # aplicar inventario/movimientos usando la misma lógica
         _apply_inventory_for_sale(sale_ticket=return_ticket, sale_date=sale_date, items=return_items_inv)
         _apply_inventory_for_sale(sale_ticket=sale_ticket, sale_date=sale_date, items=new_items_inv)
-
-        if original_ticket:
-            _mark_sale_replaced(ticket=original_ticket, replaced_by=return_ticket)
 
         db.session.commit()
     except ValueError as e:
         db.session.rollback()
+        current_app.logger.exception('Failed to create exchange: stock insufficient')
         return jsonify({'ok': False, 'error': 'stock_insufficient', 'message': str(e)}), 400
     except Exception:
         db.session.rollback()
+        current_app.logger.exception('Failed to create exchange: db error')
         return jsonify({'ok': False, 'error': 'db_error'}), 400
 
     return jsonify({
         'ok': True,
-        'original_ticket': original_ticket,
         'return_ticket': return_ticket,
         'new_ticket': sale_ticket,
         'items': {
@@ -383,15 +516,33 @@ def create_exchange():
 
 
 def _next_ticket():
-    last_id = db.session.query(db.func.max(Sale.id)).scalar() or 0
-    n = int(last_id) + 1
-    return '#' + str(n).zfill(4)
+    """Secuencia numérica para ventas/pagos: #0001, #0002, ... (ignora #Cxxxx)."""
+    try:
+        rows = db.session.query(Sale.ticket).filter(Sale.ticket.like('#%')).all()
+        max_n = 0
+        for (t,) in (rows or []):
+            s = str(t or '').strip()
+            if not s.startswith('#') or s.startswith('#C'):
+                continue
+            digits = ''.join([ch for ch in s[1:] if ch.isdigit()])
+            if not digits:
+                continue
+            try:
+                max_n = max(max_n, int(digits))
+            except Exception:
+                current_app.logger.exception('Failed to parse ticket digits')
+                continue
+        return '#' + str(max_n + 1).zfill(4)
+    except Exception:
+        current_app.logger.exception('Failed to generate next ticket')
+        return '#0001'
 
 
 def _num(v):
     try:
         return float(v)
     except Exception:
+        current_app.logger.exception('Failed to convert value to float')
         return 0.0
 
 
@@ -404,6 +555,7 @@ def _int_or_none(v):
             return None
         return int(s)
     except Exception:
+        current_app.logger.exception('Failed to convert value to int')
         return None
 
 
@@ -527,6 +679,29 @@ def _mark_sale_replaced(*, ticket: str, replaced_by: str):
     row.notes = (note + ('\n' if note else '') + extra) if extra else (note or None)
 
 
+def _next_exchange_ticket() -> str:
+    """Secuencia independiente para cambios: #C0001, #C0002, ..."""
+    try:
+        rows = db.session.query(Sale.ticket).filter(Sale.ticket.like('#C%')).all()
+        max_n = 0
+        for (t,) in (rows or []):
+            s = str(t or '').strip()
+            if not s.startswith('#C'):
+                continue
+            digits = ''.join([ch for ch in s[2:] if ch.isdigit()])
+            if not digits:
+                continue
+            try:
+                max_n = max(max_n, int(digits))
+            except Exception:
+                current_app.logger.exception('Failed to parse exchange ticket digits')
+                continue
+        return '#C' + str(max_n + 1).zfill(4)
+    except Exception:
+        current_app.logger.exception('Failed to generate next exchange ticket')
+        return '#C0001'
+
+
 @bp.post('/api/sales')
 @login_required
 @module_required('sales')
@@ -559,10 +734,22 @@ def create_sale():
         from flask_login import current_user
         row.created_by_user_id = int(getattr(current_user, 'id', 0) or 0) or None
     except Exception:
+        current_app.logger.exception('Failed to set created_by_user_id for sale')
         row.created_by_user_id = None
 
     items = payload.get('items')
     items_list = items if isinstance(items, list) else []
+
+    is_gift = bool(payload.get('is_gift'))
+    gift_code = str(payload.get('gift_code') or '').strip() or None
+    try:
+        row.is_gift = is_gift
+        if is_gift and not gift_code:
+            gift_code = _make_gift_code(row.ticket, items_list)
+        row.gift_code = gift_code
+    except Exception:
+        current_app.logger.exception('Failed to apply gift_code for sale')
+
     for it in items_list:
         d = it if isinstance(it, dict) else {}
         row.items.append(SaleItem(
@@ -627,6 +814,18 @@ def update_sale(ticket):
     row.customer_name = str(payload.get('customer_name') or '').strip() or None
     row.exchange_return_total = (None if payload.get('exchange_return_total') is None else _num(payload.get('exchange_return_total')))
     row.exchange_new_total = (None if payload.get('exchange_new_total') is None else _num(payload.get('exchange_new_total')))
+
+    is_gift = bool(payload.get('is_gift'))
+    gift_code = str(payload.get('gift_code') or '').strip() or None
+    try:
+        row.is_gift = is_gift
+        if is_gift and not gift_code:
+            items = payload.get('items')
+            items_list = items if isinstance(items, list) else []
+            gift_code = _make_gift_code(row.ticket, items_list)
+        row.gift_code = gift_code
+    except Exception:
+        current_app.logger.exception('Failed to apply gift_code while updating sale')
 
     row.items = []
     items = payload.get('items')
