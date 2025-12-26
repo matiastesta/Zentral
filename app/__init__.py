@@ -86,11 +86,11 @@ def create_app(config_class=Config):
 
     with app.app_context():
         try:
+            db.create_all()
+
+            from app.models import User, BusinessSettings
+
             if str(db.engine.url.drivername) == 'sqlite':
-                db.create_all()
-
-                from app.models import User, BusinessSettings
-
                 insp = inspect(db.engine)
 
                 def ensure_columns(table, cols):
@@ -261,25 +261,26 @@ def create_app(config_class=Config):
                     ('created_at', 'DATETIME'),
                     ('updated_at', 'DATETIME'),
                 ])
+
+            db.session.commit()
+
+            try:
+                BusinessSettings.get_singleton()
+            except Exception:
+                app.logger.exception('Failed to ensure BusinessSettings singleton exists')
+
+            if db.session.query(User).count() == 0:
+                admin = User(username='admin', email='admin@local', role='admin', is_master=False)
+                admin.set_password(os.environ.get('INITIAL_ADMIN_PASSWORD') or 'admin')
+                admin.set_permissions_all(True)
+                db.session.add(admin)
+
+                master = User(username='zentra', email='support@zentra.local', role='admin', is_master=True)
+                master.set_password(os.environ.get('ZENTRA_MASTER_PASSWORD') or 'zentra')
+                master.set_permissions_all(True)
+                db.session.add(master)
+
                 db.session.commit()
-
-                try:
-                    BusinessSettings.get_singleton()
-                except Exception:
-                    app.logger.exception('Failed to ensure BusinessSettings singleton exists')
-
-                if db.session.query(User).count() == 0:
-                    admin = User(username='admin', email='admin@local', role='admin', is_master=False)
-                    admin.set_password(os.environ.get('INITIAL_ADMIN_PASSWORD') or 'admin')
-                    admin.set_permissions_all(True)
-                    db.session.add(admin)
-
-                    master = User(username='zentra', email='support@zentra.local', role='admin', is_master=True)
-                    master.set_password(os.environ.get('ZENTRA_MASTER_PASSWORD') or 'zentra')
-                    master.set_permissions_all(True)
-                    db.session.add(master)
-
-                    db.session.commit()
         except Exception:
             db.session.rollback()
 
