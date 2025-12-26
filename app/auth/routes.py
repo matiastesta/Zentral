@@ -1,9 +1,11 @@
-from flask import render_template, redirect, url_for, flash, request
+from flask import render_template, redirect, url_for, flash, request, session, current_app
 from flask_login import login_user, logout_user, current_user
+from sqlalchemy import func
 from app.auth.forms import LoginForm, RegistrationForm
 from app.auth import bp
 from app import db
-from app.models import User
+from app.db_context import apply_rls_context
+from app.models import Company, User
 
 
 @bp.route('/login', methods=['GET', 'POST'])
@@ -17,22 +19,70 @@ def login():
         return redirect(url_for('main.index'))
     form = LoginForm()
     if form.validate_on_submit():
-        username = (form.username.data or '').strip()
+        ident = (form.login.data or '').strip()
+        ident_norm = ident.strip().lower()
         password = form.password.data or ''
-        user = db.session.query(User).filter_by(username=username).first()
+
+        # During login we need broader lookup (email OR username). We pass the identifier
+        # through app.login_email so Postgres RLS can whitelist the lookup.
+        try:
+            apply_rls_context(is_login=True, login_email=ident_norm)
+
+            q = db.session.query(User)
+            if '@' in ident_norm:
+                user = q.filter(func.lower(User.email) == ident_norm).first()
+            else:
+                user = q.filter(func.lower(User.username) == ident_norm).first()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            try:
+                current_app.logger.exception('Login failed')
+            except Exception:
+                pass
+            flash('No se pudo iniciar sesión. Intentá nuevamente o contactá soporte.', 'error')
+            return render_template('auth/login.html', title='Iniciar Sesión', form=form)
         if not user or not user.check_password(password):
             flash('Usuario o contraseña inválidos.', 'error')
             return render_template('auth/login.html', title='Iniciar Sesión', form=form)
         if not user.active:
             flash('Usuario inactivo.', 'error')
             return render_template('auth/login.html', title='Iniciar Sesión', form=form)
+
+        if str(getattr(user, 'role', '') or '') != 'zentral_admin':
+            cid = str(getattr(user, 'company_id', '') or '').strip()
+            if not cid:
+                flash('Usuario sin empresa asignada.', 'error')
+                return render_template('auth/login.html', title='Iniciar Sesión', form=form)
+            c = db.session.get(Company, cid)
+            if not c:
+                flash('Empresa inválida.', 'error')
+                return render_template('auth/login.html', title='Iniciar Sesión', form=form)
+            if str(getattr(c, 'status', '') or 'active') != 'active':
+                flash('Empresa pausada. Contactá soporte.', 'error')
+                return render_template('auth/login.html', title='Iniciar Sesión', form=form)
+
         login_user(user, remember=getattr(form, 'remember_me', None) and form.remember_me.data)
+
+        session.pop('impersonate_company_id', None)
+        if str(getattr(user, 'role', '') or '') == 'zentral_admin':
+            session['auth_is_zentral_admin'] = '1'
+            session.pop('auth_company_id', None)
+        else:
+            session['auth_is_zentral_admin'] = '0'
+            session['auth_company_id'] = str(getattr(user, 'company_id', '') or '').strip()
+
         return redirect(url_for('main.index'))
     return render_template('auth/login.html', title='Iniciar Sesión', form=form)
 
 @bp.route('/logout')
 def logout():
     logout_user()
+    session.pop('auth_is_zentral_admin', None)
+    session.pop('auth_company_id', None)
+    session.pop('impersonate_company_id', None)
     return redirect(url_for('auth.login'))
 
 @bp.route('/register', methods=['GET', 'POST'])

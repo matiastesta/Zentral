@@ -4,7 +4,7 @@ from datetime import date as dt_date
 from datetime import datetime, timedelta
 from io import BytesIO
 
-from flask import current_app, jsonify, render_template, request, send_file
+from flask import current_app, g, jsonify, render_template, request, send_file
 from flask_login import login_required
 
 from app import db
@@ -84,7 +84,7 @@ def _format_currency_ars(n) -> str:
 def _get_business_info():
     bs = None
     try:
-        bs = BusinessSettings.get_singleton()
+        bs = BusinessSettings.get_for_company(getattr(g, 'company_id', None))
     except Exception:
         bs = None
     name = (getattr(bs, 'name', None) or '').strip() or 'Zentral'
@@ -515,7 +515,7 @@ def eerr_api():
     try:
         bs = None
         try:
-            bs = BusinessSettings.get_singleton()
+            bs = BusinessSettings.get_for_company(getattr(g, 'company_id', None))
         except Exception:
             bs = None
 

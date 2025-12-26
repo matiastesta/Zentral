@@ -6,6 +6,7 @@ de datos real. Más adelante se puede reemplazar por otra capa de datos.
 """
 
 import json
+import uuid
 from datetime import datetime
 
 from flask_login import UserMixin
@@ -14,15 +15,53 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from app import db
 
 
+def _default_company_id():
+    try:
+        from flask import g
+
+        return str(getattr(g, 'company_id', '') or '').strip() or None
+    except Exception:
+        return None
+
+
+class SystemMeta(db.Model):
+    __tablename__ = 'system_meta'
+
+    key = db.Column(db.String(64), primary_key=True)
+    value = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class Company(db.Model):
+    __tablename__ = 'company'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = db.Column(db.String(255), nullable=False)
+    slug = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    plan = db.Column(db.String(64), nullable=False, default='standard')
+    status = db.Column(db.String(16), nullable=False, default='active')
+    paused_at = db.Column(db.DateTime, nullable=True)
+    pause_reason = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(255), nullable=True)
+    company_id = db.Column(db.String(36), nullable=True, index=True)
+    username = db.Column(db.String(80), nullable=False)
+    display_name = db.Column(db.String(120), nullable=True)
+    email = db.Column(db.String(255), nullable=True, unique=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(32), nullable=False, default='vendedor')
+    level = db.Column(db.Integer, nullable=False, default=2)
+    created_by_user_id = db.Column(db.Integer, nullable=True)
     permissions_json = db.Column(db.Text, nullable=False, default='{}')
     is_master = db.Column(db.Boolean, nullable=False, default=False)
     active = db.Column(db.Boolean, nullable=False, default=True)
+
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'username', name='uq_user_company_username'),
+    )
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password or '')
@@ -63,14 +102,17 @@ class User(UserMixin, db.Model):
             return False
         if self.is_master:
             return True
-        if self.role == 'admin':
+        if self.role in {'admin', 'company_admin'}:
             return True
         perms = self.get_permissions()
         return bool(perms.get(str(module_name), False))
 
 
 class BusinessSettings(db.Model):
+    __tablename__ = 'business_settings'
+
     id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, unique=True, index=True, default=_default_company_id)
     name = db.Column(db.String(255), nullable=False, default='Nombre del negocio')
     industry = db.Column(db.String(255), nullable=True)
     email = db.Column(db.String(255), nullable=True)
@@ -86,18 +128,24 @@ class BusinessSettings(db.Model):
     insight_expenses_ratio_pct = db.Column(db.Float, nullable=True)
 
     @staticmethod
-    def get_singleton():
-        bs = db.session.get(BusinessSettings, 1)
+    def get_for_company(company_id: str):
+        cid = str(company_id or '').strip()
+        if not cid:
+            return None
+        bs = db.session.query(BusinessSettings).filter(BusinessSettings.company_id == cid).first()
         if bs:
             return bs
-        bs = BusinessSettings(id=1, name='Nombre del negocio')
+        bs = BusinessSettings(company_id=cid, name='Nombre del negocio')
         db.session.add(bs)
         db.session.commit()
         return bs
 
 
 class CalendarEvent(db.Model):
+    __tablename__ = 'calendar_event'
+
     id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     title = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=True)
     event_date = db.Column(db.Date, nullable=False, index=True)
@@ -117,6 +165,7 @@ class Category(db.Model):
     __tablename__ = 'category'
 
     id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     name = db.Column(db.String(255), nullable=False, index=True)
     parent_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True, index=True)
 
@@ -129,6 +178,7 @@ class Product(db.Model):
     __tablename__ = 'product'
 
     id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     name = db.Column(db.String(255), nullable=False, index=True)
     description = db.Column(db.Text, nullable=True)
 
@@ -159,6 +209,7 @@ class InventoryLot(db.Model):
     __tablename__ = 'inventory_lot'
 
     id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False, index=True)
     product = db.relationship('Product', backref='lots')
 
@@ -181,6 +232,7 @@ class InventoryMovement(db.Model):
     __tablename__ = 'inventory_movement'
 
     id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     movement_date = db.Column(db.Date, nullable=False, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
@@ -201,6 +253,7 @@ class Sale(db.Model):
     __tablename__ = 'sale'
 
     id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     ticket = db.Column(db.String(32), nullable=False, unique=True, index=True)
     sale_date = db.Column(db.Date, nullable=False, index=True)
     sale_type = db.Column(db.String(16), nullable=False, default='Venta')
@@ -236,6 +289,7 @@ class SaleItem(db.Model):
     __tablename__ = 'sale_item'
 
     id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     sale_id = db.Column(db.Integer, db.ForeignKey('sale.id'), nullable=False, index=True)
     direction = db.Column(db.String(8), nullable=False, default='out')
 
@@ -248,7 +302,10 @@ class SaleItem(db.Model):
 
 
 class CalendarUserConfig(db.Model):
+    __tablename__ = 'calendar_user_config'
+
     id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     user_id = db.Column(db.Integer, nullable=False, unique=True, index=True)
     config_json = db.Column(db.Text, nullable=False, default='{}')
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -270,6 +327,7 @@ class CashCount(db.Model):
     __tablename__ = 'cash_count'
 
     id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     count_date = db.Column(db.Date, nullable=False, unique=True, index=True)
     employee_id = db.Column(db.String(64), nullable=True)
     employee_name = db.Column(db.String(255), nullable=True)
@@ -286,6 +344,7 @@ class Customer(db.Model):
     __tablename__ = 'customer'
 
     id = db.Column(db.String(64), primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     first_name = db.Column(db.String(255), nullable=True)
     last_name = db.Column(db.String(255), nullable=True)
     name = db.Column(db.String(255), nullable=True, index=True)
@@ -303,6 +362,7 @@ class Employee(db.Model):
     __tablename__ = 'employee'
 
     id = db.Column(db.String(64), primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     first_name = db.Column(db.String(255), nullable=True)
     last_name = db.Column(db.String(255), nullable=True)
     name = db.Column(db.String(255), nullable=True, index=True)
@@ -328,6 +388,7 @@ class Expense(db.Model):
     __tablename__ = 'expense'
 
     id = db.Column(db.String(64), primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     expense_date = db.Column(db.Date, nullable=False, index=True)
     payment_method = db.Column(db.String(32), nullable=False, default='Efectivo')
     amount = db.Column(db.Float, nullable=False, default=0.0)
@@ -353,6 +414,7 @@ class Supplier(db.Model):
     __tablename__ = 'supplier'
 
     id = db.Column(db.String(64), primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     name = db.Column(db.String(255), nullable=False, index=True)
     supplier_type = db.Column(db.String(32), nullable=True)
     status = db.Column(db.String(32), nullable=False, default='Active')
@@ -375,6 +437,7 @@ class ExpenseCategory(db.Model):
     __tablename__ = 'expense_category'
 
     id = db.Column(db.String(64), primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     name = db.Column(db.String(255), nullable=False, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

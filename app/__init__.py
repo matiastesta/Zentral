@@ -1,11 +1,10 @@
 import os
 from datetime import datetime
-from flask import Flask
+from flask import Flask, g
 from flask_login import LoginManager
 from flask_babel import Babel
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from sqlalchemy import inspect, text
 from config import Config
 
 login_manager = LoginManager()
@@ -39,6 +38,22 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
 
+    try:
+        with app.app_context():
+            if str(db.engine.url.drivername).startswith('sqlite'):
+                from app.rls import bootstrap_schema
+
+                bootstrap_schema(reset=False)
+    except Exception:
+        app.logger.exception('Failed to bootstrap SQLite schema')
+
+    try:
+        from app.db_context import configure_sqlite_tenant_guards
+
+        configure_sqlite_tenant_guards()
+    except Exception:
+        app.logger.exception('Failed to configure SQLite tenant guards')
+
     # Registrar blueprints principales
     from app.auth import bp as auth_bp
     from app.main import bp as main_bp
@@ -54,6 +69,7 @@ def create_app(config_class=Config):
     from app.employees import bp as employees_bp
     from app.user_settings import bp as user_settings_bp
     from app.calendar import bp as calendar_bp
+    from app.superadmin import bp as superadmin_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(main_bp)
@@ -69,6 +85,20 @@ def create_app(config_class=Config):
     app.register_blueprint(employees_bp, url_prefix='/employees')
     app.register_blueprint(user_settings_bp, url_prefix='/user-settings')
     app.register_blueprint(calendar_bp, url_prefix='/calendar')
+    app.register_blueprint(superadmin_bp, url_prefix='/superadmin')
+
+    @app.before_request
+    def _apply_tenant_context():
+        try:
+            from app.db_context import apply_rls_context
+
+            apply_rls_context(is_login=False)
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            app.logger.exception('Failed to apply tenant context')
 
     @app.context_processor
     def inject_now():
@@ -79,236 +109,40 @@ def create_app(config_class=Config):
     def inject_business():
         try:
             from app.models import BusinessSettings
-            return {"business": BusinessSettings.get_singleton()}
+            cid = str(getattr(g, 'company_id', '') or '').strip()
+            return {"business": BusinessSettings.get_for_company(cid) if cid else None}
         except Exception:
             app.logger.exception('Failed to inject business settings')
             return {"business": None}
 
-    with app.app_context():
+    @app.context_processor
+    def inject_support_mode():
         try:
-            from app.models import User, BusinessSettings
+            from app.tenancy import is_impersonating
 
-            db.create_all()
-
-            insp_all = inspect(db.engine)
-
-            def ensure_columns_any(table, cols):
-                if not insp_all.has_table(table):
-                    return
-                existing = {c['name'] for c in insp_all.get_columns(table)}
-                for name, coltype in cols:
-                    if name in existing:
-                        continue
-                    db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {name} {coltype}'))
-
-            if str(db.engine.url.drivername) == 'sqlite':
-                insp = inspect(db.engine)
-
-                def ensure_columns(table, cols):
-                    if not insp.has_table(table):
-                        return
-                    existing = {c['name'] for c in insp.get_columns(table)}
-                    for name, coltype in cols:
-                        if name in existing:
-                            continue
-                        db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {name} {coltype}'))
-
-                ensure_columns('business_settings', [
-                        ('industry', 'VARCHAR(255)'),
-                        ('email', 'VARCHAR(255)'),
-                        ('phone', 'VARCHAR(64)'),
-                        ('address', 'VARCHAR(255)'),
-                        ('logo_filename', 'VARCHAR(255)'),
-                        ('label_customers', 'VARCHAR(64)'),
-                        ('label_products', 'VARCHAR(64)'),
-                        ('primary_color', 'VARCHAR(16)'),
-                        ('insight_margin_delta_pp', 'FLOAT'),
-                        ('insight_profitability_delta_pp', 'FLOAT'),
-                        ('insight_expenses_ratio_pct', 'FLOAT'),
-                    ])
-                ensure_columns('user', [
-                        ('role', 'VARCHAR(32)'),
-                        ('permissions_json', 'TEXT'),
-                        ('is_master', 'BOOLEAN'),
-                        ('active', 'BOOLEAN'),
-                        ('email', 'VARCHAR(255)'),
-                        ('password_hash', 'VARCHAR(255)'),
-                    ])
-
-                ensure_columns('product', [
-                        ('description', 'TEXT'),
-                        ('category_id', 'INTEGER'),
-                        ('sale_price', 'FLOAT'),
-                        ('internal_code', 'VARCHAR(64)'),
-                        ('barcode', 'VARCHAR(64)'),
-                        ('image_filename', 'VARCHAR(255)'),
-                        ('unit_name', 'VARCHAR(32)'),
-                        ('uses_lots', 'BOOLEAN'),
-                        ('method', 'VARCHAR(16)'),
-                        ('min_stock', 'FLOAT'),
-                        ('reorder_point', 'FLOAT'),
-                        ('primary_supplier_id', 'VARCHAR(64)'),
-                        ('primary_supplier_name', 'VARCHAR(255)'),
-                        ('active', 'BOOLEAN'),
-                        ('created_at', 'DATETIME'),
-                        ('updated_at', 'DATETIME'),
-                    ])
-
-                ensure_columns('category', [
-                    ('active', 'BOOLEAN'),
-                ])
-
-                ensure_columns('inventory_lot', [
-                    ('qty_initial', 'FLOAT'),
-                    ('qty_available', 'FLOAT'),
-                    ('unit_cost', 'FLOAT'),
-                    ('received_at', 'DATETIME'),
-                    ('supplier_id', 'VARCHAR(64)'),
-                    ('supplier_name', 'VARCHAR(255)'),
-                    ('expiration_date', 'DATE'),
-                    ('lot_code', 'VARCHAR(64)'),
-                    ('note', 'TEXT'),
-                    ('origin_sale_ticket', 'VARCHAR(32)'),
-                    ('created_at', 'DATETIME'),
-                    ('updated_at', 'DATETIME'),
-                ])
-
-                ensure_columns('inventory_movement', [
-                    ('movement_date', 'DATE'),
-                    ('created_at', 'DATETIME'),
-                    ('type', 'VARCHAR(16)'),
-                    ('sale_ticket', 'VARCHAR(32)'),
-                    ('product_id', 'INTEGER'),
-                    ('lot_id', 'INTEGER'),
-                    ('qty_delta', 'FLOAT'),
-                    ('unit_cost', 'FLOAT'),
-                    ('total_cost', 'FLOAT'),
-                ])
-
-                ensure_columns('customer', [
-                    ('first_name', 'VARCHAR(255)'),
-                    ('last_name', 'VARCHAR(255)'),
-                    ('name', 'VARCHAR(255)'),
-                    ('email', 'VARCHAR(255)'),
-                    ('phone', 'VARCHAR(64)'),
-                    ('birthday', 'DATE'),
-                    ('address', 'VARCHAR(255)'),
-                    ('notes', 'TEXT'),
-                    ('status', 'VARCHAR(32)'),
-                    ('created_at', 'DATETIME'),
-                    ('updated_at', 'DATETIME'),
-                ])
-
-                ensure_columns('sale', [
-                    ('is_gift', 'BOOLEAN'),
-                    ('gift_code', 'VARCHAR(64)'),
-                ])
-
-                ensure_columns('employee', [
-                    ('first_name', 'VARCHAR(255)'),
-                    ('last_name', 'VARCHAR(255)'),
-                    ('name', 'VARCHAR(255)'),
-                    ('hire_date', 'DATE'),
-                    ('inactive_date', 'DATE'),
-                    ('default_payment_method', 'VARCHAR(32)'),
-                    ('contract_type', 'VARCHAR(64)'),
-                    ('status', 'VARCHAR(16)'),
-                    ('role', 'VARCHAR(255)'),
-                    ('birth_date', 'DATE'),
-                    ('document_id', 'VARCHAR(64)'),
-                    ('phone', 'VARCHAR(64)'),
-                    ('email', 'VARCHAR(255)'),
-                    ('address', 'VARCHAR(255)'),
-                    ('reference_salary', 'FLOAT'),
-                    ('notes', 'TEXT'),
-                    ('active', 'BOOLEAN'),
-                    ('created_at', 'DATETIME'),
-                    ('updated_at', 'DATETIME'),
-                ])
-
-                ensure_columns('expense', [
-                    ('expense_date', 'DATE'),
-                    ('payment_method', 'VARCHAR(32)'),
-                    ('amount', 'FLOAT'),
-                    ('description', 'TEXT'),
-                    ('category', 'VARCHAR(255)'),
-                    ('supplier_id', 'VARCHAR(64)'),
-                    ('supplier_name', 'VARCHAR(255)'),
-                    ('note', 'TEXT'),
-                    ('expense_type', 'VARCHAR(32)'),
-                    ('frequency', 'VARCHAR(32)'),
-                    ('employee_id', 'VARCHAR(64)'),
-                    ('employee_name', 'VARCHAR(255)'),
-                    ('period_from', 'DATE'),
-                    ('period_to', 'DATE'),
-                    ('meta_json', 'TEXT'),
-                    ('origin', 'VARCHAR(32)'),
-                    ('created_by_user_id', 'INTEGER'),
-                    ('created_at', 'DATETIME'),
-                    ('updated_at', 'DATETIME'),
-                ])
-
-                ensure_columns('supplier', [
-                    ('name', 'VARCHAR(255)'),
-                    ('supplier_type', 'VARCHAR(32)'),
-                    ('status', 'VARCHAR(32)'),
-                    ('categories_json', 'TEXT'),
-                    ('invoice_type', 'VARCHAR(32)'),
-                    ('default_payment_method', 'VARCHAR(64)'),
-                    ('payment_terms', 'VARCHAR(64)'),
-                    ('contact_person', 'VARCHAR(255)'),
-                    ('preferred_contact_channel', 'VARCHAR(32)'),
-                    ('phone', 'VARCHAR(64)'),
-                    ('email', 'VARCHAR(255)'),
-                    ('address', 'VARCHAR(255)'),
-                    ('notes', 'TEXT'),
-                    ('meta_json', 'TEXT'),
-                    ('created_at', 'DATETIME'),
-                    ('updated_at', 'DATETIME'),
-                ])
-
-                ensure_columns('expense_category', [
-                    ('name', 'VARCHAR(255)'),
-                    ('created_at', 'DATETIME'),
-                    ('updated_at', 'DATETIME'),
-                ])
-
-            if str(db.engine.url.drivername) != 'sqlite':
-                ensure_columns_any('business_settings', [
-                    ('industry', 'VARCHAR(255)'),
-                    ('email', 'VARCHAR(255)'),
-                    ('phone', 'VARCHAR(64)'),
-                    ('address', 'VARCHAR(255)'),
-                    ('logo_filename', 'VARCHAR(255)'),
-                    ('label_customers', 'VARCHAR(64)'),
-                    ('label_products', 'VARCHAR(64)'),
-                    ('primary_color', 'VARCHAR(16)'),
-                    ('insight_margin_delta_pp', 'DOUBLE PRECISION'),
-                    ('insight_profitability_delta_pp', 'DOUBLE PRECISION'),
-                    ('insight_expenses_ratio_pct', 'DOUBLE PRECISION'),
-                ])
-
-            db.session.commit()
-
-            try:
-                BusinessSettings.get_singleton()
-            except Exception:
-                app.logger.exception('Failed to ensure BusinessSettings singleton exists')
-
-            if db.session.query(User).count() == 0:
-                admin = User(username='admin', email='admin@local', role='admin', is_master=False)
-                admin.set_password(os.environ.get('INITIAL_ADMIN_PASSWORD') or 'admin')
-                admin.set_permissions_all(True)
-                db.session.add(admin)
-
-                master = User(username='zentra', email='support@zentra.local', role='admin', is_master=True)
-                master.set_password(os.environ.get('ZENTRA_MASTER_PASSWORD') or 'zentra')
-                master.set_permissions_all(True)
-                db.session.add(master)
-
-                db.session.commit()
+            return {"is_support_mode": bool(is_impersonating())}
         except Exception:
-            db.session.rollback()
+            return {"is_support_mode": False}
+
+    @app.cli.group('zentral')
+    def zentral_cli():
+        pass
+
+    @zentral_cli.command('bootstrap')
+    def zentral_bootstrap():
+        from app.rls import bootstrap_schema
+
+        bootstrap_schema(reset=False)
+
+    @zentral_cli.command('reset-db')
+    def zentral_reset_db():
+        reset_flag = str(os.environ.get('ZENTRAL_RESET_DB') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+        reset_confirm = str(os.environ.get('ZENTRAL_RESET_DB_CONFIRM') or '').strip().upper() == 'YES'
+        if not (reset_flag and reset_confirm):
+            raise RuntimeError('Reset blocked: set ZENTRAL_RESET_DB=1 and ZENTRAL_RESET_DB_CONFIRM=YES')
+        from app.rls import bootstrap_schema
+
+        bootstrap_schema(reset=True)
 
     return app
 
@@ -321,6 +155,16 @@ def load_user(user_id):
     Esto es suficiente para que Flask-Login funcione sin romper.
     """
     try:
+        try:
+            from app.db_context import apply_rls_context
+
+            apply_rls_context(is_login=False)
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            pass
         from app.models import User
         return db.session.get(User, int(user_id))
     except Exception:

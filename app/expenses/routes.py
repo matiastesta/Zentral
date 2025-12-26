@@ -6,7 +6,7 @@ import json
 import os
 import time
 
-from flask import jsonify, render_template, request, current_app, send_file, url_for
+from flask import g, jsonify, render_template, request, current_app, send_file, url_for
 from flask_login import login_required
 from werkzeug.utils import secure_filename
 
@@ -510,7 +510,7 @@ def download_expense_remito_pdf_api(expense_id):
 
     bs = None
     try:
-        bs = BusinessSettings.get_singleton()
+        bs = BusinessSettings.get_for_company(getattr(g, 'company_id', None))
     except Exception:
         bs = None
 

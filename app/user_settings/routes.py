@@ -2,7 +2,7 @@ import os
 import secrets
 import string
 
-from flask import render_template, request, redirect, url_for, flash, current_app
+from flask import g, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
@@ -37,7 +37,10 @@ def index():
     if request.method == 'POST':
         action = (request.form.get('action') or '').strip()
 
-        can_manage_users = bool(getattr(current_user, 'is_master', False) or (getattr(current_user, 'role', '') == 'admin'))
+        can_manage_users = bool(
+            getattr(current_user, 'is_master', False)
+            or (getattr(current_user, 'role', '') in {'admin', 'company_admin', 'zentral_admin'})
+        )
         if action in {'create_user', 'update_user', 'delete_user', 'reset_password'} and not can_manage_users:
             flash('No tenés permisos para administrar usuarios.', 'error')
             return redirect(url_for('user_settings.index'))
@@ -48,6 +51,10 @@ def index():
             if not u:
                 flash('Usuario inválido.', 'error')
                 return redirect(url_for('user_settings.index'))
+            if getattr(current_user, 'role', '') != 'zentral_admin':
+                if str(getattr(u, 'company_id', '') or '') != str(getattr(current_user, 'company_id', '') or ''):
+                    flash('Usuario inválido.', 'error')
+                    return redirect(url_for('user_settings.index'))
             if u.is_master:
                 flash('El usuario master no es editable.', 'error')
                 return redirect(url_for('user_settings.index'))
@@ -65,7 +72,7 @@ def index():
             return redirect(url_for('user_settings.index'))
 
         if action == 'save_business':
-            bs = BusinessSettings.get_singleton()
+            bs = BusinessSettings.get_for_company(g.company_id)
             bs.name = (request.form.get('business_name') or '').strip() or bs.name
             bs.industry = (request.form.get('business_industry') or '').strip() or None
             bs.email = (request.form.get('business_email') or '').strip() or None
@@ -95,18 +102,22 @@ def index():
 
         if action == 'create_user':
             username = (request.form.get('username') or '').strip()
-            email = (request.form.get('email') or '').strip()
+            display_name = (request.form.get('display_name') or '').strip()
+            email = (request.form.get('email') or '').strip().lower()
             password = request.form.get('password') or ''
             role = (request.form.get('role') or 'vendedor').strip()
 
             if not username or not password:
                 flash('Completá usuario y contraseña.', 'error')
                 return redirect(url_for('user_settings.index'))
-            if db.session.query(User).filter_by(username=username).first():
+            if db.session.query(User).filter(User.username == username, User.company_id == str(g.company_id or '')).first():
                 flash('El usuario ya existe.', 'error')
                 return redirect(url_for('user_settings.index'))
+            if email and db.session.query(User).filter(User.email == email).first():
+                flash('El email ya existe.', 'error')
+                return redirect(url_for('user_settings.index'))
 
-            u = User(username=username, email=email or None, role=role, is_master=False)
+            u = User(username=username, display_name=(display_name or None), email=(email or None), role=role, is_master=False, company_id=str(g.company_id or ''))
             u.set_password(password)
 
             perms = {}
@@ -125,19 +136,27 @@ def index():
             if not u:
                 flash('Usuario inválido.', 'error')
                 return redirect(url_for('user_settings.index'))
+            if getattr(current_user, 'role', '') != 'zentral_admin':
+                if str(getattr(u, 'company_id', '') or '') != str(getattr(current_user, 'company_id', '') or ''):
+                    flash('Usuario inválido.', 'error')
+                    return redirect(url_for('user_settings.index'))
             if u.is_master:
                 flash('El usuario master no es editable.', 'error')
                 return redirect(url_for('user_settings.index'))
 
             username = (request.form.get('username') or '').strip()
             if username and username != u.username:
-                if db.session.query(User).filter(User.username == username, User.id != u.id).first():
+                if db.session.query(User).filter(User.username == username, User.company_id == str(getattr(u, 'company_id', '') or ''), User.id != u.id).first():
                     flash('Ya existe otro usuario con ese nombre.', 'error')
                     return redirect(url_for('user_settings.index'))
                 u.username = username
 
-            email = (request.form.get('email') or '').strip()
-            u.email = email or None
+            email = (request.form.get('email') or '').strip().lower()
+            if email != (u.email or '').strip().lower():
+                if email and db.session.query(User).filter(User.email == email, User.id != u.id).first():
+                    flash('Ese email ya existe.', 'error')
+                    return redirect(url_for('user_settings.index'))
+            u.email = (email or None)
 
             role = (request.form.get('role') or u.role).strip()
             u.role = role
@@ -164,6 +183,10 @@ def index():
             if not u:
                 flash('Usuario inválido.', 'error')
                 return redirect(url_for('user_settings.index'))
+            if getattr(current_user, 'role', '') != 'zentral_admin':
+                if str(getattr(u, 'company_id', '') or '') != str(getattr(current_user, 'company_id', '') or ''):
+                    flash('Usuario inválido.', 'error')
+                    return redirect(url_for('user_settings.index'))
             if u.is_master:
                 flash('El usuario master no se puede eliminar.', 'error')
                 return redirect(url_for('user_settings.index'))
@@ -175,10 +198,14 @@ def index():
             flash('Usuario eliminado.', 'success')
             return redirect(url_for('user_settings.index'))
 
-    users = db.session.query(User).order_by(User.is_master.desc(), User.username.asc()).all()
-    roles = ['admin', 'vendedor', 'contador']
-    business = BusinessSettings.get_singleton()
-    return render_template('user_settings/index.html', title='Configuración de Usuario', users=users, roles=roles, business=business)
+    q = db.session.query(User)
+    if getattr(current_user, 'role', '') != 'zentral_admin':
+        q = q.filter(User.company_id == str(getattr(current_user, 'company_id', '') or ''))
+    users = q.order_by(User.is_master.desc(), User.username.asc()).all()
+
+    roles = ['company_admin', 'admin', 'vendedor', 'contador']
+    business = BusinessSettings.get_for_company(g.company_id)
+    return render_template('user_settings/index.html', title='Configuración de Usuario', users=users, roles=roles, business=business, company=getattr(g, 'company', None))
 
 
 @bp.route('/user/<int:user_id>', methods=['GET', 'POST'])
@@ -189,7 +216,15 @@ def user_detail(user_id: int):
         flash('Usuario inválido.', 'error')
         return redirect(url_for('main.index'))
 
-    can_manage_users = bool(getattr(current_user, 'is_master', False) or (getattr(current_user, 'role', '') == 'admin'))
+    if getattr(current_user, 'role', '') != 'zentral_admin':
+        if str(getattr(u, 'company_id', '') or '') != str(getattr(current_user, 'company_id', '') or ''):
+            flash('Usuario inválido.', 'error')
+            return redirect(url_for('main.index'))
+
+    can_manage_users = bool(
+        getattr(current_user, 'is_master', False)
+        or (getattr(current_user, 'role', '') in {'admin', 'company_admin', 'zentral_admin'})
+    )
     is_self = bool(current_user.id == u.id)
     can_view = bool(is_self or can_manage_users)
     if not can_view:
@@ -224,13 +259,20 @@ def user_detail(user_id: int):
 
             username = (request.form.get('username') or '').strip()
             if username and username != u.username:
-                if db.session.query(User).filter(User.username == username, User.id != u.id).first():
+                if db.session.query(User).filter(User.username == username, User.company_id == str(getattr(u, 'company_id', '') or ''), User.id != u.id).first():
                     flash('Ya existe otro usuario con ese nombre.', 'error')
                     return redirect(url_for('user_settings.user_detail', user_id=u.id))
                 u.username = username
 
-            email = (request.form.get('email') or '').strip()
-            u.email = email or None
+            email = (request.form.get('email') or '').strip().lower()
+            if email != (u.email or '').strip().lower():
+                if email and db.session.query(User).filter(User.email == email, User.id != u.id).first():
+                    flash('Ese email ya existe.', 'error')
+                    return redirect(url_for('user_settings.user_detail', user_id=u.id))
+            u.email = (email or None)
+
+            display_name = (request.form.get('display_name') or '').strip()
+            u.display_name = (display_name or None)
 
             role = (request.form.get('role') or u.role).strip()
             u.role = role
@@ -277,7 +319,7 @@ def user_detail(user_id: int):
             flash('Contraseña actualizada.', 'success')
             return redirect(url_for('user_settings.user_detail', user_id=u.id))
 
-    roles = ['admin', 'vendedor', 'contador']
+    roles = ['company_admin', 'admin', 'vendedor', 'contador']
     perms = u.get_permissions()
     can_edit_all = bool(can_manage_users and (not u.is_master))
     can_change_password = bool(is_self or (can_manage_users and (not u.is_master)))

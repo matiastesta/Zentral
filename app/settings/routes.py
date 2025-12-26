@@ -1,6 +1,6 @@
 import os
 
-from flask import render_template, request, redirect, url_for, flash, current_app
+from flask import g, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required
 from werkzeug.utils import secure_filename
 
@@ -19,7 +19,7 @@ def business_settings():
     if request.method == 'POST':
         action = (request.form.get('action') or '').strip()
         if action == 'save_business':
-            bs = BusinessSettings.get_singleton()
+            bs = BusinessSettings.get_for_company(g.company_id)
             bs.name = (request.form.get('business_name') or '').strip() or bs.name
             bs.industry = (request.form.get('business_industry') or '').strip() or None
             bs.email = (request.form.get('business_email') or '').strip() or None
@@ -48,7 +48,7 @@ def business_settings():
             return redirect(url_for('settings.business_settings'))
 
         if action == 'save_personalization':
-            bs = BusinessSettings.get_singleton()
+            bs = BusinessSettings.get_for_company(g.company_id)
             bs.label_customers = (request.form.get('label_customers') or '').strip() or None
             bs.label_products = (request.form.get('label_products') or '').strip() or None
 
@@ -64,7 +64,7 @@ def business_settings():
             return redirect(url_for('settings.business_settings'))
 
         if action == 'save_insights':
-            bs = BusinessSettings.get_singleton()
+            bs = BusinessSettings.get_for_company(g.company_id)
 
             def _f(name):
                 raw = (request.form.get(name) or '').strip().replace(',', '.')
@@ -84,5 +84,5 @@ def business_settings():
             flash('Umbrales de insights guardados.', 'success')
             return redirect(url_for('settings.business_settings'))
 
-    business = BusinessSettings.get_singleton()
+    business = BusinessSettings.get_for_company(g.company_id)
     return render_template("settings/business.html", title="Configuración del negocio", business=business)

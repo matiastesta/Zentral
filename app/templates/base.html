@@ -25,6 +25,7 @@
     {% set brand_color = (business.primary_color if business and business.primary_color else '#0d1067') %}
     {% set label_customers = (business.label_customers if business and business.label_customers else 'Clientes') %}
     {% set label_products = (business.label_products if business and business.label_products else 'Productos') %}
+    {% set show_tenant_modules = not (current_user.is_authenticated and current_user.role == 'zentral_admin' and not is_support_mode) %}
     <!-- Navigation -->
     <nav class="text-white shadow-lg sticky top-0 z-20" style="background-color: #0d1067;" data-brand-color="{{ brand_color }}">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -48,7 +49,7 @@
                 <div class="hidden sm:ml-6 sm:flex sm:items-center">
                     {% if current_user.is_authenticated %}
                     <a href="{{ url_for('user_settings.user_detail', user_id=current_user.id) }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-100 hover:text-white hover:bg-blue-700 rounded-md">
-                        <i class="fas fa-user-circle mr-2"></i> ¡Hola {{ current_user.username }}!
+                        <i class="fas fa-user-circle mr-2"></i> ¡Hola {{ current_user.display_name or current_user.username }}!
                     </a>
                     {% endif %}
                 </div>
@@ -65,64 +66,69 @@
         <!-- Mobile menu, show/hide based on menu state. -->
         <div class="sm:hidden hidden" id="mobile-menu">
             <div class="pt-2 pb-3 space-y-1">
-                {% if current_user.is_authenticated and current_user.can('dashboard') %}
+                {% if show_tenant_modules and current_user.is_authenticated and current_user.can('dashboard') %}
                 <a href="{{ url_for('main.index') }}" class="{% if ep.startswith('main.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                     <i class="fas fa-tachometer-alt mr-2"></i> Dashboard
                 </a>
                 {% endif %}
-                {% if current_user.is_authenticated and current_user.can('calendar') %}
+                {% if show_tenant_modules and current_user.is_authenticated and current_user.can('calendar') %}
                 <a href="{{ url_for('calendar.index') }}" class="{% if ep.startswith('calendar.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                     <i class="fas fa-calendar-alt mr-2"></i> Calendario
                 </a>
                 {% endif %}
-                {% if current_user.is_authenticated and current_user.can('sales') %}
+                {% if show_tenant_modules and current_user.is_authenticated and current_user.can('sales') %}
                 <a href="{{ url_for('sales.index') }}" class="{% if ep.startswith('sales.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                     <i class="fas fa-shopping-cart mr-2"></i> Ventas
                 </a>
                 {% endif %}
-                {% if current_user.is_authenticated and current_user.can('customers') %}
+                {% if show_tenant_modules and current_user.is_authenticated and current_user.can('customers') %}
                 <a href="{{ url_for('customers.index') }}" class="{% if ep.startswith('customers.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                     <i class="fas fa-user mr-2"></i> {{ label_customers }}
                 </a>
                 {% endif %}
-                {% if current_user.is_authenticated and current_user.can('suppliers') %}
+                {% if show_tenant_modules and current_user.is_authenticated and current_user.can('suppliers') %}
                 <a href="{{ url_for('suppliers.index') }}" class="{% if ep.startswith('suppliers.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                     <i class="fas fa-truck mr-2"></i> Proveedores
                 </a>
                 {% endif %}
-                {% if current_user.is_authenticated and current_user.can('employees') %}
+                {% if show_tenant_modules and current_user.is_authenticated and current_user.can('employees') %}
                 <a href="{{ url_for('employees.index') }}" class="{% if ep.startswith('employees.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                     <i class="fas fa-hard-hat mr-2"></i> Empleados
                 </a>
                 {% endif %}
-                {% if current_user.is_authenticated and current_user.can('expenses') %}
+                {% if show_tenant_modules and current_user.is_authenticated and current_user.can('expenses') %}
                 <a href="{{ url_for('expenses.index') }}" class="{% if ep.startswith('expenses.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                     <i class="fas fa-money-bill-wave mr-2"></i> Gastos
                 </a>
                 {% endif %}
-                {% if current_user.is_authenticated and current_user.can('inventory') %}
+                {% if show_tenant_modules and current_user.is_authenticated and current_user.can('inventory') %}
                 <a href="{{ url_for('inventory.index') }}" class="{% if ep.startswith('inventory.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                     <i class="fas fa-boxes mr-2"></i> Inventario
                 </a>
                 {% endif %}
-                {% if current_user.is_authenticated and current_user.can('movements') %}
+                {% if show_tenant_modules and current_user.is_authenticated and current_user.can('movements') %}
                 <a href="{{ url_for('movements.index') }}" class="{% if ep.startswith('movements.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                     <i class="fas fa-exchange-alt mr-2"></i> Movimientos
                 </a>
                 {% endif %}
-                {% if current_user.is_authenticated and current_user.can('reports') %}
+                {% if show_tenant_modules and current_user.is_authenticated and current_user.can('reports') %}
                 <a href="{{ url_for('reports.index') }}" class="{% if ep.startswith('reports.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                     <i class="fas fa-chart-bar mr-2"></i> Reportes
                 </a>
                 {% endif %}
-                {% if current_user.is_authenticated and current_user.can('user_settings') %}
+                {% if show_tenant_modules and current_user.is_authenticated and current_user.can('user_settings') %}
                 <a href="{{ url_for('user_settings.index') }}" class="{% if ep.startswith('user_settings.') or ep.startswith('user-settings.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                     <i class="fas fa-user-cog mr-2"></i> Config. de Usuario
                 </a>
                 {% endif %}
-                {% if current_user.is_authenticated and current_user.can('settings') %}
+                {% if show_tenant_modules and current_user.is_authenticated and current_user.can('settings') %}
                 <a href="{{ url_for('settings.business_settings') }}" class="{% if ep.startswith('settings.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                     <i class="fas fa-cog mr-2"></i> Config. del negocio
+                </a>
+                {% endif %}
+                {% if current_user.is_authenticated and (current_user.is_master or current_user.role == 'zentral_admin') %}
+                <a href="{{ url_for('superadmin.index') }}" class="{% if ep.startswith('superadmin.') %}bg-blue-700 text-white border-blue-500{% else %}text-blue-200 hover:bg-blue-700 hover:text-white border-transparent{% endif %} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
+                    <i class="fas fa-shield-alt mr-2"></i> Superadmin
                 </a>
                 {% endif %}
                 {% if current_user.is_authenticated %}
@@ -130,7 +136,7 @@
                     <div class="flex items-center px-4">
                         <div class="flex-shrink-0">
                             <div class="h-10 w-10 rounded-full bg-blue-300 flex items-center justify-center">
-                                <span class="text-blue-800 font-medium">{{ current_user.username[0].upper() }}</span>
+                                <span class="text-blue-800 font-medium">{{ (current_user.display_name or current_user.username)[0].upper() }}</span>
                             </div>
                         </div>
                         <div class="ml-3">
@@ -140,9 +146,9 @@
                     </div>
                     <div class="mt-3 space-y-1">
                         <a href="{{ url_for('user_settings.user_detail', user_id=current_user.id) }}" class="block px-4 py-2 text-base font-medium text-blue-200 hover:text-white hover:bg-blue-700">
-                            <i class="fas fa-user-circle mr-2"></i> ¡Hola {{ current_user.username }}!
+                            <i class="fas fa-user-circle mr-2"></i> ¡Hola {{ current_user.display_name or current_user.username }}!
                         </a>
-                        <a href="{{ url_for('settings.business_settings') if current_user.can('settings') else (url_for('user_settings.index') if current_user.can('user_settings') else url_for('main.index')) }}" class="block px-4 py-2 text-base font-medium text-blue-200 hover:text-white hover:bg-blue-700">
+                        <a href="{{ url_for('superadmin.index') if (current_user.role == 'zentral_admin' and not is_support_mode) else (url_for('settings.business_settings') if current_user.can('settings') else (url_for('user_settings.index') if current_user.can('user_settings') else url_for('main.index'))) }}" class="block px-4 py-2 text-base font-medium text-blue-200 hover:text-white hover:bg-blue-700">
                             <i class="fas fa-cog mr-2"></i> Configuración
                         </a>
                         <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-base font-medium text-blue-200 hover:text-white hover:bg-blue-700" data-confirm-logout="1">
@@ -169,6 +175,7 @@
         <aside class="w-72 hidden md:block">
             <div class="bg-white rounded-xl shadow p-4 space-y-2 sticky top-20" style="background-color: #ffffff; color: #000000;">
                 <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Navegación</h2>
+                {% if show_tenant_modules %}
                 {% if current_user.is_authenticated and current_user.can('dashboard') %}
                 <a href="{{ url_for('main.index') }}" class="w-full inline-flex items-center px-3 py-2 rounded-md text-sm font-medium {% if ep.startswith('main.') %}bg-blue-50 text-blue-700{% else %}text-gray-700 hover:bg-blue-50 hover:text-blue-700{% endif %}">
                     <i class="fas fa-tachometer-alt mr-2"></i> Dashboard
@@ -227,6 +234,12 @@
                 {% if current_user.is_authenticated and current_user.can('settings') %}
                 <a href="{{ url_for('settings.business_settings') }}" class="w-full inline-flex items-center px-3 py-2 rounded-md text-sm font-medium {% if ep.startswith('settings.') %}bg-blue-50 text-blue-700{% else %}text-gray-700 hover:bg-blue-50 hover:text-blue-700{% endif %}">
                     <i class="fas fa-cog mr-2"></i> Config. del negocio
+                </a>
+                {% endif %}
+                {% endif %}
+                {% if current_user.is_authenticated and (current_user.is_master or current_user.role == 'zentral_admin') %}
+                <a href="{{ url_for('superadmin.index') }}" class="w-full inline-flex items-center px-3 py-2 rounded-md text-sm font-medium {% if ep.startswith('superadmin.') %}bg-blue-50 text-blue-700{% else %}text-gray-700 hover:bg-blue-50 hover:text-blue-700{% endif %}">
+                    <i class="fas fa-shield-alt mr-2"></i> Superadmin
                 </a>
                 {% endif %}
                 <a href="{{ url_for('auth.logout') }}" class="w-full inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-700" data-confirm-logout="1">
