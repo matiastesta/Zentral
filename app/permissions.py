@@ -12,7 +12,11 @@ def module_required(module_name: str):
                 abort(401)
             if not getattr(current_user, 'can', None):
                 abort(403)
-            if not current_user.can(module_name):
+            try:
+                allowed = bool(current_user.can(module_name))
+            except Exception:
+                allowed = False
+            if not allowed:
                 abort(403)
             return fn(*args, **kwargs)
         return wrapped

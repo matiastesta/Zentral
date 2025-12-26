@@ -31,6 +31,7 @@
                             <th class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Total</th>
                             <th class="w-32 px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">Pago</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Notas</th>
+                            <th class="w-14 px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase"></th>
                         </tr>
                         <tr class="text-[11px] bg-white align-middle">
                             <th class="px-4 py-1">
@@ -60,7 +61,7 @@
                         </tr>
                     </thead>
                     <tbody id="mov-ventas-tbody" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
+                        <tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -76,6 +77,7 @@
                             <th class="w-56 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Proveedor</th>
                             <th class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Valor</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nota</th>
+                            <th class="w-14 px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase"></th>
                         </tr>
                         <tr class="text-[11px] bg-white align-middle">
                             <th class="px-4 py-1">
@@ -108,7 +110,7 @@
                         </tr>
                     </thead>
                     <tbody id="mov-egresos-tbody" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
+                        <tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -445,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const qs = [];
         if (range && range.from) qs.push('from=' + encodeURIComponent(isoFromDate(range.from)));
         if (range && range.to) qs.push('to=' + encodeURIComponent(isoFromDate(range.to)));
-        qs.push('limit=2000');
+        qs.push('limit=20000');
         const url = '/sales/api/sales' + (qs.length ? ('?' + qs.join('&')) : '');
         fetch(url, { credentials: 'same-origin' })
             .then(r => r.json())
@@ -454,6 +456,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 cb(items);
             })
             .catch(() => cb([]));
+    }
+
+    function apiDeleteSale(ticket) {
+        const t = String(ticket || '').trim();
+        if (!t) return Promise.resolve({ ok: false, error: 'invalid_ticket' });
+        return fetch('/sales/api/sales/' + encodeURIComponent(t), {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        }).then(r => r.json()).catch(() => ({ ok: false, error: 'network' }));
+    }
+
+    function apiDeleteExpense(expenseId) {
+        const id = String(expenseId || '').trim();
+        if (!id) return Promise.resolve({ ok: false, error: 'invalid_expense' });
+        return fetch('/expenses/api/expenses/' + encodeURIComponent(id), {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        }).then(r => r.json()).catch(() => ({ ok: false, error: 'network' }));
     }
 
     function getExpenses(cb) {
@@ -489,7 +509,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const pago = String(fVentasPago?.value || '').trim();
         const tipo = String(fVentasTipo?.value || '').trim();
 
-        tbodyVentas.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
+        tbodyVentas.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
         getSalesFromApi(rango, function (sales) {
 
             let list = Array.isArray(sales) ? sales.slice() : [];
@@ -531,21 +551,49 @@ document.addEventListener('DOMContentLoaded', function () {
 
             tbodyVentas.innerHTML = '';
             if (!list.length) {
-                tbodyVentas.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+                tbodyVentas.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
                 return;
             }
             list.forEach(s => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
+                const ticket = String(s?.ticket || '').trim();
                 tr.innerHTML = ''
                     + '<td class="px-4 py-3 text-sm text-gray-900">' + String(s?.ticket || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(s?.fecha || s?.date || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + labelTipo(s) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(s?.payment_method || '') + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(s?.notes || '') + '</td>';
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(s?.notes || '') + '</td>'
+                    + '<td class="px-4 py-3 text-center">'
+                    +   '<button type="button" class="btn-del-sale h-8 w-8 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-ticket="' + String(ticket).replace(/"/g, '&quot;') + '" title="Eliminar">'
+                    +       '<i class="fas fa-trash text-[12px]"></i>'
+                    +   '</button>'
+                    + '</td>';
                 tbodyVentas.appendChild(tr);
             });
+
+            try {
+                tbodyVentas.querySelectorAll('.btn-del-sale').forEach(function (btn) {
+                    btn.addEventListener('click', async function () {
+                        const t = String(btn.getAttribute('data-ticket') || '').trim();
+                        if (!t) return;
+                        const ok = await (window.confirmModal ? window.confirmModal(
+                            '¿Querés eliminar el ticket ' + t + '? Esta acción revierte inventario y elimina el movimiento asociado.',
+                            'Eliminar ingreso',
+                            'No se puede deshacer.'
+                        ) : Promise.resolve(window.confirm('¿Eliminar el ticket ' + t + '?')));
+                        if (!ok) return;
+                        const res = await apiDeleteSale(t);
+                        if (!res || res.ok !== true) {
+                            const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo eliminar.';
+                            if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Eliminar ingreso');
+                            return;
+                        }
+                        renderVentas();
+                    });
+                });
+            } catch (e) {}
         });
     }
 
@@ -583,20 +631,48 @@ document.addEventListener('DOMContentLoaded', function () {
 
             tbodyEgresos.innerHTML = '';
             if (!list.length) {
-                tbodyEgresos.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+                tbodyEgresos.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
                 return;
             }
             list.forEach(e => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
+                const eid = String(e?.id || '').trim();
                 tr.innerHTML = ''
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(e?.fecha || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-900">' + String(e?.categoria || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.supplier_name || e?.proveedor || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(e?.valor || 0) || 0) + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.nota || '') + '</td>';
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.nota || '') + '</td>'
+                    + '<td class="px-4 py-3 text-center">'
+                    +   '<button type="button" class="btn-del-exp h-8 w-8 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-expense-id="' + String(eid).replace(/"/g, '&quot;') + '" title="Eliminar">'
+                    +       '<i class="fas fa-trash text-[12px]"></i>'
+                    +   '</button>'
+                    + '</td>';
                 tbodyEgresos.appendChild(tr);
             });
+
+            try {
+                tbodyEgresos.querySelectorAll('.btn-del-exp').forEach(function (btn) {
+                    btn.addEventListener('click', async function () {
+                        const id = String(btn.getAttribute('data-expense-id') || '').trim();
+                        if (!id) return;
+                        const ok = await (window.confirmModal ? window.confirmModal(
+                            '¿Querés eliminar este egreso? Esta acción elimina el gasto y desaparece del historial.',
+                            'Eliminar egreso',
+                            'No se puede deshacer.'
+                        ) : Promise.resolve(window.confirm('¿Eliminar egreso?')));
+                        if (!ok) return;
+                        const res = await apiDeleteExpense(id);
+                        if (!res || res.ok !== true) {
+                            const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo eliminar.';
+                            if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Eliminar egreso');
+                            return;
+                        }
+                        renderEgresos();
+                    });
+                });
+            } catch (e) {}
         });
     }
 

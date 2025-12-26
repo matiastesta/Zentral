@@ -43,31 +43,21 @@
                     </div>
                 </div>
             </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="expenses_period" data-href="{{ url_for('expenses.index') }}">
-                <div class="flex items-center gap-3">
-                    <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">💸</div>
-                    <div class="min-w-0">
-                        <div class="text-sm font-medium text-gray-500">Gastos del período</div>
-                        <div id="kpi-total-expenses" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
-                        <div id="sk-kpi-total-expenses" class="mt-2 h-4 w-32 bg-gray-100 rounded animate-pulse"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200" data-card-key="estimated_result" title="Resultado estimado = Ventas del período - CMV (costo de mercadería vendida) - Gastos del período.">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200" data-card-key="estimated_result" title="Resultado calculado por criterio devengado. No representa flujo de caja.">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">📈</div>
                     <div class="min-w-0">
-                        <div class="text-sm font-medium text-gray-500">Resultado estimado</div>
+                        <div class="text-sm font-medium text-gray-500">Resultado operativo del período</div>
                         <div id="kpi-estimated-result" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
                         <div class="mt-1 text-xs text-gray-500">
                             <span id="kpi-estimated-margin">—</span>
-                            <span class="ml-1">· Ventas – CMV – Gastos del período</span>
+                            <span class="ml-1">· Ventas – CMV – Gastos devengados</span>
                         </div>
                         <div id="sk-kpi-estimated-result" class="mt-2 h-4 w-28 bg-gray-100 rounded animate-pulse"></div>
                     </div>
                 </div>
             </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="cash_available" data-href="{{ url_for('movements.index') }}" title="Caja/Bancos estimado desde Movimientos (ventas y egresos por forma de pago).">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="cash_available" data-href="{{ url_for('movements.index') }}" title="Liquidez disponible. No representa rentabilidad.">
                 <div class="flex items-start gap-3">
                     <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">🏦</div>
                     <div class="min-w-0 w-full">
@@ -87,60 +77,48 @@
                     </div>
                 </div>
             </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="net_cashflow" data-href="{{ url_for('movements.index') }}" title="Ingresos cobrados – Egresos pagados del período seleccionado.">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-violet-50 text-violet-700 flex items-center justify-center">💧</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Flujo neto de caja</div>
+                        <div id="kpi-net-cashflow" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Cobrado – pagado (período)</div>
+                        <div id="sk-kpi-net-cashflow" class="mt-2 h-4 w-28 bg-gray-100 rounded animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
     <section>
         <div class="flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-gray-900">Alertas y riesgos</h2>
+            <h2 class="text-sm font-semibold text-gray-900">Alertas críticas</h2>
         </div>
-        <div id="block-alerts" data-block-container="alerts" class="grid grid-cols-1 gap-4 mt-3 md:grid-cols-3">
+        <div id="block-alerts" data-block-container="alerts" class="grid grid-cols-1 gap-4 mt-3">
             <div class="p-4 bg-white rounded-lg shadow border border-gray-200" data-card-key="alerts_active">
                 <div class="flex items-center gap-3">
-                    <div class="h-10 w-10 rounded-full bg-yellow-50 text-yellow-700 flex items-center justify-center">🚨</div>
+                    <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">🚨</div>
                     <div class="min-w-0 w-full">
                         <div class="text-sm font-medium text-gray-500">Alertas activas</div>
                         <div id="kpi-alerts-total" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
                         <div id="sk-kpi-alerts-total" class="mt-2 h-4 w-20 bg-gray-100 rounded animate-pulse"></div>
                     </div>
                 </div>
-                <div class="mt-3 space-y-2 text-xs">
+                <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
                     <button type="button" class="w-full flex items-center justify-between px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50" data-href="{{ url_for('inventory.index') }}">
-                        <span class="text-gray-600">Stock bajo</span>
+                        <span class="text-gray-600">Stock crítico</span>
                         <span class="font-semibold text-gray-900"><span id="kpi-alert-stock">—</span> <i class="fas fa-arrow-right text-gray-300 ml-1"></i></span>
-                    </button>
-                    <button type="button" class="w-full flex items-center justify-between px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50" data-href="{{ url_for('customers.index') }}">
-                        <span class="text-gray-600">{{ label_customers }} deudores</span>
-                        <span class="font-semibold text-gray-900"><span id="kpi-alert-debtors">—</span> <i class="fas fa-arrow-right text-gray-300 ml-1"></i></span>
                     </button>
                     <button type="button" class="w-full flex items-center justify-between px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50" data-href="{{ url_for('expenses.index') }}">
                         <span class="text-gray-600">Gastos fuera de rango</span>
                         <span class="font-semibold text-gray-900"><span id="kpi-alert-expenses">—</span> <i class="fas fa-arrow-right text-gray-300 ml-1"></i></span>
                     </button>
+                    <button type="button" class="w-full flex items-center justify-between px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50" data-href="{{ url_for('customers.index') }}">
+                        <span class="text-gray-600">Vencimientos vencidos</span>
+                        <span class="font-semibold text-gray-900"><span id="kpi-alert-overdue">—</span> <i class="fas fa-arrow-right text-gray-300 ml-1"></i></span>
+                    </button>
                 </div>
-            </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="stock_critical" data-href="{{ url_for('inventory.index') }}">
-                <div class="flex items-center gap-3">
-                    <div class="h-10 w-10 rounded-full bg-orange-50 text-orange-700 flex items-center justify-center">📦</div>
-                    <div class="min-w-0 w-full">
-                        <div class="text-sm font-medium text-gray-500">{{ label_products }} con stock crítico</div>
-                        <div id="kpi-stock-critical-count" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
-                        <div class="mt-1 text-xs text-gray-500 truncate">Más crítico: <span id="kpi-stock-critical-top">—</span></div>
-                        <div id="sk-kpi-stock-critical" class="mt-2 h-4 w-24 bg-gray-100 rounded animate-pulse"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="debtors" data-href="{{ url_for('customers.index') }}">
-                <div class="flex items-center gap-3">
-                    <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">💳</div>
-                    <div class="min-w-0 w-full">
-                        <div class="text-sm font-medium text-gray-500">{{ label_customers }} deudores</div>
-                        <div class="mt-1 flex items-baseline justify-between gap-2">
-                            <div id="kpi-debtors" class="text-2xl font-semibold text-gray-900">—</div>
-                            <div id="kpi-debt-total" class="text-sm font-semibold text-gray-700">—</div>
-                        </div>
-                        <div id="sk-kpi-debtors" class="mt-2 h-4 w-24 bg-gray-100 rounded animate-pulse"></div>
-                    </div>
-                </div>
+                <div class="mt-2 text-xs text-gray-500">Un solo bloque de alertas, orientado a acción.</div>
             </div>
         </div>
     </section>
@@ -321,23 +299,17 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const kpiTotalSales = document.getElementById('kpi-total-sales');
-    const kpiTotalExpenses = document.getElementById('kpi-total-expenses');
     const kpiEstimatedResult = document.getElementById('kpi-estimated-result');
     const kpiEstimatedMargin = document.getElementById('kpi-estimated-margin');
     const kpiCash = document.getElementById('kpi-cash');
     const kpiBanks = document.getElementById('kpi-banks');
     const kpiTotalAvailable = document.getElementById('kpi-total-available');
+    const kpiNetCashflow = document.getElementById('kpi-net-cashflow');
 
     const kpiAlertsTotal = document.getElementById('kpi-alerts-total');
     const kpiAlertStock = document.getElementById('kpi-alert-stock');
-    const kpiAlertDebtors = document.getElementById('kpi-alert-debtors');
     const kpiAlertExpenses = document.getElementById('kpi-alert-expenses');
-
-    const kpiStockCriticalCount = document.getElementById('kpi-stock-critical-count');
-    const kpiStockCriticalTop = document.getElementById('kpi-stock-critical-top');
-
-    const kpiDebtors = document.getElementById('kpi-debtors');
-    const kpiDebtTotal = document.getElementById('kpi-debt-total');
+    const kpiAlertOverdue = document.getElementById('kpi-alert-overdue');
 
     const kpiSalesTodayTotal = document.getElementById('kpi-sales-today-total');
     const kpiSalesTodayCount = document.getElementById('kpi-sales-today-count');
@@ -352,16 +324,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const dashboardRoot = document.getElementById('dashboard-root');
 
     const skKpiTotalSales = document.getElementById('sk-kpi-total-sales');
-    const skKpiTotalExpenses = document.getElementById('sk-kpi-total-expenses');
     const skKpiEstimatedResult = document.getElementById('sk-kpi-estimated-result');
     const skKpiCash = document.getElementById('sk-kpi-cash');
     const skKpiAlertsTotal = document.getElementById('sk-kpi-alerts-total');
-    const skKpiStockCritical = document.getElementById('sk-kpi-stock-critical');
-    const skKpiDebtors = document.getElementById('sk-kpi-debtors');
     const skKpiSalesToday = document.getElementById('sk-kpi-sales-today');
     const skKpiAvgTicket = document.getElementById('sk-kpi-avg-ticket');
     const skKpiBestCustomer = document.getElementById('sk-kpi-best-customer');
     const skKpiTopProduct = document.getElementById('sk-kpi-top-product');
+    const skKpiNetCashflow = document.getElementById('sk-kpi-net-cashflow');
 
     const chartEvolutionSubtitle = document.getElementById('chart-evolution-subtitle');
     const dashRange = document.getElementById('dash-range');
@@ -749,23 +719,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function setSkeleton(on) {
-        const sks = [
-            skKpiTotalSales,
-            skKpiTotalExpenses,
-            skKpiEstimatedResult,
-            skKpiCash,
-            skKpiAlertsTotal,
-            skKpiStockCritical,
-            skKpiDebtors,
-            skKpiSalesToday,
-            skKpiAvgTicket,
-            skKpiBestCustomer,
-            skKpiTopProduct
-        ];
-        sks.forEach(el => {
-            if (!el) return;
-            el.classList.toggle('hidden', !on);
-        });
+        const show = !!on;
+        const hide = !show;
+        if (skKpiTotalSales) skKpiTotalSales.classList.toggle('hidden', hide);
+        if (skKpiEstimatedResult) skKpiEstimatedResult.classList.toggle('hidden', hide);
+        if (skKpiCash) skKpiCash.classList.toggle('hidden', hide);
+        if (skKpiNetCashflow) skKpiNetCashflow.classList.toggle('hidden', hide);
+        if (skKpiAlertsTotal) skKpiAlertsTotal.classList.toggle('hidden', hide);
+        if (skKpiSalesToday) skKpiSalesToday.classList.toggle('hidden', hide);
+        if (skKpiAvgTicket) skKpiAvgTicket.classList.toggle('hidden', hide);
+        if (skKpiBestCustomer) skKpiBestCustomer.classList.toggle('hidden', hide);
+        if (skKpiTopProduct) skKpiTopProduct.classList.toggle('hidden', hide);
     }
 
     function setEmpty(on) {
@@ -814,29 +778,66 @@ document.addEventListener('DOMContentLoaded', function() {
         return parseFecha(exp?.fecha || exp?.date || exp?.created_at || '');
     }
 
-    function sumSalesTotal(list) {
-        return (Array.isArray(list) ? list : []).reduce((acc, s) => acc + (parseFloat(s?.total || '0') || 0), 0);
+    function isCompletedSale(s) {
+        const st = String(s?.status || '').toLowerCase();
+        return st.startsWith('completad');
     }
 
-    function sumExpensesTotal(list) {
-        return (Array.isArray(list) ? list : []).reduce((acc, e) => {
-            if (e && e.meta && e.meta.supplier_cc_payment === true) return acc;
-            return acc + (parseFloat(e?.valor || '0') || 0);
+    function isRealSale(s) {
+        return String(s?.type || s?.sale_type || '').trim() === 'Venta';
+    }
+
+    function isExchange(s) {
+        return String(s?.type || s?.sale_type || '').trim() === 'Cambio';
+    }
+
+    function isCashCollection(s) {
+        return String(s?.type || s?.sale_type || '').trim() === 'CobroCC';
+    }
+
+    function sumGrossSalesDevengadas(sales) {
+        return (Array.isArray(sales) ? sales : []).reduce((acc, s) => {
+            if (!isCompletedSale(s)) return acc;
+            if (!isRealSale(s)) return acc;
+            return acc + safeNum(s?.total);
         }, 0);
     }
 
-    function calculateDebtorsFromSales(sales) {
-        const list = Array.isArray(sales) ? sales : [];
-        const map = new Map();
-        list.forEach(s => {
-            const due = (parseFloat(s?.due_amount || '0') || 0);
-            const onAccount = !!s?.on_account || String(s?.payment_method || s?.forma_pago || '') === 'Cuenta corriente';
-            if (!onAccount || due <= 0) return;
-            const cid = String(s?.customer_id || s?.customerId || s?.customer || s?.cliente || s?.customer_name || '').trim();
-            if (!cid) return;
-            map.set(cid, (map.get(cid) || 0) + due);
-        });
-        return { debtorsCount: map.size, debtorsMap: map };
+    function sumExchangesTotal(sales) {
+        return (Array.isArray(sales) ? sales : []).reduce((acc, s) => {
+            if (!isExchange(s)) return acc;
+            return acc + safeNum(s?.total);
+        }, 0);
+    }
+
+    function sumNetSalesDevengadas(sales) {
+        return sumGrossSalesDevengadas(sales) + sumExchangesTotal(sales);
+    }
+
+    function sumCashCollected(sales) {
+        return (Array.isArray(sales) ? sales : []).reduce((acc, s) => {
+            if (!isCompletedSale(s)) return acc;
+            const t = String(s?.type || '').trim();
+            if (t === 'CobroCC') return acc + safeNum(s?.total);
+            if (t === 'Venta') return acc + safeNum(s?.paid_amount);
+            return acc;
+        }, 0);
+    }
+
+    function isPaidExpense(e) {
+        const meta = (e && e.meta && typeof e.meta === 'object') ? e.meta : {};
+        if (meta.supplier_cc_payment === true) return true;
+        const cc = meta.supplier_cc;
+        if (cc && cc.enabled === true) return false;
+        const pm = String(e?.forma_pago || '').trim();
+        if (pm === 'Cuenta corriente') return false;
+        return true;
+    }
+
+    function isDevengadaExpense(e) {
+        const meta = (e && e.meta && typeof e.meta === 'object') ? e.meta : {};
+        if (meta.supplier_cc_payment === true) return false;
+        return safeNum(e?.valor) > 0;
     }
 
     function bucketByDay(from, to) {
@@ -878,7 +879,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function tryGetAllData() {
         if (!window.StorageService) {
-            return Promise.resolve({ sales: [], expenses: [], products: [], lots: [], customers: [], suppliers: [] });
+            return Promise.resolve({ sales: [], expenses: [], products: [], lots: [], customers: [], suppliers: [], movements: [] });
         }
 
         function safe(p, fallback) {
@@ -891,6 +892,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const l = (typeof window.StorageService.getInventoryLots === 'function') ? window.StorageService.getInventoryLots() : [];
         const c = (typeof window.StorageService.getCustomers === 'function') ? window.StorageService.getCustomers() : [];
         const sup = (typeof window.StorageService.getSuppliers === 'function') ? window.StorageService.getSuppliers() : [];
+        const mv = (typeof window.StorageService.getInventoryMovements === 'function') ? window.StorageService.getInventoryMovements() : [];
 
         return Promise.all([
             safe(s, []),
@@ -898,7 +900,8 @@ document.addEventListener('DOMContentLoaded', function() {
             safe(p, []),
             safe(l, []),
             safe(c, []),
-            safe(sup, [])
+            safe(sup, []),
+            safe(mv, [])
         ]).then(function (vals) {
             return {
                 sales: Array.isArray(vals[0]) ? vals[0] : [],
@@ -906,7 +909,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 products: Array.isArray(vals[2]) ? vals[2] : [],
                 lots: Array.isArray(vals[3]) ? vals[3] : [],
                 customers: Array.isArray(vals[4]) ? vals[4] : [],
-                suppliers: Array.isArray(vals[5]) ? vals[5] : []
+                suppliers: Array.isArray(vals[5]) ? vals[5] : [],
+                movements: Array.isArray(vals[6]) ? vals[6] : []
             };
         });
     }
@@ -1044,18 +1048,17 @@ document.addEventListener('DOMContentLoaded', function() {
         return map;
     }
 
-    function estimateCmvFromSales(sales, avgCostByProduct) {
-        const list = Array.isArray(sales) ? sales : [];
-        return list.reduce((acc, s) => {
-            const items = Array.isArray(s?.items) ? s.items : [];
-            const cmvVenta = items.reduce((a2, it) => {
-                const pid = String(it?.product_id || '').trim();
-                if (!pid) return a2;
-                const qty = safeNum(it?.cantidad);
-                const avg = safeNum(avgCostByProduct.get(pid) || 0);
-                return a2 + (qty * avg);
-            }, 0);
-            return acc + cmvVenta;
+    function cmvRealFromMovements(movements, salesRange) {
+        const tickets = new Set((Array.isArray(salesRange) ? salesRange : [])
+            .filter(s => isCompletedSale(s) && isRealSale(s))
+            .map(s => String(s?.ticket || '').trim())
+            .filter(Boolean));
+        if (!tickets.size) return 0;
+        return (Array.isArray(movements) ? movements : []).reduce((acc, m) => {
+            if (String(m?.type || '').trim() !== 'sale') return acc;
+            const t = String(m?.sale_ticket || '').trim();
+            if (!t || !tickets.has(t)) return acc;
+            return acc + safeNum(m?.total_cost);
         }, 0);
     }
 
@@ -1071,23 +1074,107 @@ document.addEventListener('DOMContentLoaded', function() {
             return acc;
         }, { cash: 0, banks: 0 });
 
-        const salesAgg = sumBy(sales, (s) => s?.payment_method, (s) => s?.total);
-        const expAgg = sumBy(expenses, (e) => e?.forma_pago, (e) => e?.valor);
+        const salesAgg = sumBy(sales, (s) => s?.payment_method, (s) => {
+            const t = String(s?.type || '').trim();
+            if (t === 'CobroCC') return safeNum(s?.total);
+            if (t === 'Venta') return safeNum(s?.paid_amount);
+            return 0;
+        });
+        const expAgg = sumBy(expenses, (e) => e?.forma_pago, (e) => {
+            if (!isPaidExpense(e)) return 0;
+            return safeNum(e?.valor);
+        });
 
         const cash = (salesAgg.cash || 0) - (expAgg.cash || 0);
         const banks = (salesAgg.banks || 0) - (expAgg.banks || 0);
         return { cash, banks, total: cash + banks };
     }
 
-    function computeOutOfRangeExpenses(expenses) {
-        const vals = (Array.isArray(expenses) ? expenses : [])
-            .filter(e => !(e && e.meta && e.meta.supplier_cc_payment === true))
-            .map(e => safeNum(e?.valor))
-            .filter(v => v > 0);
-        if (!vals.length) return 0;
-        const avg = vals.reduce((a, v) => a + v, 0) / vals.length;
-        const thr = avg * 3;
-        return vals.filter(v => v > thr).length;
+    function computeOutOfRangeExpenses(allExpenses, range) {
+        const listAll = (Array.isArray(allExpenses) ? allExpenses : []).filter(isDevengadaExpense);
+        if (!listAll.length) return 0;
+
+        const curFrom = new Date(range.from.getTime());
+        curFrom.setHours(0, 0, 0, 0);
+        const curTo = new Date(range.to.getTime());
+        curTo.setHours(23, 59, 59, 999);
+
+        const periodDays = Math.max(1, Math.ceil((curTo.getTime() - curFrom.getTime()) / (1000 * 60 * 60 * 24)));
+        const histTo = new Date(curFrom.getTime() - (1000 * 60 * 60 * 24));
+        const histFrom = new Date(histTo.getTime() - (1000 * 60 * 60 * 24 * 90));
+
+        const cur = new Map();
+        const hist = new Map();
+
+        listAll.forEach(e => {
+            const dt = normalizeExpenseDate(e);
+            if (!dt) return;
+            const cat = String(e?.categoria || 'Sin categoría').trim() || 'Sin categoría';
+            const val = safeNum(e?.valor);
+            if (dt >= curFrom && dt <= curTo) {
+                cur.set(cat, (cur.get(cat) || 0) + val);
+            } else if (dt >= histFrom && dt <= histTo) {
+                hist.set(cat, (hist.get(cat) || 0) + val);
+            }
+        });
+
+        const histDays = Math.max(1, Math.ceil((histTo.getTime() - histFrom.getTime()) / (1000 * 60 * 60 * 24)));
+        const thresholdMult = 1.3;
+        let alerts = 0;
+        cur.forEach((curTotal, cat) => {
+            const histTotal = hist.get(cat) || 0;
+            if (histTotal <= 0) return;
+            const avgPerDay = histTotal / histDays;
+            const expected = avgPerDay * periodDays;
+            if (curTotal > (expected * thresholdMult)) alerts += 1;
+        });
+        return alerts;
+    }
+
+    function computeOverdueCounts(payload) {
+        const today = new Date();
+        const isoToday = fmtDateYmd(today);
+        let overdue = 0;
+
+        // Clientes: no hay fecha de vencimiento explícita; usamos deuda > 0 como "vencido" si pasaron 30 días desde created_at.
+        const sales = Array.isArray(payload?.sales) ? payload.sales : [];
+        const ccMap = new Map();
+        sales.forEach(s => {
+            if (!isCompletedSale(s)) return;
+            if (String(s?.type || '').trim() !== 'Venta') return;
+            const due = safeNum(s?.due_amount);
+            if (due <= 0) return;
+            const createdAtMs = safeNum(s?.created_at);
+            const days = createdAtMs ? Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24)) : 0;
+            if (days >= 30) {
+                const cid = String(s?.customer_id || '').trim() || String(s?.customer_name || '').trim();
+                if (cid) ccMap.set(cid, true);
+            }
+        });
+        overdue += ccMap.size;
+
+        // Proveedores: cc schedule está en meta.supplier_cc.schedule; contar cuotas abiertas con due_date < hoy.
+        const exps = Array.isArray(payload?.expenses) ? payload.expenses : [];
+        const supMap = new Map();
+        exps.forEach(e => {
+            const meta = e && e.meta && typeof e.meta === 'object' ? e.meta : {};
+            const cc = meta.supplier_cc;
+            if (!cc || cc.enabled !== true) return;
+            const schedule = Array.isArray(cc.schedule) ? cc.schedule : [];
+            schedule.forEach(inst => {
+                if (String(inst?.status || '').trim() !== 'open') return;
+                const dueDate = String(inst?.due_date || '').trim();
+                const rem = safeNum(inst?.remaining);
+                if (!dueDate || rem <= 0) return;
+                if (dueDate < isoToday) {
+                    const sid = String(e?.supplier_id || '').trim() || String(e?.supplier_name || '').trim();
+                    if (sid) supMap.set(sid, true);
+                }
+            });
+        });
+        overdue += supMap.size;
+
+        return overdue;
     }
 
     function computeStockCritical(products, lots) {
@@ -1144,21 +1231,34 @@ document.addEventListener('DOMContentLoaded', function() {
         const cmvBy = {};
         labels.forEach(k => { salesBy[k] = 0; expBy[k] = 0; cmvBy[k] = 0; });
 
+        const tickets = new Set();
+
         (Array.isArray(payload?.sales) ? payload.sales : []).forEach(s => {
             const dt = normalizeSalesDate(s);
             if (!dt || dt < range.from || dt > range.to) return;
             const k = (bucket.kind === 'month') ? fmtMonthKey(dt) : fmtDateYmd(dt);
             if (!(k in salesBy)) return;
-            salesBy[k] += safeNum(s?.total);
-            const items = Array.isArray(s?.items) ? s.items : [];
-            const cmv = items.reduce((acc, it) => {
-                const pid = String(it?.product_id || '').trim();
-                if (!pid) return acc;
-                const qty = safeNum(it?.cantidad);
-                const avg = safeNum(avgCostByProduct.get(pid) || 0);
-                return acc + (qty * avg);
-            }, 0);
-            cmvBy[k] += cmv;
+            if (isCompletedSale(s) && isRealSale(s)) {
+                salesBy[k] += safeNum(s?.total);
+                const t = String(s?.ticket || '').trim();
+                if (t) tickets.add(t);
+            }
+            if (isExchange(s)) {
+                // Cambios/devoluciones restan ventas netas (total suele ser negativo)
+                salesBy[k] += safeNum(s?.total);
+            }
+        });
+
+        // CMV real por movimientos (solo tipo sale y tickets del período)
+        (Array.isArray(payload?.movements) ? payload.movements : []).forEach(m => {
+            if (String(m?.type || '').trim() !== 'sale') return;
+            const t = String(m?.sale_ticket || '').trim();
+            if (!t || !tickets.has(t)) return;
+            const dt = parseFecha(m?.date || '');
+            if (!dt || dt < range.from || dt > range.to) return;
+            const k = (bucket.kind === 'month') ? fmtMonthKey(dt) : fmtDateYmd(dt);
+            if (!(k in cmvBy)) return;
+            cmvBy[k] += safeNum(m?.total_cost);
         });
 
         (Array.isArray(payload?.expenses) ? payload.expenses : []).forEach(e => {
@@ -1166,6 +1266,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!dt || dt < range.from || dt > range.to) return;
             const k = (bucket.kind === 'month') ? fmtMonthKey(dt) : fmtDateYmd(dt);
             if (!(k in expBy)) return;
+            if (!isDevengadaExpense(e)) return;
             expBy[k] += safeNum(e?.valor);
         });
 
@@ -1182,31 +1283,36 @@ document.addEventListener('DOMContentLoaded', function() {
         const products = Array.isArray(payload?.products) ? payload.products : [];
         const lots = Array.isArray(payload?.lots) ? payload.lots : [];
         const customers = Array.isArray(payload?.customers) ? payload.customers : [];
+        const movements = Array.isArray(payload?.movements) ? payload.movements : [];
 
         const salesRange = salesInRange(salesAll, range);
         const expRange = expensesInRange(expensesAll, range);
 
-        const totalSales = sumSalesTotal(salesRange);
-        const totalExpenses = sumExpensesTotal(expRange);
+        const totalSales = sumNetSalesDevengadas(salesRange);
 
-        const avgCostByProduct = buildAvgCostByProduct(products, lots);
-        const cmv = estimateCmvFromSales(salesRange, avgCostByProduct);
+        const totalExpenses = (Array.isArray(expRange) ? expRange : []).reduce((acc, e) => {
+            if (e && e.meta && e.meta.supplier_cc_payment === true) return acc;
+            return acc + safeNum(e?.valor);
+        }, 0);
+
+        const cmv = cmvRealFromMovements(movements, salesRange);
         const estimatedResult = totalSales - cmv - totalExpenses;
         const estimatedMarginPct = totalSales > 0 ? ((estimatedResult / totalSales) * 100) : 0;
 
-        const caja = computeCashAndBanks(salesRange, expRange);
-
-        const debtors = calculateDebtorsFromSales(salesRange);
-        const debtTotal = Array.from(debtors.debtorsMap.values()).reduce((acc, v) => acc + safeNum(v), 0);
+        const caja = computeCashAndBanks(salesAll, expensesAll);
+        const cashIn = sumCashCollected(salesRange);
+        const cashOut = (Array.isArray(expRange) ? expRange : []).reduce((acc, e) => acc + (isPaidExpense(e) ? safeNum(e?.valor) : 0), 0);
+        const netCashflow = cashIn - cashOut;
 
         const stockCrit = computeStockCritical(products, lots);
-        const expensesOutOfRange = computeOutOfRangeExpenses(expRange);
+        const expensesOutOfRange = computeOutOfRangeExpenses(expensesAll, range);
+        const overdue = computeOverdueCounts(payload);
 
         const today = new Date();
         const todayRange = { from: toStartOfDay(today), to: toEndOfDay(today) };
         const salesToday = salesInRange(salesAll, todayRange);
-        const salesTodayTotal = sumSalesTotal(salesToday);
-        const salesTodayCount = salesToday.length;
+        const salesTodayTotal = sumNetSalesDevengadas(salesToday);
+        const salesTodayCount = (Array.isArray(salesToday) ? salesToday : []).filter(s => isCompletedSale(s) && isRealSale(s)).length;
 
         const avgTicket = salesRange.length > 0 ? (totalSales / salesRange.length) : 0;
 
@@ -1237,8 +1343,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const topProd = computeTopProductByQty(salesRange);
         const topProdName = topProd.key ? String(topProd.key) : '';
 
-        const alertsTotal = (stockCrit.criticalCount || 0) + (debtors.debtorsCount || 0) + (expensesOutOfRange || 0);
-        const evolution = computeEvolution(range, payload, avgCostByProduct);
+        const alertsTotal = (stockCrit.criticalCount || 0) + (expensesOutOfRange || 0) + (overdue || 0);
+
+        const evolution = computeEvolution(range, payload, buildAvgCostByProduct(products, lots));
 
         return {
             totalSales,
@@ -1249,14 +1356,11 @@ document.addEventListener('DOMContentLoaded', function() {
             cash: caja.cash,
             banks: caja.banks,
             totalAvailable: caja.total,
+            netCashflow,
             alertsTotal,
             alertStock: stockCrit.criticalCount,
-            alertDebtors: debtors.debtorsCount,
             alertExpenses: expensesOutOfRange,
-            stockCriticalCount: stockCrit.criticalCount,
-            stockCriticalTop: stockCrit.topName,
-            debtorsCount: debtors.debtorsCount,
-            debtTotal,
+            alertOverdue: overdue,
             salesTodayTotal,
             salesTodayCount,
             avgTicket,
@@ -1271,7 +1375,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderKPIs(kpis) {
         if (kpiTotalSales) kpiTotalSales.textContent = formatearMoneda(kpis.totalSales);
-        if (kpiTotalExpenses) kpiTotalExpenses.textContent = formatearMoneda(kpis.totalExpenses);
 
         if (kpiEstimatedResult) {
             kpiEstimatedResult.textContent = formatearMoneda(kpis.estimatedResult);
@@ -1287,17 +1390,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (kpiCash) kpiCash.textContent = formatearMoneda(kpis.cash);
         if (kpiBanks) kpiBanks.textContent = formatearMoneda(kpis.banks);
         if (kpiTotalAvailable) kpiTotalAvailable.textContent = formatearMoneda(kpis.totalAvailable);
+        if (kpiNetCashflow) kpiNetCashflow.textContent = formatearMoneda(kpis.netCashflow || 0);
 
         if (kpiAlertsTotal) kpiAlertsTotal.textContent = String(kpis.alertsTotal || 0);
         if (kpiAlertStock) kpiAlertStock.textContent = String(kpis.alertStock || 0);
-        if (kpiAlertDebtors) kpiAlertDebtors.textContent = String(kpis.alertDebtors || 0);
         if (kpiAlertExpenses) kpiAlertExpenses.textContent = String(kpis.alertExpenses || 0);
-
-        if (kpiStockCriticalCount) kpiStockCriticalCount.textContent = String(kpis.stockCriticalCount || 0);
-        if (kpiStockCriticalTop) kpiStockCriticalTop.textContent = String(kpis.stockCriticalTop || '—');
-
-        if (kpiDebtors) kpiDebtors.textContent = String(kpis.debtorsCount || 0);
-        if (kpiDebtTotal) kpiDebtTotal.textContent = formatearMoneda(kpis.debtTotal || 0);
+        if (kpiAlertOverdue) kpiAlertOverdue.textContent = String(kpis.alertOverdue || 0);
 
         if (kpiSalesTodayTotal) kpiSalesTodayTotal.textContent = formatearMoneda(kpis.salesTodayTotal || 0);
         if (kpiSalesTodayCount) kpiSalesTodayCount.textContent = String(kpis.salesTodayCount || 0);
@@ -1318,7 +1416,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return tryGetAllData().then(function (payload) {
             const kpis = calculateDashboardKPIs(payload, range);
 
-            const hasAny = (kpis.totalSales > 0) || (kpis.totalExpenses > 0) || (kpis.salesTodayTotal > 0);
+            const hasAny = (kpis.totalSales > 0) || (kpis.totalExpenses > 0) || (kpis.salesTodayTotal > 0) || (Math.abs(Number(kpis.netCashflow || 0)) > 0.0001);
             setEmpty(!hasAny);
 
             if (chartEvolutionSubtitle) {
@@ -1419,20 +1517,21 @@ document.addEventListener('DOMContentLoaded', function() {
             + '<table>'
             + '<tr><th>KPI</th><th class="num">Valor</th></tr>'
             + '<tr><td>Ventas del período</td><td class="num">' + String(k.totalSales ?? 0) + '</td></tr>'
-            + '<tr><td>Gastos del período</td><td class="num">' + String(k.totalExpenses ?? 0) + '</td></tr>'
-            + '<tr><td>CMV estimado</td><td class="num">' + String(k.cmv ?? 0) + '</td></tr>'
+            + '<tr><td>Gastos devengados del período</td><td class="num">' + String(k.totalExpenses ?? 0) + '</td></tr>'
+            + '<tr><td>CMV (solo ventas)</td><td class="num">' + String(k.cmv ?? 0) + '</td></tr>'
             + '<tr><td>Resultado estimado</td><td class="num">' + String(k.estimatedResult ?? 0) + '</td></tr>'
             + '<tr><td>Caja (efectivo)</td><td class="num">' + String(k.cash ?? 0) + '</td></tr>'
             + '<tr><td>Bancos</td><td class="num">' + String(k.banks ?? 0) + '</td></tr>'
-            + '<tr><td>Total disponible</td><td class="num">' + String(k.totalAvailable ?? 0) + '</td></tr>'
+            + '<tr><td>Caja disponible (total)</td><td class="num">' + String(k.totalAvailable ?? 0) + '</td></tr>'
+            + '<tr><td>Flujo neto de caja (período)</td><td class="num">' + String(k.netCashflow ?? 0) + '</td></tr>'
             + '</table>'
 
-            + '<h2>Bloque 2 — Alertas y riesgos</h2>'
+            + '<h2>Bloque 2 — Alertas críticas</h2>'
             + '<table>'
             + '<tr><th>Alerta</th><th class="num">Cantidad</th></tr>'
-            + '<tr><td>Stock bajo / crítico</td><td class="num">' + String(k.stockCriticalCount ?? 0) + '</td></tr>'
-            + '<tr><td>{{ label_customers }} deudores</td><td class="num">' + String(k.debtorsCount ?? 0) + '</td></tr>'
+            + '<tr><td>Stock crítico</td><td class="num">' + String(k.alertStock ?? 0) + '</td></tr>'
             + '<tr><td>Gastos fuera de rango</td><td class="num">' + String(k.alertExpenses ?? 0) + '</td></tr>'
+            + '<tr><td>Vencimientos vencidos</td><td class="num">' + String(k.alertOverdue ?? 0) + '</td></tr>'
             + '</table>'
 
             + '<h2>Bloque 3 — Actividad comercial</h2>'
@@ -1514,10 +1613,20 @@ document.addEventListener('DOMContentLoaded', function() {
             + '  <thead><tr><th>Bloque 1 — Estado general</th><th class="num">Valor</th></tr></thead>'
             + '  <tbody>'
             + '    <tr><td>Ventas del período</td><td class="num">' + formatearMoneda(k.totalSales || 0) + '</td></tr>'
-            + '    <tr><td>Gastos del período</td><td class="num">' + formatearMoneda(k.totalExpenses || 0) + '</td></tr>'
-            + '    <tr><td>CMV estimado</td><td class="num">' + formatearMoneda(k.cmv || 0) + '</td></tr>'
-            + '    <tr><td>Resultado estimado</td><td class="num">' + formatearMoneda(k.estimatedResult || 0) + '</td></tr>'
+            + '    <tr><td>Gastos devengados del período</td><td class="num">' + formatearMoneda(k.totalExpenses || 0) + '</td></tr>'
+            + '    <tr><td>CMV (solo ventas)</td><td class="num">' + formatearMoneda(k.cmv || 0) + '</td></tr>'
+            + '    <tr><td>Resultado operativo (devengado)</td><td class="num">' + formatearMoneda(k.estimatedResult || 0) + '</td></tr>'
             + '    <tr><td>Caja disponible (total)</td><td class="num">' + formatearMoneda(k.totalAvailable || 0) + '</td></tr>'
+            + '    <tr><td>Flujo neto de caja (período)</td><td class="num">' + formatearMoneda(k.netCashflow || 0) + '</td></tr>'
+            + '  </tbody>'
+            + '</table>'
+
+            + '<table>'
+            + '  <thead><tr><th>Bloque 2 — Alertas críticas</th><th class="num">Cantidad</th></tr></thead>'
+            + '  <tbody>'
+            + '    <tr><td>Stock crítico</td><td class="num">' + String(k.alertStock || 0) + '</td></tr>'
+            + '    <tr><td>Gastos fuera de rango</td><td class="num">' + String(k.alertExpenses || 0) + '</td></tr>'
+            + '    <tr><td>Vencimientos vencidos</td><td class="num">' + String(k.alertOverdue || 0) + '</td></tr>'
             + '  </tbody>'
             + '</table>'
 

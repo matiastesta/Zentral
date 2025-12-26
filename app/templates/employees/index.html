@@ -124,9 +124,9 @@
 
 <div id="employee-actions-menu" class="hidden fixed w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[9999]">
     <div class="py-1 text-[11px]">
-        <button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="legajo">Ver legajo</button>
-        <button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="edit">Editar</button>
-        <button id="employee-actions-deactivate" type="button" class="w-full text-left px-3 py-2 text-red-700 hover:bg-red-50" data-action="deactivate">Dar de baja</button>
+        <button type="button" class="w-full text-left px-3 py-1.5 hover:bg-gray-100" data-action="legajo">Ver legajo</button>
+        <button type="button" class="w-full text-left px-3 py-1.5 hover:bg-gray-100" data-action="edit">Editar</button>
+        <button id="employee-actions-deactivate" type="button" class="w-full text-left px-3 py-1.5 text-red-700 hover:bg-red-50" data-action="deactivate">Dar de baja</button>
     </div>
 </div>
 
@@ -401,12 +401,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const mw = employeeActionsMenu.offsetWidth || 176;
             const mh = employeeActionsMenu.offsetHeight || 120;
             let left = rect.right - mw;
-            let top = rect.bottom + 6;
+            let top = rect.bottom + 4;
 
             if (left < pad) left = pad;
             if (left + mw > window.innerWidth - pad) left = Math.max(pad, window.innerWidth - mw - pad);
             if (top + mh > window.innerHeight - pad) {
-                top = rect.top - mh - 6;
+                top = rect.top - mh - 4;
             }
             if (top < pad) top = pad;
 

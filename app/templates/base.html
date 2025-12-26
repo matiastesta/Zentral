@@ -145,7 +145,7 @@
                         <a href="{{ url_for('settings.business_settings') if current_user.can('settings') else (url_for('user_settings.index') if current_user.can('user_settings') else url_for('main.index')) }}" class="block px-4 py-2 text-base font-medium text-blue-200 hover:text-white hover:bg-blue-700">
                             <i class="fas fa-cog mr-2"></i> Configuración
                         </a>
-                        <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-base font-medium text-blue-200 hover:text-white hover:bg-blue-700">
+                        <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-base font-medium text-blue-200 hover:text-white hover:bg-blue-700" data-confirm-logout="1">
                             <i class="fas fa-sign-out-alt mr-2"></i> Cerrar sesión
                         </a>
                     </div>
@@ -229,14 +229,14 @@
                     <i class="fas fa-cog mr-2"></i> Config. del negocio
                 </a>
                 {% endif %}
-                <a href="{{ url_for('auth.logout') }}" class="w-full inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-700">
+                <a href="{{ url_for('auth.logout') }}" class="w-full inline-flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-700" data-confirm-logout="1">
                     <i class="fas fa-sign-out-alt mr-2"></i> Cerrar sesión
                 </a>
 
                 <!-- Marca de agua Zentra Consultora -->
                 <div class="pt-4 mt-4 border-t border-gray-100">
                     <div class="w-full">
-                        <img src="{{ url_for('static', filename='images/zentra-consultora-horizontal.png.png') }}" alt="Zentra" class="w-full h-12 object-contain">
+                        <img src="{{ url_for('static', filename='images/zentral-logo.svg') }}" alt="ZENTRAL" class="w-full h-14 object-contain">
                     </div>
                 </div>
             </div>
@@ -508,6 +508,25 @@
                     }
                 });
             }
+
+            document.querySelectorAll('a[data-confirm-logout="1"]').forEach(function (a) {
+                a.addEventListener('click', async function (ev) {
+                    try {
+                        ev.preventDefault();
+                        const href = a.getAttribute('href') || '';
+                        const ok = await (window.confirmModal ? window.confirmModal(
+                            '¿Querés cerrar sesión?',
+                            'Cerrar sesión',
+                            'Vas a salir del sistema.',
+                            { okText: 'Cerrar sesión', cancelText: 'Cancelar' }
+                        ) : Promise.resolve(window.confirm('¿Querés cerrar sesión?')));
+                        if (!ok) return;
+                        window.location.href = href;
+                    } catch (e) {
+                        window.location.href = a.getAttribute('href') || '/auth/logout';
+                    }
+                });
+            });
         });
     </script>
 

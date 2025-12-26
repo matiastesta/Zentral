@@ -38,6 +38,20 @@ def _parse_date_iso(raw, fallback=None):
 
 
 def _serialize_sale(row: Sale):
+    has_venta_libre = False
+    venta_libre_count = 0
+    try:
+        for it in (row.items or []):
+            pid = str(getattr(it, 'product_id', '') or '').strip()
+            nm = str(getattr(it, 'product_name', '') or '').strip().lower()
+            if (not pid) or (nm == 'venta libre'):
+                has_venta_libre = True
+                venta_libre_count += 1
+    except Exception:
+        current_app.logger.exception('Failed to compute venta libre flag')
+        has_venta_libre = False
+        venta_libre_count = 0
+
     return {
         'id': row.id,
         'ticket': row.ticket,
@@ -62,6 +76,8 @@ def _serialize_sale(row: Sale):
         'exchange_new_total': row.exchange_new_total,
         'created_at': _dt_to_ms(row.created_at),
         'updated_at': _dt_to_ms(row.updated_at),
+        'has_venta_libre': bool(has_venta_libre),
+        'venta_libre_count': int(venta_libre_count),
         'items': [
             {
                 'product_id': it.product_id or '',
@@ -154,7 +170,7 @@ def list_sales():
     include_replaced = str(request.args.get('include_replaced') or '').strip() in ('1', 'true', 'True')
     exclude_cc = str(request.args.get('exclude_cc') or '').strip() in ('1', 'true', 'True')
     limit = int(request.args.get('limit') or 300)
-    if limit <= 0 or limit > 2000:
+    if limit <= 0 or limit > 20000:
         limit = 300
 
     d_from = _parse_date_iso(raw_from, None)
@@ -865,6 +881,53 @@ def delete_sale(ticket):
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     try:
+        related_ticket = ''
+        try:
+            note_rel = str(getattr(row, 'notes', '') or '').strip()
+            if note_rel:
+                import re
+                mrel = re.search(r"Relacionado\s+a\s+(?:venta|cambio)\s+([^\n\r]+)", note_rel, re.IGNORECASE)
+                if mrel and mrel.group(1):
+                    related_ticket = str(mrel.group(1)).strip()
+        except Exception:
+            current_app.logger.exception('Failed to parse related ticket from notes')
+            related_ticket = ''
+
+        # If this is a CC payment ticket, revert the settlement on the referenced original sale.
+        try:
+            if str(getattr(row, 'sale_type', '') or '').strip() == 'CobroCC':
+                note = str(getattr(row, 'notes', '') or '').strip()
+                ref = ''
+                import re
+                m = re.search(r"Ticket\s+([^\)\n\r]+)", note)
+                if m and m.group(1):
+                    ref = str(m.group(1)).strip()
+                if ref:
+                    orig = db.session.query(Sale).filter(Sale.ticket == ref).first()
+                    if orig:
+                        amt = abs(float(getattr(row, 'total', 0.0) or 0.0))
+                        orig.paid_amount = max(0.0, float(orig.paid_amount or 0.0) - amt)
+                        orig.due_amount = max(0.0, float(orig.due_amount or 0.0) + amt)
+                        orig.on_account = bool(orig.due_amount and float(orig.due_amount or 0.0) > 0)
+                        prev = str(orig.notes or '').strip()
+                        extra = f"Cobro CC revertido por eliminación de {t}".strip()
+                        orig.notes = (prev + ('\n' if prev else '') + extra) if extra else (prev or None)
+        except Exception:
+            current_app.logger.exception('Failed to revert CobroCC side-effects')
+
+        # Revert inventory impacts for both tickets (if this sale is part of an exchange flow).
+        if related_ticket and related_ticket != t:
+            rel_row = db.session.query(Sale).filter(Sale.ticket == related_ticket).first()
+            if rel_row:
+                try:
+                    _revert_inventory_for_ticket(related_ticket)
+                except Exception:
+                    current_app.logger.exception('Failed to revert inventory for related ticket')
+                try:
+                    db.session.delete(rel_row)
+                except Exception:
+                    current_app.logger.exception('Failed to delete related sale row')
+
         _revert_inventory_for_ticket(t)
         db.session.delete(row)
         db.session.commit()

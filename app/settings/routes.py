@@ -63,5 +63,26 @@ def business_settings():
             flash('Personalización guardada.', 'success')
             return redirect(url_for('settings.business_settings'))
 
+        if action == 'save_insights':
+            bs = BusinessSettings.get_singleton()
+
+            def _f(name):
+                raw = (request.form.get(name) or '').strip().replace(',', '.')
+                if raw == '':
+                    return None
+                try:
+                    return float(raw)
+                except Exception:
+                    return None
+
+            bs.insight_margin_delta_pp = _f('insight_margin_delta_pp')
+            bs.insight_profitability_delta_pp = _f('insight_profitability_delta_pp')
+            bs.insight_expenses_ratio_pct = _f('insight_expenses_ratio_pct')
+
+            db.session.add(bs)
+            db.session.commit()
+            flash('Umbrales de insights guardados.', 'success')
+            return redirect(url_for('settings.business_settings'))
+
     business = BusinessSettings.get_singleton()
     return render_template("settings/business.html", title="Configuración del negocio", business=business)

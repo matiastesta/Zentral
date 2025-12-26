@@ -81,6 +81,10 @@ class BusinessSettings(db.Model):
     label_products = db.Column(db.String(64), nullable=True)
     primary_color = db.Column(db.String(16), nullable=True)
 
+    insight_margin_delta_pp = db.Column(db.Float, nullable=True)
+    insight_profitability_delta_pp = db.Column(db.Float, nullable=True)
+    insight_expenses_ratio_pct = db.Column(db.Float, nullable=True)
+
     @staticmethod
     def get_singleton():
         bs = db.session.get(BusinessSettings, 1)

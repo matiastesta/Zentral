@@ -1806,7 +1806,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (range && range.to) qs.push('to=' + encodeURIComponent(isoFromDate(range.to)));
         qs.push('include_replaced=1');
         qs.push('exclude_cc=1');
-        qs.push('limit=2000');
+        qs.push('limit=20000');
         const url = '/sales/api/sales' + (qs.length ? ('?' + qs.join('&')) : '');
         return fetch(url, { credentials: 'same-origin' })
             .then(r => r.json())
@@ -1871,7 +1871,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (salesLoadPromise) return salesLoadPromise;
         const to = new Date();
         const from = new Date();
-        from.setDate(from.getDate() - 365);
+        from.setDate(from.getDate() - 3650);
         salesLoadPromise = apiListSales({ from, to }).then(items => {
             salesCache = Array.isArray(items) ? items : [];
             salesLoaded = true;
@@ -1923,6 +1923,17 @@ document.addEventListener('DOMContentLoaded', function() {
             tr.setAttribute('data-is-gift', isGift ? '1' : '0');
             tr.setAttribute('data-gift-code', giftCode);
 
+            let hasVentaLibre = false;
+            try {
+                if (s && s.has_venta_libre) hasVentaLibre = true;
+                const items = Array.isArray(s?.items) ? s.items : [];
+                for (const it of items) {
+                    const pid = String(it?.product_id || '').trim();
+                    const nm = String(it?.nombre || it?.product_name || '').trim().toLowerCase();
+                    if (!pid || nm === 'venta libre') { hasVentaLibre = true; break; }
+                }
+            } catch (e) {}
+
             const rawTipo = String(s?.type || 'Venta').trim() || 'Venta';
             const tipoLabel = (rawTipo === 'CobroCC') ? 'Cobro CC' : rawTipo;
             tr.setAttribute('data-type', tipoLabel);
@@ -1951,7 +1962,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     + '<div class="text-gray-700 font-mono font-semibold">' + primary + '</div>'
                     + (g && t ? ('<div class="mt-0.5 text-[10px] text-gray-500">' + t + '</div>') : '');
             } else {
-                ticketCellHtml = String(ticket || '—');
+                const warn = hasVentaLibre
+                    ? '<span class="ml-2 inline-flex items-center" title="Precaución: este ticket contiene VENTA LIBRE (producto sin registrar / sin costo)"><i class="fas fa-triangle-exclamation text-amber-600"></i></span>'
+                    : '';
+                ticketCellHtml = '<span>' + String(ticket || '—') + '</span>' + warn;
             }
             const ticketCellClass = ventasGiftOnly ? 'px-3 py-2' : 'px-3 py-2 text-gray-500';
             tr.innerHTML = ''
