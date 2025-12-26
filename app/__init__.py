@@ -86,9 +86,9 @@ def create_app(config_class=Config):
 
     with app.app_context():
         try:
-            db.create_all()
-
             from app.models import User, BusinessSettings
+
+            db.create_all()
 
             if str(db.engine.url.drivername) == 'sqlite':
                 insp = inspect(db.engine)
