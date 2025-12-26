@@ -90,6 +90,17 @@ def create_app(config_class=Config):
 
             db.create_all()
 
+            insp_all = inspect(db.engine)
+
+            def ensure_columns_any(table, cols):
+                if not insp_all.has_table(table):
+                    return
+                existing = {c['name'] for c in insp_all.get_columns(table)}
+                for name, coltype in cols:
+                    if name in existing:
+                        continue
+                    db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {name} {coltype}'))
+
             if str(db.engine.url.drivername) == 'sqlite':
                 insp = inspect(db.engine)
 
@@ -260,6 +271,21 @@ def create_app(config_class=Config):
                     ('name', 'VARCHAR(255)'),
                     ('created_at', 'DATETIME'),
                     ('updated_at', 'DATETIME'),
+                ])
+
+            if str(db.engine.url.drivername) != 'sqlite':
+                ensure_columns_any('business_settings', [
+                    ('industry', 'VARCHAR(255)'),
+                    ('email', 'VARCHAR(255)'),
+                    ('phone', 'VARCHAR(64)'),
+                    ('address', 'VARCHAR(255)'),
+                    ('logo_filename', 'VARCHAR(255)'),
+                    ('label_customers', 'VARCHAR(64)'),
+                    ('label_products', 'VARCHAR(64)'),
+                    ('primary_color', 'VARCHAR(16)'),
+                    ('insight_margin_delta_pp', 'DOUBLE PRECISION'),
+                    ('insight_profitability_delta_pp', 'DOUBLE PRECISION'),
+                    ('insight_expenses_ratio_pct', 'DOUBLE PRECISION'),
                 ])
 
             db.session.commit()
