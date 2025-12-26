@@ -30,6 +30,22 @@ from app.models import (
 from app.superadmin import bp
 
 
+MODULE_KEYS = [
+    'dashboard',
+    'calendar',
+    'sales',
+    'expenses',
+    'inventory',
+    'customers',
+    'suppliers',
+    'employees',
+    'movements',
+    'reports',
+    'settings',
+    'user_settings',
+]
+
+
 def _require_zentral_admin():
     if not current_user.is_authenticated:
         abort(401)
@@ -95,43 +111,6 @@ def pause_company(company_id: str):
     return redirect(url_for('superadmin.index'))
 
 
-@bp.post('/companies/<company_id>/reset-data')
-@login_required
-def reset_company_data(company_id: str):
-    _require_zentral_admin()
-    c = db.session.get(Company, str(company_id))
-    if not c:
-        flash('Empresa inválida.', 'error')
-        return redirect(url_for('superadmin.index'))
-
-    cid = str(c.id)
-
-    # Delete operational tables but keep company, users and business settings.
-    db.session.query(SaleItem).filter(SaleItem.company_id == cid).delete(synchronize_session=False)
-    db.session.query(Sale).filter(Sale.company_id == cid).delete(synchronize_session=False)
-
-    db.session.query(InventoryMovement).filter(InventoryMovement.company_id == cid).delete(synchronize_session=False)
-    db.session.query(InventoryLot).filter(InventoryLot.company_id == cid).delete(synchronize_session=False)
-
-    db.session.query(Expense).filter(Expense.company_id == cid).delete(synchronize_session=False)
-    db.session.query(ExpenseCategory).filter(ExpenseCategory.company_id == cid).delete(synchronize_session=False)
-
-    db.session.query(CalendarEvent).filter(CalendarEvent.company_id == cid).delete(synchronize_session=False)
-    db.session.query(CalendarUserConfig).filter(CalendarUserConfig.company_id == cid).delete(synchronize_session=False)
-    db.session.query(CashCount).filter(CashCount.company_id == cid).delete(synchronize_session=False)
-
-    db.session.query(Product).filter(Product.company_id == cid).delete(synchronize_session=False)
-    db.session.query(Category).filter(Category.company_id == cid).delete(synchronize_session=False)
-    db.session.query(Customer).filter(Customer.company_id == cid).delete(synchronize_session=False)
-    db.session.query(Supplier).filter(Supplier.company_id == cid).delete(synchronize_session=False)
-    db.session.query(Employee).filter(Employee.company_id == cid).delete(synchronize_session=False)
-
-    db.session.commit()
-
-    flash(f'Datos operativos reiniciados para {c.name}.', 'success')
-    return redirect(url_for('superadmin.index'))
-
-
 @bp.route('/companies/<company_id>/delete', methods=['POST'])
 @login_required
 def delete_company(company_id: str):
@@ -168,34 +147,6 @@ def delete_company(company_id: str):
     db.session.commit()
 
     flash('Empresa eliminada.', 'success')
-    return redirect(url_for('superadmin.index'))
-
-
-@bp.route('/companies/reset-data-all', methods=['POST'])
-@login_required
-def reset_all_companies_data():
-    _require_zentral_admin()
-
-    session.pop('impersonate_company_id', None)
-
-    # Delete operational tables for all companies but keep company, users and business settings.
-    db.session.query(SaleItem).delete(synchronize_session=False)
-    db.session.query(Sale).delete(synchronize_session=False)
-    db.session.query(InventoryMovement).delete(synchronize_session=False)
-    db.session.query(InventoryLot).delete(synchronize_session=False)
-    db.session.query(Expense).delete(synchronize_session=False)
-    db.session.query(ExpenseCategory).delete(synchronize_session=False)
-    db.session.query(CalendarEvent).delete(synchronize_session=False)
-    db.session.query(CalendarUserConfig).delete(synchronize_session=False)
-    db.session.query(CashCount).delete(synchronize_session=False)
-    db.session.query(Product).delete(synchronize_session=False)
-    db.session.query(Category).delete(synchronize_session=False)
-    db.session.query(Customer).delete(synchronize_session=False)
-    db.session.query(Supplier).delete(synchronize_session=False)
-    db.session.query(Employee).delete(synchronize_session=False)
-
-    db.session.commit()
-    flash('Datos operativos reiniciados para TODAS las empresas.', 'success')
     return redirect(url_for('superadmin.index'))
 
 
@@ -249,45 +200,86 @@ def company_users(company_id: str):
     return render_template('superadmin/company_users.html', title=f'Usuarios · {c.name}', company=c, users=users)
 
 
-@bp.post('/companies/<company_id>/users/create')
+@bp.route('/companies/<company_id>/users/<int:user_id>/edit', methods=['GET', 'POST'])
 @login_required
-def company_users_create(company_id: str):
+def company_user_edit(company_id: str, user_id: int):
     _require_zentral_admin()
     c = db.session.get(Company, str(company_id))
     if not c:
         flash('Empresa inválida.', 'error')
         return redirect(url_for('superadmin.index'))
 
-    email = (request.form.get('email') or '').strip().lower()
-    display_name = (request.form.get('display_name') or '').strip()
-    username = (request.form.get('username') or '').strip()
-    password = (request.form.get('password') or '').strip()
-    role = (request.form.get('role') or 'company_admin').strip() or 'company_admin'
-    try:
-        level = int(request.form.get('level') or 2)
-    except Exception:
-        level = 2
-
-    if not password or not username:
-        flash('Completá usuario y contraseña.', 'error')
+    u = db.session.get(User, int(user_id))
+    if not u or str(getattr(u, 'company_id', '') or '') != str(c.id):
+        flash('Usuario inválido.', 'error')
         return redirect(url_for('superadmin.company_users', company_id=c.id))
 
-    if db.session.query(User).filter(User.username == username, User.company_id == str(c.id)).first():
-        flash('El usuario ya existe en esta empresa.', 'error')
+    if request.method == 'POST':
+        if getattr(u, 'is_master', False):
+            flash('El usuario master no es editable.', 'error')
+            return redirect(url_for('superadmin.company_user_edit', company_id=c.id, user_id=u.id))
+
+        username = (request.form.get('username') or '').strip()
+        if username and username != u.username:
+            exists = (
+                db.session.query(User)
+                .filter(User.company_id == str(c.id), User.username == username, User.id != u.id)
+                .first()
+            )
+            if exists:
+                flash('Ya existe otro usuario con ese nombre en esta empresa.', 'error')
+                return redirect(url_for('superadmin.company_user_edit', company_id=c.id, user_id=u.id))
+            u.username = username
+
+        email = (request.form.get('email') or '').strip().lower()
+        if email != (u.email or '').strip().lower():
+            if email and db.session.query(User).filter(User.email == email, User.id != u.id).first():
+                flash('Ese email ya existe.', 'error')
+                return redirect(url_for('superadmin.company_user_edit', company_id=c.id, user_id=u.id))
+        u.email = (email or None)
+
+        u.display_name = ((request.form.get('display_name') or '').strip() or None)
+
+        role = (request.form.get('role') or '').strip() or (u.role or 'vendedor')
+        u.role = role
+
+        try:
+            u.level = int(request.form.get('level') or u.level or 2)
+        except Exception:
+            pass
+
+        u.active = bool(request.form.get('active') == 'on')
+
+        perms = {}
+        for key in MODULE_KEYS:
+            perms[key] = bool(request.form.get(f'perm_{key}') == 'on')
+        u.set_permissions(perms)
+
+        new_password = (request.form.get('new_password') or '').strip()
+        new_password_confirm = (request.form.get('new_password_confirm') or '').strip()
+        if new_password or new_password_confirm:
+            if new_password != new_password_confirm:
+                flash('Las contraseñas no coinciden.', 'error')
+                return redirect(url_for('superadmin.company_user_edit', company_id=c.id, user_id=u.id))
+            if len(new_password) < 6:
+                flash('La nueva contraseña es muy corta.', 'error')
+                return redirect(url_for('superadmin.company_user_edit', company_id=c.id, user_id=u.id))
+            u.set_password(new_password)
+
+        db.session.commit()
+        flash('Usuario actualizado.', 'success')
         return redirect(url_for('superadmin.company_users', company_id=c.id))
 
-    if email and db.session.query(User).filter(User.email == email).first():
-        flash('Ese email ya existe.', 'error')
-        return redirect(url_for('superadmin.company_users', company_id=c.id))
-
-    u = User(email=(email or None), display_name=(display_name or None), username=username, role=role, company_id=str(c.id), is_master=False, active=True, level=level)
-    u.set_password(password)
-    u.set_permissions_all(True)
-    db.session.add(u)
-    db.session.commit()
-
-    flash('Usuario creado.', 'success')
-    return redirect(url_for('superadmin.company_users', company_id=c.id))
+    roles = ['company_admin', 'admin', 'vendedor', 'contador']
+    perms = u.get_permissions() if getattr(u, 'get_permissions', None) else {}
+    return render_template(
+        'superadmin/company_user_edit.html',
+        title=f'Editar usuario · {c.name}',
+        company=c,
+        user=u,
+        roles=roles,
+        perms=perms,
+    )
 
 
 @bp.post('/companies/<company_id>/users/<int:user_id>/reset-password')

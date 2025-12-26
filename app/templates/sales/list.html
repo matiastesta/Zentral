@@ -955,6 +955,9 @@
                     <div class="flex justify-between"><span>Total</span><span id="ticket-total-sidebar" class="font-semibold text-gray-900">$0,00</span></div>
                     <div id="cc-resumen-paso2" class="hidden text-[11px] text-gray-600 text-right"></div>
                 </div>
+                <button id="btn-imprimir-ticket" type="button" class="w-full mt-3 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100">
+                    Imprimir ticket
+                </button>
                 <button id="btn-confirmar-venta" class="w-full mt-3 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">
                     Confirmar ticket y registrar
                 </button>
@@ -4084,6 +4087,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    const btnImprimirTicket = document.getElementById('btn-imprimir-ticket');
+    if (btnImprimirTicket) {
+        btnImprimirTicket.addEventListener('click', function () {
+            printCurrentTicket();
+        });
+    }
+
     function parseMoneda(texto) {
         if (texto === null || texto === undefined) return 0;
         const limpio = String(texto)
@@ -5356,6 +5366,131 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         try { placeVentaStepsPills(1); } catch (e) {}
         try { actualizarTotalEstimado(); } catch (e) {}
+    }
+
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, function (ch) {
+            if (ch === '&') return '&amp;';
+            if (ch === '<') return '&lt;';
+            if (ch === '>') return '&gt;';
+            if (ch === '"') return '&quot;';
+            if (ch === "'") return '&#39;';
+            return ch;
+        });
+    }
+
+    function buildTicketPrintHtml(data) {
+        const businessName = escapeHtml(String(data?.businessName || '').trim() || '');
+        const ticket = escapeHtml(String(data?.ticket || '').trim() || '');
+        const fecha = escapeHtml(String(data?.fecha || '').trim() || '');
+        const pago = escapeHtml(String(data?.payment_method || '').trim() || '');
+        const customer = escapeHtml(String(data?.customer_name || '').trim() || '');
+        const notes = escapeHtml(String(data?.notes || '').trim() || '');
+        const items = Array.isArray(data?.items) ? data.items : [];
+
+        const rows = items.map(function (it) {
+            const name = escapeHtml(String(it?.nombre || it?.product_name || 'Producto'));
+            const qty = (parseFloat(it?.cantidad ?? it?.qty ?? 0) || 0);
+            const price = (parseFloat(it?.precio ?? it?.unit_price ?? 0) || 0);
+            const subtotal = (parseFloat(it?.subtotal ?? 0) || 0);
+            return (
+                '<tr>'
+                + '<td class="name">' + name + '</td>'
+                + '<td class="qty">' + escapeHtml(formatearNumero(qty)) + '</td>'
+                + '<td class="price">' + escapeHtml(formatearMoneda(price)) + '</td>'
+                + '<td class="sub">' + escapeHtml(formatearMoneda(subtotal)) + '</td>'
+                + '</tr>'
+            );
+        }).join('');
+
+        const total = (parseFloat(data?.total ?? 0) || 0);
+
+        return (
+            '<!doctype html><html><head><meta charset="utf-8">'
+            + '<title>Ticket</title>'
+            + '<style>'
+            + 'html,body{margin:0;padding:0;font-family:Arial, sans-serif;}'
+            + '@page{size:58mm auto;margin:3mm;}'
+            + 'body{width:58mm;}'
+            + '.h{text-align:center;font-weight:700;font-size:14px;margin:0 0 6px 0;}'
+            + '.meta{font-size:11px;line-height:1.2;margin-bottom:6px;}'
+            + '.sep{border-top:1px dashed #000;margin:6px 0;}'
+            + 'table{width:100%;border-collapse:collapse;font-size:11px;}'
+            + 'td{padding:2px 0;vertical-align:top;}'
+            + 'td.name{width:58%;padding-right:4px;}'
+            + 'td.qty{width:10%;text-align:right;white-space:nowrap;}'
+            + 'td.price{width:16%;text-align:right;white-space:nowrap;}'
+            + 'td.sub{width:16%;text-align:right;white-space:nowrap;}'
+            + '.tot{font-size:12px;font-weight:700;text-align:right;margin-top:6px;}'
+            + '.f{text-align:center;font-size:11px;margin-top:10px;}'
+            + '</style></head><body>'
+            + (businessName ? ('<div class="h">' + businessName + '</div>') : '')
+            + '<div class="meta">'
+            + (ticket ? ('<div><b>Ticket:</b> ' + ticket + '</div>') : '')
+            + (fecha ? ('<div><b>Fecha:</b> ' + fecha + '</div>') : '')
+            + (pago ? ('<div><b>Pago:</b> ' + pago + '</div>') : '')
+            + (customer ? ('<div><b>Cliente:</b> ' + customer + '</div>') : '')
+            + (notes ? ('<div><b>Notas:</b> ' + notes + '</div>') : '')
+            + '</div>'
+            + '<div class="sep"></div>'
+            + '<table><tbody>' + rows + '</tbody></table>'
+            + '<div class="sep"></div>'
+            + '<div class="tot">TOTAL: ' + escapeHtml(formatearMoneda(total)) + '</div>'
+            + '<div class="f">Gracias por su compra</div>'
+            + '</body></html>'
+        );
+    }
+
+    function printCurrentTicket() {
+        const items = getCartItems();
+        if (!items.length) {
+            showAlertModal('Agregá al menos un producto al carrito.', 'Atención', 'Validación requerida');
+            return;
+        }
+
+        const fecha = String(ticketFecha?.value || '').trim() || defaultFecha;
+        const notas = String(ticketNotas?.value || '').trim();
+        const pago = getSelectedPaymentMethod();
+        const totals = computeTicketTotals();
+        const total = totals.total;
+
+        let businessName = '';
+        try {
+            const el = document.getElementById('business-name');
+            businessName = String(el?.textContent || '').trim();
+        } catch (e) {
+            businessName = '';
+        }
+
+        const data = {
+            businessName,
+            ticket: editTicketId ? String(editTicketId) : '',
+            fecha,
+            payment_method: pago,
+            customer_name: selectedCustomer ? (selectedCustomer.name || '') : '',
+            notes: notas,
+            total,
+            items,
+        };
+
+        const html = buildTicketPrintHtml(data);
+        const w = window.open('', '_blank', 'width=420,height=720');
+        if (!w) {
+            showAlertModal('El navegador bloqueó la ventana de impresión. Habilitá popups para poder imprimir.', 'Atención', 'Impresión');
+            return;
+        }
+        try {
+            w.onafterprint = function () { try { w.close(); } catch (e) {} };
+        } catch (e) {}
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+        try {
+            w.onload = function () {
+                try { w.focus(); } catch (e) {}
+                try { w.print(); } catch (e) {}
+            };
+        } catch (e) {}
     }
 
     function adjustSelectedCartQty(delta) {

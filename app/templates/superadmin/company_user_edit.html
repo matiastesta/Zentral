@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">Editar usuario · {{ company.name }}</h1>
+        <p class="mt-1 text-sm text-gray-600">Como superadmin, podés editar accesos, rol y permisos del usuario.</p>
+    </div>
+    <a href="{{ url_for('superadmin.company_users', company_id=company.id) }}" class="inline-flex items-center px-3 py-2 text-sm font-medium bg-gray-100 rounded-md hover:bg-gray-200">Volver</a>
+</div>
+
+<div class="w-full flex justify-center">
+    <div class="w-full max-w-3xl bg-white rounded-2xl shadow border border-gray-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-semibold text-gray-900">{{ user.username }}{% if user.is_master %} <span class="ml-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">master</span>{% endif %}</h3>
+                <p class="text-xs text-gray-500">Empresa: {{ company.name }} · ID: {{ company.id }}</p>
+            </div>
+        </div>
+
+        <div class="p-5 space-y-6">
+            <form method="post" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Usuario</label>
+                        <input name="username" type="text" value="{{ user.username }}" class="w-full px-3 py-2 text-sm border rounded-md" {% if user.is_master %}disabled{% endif %}>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Email (opcional)</label>
+                        <input name="email" type="email" value="{{ user.email or '' }}" class="w-full px-3 py-2 text-sm border rounded-md" {% if user.is_master %}disabled{% endif %}>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Nombre para mostrar</label>
+                        <input name="display_name" type="text" value="{{ user.display_name or '' }}" class="w-full px-3 py-2 text-sm border rounded-md" {% if user.is_master %}disabled{% endif %}>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Activo</label>
+                        <div class="h-10 w-full px-3 border rounded-md bg-white flex items-center gap-2">
+                            <input name="active" type="checkbox" {% if user.active %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>
+                            <span class="text-sm text-gray-700">Activo</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Rol</label>
+                        <select name="role" class="w-full px-3 py-2 text-sm border rounded-md bg-white" {% if user.is_master %}disabled{% endif %}>
+                            {% for r in roles %}
+                                <option value="{{ r }}" {% if user.role == r %}selected{% endif %}>{{ r }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Nivel</label>
+                        <input name="level" type="number" value="{{ user.level }}" class="w-full px-3 py-2 text-sm border rounded-md" {% if user.is_master %}disabled{% endif %}>
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl p-3">
+                    <div class="text-xs font-semibold text-gray-700">Permisos</div>
+                    <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                        <label class="inline-flex items-center gap-2"><input name="perm_dashboard" type="checkbox" {% if perms.get('dashboard') %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>Dashboard</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_calendar" type="checkbox" {% if perms.get('calendar') %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>Calendario</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_sales" type="checkbox" {% if perms.get('sales') %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>Ventas</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_expenses" type="checkbox" {% if perms.get('expenses') %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>Egresos</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_inventory" type="checkbox" {% if perms.get('inventory') %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>Inventario</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_customers" type="checkbox" {% if perms.get('customers') %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>Clientes</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_suppliers" type="checkbox" {% if perms.get('suppliers') %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>Proveedores</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_employees" type="checkbox" {% if perms.get('employees') %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>Empleados</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_movements" type="checkbox" {% if perms.get('movements') %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>Movimientos</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_reports" type="checkbox" {% if perms.get('reports') %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>Reportes</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_settings" type="checkbox" {% if perms.get('settings') %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>Config. negocio</label>
+                        <label class="inline-flex items-center gap-2"><input name="perm_user_settings" type="checkbox" {% if perms.get('user_settings') %}checked{% endif %} {% if user.is_master %}disabled{% endif %}>Config. usuario</label>
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl p-3">
+                    <div class="text-xs font-semibold text-gray-700">Cambiar contraseña (opcional)</div>
+                    <p class="mt-1 text-xs text-gray-500">No se puede ver la contraseña actual. Podés setear una nueva.</p>
+                    <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Nueva contraseña</label>
+                            <input name="new_password" type="password" class="w-full px-3 py-2 text-sm border rounded-md" {% if user.is_master %}disabled{% endif %}>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Confirmar nueva contraseña</label>
+                            <input name="new_password_confirm" type="password" class="w-full px-3 py-2 text-sm border rounded-md" {% if user.is_master %}disabled{% endif %}>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700" {% if user.is_master %}disabled{% endif %}>Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

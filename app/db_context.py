@@ -1,5 +1,6 @@
 from flask import g, has_request_context, request, session
 from sqlalchemy import event, text
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session, with_loader_criteria
 
 from app import db
@@ -12,6 +13,17 @@ _SQLITE_TENANT_GUARDS_CONFIGURED = False
 def apply_rls_context(*, is_login: bool, login_email: str | None = None) -> None:
     if not has_request_context():
         return
+
+    def _is_missing_company_table(err: Exception) -> bool:
+        try:
+            msg = str(err)
+        except Exception:
+            msg = ''
+        if 'relation "company" does not exist' in msg:
+            return True
+        if 'UndefinedTable' in msg and 'company' in msg:
+            return True
+        return False
 
     engine_drivername = ''
     try:
@@ -59,14 +71,24 @@ def apply_rls_context(*, is_login: bool, login_email: str | None = None) -> None
                 'login_email': login_email_v,
             },
         )
+        try:
+            ensure_request_context()
 
-        ensure_request_context()
-
-        cid2 = str(getattr(g, 'company_id', None) or '')
-        db.session.execute(
-            text("SELECT set_config('app.current_company_id', :cid, true)"),
-            {'cid': cid2},
-        )
+            cid2 = str(getattr(g, 'company_id', None) or '')
+            db.session.execute(
+                text("SELECT set_config('app.current_company_id', :cid, true)"),
+                {'cid': cid2},
+            )
+        except Exception as e:
+            # During first boot on Postgres the schema may not be migrated yet.
+            # Avoid hard failing requests (login/bootstrap) when tenant tables are missing.
+            if isinstance(e, ProgrammingError) or _is_missing_company_table(e):
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                return
+            raise
     except Exception:
         try:
             db.session.rollback()

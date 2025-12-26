@@ -48,6 +48,18 @@ def create_app(config_class=Config):
         app.logger.exception('Failed to bootstrap SQLite schema')
 
     try:
+        with app.app_context():
+            if not str(db.engine.url.drivername).startswith('sqlite'):
+                auto_bootstrap = str(os.environ.get('AUTO_BOOTSTRAP_DB') or '').strip().lower() in ('1', 'true', 'yes', 'on')
+                if auto_bootstrap:
+                    auto_reset = str(os.environ.get('AUTO_RESET_DB') or '').strip().lower() in ('1', 'true', 'yes', 'on')
+                    from app.rls import bootstrap_schema
+
+                    bootstrap_schema(reset=auto_reset)
+    except Exception:
+        app.logger.exception('Failed to bootstrap Postgres schema')
+
+    try:
         from app.db_context import configure_sqlite_tenant_guards
 
         configure_sqlite_tenant_guards()
@@ -118,11 +130,17 @@ def create_app(config_class=Config):
     @app.context_processor
     def inject_support_mode():
         try:
+            from flask import g
             from app.tenancy import is_impersonating
 
-            return {"is_support_mode": bool(is_impersonating())}
+            support_mode = bool(is_impersonating())
+            support_company = getattr(g, 'company', None) if support_mode else None
+            return {
+                "is_support_mode": support_mode,
+                "support_company": support_company,
+            }
         except Exception:
-            return {"is_support_mode": False}
+            return {"is_support_mode": False, "support_company": None}
 
     @app.cli.group('zentral')
     def zentral_cli():

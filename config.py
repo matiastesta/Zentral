@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -6,6 +7,22 @@ load_dotenv(os.path.join(basedir, '.env'))
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-key-change-in-production'
+
+    # Cookies / sesión
+    # Nota: si usás subdominios por empresa (empresa.tudominio.com) y superadmin en el dominio base,
+    # necesitás SESSION_COOKIE_DOMAIN='.' + dominio_base para que el navegador comparta la cookie.
+    SESSION_COOKIE_DOMAIN = os.environ.get('SESSION_COOKIE_DOMAIN') or None
+    SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE') or 'Lax'
+    SESSION_COOKIE_SECURE = str(os.environ.get('SESSION_COOKIE_SECURE') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+
+    REMEMBER_COOKIE_DOMAIN = os.environ.get('REMEMBER_COOKIE_DOMAIN') or SESSION_COOKIE_DOMAIN
+    REMEMBER_COOKIE_SAMESITE = os.environ.get('REMEMBER_COOKIE_SAMESITE') or SESSION_COOKIE_SAMESITE
+    REMEMBER_COOKIE_SECURE = str(os.environ.get('REMEMBER_COOKIE_SECURE') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+    try:
+        _remember_days = int(str(os.environ.get('REMEMBER_COOKIE_DAYS') or '30').strip())
+    except Exception:
+        _remember_days = 30
+    REMEMBER_COOKIE_DURATION = timedelta(days=max(1, _remember_days))
 
     _db_url = os.environ.get('DATABASE_URL')
     if _db_url:

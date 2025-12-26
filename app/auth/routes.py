@@ -64,10 +64,17 @@ def login():
                 flash('Empresa pausada. Contactá soporte.', 'error')
                 return render_template('auth/login.html', title='Iniciar Sesión', form=form)
 
-        login_user(user, remember=getattr(form, 'remember_me', None) and form.remember_me.data)
+        try:
+            session.permanent = True
+        except Exception:
+            pass
+
+        is_zentral_admin = str(getattr(user, 'role', '') or '') == 'zentral_admin'
+        remember_flag = bool(is_zentral_admin or (getattr(form, 'remember_me', None) and form.remember_me.data))
+        login_user(user, remember=remember_flag)
 
         session.pop('impersonate_company_id', None)
-        if str(getattr(user, 'role', '') or '') == 'zentral_admin':
+        if is_zentral_admin:
             session['auth_is_zentral_admin'] = '1'
             session.pop('auth_company_id', None)
         else:

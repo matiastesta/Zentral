@@ -7,9 +7,6 @@
         <p class="mt-1 text-sm text-gray-600">Gestión de empresas, pausa/reactivación y acceso soporte.</p>
     </div>
     <div class="flex items-center gap-2">
-        <form method="post" action="{{ url_for('superadmin.reset_all_companies_data') }}" class="inline" onsubmit="return confirm('Resetear datos operativos de TODAS las empresas? (ventas, clientes, productos, etc.) No se borran usuarios.');">
-            <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-800 bg-gray-200 rounded-md hover:bg-gray-300">Reset global</button>
-        </form>
         <form method="post" action="{{ url_for('superadmin.clear_impersonation') }}" class="inline">
             <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-gray-700 rounded-md hover:bg-gray-800">Salir modo soporte</button>
         </form>
@@ -68,20 +65,17 @@
                             <form method="post" action="{{ url_for('superadmin.impersonate_company', company_id=c.id) }}" class="inline">
                                 <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Soporte</button>
                             </form>
-                            <form method="post" action="{{ url_for('superadmin.reset_company_data', company_id=c.id) }}" class="inline" onsubmit="return confirm('Resetear datos operativos de la empresa? (ventas, clientes, productos, etc.) No se borran usuarios.');">
-                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-200 hover:bg-gray-300">Reset datos</button>
-                            </form>
                             {% if c.status == 'paused' %}
                                 <form method="post" action="{{ url_for('superadmin.reactivate_company', company_id=c.id) }}" class="inline">
                                     <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700">Reactivar</button>
                                 </form>
                             {% else %}
-                                <form method="post" action="{{ url_for('superadmin.pause_company', company_id=c.id) }}" class="inline">
+                                <form method="post" action="{{ url_for('superadmin.pause_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Pausar empresa" data-confirm-message="¿Querés pausar {{ c.name }}?" data-confirm-ok="Pausar" data-confirm-cancel="Cancelar">
                                     <input type="hidden" name="reason" value="">
                                     <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700">Pausar</button>
                                 </form>
                             {% endif %}
-                            <form method="post" action="{{ url_for('superadmin.delete_company', company_id=c.id) }}" class="inline" onsubmit="return confirm('Eliminar empresa y TODA su información? Esta acción no se puede deshacer.');">
+                            <form method="post" action="{{ url_for('superadmin.delete_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar empresa" data-confirm-message="Vas a eliminar {{ c.name }} y TODA su información. Esta acción no se puede deshacer." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
                                 <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
                             </form>
                         </td>
