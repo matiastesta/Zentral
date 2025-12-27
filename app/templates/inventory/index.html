@@ -117,11 +117,11 @@
                     </div>
                     <div class="md:col-span-4">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de ingreso</label>
-                        <input id="edit-lot-date" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
+                        <input id="edit-lot-date" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="YYYY-MM-DD" autocomplete="off">
                     </div>
                     <div class="md:col-span-4">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Vencimiento</label>
-                        <input id="edit-lot-exp" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
+                        <input id="edit-lot-exp" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="YYYY-MM-DD" autocomplete="off">
                     </div>
 
                     <div class="md:col-span-12">
@@ -742,7 +742,7 @@
                     </div>
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de ingreso</label>
-                        <input id="lot-date" type="date" class="w-full px-3 py-2 text-sm border rounded-md" value="{{ now.strftime('%Y-%m-%d') }}">
+                        <input id="lot-date" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" value="{{ now.strftime('%Y-%m-%d') }}" placeholder="YYYY-MM-DD" autocomplete="off">
                     </div>
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor</label>
@@ -770,7 +770,7 @@
                     </div>
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Vencimiento</label>
-                        <input id="lot-exp" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
+                        <input id="lot-exp" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="YYYY-MM-DD" autocomplete="off">
                         <label class="mt-2 inline-flex items-center text-xs text-gray-600"><input id="lot-no-exp" type="checkbox" class="rounded border-gray-300 mr-2"> No corresponde</label>
                     </div>
 
@@ -887,6 +887,26 @@ document.addEventListener('DOMContentLoaded', function () {
     const linkCreateSupplierLotEdit = document.getElementById('link-create-supplier-lot-edit');
     const editLotNote = document.getElementById('edit-lot-note');
     const editLotMsg = document.getElementById('edit-lot-msg');
+
+    try {
+        if (typeof flatpickr === 'function') {
+            const commonOpts = {
+                dateFormat: 'Y-m-d',
+                allowInput: true,
+                locale: (flatpickr && flatpickr.l10ns && flatpickr.l10ns.es) ? flatpickr.l10ns.es : undefined,
+            };
+            if (typeof flatpickr.l10ns !== 'undefined' && flatpickr.l10ns.es) {
+                try { flatpickr.localize(flatpickr.l10ns.es); } catch (e) { }
+            }
+            const lotDate = document.getElementById('lot-date');
+            const lotExp = document.getElementById('lot-exp');
+            if (lotDate) flatpickr(lotDate, commonOpts);
+            if (lotExp) flatpickr(lotExp, commonOpts);
+            if (editLotDate) flatpickr(editLotDate, commonOpts);
+            if (editLotExp) flatpickr(editLotExp, commonOpts);
+        }
+    } catch (e) {
+    }
 
     let editingLotId = '';
 

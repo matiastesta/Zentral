@@ -5364,6 +5364,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const pago = escapeHtml(String(data?.payment_method || '').trim() || '');
         const customer = escapeHtml(String(data?.customer_name || '').trim() || '');
         const notes = escapeHtml(String(data?.notes || '').trim() || '');
+        const isGift = !!(data?.is_gift);
+        const giftCode = escapeHtml(String(data?.gift_code || '').trim() || '');
         const items = Array.isArray(data?.items) ? data.items : [];
 
         const rows = items.map(function (it) {
@@ -5371,6 +5373,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const qty = (parseFloat(it?.cantidad ?? it?.qty ?? 0) || 0);
             const price = (parseFloat(it?.precio ?? it?.unit_price ?? 0) || 0);
             const subtotal = (parseFloat(it?.subtotal ?? 0) || 0);
+
+            if (isGift) {
+                return (
+                    '<tr>'
+                    + '<td class="name">' + name + '</td>'
+                    + '<td class="qty">' + escapeHtml(formatearNumero(qty)) + '</td>'
+                    + '</tr>'
+                );
+            }
+
             return (
                 '<tr>'
                 + '<td class="name">' + name + '</td>'
@@ -5395,10 +5407,12 @@ document.addEventListener('DOMContentLoaded', function() {
             + '.sep{border-top:1px dashed #000;margin:6px 0;}'
             + 'table{width:100%;border-collapse:collapse;font-size:11px;}'
             + 'td{padding:2px 0;vertical-align:top;}'
-            + 'td.name{width:58%;padding-right:4px;}'
-            + 'td.qty{width:10%;text-align:right;white-space:nowrap;}'
-            + 'td.price{width:16%;text-align:right;white-space:nowrap;}'
-            + 'td.sub{width:16%;text-align:right;white-space:nowrap;}'
+            + 'td.name{width:48%;padding-right:4px;}'
+            + 'td.qty{width:10%;text-align:right;white-space:nowrap;padding-right:4px;}'
+            + 'td.price{width:21%;text-align:right;white-space:nowrap;padding-right:6px;}'
+            + 'td.sub{width:21%;text-align:right;white-space:nowrap;}'
+            + 'tr.th td{padding:0 0 3px 0;font-size:10px;font-weight:700;}'
+            + 'tr.th td{border-bottom:1px dotted #000;}'
             + '.tot{font-size:12px;font-weight:700;text-align:right;margin-top:6px;}'
             + '.f{text-align:center;font-size:11px;margin-top:10px;}'
             + '</style></head><body>'
@@ -5409,11 +5423,15 @@ document.addEventListener('DOMContentLoaded', function() {
             + (pago ? ('<div><b>Pago:</b> ' + pago + '</div>') : '')
             + (customer ? ('<div><b>Cliente:</b> ' + customer + '</div>') : '')
             + (notes ? ('<div><b>Notas:</b> ' + notes + '</div>') : '')
+            + (isGift ? ('<div><b>Código de regalo:</b> ' + (giftCode || '—') + '</div>') : '')
             + '</div>'
             + '<div class="sep"></div>'
-            + '<table><tbody>' + rows + '</tbody></table>'
+            + '<table><tbody>'
+            + (isGift ? '' : ('<tr class="th"><td class="name"></td><td class="qty">Cant.</td><td class="price">PU</td><td class="sub">Sub</td></tr>'))
+            + rows
+            + '</tbody></table>'
             + '<div class="sep"></div>'
-            + '<div class="tot">TOTAL: ' + escapeHtml(formatearMoneda(total)) + '</div>'
+            + (isGift ? '' : ('<div class="tot">TOTAL: ' + escapeHtml(formatearMoneda(total)) + '</div>'))
             + '<div class="f">Gracias por su compra</div>'
             + '</body></html>'
         );
@@ -5449,6 +5467,8 @@ document.addEventListener('DOMContentLoaded', function() {
             notes: notas,
             total,
             items,
+            is_gift: !!ventaIsGift,
+            gift_code: String(ventaGiftCode || '').trim(),
         };
 
         const html = buildTicketPrintHtml(data);

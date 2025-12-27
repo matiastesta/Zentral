@@ -203,7 +203,7 @@
 <div id="modal-new" class="hidden fixed inset-0 z-50">
     <div class="absolute inset-0 bg-black/40"></div>
     <div class="relative h-full w-full flex items-center justify-center p-4">
-        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: calc(100vh - 2rem);">
             <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
                     <h3 id="modal-new-title" class="text-base font-semibold text-gray-900">Nuevo aviso</h3>
@@ -212,7 +212,7 @@
                 <button id="btn-close-new" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600"><i class="fas fa-times"></i></button>
             </div>
 
-            <form id="form-event" method="post" class="p-5 space-y-3">
+            <form id="form-event" method="post" class="p-5 space-y-3 overflow-y-auto flex-1">
                 <input id="event-action" type="hidden" name="action" value="create_manual_event">
                 <input id="event-id" type="hidden" name="event_id" value="">
                 <div>
@@ -226,7 +226,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-gray-600 mb-1">Fecha</label>
-                        <input id="event-date" name="date" type="date" class="w-full px-3 py-2 text-sm border rounded-md">
+                        <input id="event-date" name="date" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="YYYY-MM-DD" autocomplete="off">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 mb-1">Prioridad</label>
@@ -284,7 +284,7 @@
 <div id="modal-config" class="hidden fixed inset-0 z-50">
     <div class="absolute inset-0 bg-black/40"></div>
     <div class="relative h-full w-full flex items-center justify-center p-4">
-        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: calc(100vh - 2rem);">
             <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
                     <h3 class="text-base font-semibold text-gray-900">Editar avisos / eventos</h3>
@@ -293,7 +293,7 @@
                 <button id="btn-close-config" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600"><i class="fas fa-times"></i></button>
             </div>
 
-            <form method="post" class="p-5 space-y-4">
+            <form method="post" class="p-5 space-y-4 overflow-y-auto flex-1">
                 <input type="hidden" name="action" value="save_calendar_config">
 
                 {% set sources = (cfg.get('event_sources') if cfg else {}) %}
@@ -405,6 +405,23 @@ document.addEventListener('DOMContentLoaded', function () {
     const deleteBtn = document.getElementById('btn-delete-event');
     const deleteIdInput = document.getElementById('delete-event-id');
 
+    let datePicker = null;
+    try {
+        if (dateInput && typeof flatpickr === 'function') {
+            if (flatpickr && flatpickr.l10ns && flatpickr.l10ns.es) {
+                try { flatpickr.localize(flatpickr.l10ns.es); } catch (e) { }
+            }
+            datePicker = flatpickr(dateInput, {
+                dateFormat: 'Y-m-d',
+                allowInput: true,
+                appendTo: document.body,
+                disableMobile: true,
+            });
+        }
+    } catch (e) {
+        datePicker = null;
+    }
+
     function openModal(el) { if (el) el.classList.remove('hidden'); }
     function closeModal(el) { if (el) el.classList.add('hidden'); }
 
@@ -413,7 +430,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (idInput) idInput.value = '';
         if (titleInput) titleInput.value = '';
         if (descInput) descInput.value = '';
-        if (dateInput) dateInput.valueAsDate = new Date();
+        if (dateInput) dateInput.value = ymd(new Date());
+        try {
+            if (datePicker) datePicker.setDate(dateInput.value, false);
+        } catch (e) {
+        }
         if (prioInput) prioInput.value = 'media';
         if (sourceInput) sourceInput.value = 'manual';
         if (statusInput) statusInput.value = 'open';
@@ -439,6 +460,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (titleInput) titleInput.value = btn.getAttribute('data-title') || '';
             if (descInput) descInput.value = btn.getAttribute('data-description') || '';
             if (dateInput) dateInput.value = btn.getAttribute('data-date') || '';
+            try {
+                if (datePicker) datePicker.setDate(dateInput.value, false);
+            } catch (e) {
+            }
             if (prioInput) prioInput.value = btn.getAttribute('data-priority') || 'media';
             if (sourceInput) sourceInput.value = btn.getAttribute('data-source-module') || 'manual';
             if (statusInput) statusInput.value = btn.getAttribute('data-status') || 'open';

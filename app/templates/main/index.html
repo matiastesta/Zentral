@@ -445,6 +445,7 @@
 {% endblock %}
 
 {% block scripts %}
+{{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const kpiTotalSales = document.getElementById('kpi-total-sales');

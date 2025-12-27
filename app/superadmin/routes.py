@@ -631,7 +631,72 @@ def company_users(company_id: str):
         flash('Empresa inválida.', 'error')
         return redirect(url_for('superadmin.index'))
     users = db.session.query(User).filter(User.company_id == str(c.id)).order_by(User.username.asc()).all()
-    return render_template('superadmin/company_users.html', title=f'Usuarios · {c.name}', company=c, users=users)
+    roles = _company_role_names(str(c.id))
+    return render_template('superadmin/company_users.html', title=f'Usuarios · {c.name}', company=c, users=users, roles=roles, module_keys=MODULE_KEYS)
+
+
+@bp.post('/companies/<company_id>/users/create')
+@login_required
+def company_users_create(company_id: str):
+    _require_zentral_admin()
+    c = db.session.get(Company, str(company_id))
+    if not c:
+        flash('Empresa inválida.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    username = (request.form.get('username') or '').strip()
+    display_name = (request.form.get('display_name') or '').strip()
+    email = (request.form.get('email') or '').strip().lower()
+    password = (request.form.get('password') or '').strip()
+
+    role_raw = (request.form.get('role') or 'vendedor').strip() or 'vendedor'
+    if role_raw == '__new__':
+        role_raw = (request.form.get('role_new') or '').strip()
+    role = _ensure_company_role_exists(str(c.id), role_raw)
+
+    if not username or not password:
+        flash('Completá usuario y contraseña.', 'error')
+        return redirect(url_for('superadmin.company_users', company_id=c.id))
+    if len(password) < 6:
+        flash('Contraseña inválida (mínimo 6 caracteres).', 'error')
+        return redirect(url_for('superadmin.company_users', company_id=c.id))
+    if not role:
+        flash('Rol inválido.', 'error')
+        return redirect(url_for('superadmin.company_users', company_id=c.id))
+
+    exists = (
+        db.session.query(User)
+        .filter(User.company_id == str(c.id), User.username == username)
+        .first()
+    )
+    if exists:
+        flash('Ya existe otro usuario con ese nombre en esta empresa.', 'error')
+        return redirect(url_for('superadmin.company_users', company_id=c.id))
+    if email and db.session.query(User).filter(User.email == email).first():
+        flash('Ese email ya existe.', 'error')
+        return redirect(url_for('superadmin.company_users', company_id=c.id))
+
+    u = User(
+        username=username,
+        display_name=(display_name or None),
+        email=(email or None),
+        role=role,
+        is_master=False,
+        active=True,
+        company_id=str(c.id),
+        created_by_user_id=int(getattr(current_user, 'id', 0) or 0) or None,
+    )
+    u.set_password(password)
+
+    perms = {}
+    for key in MODULE_KEYS:
+        perms[key] = bool(request.form.get(f'perm_{key}') == 'on')
+    u.set_permissions(perms)
+
+    db.session.add(u)
+    db.session.commit()
+    flash('Usuario creado.', 'success')
+    return redirect(url_for('superadmin.company_users', company_id=c.id))
 
 
 @bp.route('/companies/<company_id>/users/<int:user_id>/edit', methods=['GET', 'POST'])

@@ -404,6 +404,11 @@
                         </select>
                     </div>
                 </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Monto a pagar</label>
+                    <input id="settle-pay-amount" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
+                    <div class="mt-1 text-[11px] text-gray-500">Podés pagar el total o un monto parcial (se descuenta de la deuda).</div>
+                </div>
                 <div id="settle-error" class="text-[11px] text-red-600 hidden flex items-center gap-1"><i class="fas fa-exclamation-circle"></i><span>Seleccioná una venta válida.</span></div>
             </div>
             <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
@@ -505,6 +510,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const settleSale = document.getElementById('settle-sale');
     const settleAmount = document.getElementById('settle-amount');
     const settleMethod = document.getElementById('settle-method');
+    const settlePayAmount = document.getElementById('settle-pay-amount');
     const settleError = document.getElementById('settle-error');
 
     let cacheCustomers = [];
@@ -910,6 +916,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (settleSale && firstId) settleSale.value = firstId;
         const firstDue = outs.length ? (parseFloat(outs[0]?.due_amount || 0) || 0) : 0;
         if (settleAmount) settleAmount.textContent = fmtMoney(firstDue);
+        if (settlePayAmount) settlePayAmount.value = String(firstDue || 0);
 
         openModal(modalSettle);
     }
@@ -919,16 +926,31 @@ document.addEventListener('DOMContentLoaded', function () {
         const s = ensureArray(cacheSales).find(x => safeStr(x?.id) === id);
         const due = s ? (parseFloat(s?.due_amount || 0) || 0) : 0;
         if (settleAmount) settleAmount.textContent = fmtMoney(due);
+        if (settlePayAmount) settlePayAmount.value = String(due || 0);
     }
 
     function confirmSettleDebt() {
         const saleId = safeStr(settleSale?.value);
         const method = safeStr(settleMethod?.value || 'Efectivo') || 'Efectivo';
+        const payAmount = parseFloat(settlePayAmount?.value || 0) || 0;
         if (!saleId) {
             if (settleError) settleError.classList.remove('hidden');
             return;
         }
-        apiSettleDebt({ sale_id: saleId, payment_method: method })
+        const s = ensureArray(cacheSales).find(x => safeStr(x?.id) === saleId);
+        const due = s ? (parseFloat(s?.due_amount || 0) || 0) : 0;
+        if (!(payAmount > 0) || payAmount - due > 0.00001) {
+            if (settleError) {
+                settleError.querySelector('span').textContent = 'Ingresá un monto válido (mayor a 0 y menor o igual a la deuda).';
+                settleError.classList.remove('hidden');
+            }
+            return;
+        }
+        if (settleError) {
+            settleError.querySelector('span').textContent = 'Seleccioná una venta válida.';
+            settleError.classList.add('hidden');
+        }
+        apiSettleDebt({ sale_id: saleId, payment_method: method, amount: payAmount })
             .then(function (data) {
                 if (!data || data.ok !== true) {
                     if (settleError) settleError.classList.remove('hidden');

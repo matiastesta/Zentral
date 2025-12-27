@@ -5,7 +5,7 @@ from flask_login import LoginManager
 from flask_babel import Babel
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from config import Config
+from config import Config, config
 
 login_manager = LoginManager()
 login_manager.login_view = 'auth.login'
@@ -16,6 +16,12 @@ migrate = Migrate()
 
 
 def create_app(config_class=Config):
+    if config_class is Config:
+        try:
+            env_name = str(os.environ.get('APP_ENV') or os.environ.get('FLASK_ENV') or 'default').strip().lower()
+            config_class = config.get(env_name) or config.get('default') or Config
+        except Exception:
+            config_class = Config
     app = Flask(__name__)
     app.config.from_object(config_class)
 

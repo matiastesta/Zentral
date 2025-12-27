@@ -336,6 +336,7 @@ def settle_sale_due_amount():
     sale_id = payload.get('sale_id')
     ticket = str(payload.get('ticket') or '').strip()
     payment_method = str(payload.get('payment_method') or 'Efectivo').strip() or 'Efectivo'
+    amount_raw = payload.get('amount')
 
     cid = _company_id()
     if not cid:
@@ -360,6 +361,20 @@ def settle_sale_due_amount():
     if due <= 0:
         return jsonify({'ok': False, 'error': 'no_due'}), 400
 
+    pay_amount = None
+    if amount_raw is not None and str(amount_raw).strip() != '':
+        try:
+            pay_amount = float(amount_raw)
+        except Exception:
+            pay_amount = None
+    if pay_amount is None:
+        pay_amount = abs(due)
+    pay_amount = float(pay_amount or 0.0)
+    if pay_amount <= 0:
+        return jsonify({'ok': False, 'error': 'amount_invalid'}), 400
+    if pay_amount - abs(due) > 0.00001:
+        return jsonify({'ok': False, 'error': 'amount_exceeds_due'}), 400
+
     settle_date = dt_date.today()
     payment_ticket = _next_ticket()
     ref = str(row.ticket or '').strip()
@@ -372,11 +387,11 @@ def settle_sale_due_amount():
         status='Completada',
         payment_method=payment_method,
         notes=note,
-        total=abs(due),
+        total=abs(pay_amount),
         discount_general_pct=0.0,
         discount_general_amount=0.0,
         on_account=False,
-        paid_amount=abs(due),
+        paid_amount=abs(pay_amount),
         due_amount=0.0,
         customer_id=row.customer_id,
         customer_name=row.customer_name,
@@ -391,10 +406,15 @@ def settle_sale_due_amount():
         current_app.logger.exception('Failed to set created_by_user_id for payment sale')
         payment_sale.created_by_user_id = None
 
-    row.paid_amount = float(row.paid_amount or 0.0) + abs(due)
-    row.due_amount = 0.0
-    row.on_account = False
-    extra = f"CC saldada por {payment_ticket} ({payment_method})"
+    row.paid_amount = float(row.paid_amount or 0.0) + abs(pay_amount)
+    remaining = abs(due) - abs(pay_amount)
+    row.due_amount = float(remaining if remaining > 0.00001 else 0.0)
+    row.on_account = bool(row.due_amount > 0)
+    extra = (
+        f"CC cobrada parcialmente por {payment_ticket} ({payment_method})"
+        if row.on_account
+        else f"CC saldada por {payment_ticket} ({payment_method})"
+    )
     prev = str(row.notes or '').strip()
     row.notes = (prev + ('\n' if prev else '') + extra) if extra else (prev or None)
 
