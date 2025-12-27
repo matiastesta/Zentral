@@ -98,7 +98,7 @@ def _apply_customer_payload(row: Customer, payload: dict):
     birthday = _parse_date_iso(payload.get('birthday') or payload.get('fecha_cumpleanos'), None)
     address = str(payload.get('address') or payload.get('direccion') or '').strip() or None
     notes = str(payload.get('notes') or payload.get('observaciones') or '').strip() or None
-    status = str(payload.get('status') or payload.get('estado') or row.status or 'activo').strip() or 'activo'
+    status = str(row.status or 'activo').strip() or 'activo'
 
     row.first_name = first_name
     row.last_name = last_name

@@ -1,22 +1,15 @@
 from datetime import date as dt_date, datetime
 from typing import Any, Dict, List
 
-from flask import current_app, jsonify, render_template, request, url_for
+from flask import current_app, g, jsonify, render_template, request, url_for
 from flask_login import login_required
+
+from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.models import CashCount, Category, InventoryLot, InventoryMovement, Product, Sale, SaleItem
 from app.permissions import module_required
 from app.sales import bp
-
-
-@bp.route("/")
-@bp.route("/index")
-@login_required
-@module_required('sales')
-def index():
-    """Listado básico de ventas (dummy)."""
-    return render_template("sales/list.html", title="Ventas")
 
 
 def _dt_to_ms(dt):
@@ -35,6 +28,13 @@ def _parse_date_iso(raw, fallback=None):
     except Exception:
         current_app.logger.exception('Failed to parse date from iso format')
         return fallback
+
+
+def _company_id() -> str:
+    try:
+        return str(getattr(g, 'company_id', '') or '').strip()
+    except Exception:
+        return ''
 
 
 def _serialize_sale(row: Sale):
@@ -176,7 +176,10 @@ def list_sales():
     d_from = _parse_date_iso(raw_from, None)
     d_to = _parse_date_iso(raw_to, None)
 
-    q = db.session.query(Sale)
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+    q = db.session.query(Sale).filter(Sale.company_id == cid)
     if d_from:
         q = q.filter(Sale.sale_date >= d_from)
     if d_to:
@@ -195,7 +198,8 @@ def list_sales():
 @module_required('sales')
 def get_sale(ticket):
     t = str(ticket or '').strip()
-    row = db.session.query(Sale).filter(Sale.ticket == t).first()
+    cid = _company_id()
+    row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == t).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     return jsonify({'ok': True, 'item': _serialize_sale(row)})
@@ -208,7 +212,10 @@ def list_products_for_sales():
     limit = int(request.args.get('limit') or 5000)
     if limit <= 0 or limit > 10000:
         limit = 5000
-    q = db.session.query(Product).filter(Product.active == True)  # noqa: E712
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+    q = db.session.query(Product).filter(Product.company_id == cid).filter(Product.active == True)  # noqa: E712
     q = q.order_by(Product.name.asc()).limit(limit)
     rows = q.all()
     return jsonify({'ok': True, 'items': [_serialize_product_for_sales(r) for r in rows]})
@@ -222,7 +229,10 @@ def list_lots_for_sales():
     if limit <= 0 or limit > 20000:
         limit = 10000
     product_id = (request.args.get('product_id') or '').strip()
-    q = db.session.query(InventoryLot).filter(InventoryLot.qty_available > 0)
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+    q = db.session.query(InventoryLot).filter(InventoryLot.company_id == cid).filter(InventoryLot.qty_available > 0)
     if product_id:
         try:
             q = q.filter(InventoryLot.product_id == int(product_id))
@@ -241,7 +251,10 @@ def debt_summary():
     customer_id = str(request.args.get('customer_id') or '').strip()
     customer_name = str(request.args.get('customer_name') or '').strip()
 
-    q = db.session.query(Sale).filter(Sale.due_amount > 0)
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'saldo': 0.0, 'dias': 0}), 200
+    q = db.session.query(Sale).filter(Sale.company_id == cid).filter(Sale.due_amount > 0)
     if customer_id:
         q = q.filter(Sale.customer_id == customer_id)
     elif customer_name:
@@ -283,6 +296,10 @@ def settle_sale_due_amount():
     ticket = str(payload.get('ticket') or '').strip()
     payment_method = str(payload.get('payment_method') or 'Efectivo').strip() or 'Efectivo'
 
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     row = None
     if sale_id is not None and str(sale_id).strip() != '':
         try:
@@ -291,8 +308,11 @@ def settle_sale_due_amount():
             current_app.logger.exception('Failed to retrieve sale by id')
             row = None
     if not row and ticket:
-        row = db.session.query(Sale).filter(Sale.ticket == ticket).first()
+        row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == ticket).first()
     if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    if str(getattr(row, 'company_id', '') or '') != cid:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
     due = float(row.due_amount or 0.0)
@@ -324,7 +344,8 @@ def settle_sale_due_amount():
     )
     try:
         from flask_login import current_user
-        payment_sale.created_by_user_id = int(getattr(current_user, 'id', 0) or 0) or None
+        uid = int(getattr(current_user, 'id', 0) or 0) or None
+        payment_sale.created_by_user_id = uid
     except Exception:
         current_app.logger.exception('Failed to set created_by_user_id for payment sale')
         payment_sale.created_by_user_id = None
@@ -339,6 +360,9 @@ def settle_sale_due_amount():
     db.session.add(payment_sale)
     try:
         db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'ticket_duplicate', 'message': 'No se pudo registrar el cobro: ticket duplicado.'}), 400
     except Exception:
         db.session.rollback()
         current_app.logger.exception('Failed to commit payment sale')
@@ -511,6 +535,9 @@ def create_exchange():
         _apply_inventory_for_sale(sale_ticket=sale_ticket, sale_date=sale_date, items=new_items_inv)
 
         db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'ticket_duplicate', 'message': 'No se pudo registrar el cambio: ticket duplicado.'}), 400
     except ValueError as e:
         db.session.rollback()
         current_app.logger.exception('Failed to create exchange: stock insufficient')
@@ -534,7 +561,10 @@ def create_exchange():
 def _next_ticket():
     """Secuencia numérica para ventas/pagos: #0001, #0002, ... (ignora #Cxxxx)."""
     try:
-        rows = db.session.query(Sale.ticket).filter(Sale.ticket.like('#%')).all()
+        cid = _company_id()
+        if not cid:
+            return '#0001'
+        rows = db.session.query(Sale.ticket).filter(Sale.company_id == cid).filter(Sale.ticket.like('#%')).all()
         max_n = 0
         for (t,) in (rows or []):
             s = str(t or '').strip()
@@ -581,6 +611,7 @@ def _apply_inventory_for_sale(*, sale_ticket: str, sale_date: dt_date, items: Li
     - out: consume FIFO en InventoryLot (qty_available)
     - in: crea un lote nuevo (devolución) y suma stock
     """
+    cid = _company_id()
     for it in (items if isinstance(items, list) else []):
         d = it if isinstance(it, dict) else {}
         direction = str(d.get('direction') or 'out').strip().lower() or 'out'
@@ -595,12 +626,21 @@ def _apply_inventory_for_sale(*, sale_ticket: str, sale_date: dt_date, items: Li
         prod = db.session.get(Product, pid)
         if not prod or not prod.active:
             continue
+        if cid and str(getattr(prod, 'company_id', '') or '') != cid:
+            continue
 
         if direction == 'in':
             # Devolución: entra stock. Creamos lote propio para trazabilidad.
-            last_cost = db.session.query(InventoryLot.unit_cost).filter(InventoryLot.product_id == pid).order_by(InventoryLot.received_at.desc(), InventoryLot.id.desc()).first()
+            last_cost = (
+                db.session.query(InventoryLot.unit_cost)
+                .filter(InventoryLot.company_id == cid)
+                .filter(InventoryLot.product_id == pid)
+                .order_by(InventoryLot.received_at.desc(), InventoryLot.id.desc())
+                .first()
+            )
             unit_cost = float(last_cost[0]) if last_cost and last_cost[0] is not None else 0.0
             lot = InventoryLot(
+                company_id=cid,
                 product_id=pid,
                 qty_initial=qty,
                 qty_available=qty,
@@ -611,6 +651,7 @@ def _apply_inventory_for_sale(*, sale_ticket: str, sale_date: dt_date, items: Li
             db.session.add(lot)
             db.session.flush()
             db.session.add(InventoryMovement(
+                company_id=cid,
                 movement_date=sale_date,
                 type='return',
                 sale_ticket=sale_ticket,
@@ -626,6 +667,7 @@ def _apply_inventory_for_sale(*, sale_ticket: str, sale_date: dt_date, items: Li
         remaining = qty
         lots = (
             db.session.query(InventoryLot)
+            .filter(InventoryLot.company_id == cid)
             .filter(InventoryLot.product_id == pid)
             .filter(InventoryLot.qty_available > 0)
             .order_by(InventoryLot.received_at.asc(), InventoryLot.id.asc())
@@ -647,6 +689,7 @@ def _apply_inventory_for_sale(*, sale_ticket: str, sale_date: dt_date, items: Li
             remaining -= take
             unit_cost = float(lot.unit_cost or 0)
             db.session.add(InventoryMovement(
+                company_id=cid,
                 movement_date=sale_date,
                 type='sale',
                 sale_ticket=sale_ticket,
@@ -664,8 +707,12 @@ def _revert_inventory_for_ticket(ticket: str):
     if not t:
         return
 
+    cid = _company_id()
+    if not cid:
+        return
     movs = (
         db.session.query(InventoryMovement)
+        .filter(InventoryMovement.company_id == cid)
         .filter(InventoryMovement.sale_ticket == t)
         .order_by(InventoryMovement.id.asc())
         .with_for_update()
@@ -674,7 +721,7 @@ def _revert_inventory_for_ticket(ticket: str):
     for m in movs:
         if m.lot_id:
             lot = db.session.get(InventoryLot, int(m.lot_id))
-            if lot:
+            if lot and str(getattr(lot, 'company_id', '') or '') == cid:
                 lot.qty_available = float(lot.qty_available or 0) - float(m.qty_delta or 0)
                 # Si era lote creado por devolución de este ticket y queda vacío, lo eliminamos.
                 if (lot.origin_sale_ticket or '') == t and float(lot.qty_available or 0) <= 1e-9:
@@ -686,7 +733,10 @@ def _mark_sale_replaced(*, ticket: str, replaced_by: str):
     t = str(ticket or '').strip()
     if not t:
         return
-    row = db.session.query(Sale).filter(Sale.ticket == t).first()
+    cid = _company_id()
+    if not cid:
+        return
+    row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == t).first()
     if not row:
         return
     row.status = 'Reemplazada'
@@ -698,7 +748,10 @@ def _mark_sale_replaced(*, ticket: str, replaced_by: str):
 def _next_exchange_ticket() -> str:
     """Secuencia independiente para cambios: #C0001, #C0002, ..."""
     try:
-        rows = db.session.query(Sale.ticket).filter(Sale.ticket.like('#C%')).all()
+        cid = _company_id()
+        if not cid:
+            return '#C0001'
+        rows = db.session.query(Sale.ticket).filter(Sale.company_id == cid).filter(Sale.ticket.like('#C%')).all()
         max_n = 0
         for (t,) in (rows or []):
             s = str(t or '').strip()
@@ -787,6 +840,13 @@ def create_sale():
             db.session.rollback()
             return jsonify({'ok': False, 'error': 'stock_insufficient', 'message': str(e)}), 400
         db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({
+            'ok': False,
+            'error': 'ticket_duplicate',
+            'message': 'No se pudo registrar la venta: ticket duplicado. Esto puede ocurrir si el ticket es único global y hay múltiples empresas. Se recomienda que el ticket sea único por empresa.',
+        }), 400
     except Exception:
         db.session.rollback()
         return jsonify({'ok': False, 'error': 'db_error'}), 400
@@ -798,7 +858,8 @@ def create_sale():
 @module_required('sales')
 def update_sale(ticket):
     t = str(ticket or '').strip()
-    row = db.session.query(Sale).filter(Sale.ticket == t).first()
+    cid = _company_id()
+    row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == t).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
@@ -877,7 +938,8 @@ def update_sale(ticket):
 @module_required('sales')
 def delete_sale(ticket):
     t = str(ticket or '').strip()
-    row = db.session.query(Sale).filter(Sale.ticket == t).first()
+    cid = _company_id()
+    row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == t).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     try:
@@ -903,7 +965,7 @@ def delete_sale(ticket):
                 if m and m.group(1):
                     ref = str(m.group(1)).strip()
                 if ref:
-                    orig = db.session.query(Sale).filter(Sale.ticket == ref).first()
+                    orig = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == ref).first()
                     if orig:
                         amt = abs(float(getattr(row, 'total', 0.0) or 0.0))
                         orig.paid_amount = max(0.0, float(orig.paid_amount or 0.0) - amt)
@@ -917,7 +979,7 @@ def delete_sale(ticket):
 
         # Revert inventory impacts for both tickets (if this sale is part of an exchange flow).
         if related_ticket and related_ticket != t:
-            rel_row = db.session.query(Sale).filter(Sale.ticket == related_ticket).first()
+            rel_row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == related_ticket).first()
             if rel_row:
                 try:
                     _revert_inventory_for_ticket(related_ticket)
@@ -947,7 +1009,11 @@ def get_cash_count():
     except Exception:
         d = dt_date.today()
 
-    row = db.session.query(CashCount).filter(CashCount.count_date == d).first()
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'item': None})
+
+    row = db.session.query(CashCount).filter(CashCount.company_id == cid, CashCount.count_date == d).first()
     if not row:
         return jsonify({'ok': True, 'item': None})
 
@@ -977,6 +1043,10 @@ def upsert_cash_count():
     except Exception:
         d = dt_date.today()
 
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     def num(v):
         try:
             return float(v)
@@ -991,9 +1061,9 @@ def upsert_cash_count():
     employee_id = str(payload.get('employee_id') or '').strip() or None
     employee_name = str(payload.get('employee_name') or '').strip() or None
 
-    row = db.session.query(CashCount).filter(CashCount.count_date == d).first()
+    row = db.session.query(CashCount).filter(CashCount.company_id == cid, CashCount.count_date == d).first()
     if not row:
-        row = CashCount(count_date=d)
+        row = CashCount(count_date=d, company_id=cid)
         db.session.add(row)
 
     row.employee_id = employee_id

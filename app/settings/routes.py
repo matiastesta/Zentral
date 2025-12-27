@@ -21,10 +21,38 @@ def business_settings():
         if action == 'save_business':
             bs = BusinessSettings.get_for_company(g.company_id)
             bs.name = (request.form.get('business_name') or '').strip() or bs.name
-            bs.industry = (request.form.get('business_industry') or '').strip() or None
+            ind = (request.form.get('business_industry') or '').strip() or None
+            if ind == 'Otro':
+                other = (request.form.get('business_industry_other') or '').strip()
+                bs.industry = other or 'Otro'
+            else:
+                bs.industry = ind
             bs.email = (request.form.get('business_email') or '').strip() or None
             bs.phone = (request.form.get('business_phone') or '').strip() or None
             bs.address = (request.form.get('business_address') or '').strip() or None
+
+            raw_color = (request.form.get('primary_color') or '').strip()
+            if raw_color and raw_color.startswith('#') and len(raw_color) in {4, 7}:
+                bs.primary_color = raw_color
+            elif not raw_color:
+                bs.primary_color = None
+
+            def _f_range(name, default=None, mn=0.6, mx=1.6):
+                raw = (request.form.get(name) or '').strip().replace(',', '.')
+                if raw == '':
+                    return default
+                try:
+                    v = float(raw)
+                except Exception:
+                    return default
+                if v < mn:
+                    v = mn
+                if v > mx:
+                    v = mx
+                return v
+
+            bs.background_brightness = _f_range('background_brightness', default=1.0)
+            bs.background_contrast = _f_range('background_contrast', default=1.0)
 
             f = request.files.get('business_logo')
             if f and getattr(f, 'filename', ''):
@@ -42,46 +70,24 @@ def business_settings():
                     f.save(path)
                     bs.logo_filename = final_name
 
+            bg = request.files.get('background_image')
+            if bg and getattr(bg, 'filename', ''):
+                filename = secure_filename(bg.filename)
+                _, ext = os.path.splitext(filename.lower())
+                if ext != '.png':
+                    flash('La imagen de fondo debe ser PNG.', 'error')
+                    return redirect(url_for('settings.business_settings'))
+                folder = current_app.config.get('UPLOAD_FOLDER')
+                if folder:
+                    os.makedirs(folder, exist_ok=True)
+                    final_name = 'business_background' + ext
+                    path = os.path.join(folder, final_name)
+                    bg.save(path)
+                    bs.background_image_filename = final_name
+
             db.session.add(bs)
             db.session.commit()
             flash('Datos del negocio guardados.', 'success')
-            return redirect(url_for('settings.business_settings'))
-
-        if action == 'save_personalization':
-            bs = BusinessSettings.get_for_company(g.company_id)
-            bs.label_customers = (request.form.get('label_customers') or '').strip() or None
-            bs.label_products = (request.form.get('label_products') or '').strip() or None
-
-            raw_color = (request.form.get('primary_color') or '').strip()
-            if raw_color and raw_color.startswith('#') and len(raw_color) in {4, 7}:
-                bs.primary_color = raw_color
-            elif not raw_color:
-                bs.primary_color = None
-
-            db.session.add(bs)
-            db.session.commit()
-            flash('Personalización guardada.', 'success')
-            return redirect(url_for('settings.business_settings'))
-
-        if action == 'save_insights':
-            bs = BusinessSettings.get_for_company(g.company_id)
-
-            def _f(name):
-                raw = (request.form.get(name) or '').strip().replace(',', '.')
-                if raw == '':
-                    return None
-                try:
-                    return float(raw)
-                except Exception:
-                    return None
-
-            bs.insight_margin_delta_pp = _f('insight_margin_delta_pp')
-            bs.insight_profitability_delta_pp = _f('insight_profitability_delta_pp')
-            bs.insight_expenses_ratio_pct = _f('insight_expenses_ratio_pct')
-
-            db.session.add(bs)
-            db.session.commit()
-            flash('Umbrales de insights guardados.', 'success')
             return redirect(url_for('settings.business_settings'))
 
     business = BusinessSettings.get_for_company(g.company_id)

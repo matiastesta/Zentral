@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">Roles · {{ company.name }}</h1>
+        <p class="mt-1 text-sm text-gray-600">Roles reutilizables para asignar permisos por módulo.</p>
+    </div>
+    <div class="flex items-center gap-2">
+        <a href="{{ url_for('superadmin.company_overview', company_id=company.id) }}" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md bg-gray-100 hover:bg-gray-200">Volver</a>
+        <a href="{{ url_for('superadmin.company_role_new', company_id=company.id) }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Nuevo rol</a>
+    </div>
+</div>
+
+<div class="p-5 bg-white rounded-lg shadow">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Permisos</th>
+                    <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for r in roles %}
+                <tr>
+                    <td class="px-3 py-2 font-medium text-gray-900">{{ r.name }}</td>
+                    <td class="px-3 py-2 text-gray-700">
+                        {% set p = r.get_permissions() %}
+                        {% set enabled = [] %}
+                        {% for k in module_keys %}
+                            {% if p.get(k) %}
+                                {% set _ = enabled.append(k) %}
+                            {% endif %}
+                        {% endfor %}
+                        {{ enabled|length }} habilitados
+                    </td>
+                    <td class="px-3 py-2 text-right whitespace-nowrap space-x-2">
+                        <a href="{{ url_for('superadmin.company_role_edit', company_id=company.id, role_id=r.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Editar</a>
+                        <form method="post" action="{{ url_for('superadmin.company_role_delete', company_id=company.id, role_id=r.id) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar rol" data-confirm-message="Vas a eliminar el rol {{ r.name }}. Los usuarios con este rol pasarán a vendedor." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
+                            <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" class="px-3 py-4 text-center text-gray-500">No hay roles todavía.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

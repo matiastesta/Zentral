@@ -1,0 +1,59 @@
+ html {
+     --brand-color: #0d1067;
+     --brand-color-dark: #0b0e59;
+     --brand-color-darker: #090b4e;
+     --brand-color-rgb: 13,16,103;
+     --brand-color-50: rgba(13,16,103,0.08);
+     --brand-color-100: rgba(13,16,103,0.12);
+     --brand-color-200: rgba(13,16,103,0.20);
+     --app-bg-image: none;
+     --app-bg-brightness: 1;
+     --app-bg-contrast: 1;
+ }
+
+ body {
+     position: relative;
+ }
+
+ body::before {
+     content: '';
+     position: fixed;
+     inset: 0;
+     z-index: -1;
+     background-image: var(--app-bg-image);
+     background-size: cover;
+     background-position: center;
+     background-repeat: no-repeat;
+     filter: brightness(var(--app-bg-brightness)) contrast(var(--app-bg-contrast));
+ }
+
+ /* Brand overrides for common Tailwind utility classes (blue/indigo). */
+ .bg-blue-600 { background-color: var(--brand-color) !important; }
+ .hover\:bg-blue-700:hover { background-color: var(--brand-color-dark) !important; }
+ .bg-blue-700 { background-color: var(--brand-color-dark) !important; }
+
+ .bg-indigo-600 { background-color: var(--brand-color) !important; }
+ .hover\:bg-indigo-700:hover { background-color: var(--brand-color-dark) !important; }
+ .bg-indigo-700 { background-color: var(--brand-color-dark) !important; }
+
+ .bg-blue-50 { background-color: var(--brand-color-50) !important; }
+ .bg-blue-100 { background-color: var(--brand-color-100) !important; }
+ .bg-indigo-50 { background-color: var(--brand-color-50) !important; }
+ .bg-indigo-100 { background-color: var(--brand-color-100) !important; }
+
+ .text-blue-600 { color: var(--brand-color) !important; }
+ .text-blue-700 { color: var(--brand-color-dark) !important; }
+ .hover\:text-blue-800:hover { color: var(--brand-color-darker) !important; }
+ .text-indigo-600 { color: var(--brand-color) !important; }
+ .text-indigo-700 { color: var(--brand-color-dark) !important; }
+ .hover\:text-indigo-800:hover { color: var(--brand-color-darker) !important; }
+
+ .border-blue-200 { border-color: var(--brand-color-200) !important; }
+ .border-blue-500 { border-color: var(--brand-color) !important; }
+ .border-indigo-200 { border-color: var(--brand-color-200) !important; }
+ .border-indigo-500 { border-color: var(--brand-color) !important; }
+
+ .focus\:ring-blue-500:focus { --tw-ring-color: rgba(var(--brand-color-rgb), 0.45) !important; }
+ .focus\:border-blue-500:focus { border-color: var(--brand-color) !important; }
+ .focus\:ring-indigo-500:focus { --tw-ring-color: rgba(var(--brand-color-rgb), 0.45) !important; }
+ .focus\:border-indigo-500:focus { border-color: var(--brand-color) !important; }

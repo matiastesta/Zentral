@@ -20,14 +20,17 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     {% block styles %}{% endblock %}
 </head>
-<body class="bg-gray-100" style="background-color: #fbf9f5;">
+{% set brand_color = (business.primary_color if business and business.primary_color else '#0d1067') %}
+{% set bg_brightness = (business.background_brightness if business and business.background_brightness else 1.0) %}
+{% set bg_contrast = (business.background_contrast if business and business.background_contrast else 1.0) %}
+{% set bg_img = (url_for('static', filename='uploads/' ~ business.background_image_filename) if business and business.background_image_filename else '') %}
+<body class="bg-gray-100" style="background-color: #fbf9f5; --brand-color: {{ brand_color }}; --app-bg-brightness: {{ bg_brightness }}; --app-bg-contrast: {{ bg_contrast }}; --app-bg-image: {% if bg_img %}url('{{ bg_img }}'){% else %}none{% endif %};">
     {% set ep = request.endpoint or '' %}
-    {% set brand_color = (business.primary_color if business and business.primary_color else '#0d1067') %}
-    {% set label_customers = (business.label_customers if business and business.label_customers else 'Clientes') %}
-    {% set label_products = (business.label_products if business and business.label_products else 'Productos') %}
+    {% set label_customers = 'Clientes' %}
+    {% set label_products = 'Productos' %}
     {% set show_tenant_modules = not (current_user.is_authenticated and current_user.role == 'zentral_admin' and not is_support_mode) %}
     <!-- Navigation -->
-    <nav class="text-white shadow-lg sticky top-0 z-20" style="background-color: #0d1067;" data-brand-color="{{ brand_color }}">
+    <nav class="text-white shadow-lg sticky top-0 z-20" style="background-color: var(--brand-color);" data-brand-color="{{ brand_color }}">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex">
@@ -517,6 +520,28 @@
             if (nav) {
                 const c = (nav.getAttribute('data-brand-color') || '').trim();
                 if (c) nav.style.backgroundColor = c;
+
+                try {
+                    const hex = c;
+                    const m = String(hex || '').trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+                    if (m) {
+                        let s = m[1];
+                        if (s.length === 3) s = s.split('').map(ch => ch + ch).join('');
+                        const n = parseInt(s, 16);
+                        const r = (n >> 16) & 255;
+                        const g = (n >> 8) & 255;
+                        const b = n & 255;
+                        const root = document.documentElement;
+                        root.style.setProperty('--brand-color', '#' + s.toLowerCase());
+                        root.style.setProperty('--brand-color-rgb', r + ',' + g + ',' + b);
+                        root.style.setProperty('--brand-color-dark', 'rgb(' + Math.max(0, Math.round(r * 0.86)) + ',' + Math.max(0, Math.round(g * 0.86)) + ',' + Math.max(0, Math.round(b * 0.86)) + ')');
+                        root.style.setProperty('--brand-color-darker', 'rgb(' + Math.max(0, Math.round(r * 0.76)) + ',' + Math.max(0, Math.round(g * 0.76)) + ',' + Math.max(0, Math.round(b * 0.76)) + ')');
+                        root.style.setProperty('--brand-color-50', 'rgba(' + r + ',' + g + ',' + b + ',0.08)');
+                        root.style.setProperty('--brand-color-100', 'rgba(' + r + ',' + g + ',' + b + ',0.12)');
+                        root.style.setProperty('--brand-color-200', 'rgba(' + r + ',' + g + ',' + b + ',0.20)');
+                    }
+                } catch (e) {
+                }
             }
             document.querySelectorAll('[data-brand-bg]').forEach(function(el) {
                 const c = (el.getAttribute('data-brand-bg') || '').trim();

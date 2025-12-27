@@ -1029,16 +1029,8 @@
                     <input id="new-customer-email" type="email" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Cumpleaños (opcional)</label>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de Nacimiento (opcional)</label>
                     <input id="new-customer-birthday" type="date" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>
-                    <select id="new-customer-status" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                        <option value="activo">Activo</option>
-                        <option value="inactivo">Inactivo</option>
-                        <option value="bloqueado">Bloqueado</option>
-                    </select>
                 </div>
                 <div class="md:col-span-2">
                     <label class="block text-xs font-medium text-gray-600 mb-1">Dirección (opcional)</label>
@@ -1254,7 +1246,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputNewCustomerEmail = document.getElementById('new-customer-email');
     const inputNewCustomerPhone = document.getElementById('new-customer-phone');
     const inputNewCustomerBirthday = document.getElementById('new-customer-birthday');
-    const inputNewCustomerStatus = document.getElementById('new-customer-status');
     const inputNewCustomerAddress = document.getElementById('new-customer-address');
     const inputNewCustomerNotes = document.getElementById('new-customer-notes');
     const msgCreateCustomerError = document.getElementById('msg-create-customer-error');
@@ -3096,7 +3087,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (inputNewCustomerEmail) inputNewCustomerEmail.value = '';
         if (inputNewCustomerPhone) inputNewCustomerPhone.value = '';
         if (inputNewCustomerBirthday) inputNewCustomerBirthday.value = '';
-        if (inputNewCustomerStatus) inputNewCustomerStatus.value = 'activo';
         if (inputNewCustomerAddress) inputNewCustomerAddress.value = '';
         if (inputNewCustomerNotes) inputNewCustomerNotes.value = '';
         openModal(modalCreateCustomer);
@@ -3109,7 +3099,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const email = String(inputNewCustomerEmail?.value || '').trim();
         const phone = String(inputNewCustomerPhone?.value || '').trim();
         const birthday = String(inputNewCustomerBirthday?.value || '').trim();
-        const status = String(inputNewCustomerStatus?.value || 'activo').trim() || 'activo';
         const address = String(inputNewCustomerAddress?.value || '').trim();
         const notes = String(inputNewCustomerNotes?.value || '').trim();
         if (!first || !last || !phone) {
@@ -3137,7 +3126,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const payload = { first_name: first, last_name: last, phone: phone, email: email, birthday: birthday, address: address, notes: notes, status: status };
+        const payload = { first_name: first, last_name: last, phone: phone, email: email, birthday: birthday, address: address, notes: notes };
         fetch('/customers/api/customers', {
             method: 'POST',
             credentials: 'same-origin',

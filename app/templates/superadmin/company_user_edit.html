@@ -49,8 +49,8 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Nivel</label>
-                        <input name="level" type="number" value="{{ user.level }}" class="w-full px-3 py-2 text-sm border rounded-md" {% if user.is_master %}disabled{% endif %}>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Contraseña</label>
+                        <input type="text" value="{{ user.password_plain or '' }}" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" readonly>
                     </div>
                 </div>
 

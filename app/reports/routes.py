@@ -6,6 +6,7 @@ from io import BytesIO
 
 from flask import current_app, g, jsonify, render_template, request, send_file
 from flask_login import login_required
+from sqlalchemy import and_
 
 from app import db
 from app.models import BusinessSettings, Category, Customer, Employee, Expense, InventoryLot, InventoryMovement, Product, Sale, SaleItem
@@ -28,6 +29,13 @@ def _num(v):
         return float(v)
     except Exception:
         return 0.0
+
+
+def _company_id() -> str:
+    try:
+        return str(getattr(g, 'company_id', '') or '').strip()
+    except Exception:
+        return ''
 
 
 def _load_meta(row: Expense) -> dict:
@@ -122,6 +130,13 @@ def eerr_api():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
     raw_compare = (request.args.get('compare') or '').strip().lower()  # none | prev | yoy
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'compare_mode': 'none', 'period': {'from': '', 'to': '', 'days': 0}, 'kpis': {}, 'kpis_prev': None, 'deltas': {}, 'rows': [], 'sub': {}, 'insights': []})
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'compare_mode': 'none', 'kpis': {}, 'kpis_prev': None, 'deltas': {}, 'table': [], 'series': [], 'insights': [], 'breakdowns': {}})
 
     d_from = _parse_date_iso(raw_from, None)
     d_to = _parse_date_iso(raw_to, None)
@@ -133,6 +148,7 @@ def eerr_api():
     # 1) Ventas válidas
     sales_q = (
         db.session.query(Sale)
+        .filter(Sale.company_id == cid)
         .filter(Sale.sale_date >= d_from)
         .filter(Sale.sale_date <= d_to)
         .filter(Sale.sale_type == 'Venta')
@@ -146,6 +162,7 @@ def eerr_api():
     # 2) Cambios: se registran como Sale(sale_type='Cambio', status='Cambio', total negativo)
     exchange_q = (
         db.session.query(Sale)
+        .filter(Sale.company_id == cid)
         .filter(Sale.sale_date >= d_from)
         .filter(Sale.sale_date <= d_to)
         .filter(Sale.sale_type == 'Cambio')
@@ -161,6 +178,7 @@ def eerr_api():
     if valid_tickets:
         cmv = (
             db.session.query(db.func.coalesce(db.func.sum(InventoryMovement.total_cost), 0.0))
+            .filter(InventoryMovement.company_id == cid)
             .filter(InventoryMovement.type == 'sale')
             .filter(InventoryMovement.sale_ticket.in_(valid_tickets))
             .scalar()
@@ -172,6 +190,7 @@ def eerr_api():
     # 4) Gastos (incluye pendientes por CC proveedor; excluye pagos de CC para no duplicar)
     exp_q = (
         db.session.query(Expense)
+        .filter(Expense.company_id == cid)
         .filter(Expense.expense_date >= d_from)
         .filter(Expense.expense_date <= d_to)
     )
@@ -226,6 +245,7 @@ def eerr_api():
     try:
         rows = (
             db.session.query(Sale.sale_date, db.func.coalesce(db.func.sum(Sale.total), 0.0))
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= d_from)
             .filter(Sale.sale_date <= d_to)
             .filter(Sale.sale_type == 'Venta')
@@ -243,6 +263,7 @@ def eerr_api():
     try:
         rows = (
             db.session.query(Sale.sale_date, db.func.coalesce(db.func.sum(Sale.total), 0.0))
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= d_from)
             .filter(Sale.sale_date <= d_to)
             .filter(Sale.sale_type == 'Cambio')
@@ -260,7 +281,9 @@ def eerr_api():
         # Join por ticket para traer CMV por fecha de venta
         rows = (
             db.session.query(Sale.sale_date, db.func.coalesce(db.func.sum(InventoryMovement.total_cost), 0.0))
-            .join(InventoryMovement, InventoryMovement.sale_ticket == Sale.ticket)
+            .join(InventoryMovement, and_(InventoryMovement.company_id == Sale.company_id, InventoryMovement.sale_ticket == Sale.ticket))
+            .filter(Sale.company_id == cid)
+            .filter(InventoryMovement.company_id == cid)
             .filter(Sale.sale_date >= d_from)
             .filter(Sale.sale_date <= d_to)
             .filter(Sale.sale_type == 'Venta')
@@ -328,6 +351,7 @@ def eerr_api():
     try:
         rows = (
             db.session.query(Sale.payment_method, db.func.coalesce(db.func.sum(Sale.total), 0.0))
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= d_from)
             .filter(Sale.sale_date <= d_to)
             .filter(Sale.sale_type == 'Venta')
@@ -345,6 +369,7 @@ def eerr_api():
     try:
         rows = (
             db.session.query(Sale.payment_method, db.func.coalesce(db.func.sum(Sale.total), 0.0))
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= d_from)
             .filter(Sale.sale_date <= d_to)
             .filter(Sale.sale_type == 'Cambio')
@@ -370,6 +395,7 @@ def eerr_api():
         if emp_ids:
             rows = (
                 db.session.query(Employee)
+                .filter(Employee.company_id == cid)
                 .filter(Employee.id.in_(list(emp_ids)))
                 .all()
             )
@@ -440,11 +466,11 @@ def eerr_api():
         rows = (
             db.session.query(SaleItem.product_name, db.func.coalesce(db.func.sum(SaleItem.subtotal), 0.0))
             .join(Sale, Sale.id == SaleItem.sale_id)
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= d_from)
             .filter(Sale.sale_date <= d_to)
             .filter(Sale.sale_type == 'Venta')
             .filter(Sale.status == 'Completada')
-            .filter(SaleItem.direction == 'out')
             .group_by(SaleItem.product_name)
             .all()
         )
@@ -461,8 +487,11 @@ def eerr_api():
     try:
         rows = (
             db.session.query(Product.name, db.func.coalesce(db.func.sum(InventoryMovement.total_cost), 0.0), db.func.coalesce(db.func.sum(-InventoryMovement.qty_delta), 0.0))
-            .join(InventoryMovement, InventoryMovement.product_id == Product.id)
-            .join(Sale, Sale.ticket == InventoryMovement.sale_ticket)
+            .join(InventoryMovement, and_(InventoryMovement.company_id == Product.company_id, InventoryMovement.product_id == Product.id))
+            .join(Sale, and_(Sale.company_id == InventoryMovement.company_id, Sale.ticket == InventoryMovement.sale_ticket))
+            .filter(Product.company_id == cid)
+            .filter(InventoryMovement.company_id == cid)
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= d_from)
             .filter(Sale.sale_date <= d_to)
             .filter(Sale.sale_type == 'Venta')
@@ -491,9 +520,13 @@ def eerr_api():
     try:
         rows = (
             db.session.query(Category.name, db.func.coalesce(db.func.sum(InventoryMovement.total_cost), 0.0))
-            .join(Product, Product.category_id == Category.id)
-            .join(InventoryMovement, InventoryMovement.product_id == Product.id)
-            .join(Sale, Sale.ticket == InventoryMovement.sale_ticket)
+            .join(Product, and_(Product.company_id == Category.company_id, Product.category_id == Category.id))
+            .join(InventoryMovement, and_(InventoryMovement.company_id == Product.company_id, InventoryMovement.product_id == Product.id))
+            .join(Sale, and_(Sale.company_id == InventoryMovement.company_id, Sale.ticket == InventoryMovement.sale_ticket))
+            .filter(Category.company_id == cid)
+            .filter(Product.company_id == cid)
+            .filter(InventoryMovement.company_id == cid)
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= d_from)
             .filter(Sale.sale_date <= d_to)
             .filter(Sale.sale_type == 'Venta')
@@ -594,6 +627,7 @@ def eerr_api():
                 # Ventas válidas
                 sales_rows_prev = (
                     db.session.query(Sale)
+                    .filter(Sale.company_id == cid)
                     .filter(Sale.sale_date >= prev_from)
                     .filter(Sale.sale_date <= prev_to)
                     .filter(Sale.sale_type == 'Venta')
@@ -604,6 +638,7 @@ def eerr_api():
 
                 exchange_rows_prev = (
                     db.session.query(Sale)
+                    .filter(Sale.company_id == cid)
                     .filter(Sale.sale_date >= prev_from)
                     .filter(Sale.sale_date <= prev_to)
                     .filter(Sale.sale_type == 'Cambio')
@@ -618,6 +653,7 @@ def eerr_api():
                 if valid_tickets_prev:
                     cmv_prev = (
                         db.session.query(db.func.coalesce(db.func.sum(InventoryMovement.total_cost), 0.0))
+                        .filter(InventoryMovement.company_id == cid)
                         .filter(InventoryMovement.type == 'sale')
                         .filter(InventoryMovement.sale_ticket.in_(valid_tickets_prev))
                         .scalar()
@@ -627,6 +663,7 @@ def eerr_api():
                 # Gastos previos
                 exp_rows_prev = (
                     db.session.query(Expense)
+                    .filter(Expense.company_id == cid)
                     .filter(Expense.expense_date >= prev_from)
                     .filter(Expense.expense_date <= prev_to)
                     .all()
@@ -895,6 +932,10 @@ def sales_analysis_api():
     customer_id = (request.args.get('customer_id') or '').strip()
     payment_method = (request.args.get('payment_method') or '').strip()
 
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'group_by': group_by, 'kpis': {}, 'kpis_prev': None, 'deltas': {}, 'rows': [], 'scatter': [], 'sub': {}, 'insights': []})
+
     d_from = _parse_date_iso(raw_from, None)
     d_to = _parse_date_iso(raw_to, None)
     if not d_from or not d_to:
@@ -933,6 +974,7 @@ def sales_analysis_api():
 
         sq_sales = (
             db.session.query(Sale)
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= frm)
             .filter(Sale.sale_date <= to)
             .filter(Sale.sale_type == 'Venta')
@@ -940,6 +982,7 @@ def sales_analysis_api():
         )
         sq_returns = (
             db.session.query(Sale)
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= frm)
             .filter(Sale.sale_date <= to)
             .filter(Sale.sale_type == 'Cambio')
@@ -966,6 +1009,7 @@ def sales_analysis_api():
                 db.func.coalesce(db.func.sum(SaleItem.qty), 0.0),
             )
             .join(Sale, Sale.id == SaleItem.sale_id)
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= frm)
             .filter(Sale.sale_date <= to)
             .filter(Sale.sale_type == 'Venta')
@@ -980,6 +1024,7 @@ def sales_analysis_api():
                 db.func.coalesce(db.func.sum(SaleItem.qty), 0.0),
             )
             .join(Sale, Sale.id == SaleItem.sale_id)
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= frm)
             .filter(Sale.sale_date <= to)
             .filter(Sale.sale_type == 'Cambio')
@@ -1046,6 +1091,7 @@ def sales_analysis_api():
             try:
                 rows = (
                     db.session.query(InventoryMovement.product_id, db.func.coalesce(db.func.sum(InventoryMovement.total_cost), 0.0))
+                    .filter(InventoryMovement.company_id == cid)
                     .filter(InventoryMovement.type == 'sale')
                     .filter(InventoryMovement.sale_ticket.in_(sale_tickets))
                     .group_by(InventoryMovement.product_id)
@@ -1357,6 +1403,10 @@ def finance_api():
     raw_to = (request.args.get('to') or '').strip()
     raw_compare = (request.args.get('compare') or '').strip().lower()  # none | prev | yoy
 
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'period': {'from': '', 'to': ''}, 'compare_mode': 'none', 'kpis': {}, 'kpis_prev': None, 'deltas': {}, 'series': [], 'trends': {}, 'months_summary': {}, 'breakdowns': {}, 'insights': []})
+
     d_from = _parse_date_iso(raw_from, None)
     d_to = _parse_date_iso(raw_to, None)
     if not d_from or not d_to:
@@ -1402,6 +1452,7 @@ def finance_api():
         try:
             income_sales = (
                 db.session.query(db.func.coalesce(db.func.sum(Sale.total), 0.0))
+                .filter(Sale.company_id == cid)
                 .filter(Sale.sale_date >= p_from)
                 .filter(Sale.sale_date <= p_to)
                 .filter(Sale.sale_type == 'Venta')
@@ -1415,6 +1466,7 @@ def finance_api():
         try:
             income_exchanges = (
                 db.session.query(db.func.coalesce(db.func.sum(Sale.total), 0.0))
+                .filter(Sale.company_id == cid)
                 .filter(Sale.sale_date >= p_from)
                 .filter(Sale.sale_date <= p_to)
                 .filter(Sale.sale_type == 'Cambio')
@@ -1434,6 +1486,7 @@ def finance_api():
         try:
             exp_rows = (
                 db.session.query(Expense)
+                .filter(Expense.company_id == cid)
                 .filter(Expense.expense_date >= p_from)
                 .filter(Expense.expense_date <= p_to)
                 .all()
@@ -1777,10 +1830,10 @@ def inventory_rotation_api():
         yellow_days = green_days * 2
 
     # Products & category map
-    products = db.session.query(Product).all()
+    products = db.session.query(Product).filter(Product.company_id == cid).all()
     cat_map = {}
     try:
-        for c in (db.session.query(Category).all() or []):
+        for c in (db.session.query(Category).filter(Category.company_id == cid).all() or []):
             cat_map[int(c.id)] = c
     except Exception:
         cat_map = {}
@@ -1795,6 +1848,7 @@ def inventory_rotation_api():
                 db.func.coalesce(db.func.sum(InventoryLot.qty_available), 0.0),
                 db.func.coalesce(db.func.sum(InventoryLot.qty_available * InventoryLot.unit_cost), 0.0),
             )
+            .filter(InventoryLot.company_id == cid)
             .group_by(InventoryLot.product_id)
             .all()
         )
@@ -1814,6 +1868,7 @@ def inventory_rotation_api():
                 InventoryMovement.product_id,
                 db.func.coalesce(db.func.sum(InventoryMovement.qty_delta), 0.0),
             )
+            .filter(InventoryMovement.company_id == cid)
             .filter(InventoryMovement.movement_date > d_to)
             .group_by(InventoryMovement.product_id)
             .all()
@@ -1829,6 +1884,7 @@ def inventory_rotation_api():
                 InventoryMovement.product_id,
                 db.func.coalesce(db.func.sum(InventoryMovement.qty_delta), 0.0),
             )
+            .filter(InventoryMovement.company_id == cid)
             .filter(InventoryMovement.movement_date >= d_from)
             .filter(InventoryMovement.movement_date <= d_to)
             .group_by(InventoryMovement.product_id)

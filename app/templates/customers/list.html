@@ -144,15 +144,8 @@
                     <input id="cust-email" type="email" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Cumpleaños (opcional)</label>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de Nacimiento (opcional)</label>
                     <input id="cust-birthday" type="date" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>
-                    <select id="cust-status" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                        <option value="activo">Activo</option>
-                        <option value="inactivo">Inactivo</option>
-                    </select>
                 </div>
                 <div class="md:col-span-2">
                     <label class="block text-xs font-medium text-gray-600 mb-1">Dirección (opcional)</label>
@@ -188,7 +181,7 @@
             <div class="p-5 space-y-4 overflow-y-auto flex-1">
                 <div class="p-3 border border-gray-200 rounded-xl bg-gray-50">
                     <div class="text-sm font-semibold text-gray-900">Clasificación de clientes</div>
-                    <div class="mt-1 text-[11px] text-gray-500">Reglas basadas en compras recientes y estado. El cliente “Mejor” siempre exige más compras que “Frecuente”.</div>
+                    <div class="mt-1 text-[11px] text-gray-500">Reglas basadas en compras recientes. El cliente “Mejor” siempre exige más compras que “Frecuente”.</div>
                     <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Ventana de compra (días)</label>
@@ -312,7 +305,7 @@
                             <div><span class="text-gray-500">Teléfono:</span> <span id="legajo-phone">—</span></div>
                             <div><span class="text-gray-500">Email:</span> <span id="legajo-email">—</span></div>
                             <div><span class="text-gray-500">Incorporación:</span> <span id="legajo-join">—</span></div>
-                            <div><span class="text-gray-500">Cumpleaños:</span> <span id="legajo-bday">—</span></div>
+                            <div><span class="text-gray-500">Fecha de Nacimiento:</span> <span id="legajo-bday">—</span></div>
                             <div><span class="text-gray-500">Dirección:</span> <span id="legajo-address">—</span></div>
                         </div>
                     </div>
@@ -320,7 +313,6 @@
                     <div class="p-4 border border-gray-200 rounded-xl bg-white">
                         <div class="text-xs font-semibold text-gray-700">CRM</div>
                         <div class="mt-2 space-y-1 text-sm text-gray-800">
-                            <div><span class="text-gray-500">Estado:</span> <span id="legajo-status">—</span></div>
                             <div><span class="text-gray-500">Clasificación:</span> <span id="legajo-clas">—</span></div>
                             <div><span class="text-gray-500">Compras:</span> <span id="legajo-compras">—</span></div>
                             <div><span class="text-gray-500">Monto total:</span> <span id="legajo-monto">—</span></div>
@@ -460,7 +452,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const inputBirthday = document.getElementById('cust-birthday');
     const inputAddress = document.getElementById('cust-address');
     const inputNotes = document.getElementById('cust-notes');
-    const inputStatus = document.getElementById('cust-status');
 
     const modalAlerts = document.getElementById('modal-alerts');
     const btnCloseAlerts = document.getElementById('btn-close-alerts');
@@ -494,7 +485,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const legajoJoin = document.getElementById('legajo-join');
     const legajoBday = document.getElementById('legajo-bday');
     const legajoAddress = document.getElementById('legajo-address');
-    const legajoStatus = document.getElementById('legajo-status');
     const legajoClas = document.getElementById('legajo-clas');
     const legajoCompras = document.getElementById('legajo-compras');
     const legajoMonto = document.getElementById('legajo-monto');
@@ -614,7 +604,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function readCrmFormValues() {
         const recentDays = Math.max(1, parseInt(inputCrmRecentDays?.value || 60, 10) || 60);
         const overdueDays = Math.max(1, parseInt(inputCrmDebtOverdueDays?.value || 30, 10) || 30);
-        const criticalDays = Math.max(1, parseInt(inputCrmDebtCriticalDays?.value || 60, 10) || 60);
+        const criticalDays = Math.max(overdueDays, parseInt(inputCrmDebtCriticalDays?.value || 60, 10) || 60);
         const freqMin = Math.max(1, parseInt(inputCrmFreqMin?.value || 1, 10) || 1);
         const bestMin = Math.max(1, parseInt(inputCrmBestMin?.value || 2, 10) || 2);
         const labels = {
@@ -662,7 +652,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const rows = [
             { k: best, c1: '>= ' + safeStr(c.best_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'Sin CC vencida' },
             { k: freq, c1: '>= ' + safeStr(c.freq_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'O con deuda sin vencer' },
-            { k: inactive, c1: 'No cumple Mejor/Frecuente', c2: 'O estado inactivo' },
+            { k: inactive, c1: 'No cumple Mejor/Frecuente', c2: 'Sin actividad reciente' },
             { k: debtor, c1: 'CC vencida > ' + safeStr(c.debt_overdue_days) + ' días', c2: 'Crítica > ' + safeStr(c.debt_critical_days) + ' días' },
         ];
 
@@ -835,7 +825,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (legajoBday) legajoBday.textContent = safeStr(c.birthday || '—');
         if (legajoAddress) legajoAddress.textContent = safeStr(c.address || '—');
 
-        if (legajoStatus) legajoStatus.innerHTML = badgeEstado(c.status);
         if (legajoClas) legajoClas.innerHTML = badgeClas(c) + (badgeAlerta(c) ? (' ' + badgeAlerta(c)) : '');
         if (legajoCompras) legajoCompras.textContent = safeStr(c.cantidad_compras || 0);
         if (legajoMonto) legajoMonto.textContent = fmtMoney(parseFloat(c.monto_total_comprado || 0) || 0);
@@ -1032,7 +1021,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const birthday = safeStr(obj.birthday || obj.fecha_cumpleanos || '').trim();
         const address = safeStr(obj.address || obj.direccion || '').trim();
         const notes = safeStr(obj.notes || obj.observaciones || '').trim();
-        const status = safeStr(obj.status || obj.estado || 'activo').trim() || 'activo';
         const createdAt = parseInt(obj.created_at || obj.fecha_incorporacion_ts || 0, 10) || parseDateToTs(obj.fecha_incorporacion) || Date.now();
 
         return {
@@ -1044,7 +1032,6 @@ document.addEventListener('DOMContentLoaded', function () {
             birthday,
             address,
             notes,
-            status: (status === 'inactivo') ? 'inactivo' : 'activo',
             created_at: createdAt
         };
     }
@@ -1068,7 +1055,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 birthday: prev.birthday || c.birthday,
                 address: prev.address || c.address,
                 notes: prev.notes || c.notes,
-                status: prev.status || c.status,
                 created_at: Math.min(prev.created_at || Date.now(), c.created_at || Date.now())
             });
         });
@@ -1212,12 +1198,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const isOverdue = (saldo > 0) && (diasDeuda > overdueDays);
 
-            const forcedInactive = normKey(c?.status) === 'inactivo';
-
             let clas = 'inactivo';
-            if (forcedInactive) {
-                clas = 'inactivo';
-            } else if (isOverdue) {
+            if (isOverdue) {
                 clas = 'deudor';
             } else if (saldo > 0) {
                 // Tiene deuda pero no está vencida: se considera frecuente
@@ -1321,12 +1303,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function badgeEstado(status) {
-        const s = safeStr(status);
-        if (s === 'inactivo') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">Inactivo</span>';
-        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[11px] font-medium">Activo</span>';
-    }
-
     function badgeClas(c) {
         const crm = getCrmCfg();
         const cls = safeStr(c.clasificacion);
@@ -1339,6 +1315,41 @@ document.addEventListener('DOMContentLoaded', function () {
         if (cls === 'mejor_cliente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium">' + lblBest + '</span>';
         if (cls === 'frecuente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">' + lblFreq + '</span>';
         return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">' + lblInactive + '</span>';
+    }
+
+    function deleteCustomer(id) {
+        const cid = safeStr(id).trim();
+        if (!cid) return;
+
+        const c = ensureArray(cacheCustomers).find(x => safeStr(x.id) === cid);
+        const label = c ? ((safeStr(c.first_name) + ' ' + safeStr(c.last_name)).trim() || safeStr(c.name) || cid) : cid;
+
+        const doConfirm = function () {
+            if (window.confirmModal && typeof window.confirmModal === 'function') {
+                return window.confirmModal(
+                    '¿Seguro que querés eliminar ' + label + '?',
+                    'Eliminar cliente',
+                    'Esta acción no se puede deshacer.',
+                    { okText: 'Eliminar', cancelText: 'Cancelar' }
+                );
+            }
+            return Promise.resolve(window.confirm('¿Seguro que querés eliminar ' + label + '?'));
+        };
+
+        doConfirm().then(function (ok) {
+            if (!ok) return;
+            fetch('/customers/api/customers/' + encodeURIComponent(cid), {
+                method: 'DELETE',
+                credentials: 'same-origin'
+            }).then(r => r.json()).then(function (res) {
+                if (!res || res.ok !== true) return;
+                Promise.resolve(readCustomers()).then(function (items) {
+                    cacheCustomers = dedupeCustomers(items);
+                    render();
+                });
+            }).catch(function () {
+            });
+        });
     }
 
     function badgeAlerta(c) {
@@ -1415,8 +1426,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 +     '</button>'
                 +     '<div class="menu-cliente-acciones hidden origin-top-right absolute right-0 mt-1 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">'
                 +       '<div class="py-1 text-[11px]">'
-                +         '<button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="legajo" data-id="' + safeStr(c.id) + '">Ver legajo</button>'
-                +         '<button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="edit" data-id="' + safeStr(c.id) + '">Editar</button>'
+                +         '<button type="button" class="w-full text-left px-3 py-2 text-blue-700 hover:bg-blue-50" data-action="legajo" data-id="' + safeStr(c.id) + '">Ver legajo</button>'
+                +         '<button type="button" class="w-full text-left px-3 py-2 text-blue-700 hover:bg-blue-50" data-action="edit" data-id="' + safeStr(c.id) + '">Editar</button>'
+                +         '<button type="button" class="w-full text-left px-3 py-2 text-blue-700 hover:bg-blue-50" data-action="delete" data-id="' + safeStr(c.id) + '">Eliminar</button>'
                 +         (isDebtor ? ('<button type="button" class="w-full text-left px-3 py-2 text-red-700 hover:bg-red-50" data-action="settle" data-id="' + safeStr(c.id) + '">Saldar deuda</button>') : '')
                 +       '</div>'
                 +     '</div>'
@@ -1478,7 +1490,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (inputBirthday) inputBirthday.value = '';
         if (inputAddress) inputAddress.value = '';
         if (inputNotes) inputNotes.value = '';
-        if (inputStatus) inputStatus.value = 'activo';
     }
 
     function openNewCustomer() {
@@ -1500,7 +1511,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (inputBirthday) inputBirthday.value = safeStr(c.birthday);
         if (inputAddress) inputAddress.value = safeStr(c.address);
         if (inputNotes) inputNotes.value = safeStr(c.notes);
-        if (inputStatus) inputStatus.value = safeStr(c.status || 'activo');
         openModal(modalForm);
     }
 
@@ -1515,7 +1525,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const payload = {
-            id: editingCustomerId || safeStr(Date.now()),
             first_name: first,
             last_name: last,
             phone: phone,
@@ -1523,26 +1532,30 @@ document.addEventListener('DOMContentLoaded', function () {
             birthday: safeStr(inputBirthday?.value).trim(),
             address: safeStr(inputAddress?.value).trim(),
             notes: safeStr(inputNotes?.value).trim(),
-            status: safeStr(inputStatus?.value).trim() || 'activo',
-            created_at: editingCustomerId ? (ensureArray(cacheCustomers).find(x => safeStr(x.id) === safeStr(editingCustomerId))?.created_at || Date.now()) : Date.now()
         };
 
-        const next = ensureArray(cacheCustomers).slice();
-        const idx = next.findIndex(x => safeStr(x.id) === safeStr(payload.id));
-        if (idx >= 0) next[idx] = payload;
-        else next.push(payload);
+        const isEditing = !!editingCustomerId;
+        const url = isEditing ? ('/customers/api/customers/' + encodeURIComponent(editingCustomerId)) : '/customers/api/customers';
+        const method = isEditing ? 'PUT' : 'POST';
 
-        cacheCustomers = dedupeCustomers(next);
-        const res = saveCustomers(cacheCustomers);
-        if (isPromise(res)) {
-            res.then(function () {
+        fetch(url, {
+            method: method,
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(r => r.json()).then(function (res) {
+            if (!res || res.ok !== true) {
+                if (msgFormError) msgFormError.classList.remove('hidden');
+                return;
+            }
+            Promise.resolve(readCustomers()).then(function (items) {
+                cacheCustomers = dedupeCustomers(items);
                 closeModal(modalForm);
                 render();
             });
-        } else {
-            closeModal(modalForm);
-            render();
-        }
+        }).catch(function () {
+            if (msgFormError) msgFormError.classList.remove('hidden');
+        });
     }
 
     function initSorting() {
@@ -1554,7 +1567,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (sortKey === k) sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
                 else {
                     sortKey = k;
-                    sortDir = (k === 'nombre' || k === 'estado') ? 'asc' : 'desc';
+                    sortDir = (k === 'nombre') ? 'asc' : 'desc';
                 }
                 render();
             });
@@ -1762,6 +1775,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (action === 'edit') openEditCustomer(id);
                 if (action === 'legajo') openLegajo(id);
                 if (action === 'settle') openSettleDebt(id);
+                if (action === 'delete') deleteCustomer(id);
             });
         }
 

@@ -53,7 +53,7 @@
     </div>
 </div>
 
-<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+<div class="bg-white rounded-lg shadow border border-gray-200 overflow-visible">
     <div class="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-3">
         <div>
             <h2 class="text-sm font-semibold text-gray-900">Listado de proveedores</h2>
@@ -68,51 +68,53 @@
             </a>
         </div>
     </div>
-    <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-            <tr>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nombre</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Estado</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Última compra</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Monto comprado (mes)</th>
-                <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Saldo cuenta corriente</th>
-                <th class="px-4 py-3"></th>
-            </tr>
-            <tr class="bg-white">
-                <th class="px-4 py-2">
-                    <input id="sup-filter-name" type="text" class="w-full px-2 py-1 text-xs border rounded-md text-gray-700" placeholder="Buscar...">
-                </th>
-                <th class="px-4 py-2">
-                    <div class="relative">
-                        <button id="sup-cat-btn" type="button" class="w-full px-2 py-1 text-xs border rounded-md bg-white text-gray-700 inline-flex items-center justify-between">
-                            <span id="sup-cat-btn-label" class="truncate">Categoría: todas</span>
-                            <i class="fas fa-chevron-down text-[10px] text-gray-400"></i>
-                        </button>
-                        <div id="sup-cat-items" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-auto max-h-56"></div>
-                    </div>
-                </th>
-                <th class="px-4 py-2">
-                    <div class="relative">
-                        <button id="sup-status-btn" type="button" class="w-full px-2 py-1 text-xs border rounded-md bg-white text-gray-700 inline-flex items-center justify-between">
-                            <span id="sup-status-btn-label" class="truncate">Estado: todos</span>
-                            <i class="fas fa-chevron-down text-[10px] text-gray-400"></i>
-                        </button>
-                        <div id="sup-status-items" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-auto max-h-56"></div>
-                    </div>
-                </th>
-                <th class="px-4 py-2"></th>
-                <th class="px-4 py-2"></th>
-                <th class="px-4 py-2"></th>
-                <th class="px-4 py-2"></th>
-            </tr>
-        </thead>
-        <tbody id="sup-tbody" class="bg-white divide-y divide-gray-200">
-            <tr>
-                <td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay proveedores cargados. Podés darlos de alta desde Proveedores o Egresos.</td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="overflow-x-auto overflow-y-visible">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nombre</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Estado</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Última compra</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Monto comprado (mes)</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Saldo cuenta corriente</th>
+                    <th class="px-4 py-3"></th>
+                </tr>
+                <tr class="bg-white">
+                    <th class="px-4 py-2">
+                        <input id="sup-filter-name" type="text" class="w-full px-2 py-1 text-xs border rounded-md text-gray-700" placeholder="Buscar...">
+                    </th>
+                    <th class="px-4 py-2">
+                        <div class="relative">
+                            <button id="sup-cat-btn" type="button" class="w-full px-2 py-1 text-xs border rounded-md bg-white text-gray-700 inline-flex items-center justify-between">
+                                <span id="sup-cat-btn-label" class="truncate">Categoría: todas</span>
+                                <i class="fas fa-chevron-down text-[10px] text-gray-400"></i>
+                            </button>
+                            <div id="sup-cat-items" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-auto max-h-56"></div>
+                        </div>
+                    </th>
+                    <th class="px-4 py-2">
+                        <div class="relative">
+                            <button id="sup-status-btn" type="button" class="w-full px-2 py-1 text-xs border rounded-md bg-white text-gray-700 inline-flex items-center justify-between">
+                                <span id="sup-status-btn-label" class="truncate">Estado: todos</span>
+                                <i class="fas fa-chevron-down text-[10px] text-gray-400"></i>
+                            </button>
+                            <div id="sup-status-items" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-auto max-h-56"></div>
+                        </div>
+                    </th>
+                    <th class="px-4 py-2"></th>
+                    <th class="px-4 py-2"></th>
+                    <th class="px-4 py-2"></th>
+                    <th class="px-4 py-2"></th>
+                </tr>
+            </thead>
+            <tbody id="sup-tbody" class="bg-white divide-y divide-gray-200">
+                <tr>
+                    <td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay proveedores cargados. Podés darlos de alta desde Proveedores o Egresos.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <div id="modal-supplier-cc" class="hidden fixed inset-0 z-50">

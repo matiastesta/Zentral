@@ -396,25 +396,25 @@
 
     <button id="kpi-alerts-card" type="button" class="md:col-span-2 p-3 rounded-xl bg-white shadow border border-gray-100 text-left hover:bg-gray-50">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-            <div class="flex flex-col items-center md:items-start text-center md:text-left">
+            <div class="flex flex-col items-center text-center">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 flex items-center justify-center rounded-full bg-amber-50 text-amber-700">
                         <i class="fas fa-exclamation-triangle"></i>
                     </div>
                     <div class="flex flex-col">
                         <div class="text-xs uppercase tracking-wide text-gray-500">Alertas activas</div>
-                        <div class="mt-0.5 flex items-baseline justify-center md:justify-start gap-2">
+                        <div class="mt-0.5 flex items-baseline justify-center gap-2">
                             <div class="text-3xl font-semibold text-gray-900 leading-none"><span id="kpi-alerts">0</span></div>
-                            <div class="text-sm font-medium text-gray-700 leading-none">stock bajo + vencimientos</div>
+                            <div class="text-xs font-medium text-gray-700 leading-none">stock bajo + vencimientos</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="flex flex-col items-center md:items-start text-center md:text-left md:border-l md:border-gray-100 md:pl-4">
+            <div class="flex flex-col items-center text-center md:border-l md:border-gray-100 md:pl-4">
                 <div class="text-xs uppercase tracking-wide text-gray-500">Alertas por producto</div>
                 <div id="kpi-alerts-list" class="mt-2 w-full space-y-1"></div>
-                <div id="kpi-alerts-hint" class="mt-2 text-[10px] text-gray-500">Click para ver productos en “Reponer” y “Crítico”.</div>
+                <div id="kpi-alerts-hint" class="mt-2 text-xs text-gray-500">Click para ver productos en “Reponer” y “Crítico”.</div>
             </div>
         </div>
     </button>
@@ -481,6 +481,7 @@
                             <option value="OK">OK</option>
                             <option value="Reponer">Reponer</option>
                             <option value="Crítico">Crítico</option>
+                            <option value="Inactivo">Inactivo</option>
                         </select>
                     </th>
                     <th class="px-4 py-1"></th>
@@ -657,6 +658,10 @@
                             <div class="md:col-span-5">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Descripción</label>
                                 <textarea id="prod-desc" rows="1" class="w-full h-10 px-3 py-2 text-sm border rounded-md resize-none" placeholder="Opcional"></textarea>
+                            </div>
+                            <div class="md:col-span-3">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Precio de Lista</label>
+                                <input id="prod-sale-price" type="number" min="0" step="0.01" class="w-full h-10 px-3 py-2 text-sm border rounded-md" placeholder="0">
                             </div>
                             <div class="md:col-span-4">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor principal (opcional)</label>
@@ -1014,6 +1019,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnSelectSupplierProduct = document.getElementById('btn-select-supplier-product');
     const linkCreateSupplierProduct = document.getElementById('link-create-supplier-product');
     const btnSaveProduct = document.getElementById('btn-save-product');
+    const prodSalePrice = document.getElementById('prod-sale-price');
 
     const lotProduct = document.getElementById('lot-product');
     const lotDate = document.getElementById('lot-date');
@@ -1055,6 +1061,58 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentSupplierTarget = '';
     let suppressSupplierInputClear = false;
 
+     let prefillLotProductId = '';
+     const PRODUCT_DRAFT_KEY = 'inventory_product_draft_v1';
+
+     function saveProductDraft() {
+         try {
+             const unitBase = String(prodUnit?.value || '').trim();
+             const unitOther = String(prodUnitOther?.value || '').trim();
+             const payload = {
+                 name: String(prodName?.value || ''),
+                 category_id: String(prodCatId?.value || ''),
+                 unit_base: unitBase,
+                 unit_other: unitOther,
+                 active: !!prodActive?.checked,
+                 description: String(prodDesc?.value || ''),
+                 uses_lots: !!prodLots?.checked,
+                 method: String(prodMethod?.value || 'FIFO'),
+                 min_stock: String(prodMin?.value ?? ''),
+                 reorder_point: String(prodReorder?.value ?? ''),
+                 sale_price: String(prodSalePrice?.value ?? '')
+             };
+             sessionStorage.setItem(PRODUCT_DRAFT_KEY, JSON.stringify(payload));
+         } catch (e) {
+         }
+     }
+
+     function restoreProductDraft() {
+         try {
+             const raw = sessionStorage.getItem(PRODUCT_DRAFT_KEY);
+             if (!raw) return;
+             const d = JSON.parse(raw);
+             if (!d || typeof d !== 'object') return;
+
+             if (prodName && d.name != null) prodName.value = String(d.name || '');
+             if (prodCatId && d.category_id != null) prodCatId.value = String(d.category_id || '');
+             if (prodUnit && d.unit_base != null) prodUnit.value = String(d.unit_base || 'Unidad') || 'Unidad';
+             if (prodUnitOther && d.unit_other != null) prodUnitOther.value = String(d.unit_other || '');
+             if (wrapProdUnit) wrapProdUnit.classList.toggle('hidden', String(prodUnit?.value || '') !== 'Otro');
+
+             if (prodActive && d.active != null) prodActive.checked = !!d.active;
+             if (prodDesc && d.description != null) prodDesc.value = String(d.description || '');
+             if (prodLots && d.uses_lots != null) prodLots.checked = !!d.uses_lots;
+             if (prodMethod && d.method != null) prodMethod.value = String(d.method || 'FIFO') || 'FIFO';
+             if (prodMin && d.min_stock != null) prodMin.value = String(d.min_stock ?? '');
+             if (prodReorder && d.reorder_point != null) prodReorder.value = String(d.reorder_point ?? '');
+             if (prodSalePrice && d.sale_price != null) prodSalePrice.value = String(d.sale_price ?? '');
+
+             syncProductToggleLabels();
+             sessionStorage.removeItem(PRODUCT_DRAFT_KEY);
+         } catch (e) {
+         }
+     }
+
     function applyReturnedSupplierSelection() {
         try {
             const url = new URL(window.location.href);
@@ -1068,6 +1126,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 openAddLot();
             } else if (target === 'product') {
                 openCreate();
+                restoreProductDraft();
             } else {
                 openCreate();
             }
@@ -1109,6 +1168,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         try {
             poblarProductosSelect();
+            if (prefillLotProductId && lotProduct) {
+                lotProduct.value = String(prefillLotProductId);
+                prefillLotProductId = '';
+            }
         } catch (e) {
         }
     }
@@ -1597,7 +1660,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function apiListProducts() {
-        return fetch('/inventory/api/products?active=1&limit=5000', { credentials: 'same-origin' })
+        return fetch('/inventory/api/products?limit=5000', { credentials: 'same-origin' })
             .then(r => r.json())
             .then(d => (d && d.ok && Array.isArray(d.items)) ? d.items : []);
     }
@@ -1766,6 +1829,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function badgeStatus(st) {
+        if (st === 'Inactivo') return '<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">Inactivo</span>';
         if (st === 'Crítico') return '<span class="px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">Crítico</span>';
         if (st === 'Reponer') return '<span class="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium">Reponer</span>';
         return '<span class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[11px] font-medium">OK</span>';
@@ -2299,6 +2363,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (prodMethodLockMsg) prodMethodLockMsg.classList.add('hidden');
         if (prodMin) prodMin.value = '';
         if (prodDesc) prodDesc.value = '';
+        if (prodSalePrice) prodSalePrice.value = '';
         if (prodImage) prodImage.value = '';
         if (prodImagePreview) {
             prodImagePreview.src = '';
@@ -2352,6 +2417,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (prodMethod) prodMethod.value = String(prod?.method || 'FIFO');
         if (prodMin) prodMin.value = String(prod?.min_stock ?? '');
         if (prodReorder) prodReorder.value = String(prod?.reorder_point ?? '');
+        if (prodSalePrice) prodSalePrice.value = String(prod?.sale_price ?? '');
         if (prodPrimarySupplierId) prodPrimarySupplierId.value = String(prod?.primary_supplier_id || '').trim();
         if (prodPrimarySupplier) prodPrimarySupplier.value = String(prod?.primary_supplier_name || '');
         if (prodActive) prodActive.checked = (prod?.active !== false);
@@ -2458,13 +2524,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const filteredProducts = products
             .filter(p => {
+                const isInactive = (p && p.active === false);
                 if (q && !String(p.name || '').toLowerCase().includes(q)) return false;
                 if (cat && categoryLabel(p) !== cat) return false;
+
                 const metrics = compute(p);
-                if (stList.length && stList.indexOf(metrics.status) < 0) return false;
-                return true;
+                if (isInactive) metrics.status = 'Inactivo';
+
+                if (!stList.length) {
+                    return !isInactive;
+                }
+                return stList.indexOf(metrics.status) >= 0;
             })
-            .map(p => ({ p, m: compute(p) }));
+            .map(p => {
+                const m = compute(p);
+                if (p && p.active === false) m.status = 'Inactivo';
+                return { p, m };
+            });
 
         const filteredLots = lots
             .filter(l => {
@@ -2500,11 +2576,16 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderKPIs(products, lots) {
         const days30 = 30 * 24 * 60 * 60 * 1000;
         const now = Date.now();
+        const activeProducts = (Array.isArray(products) ? products : []).filter(p => !!p && p.active !== false);
+        const activeIds = new Set(activeProducts.map(p => String(p.id)));
+
         const expSoon = lots.filter(l => {
             const exp = String(l.expiration_date || '').trim();
             if (!exp) return false;
             const t = new Date(exp).getTime();
             if (!t) return false;
+            const pid = String(l.product_id || '').trim();
+            if (!activeIds.has(pid)) return false;
             return t >= now && t <= (now + days30) && parseNumeroSeguro(l.qty_available) > 0;
         });
         const expSoonCount = expSoon.length;
@@ -2512,7 +2593,7 @@ document.addEventListener('DOMContentLoaded', function () {
         let totalValue = 0;
         let alerts = 0;
         const alertProducts = [];
-        products.forEach(p => {
+        activeProducts.forEach(p => {
             const rel = lots.filter(l => String(l.product_id) === String(p.id));
             const stock = rel.reduce((acc, l) => acc + parseNumeroSeguro(l.qty_available), 0);
             const costSum = rel.reduce((acc, l) => acc + (parseNumeroSeguro(l.qty_available) * parseNumeroSeguro(l.unit_cost)), 0);
@@ -2536,7 +2617,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         if (kpiStockValue) kpiStockValue.textContent = formatMoney(totalValue);
-        if (kpiProducts) kpiProducts.textContent = String(products.length);
+        if (kpiProducts) kpiProducts.textContent = String(activeProducts.length);
         if (kpiExpire) kpiExpire.textContent = String(expSoonCount);
         if (kpiAlerts) kpiAlerts.textContent = String(alerts);
 
@@ -2544,7 +2625,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const maxItems = 6;
             const shown = alertProducts.slice(0, maxItems);
             if (!shown.length) {
-                kpiAlertsList.innerHTML = '<div class="text-sm text-gray-500">Sin alertas de stock.</div>';
+                kpiAlertsList.innerHTML = '<div class="text-xs text-gray-500 text-center">Sin alertas de stock.</div>';
             } else {
                 const first = shown[0];
                 const rest = shown.slice(1);
@@ -2605,9 +2686,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '    <button type="button" class="btn-actions-toggle h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-500" aria-label="Acciones" data-product-id="' + String(p.id) + '">' 
                 + '      <i class="fas fa-ellipsis-v"></i>'
                 + '    </button>'
-                + '    <div class="row-actions-menu hidden absolute right-0 mt-2 w-40 rounded-md border border-gray-200 bg-white shadow-lg z-20">'
+                + '    <div class="row-actions-menu hidden absolute right-0 mt-2 w-44 rounded-md border border-gray-200 bg-white shadow-lg z-20">'
                 + '      <button type="button" class="btn-view-file w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Ver legajo</button>'
-                + '      <button type="button" class="btn-deactivate-product w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Desactivar</button>'
+                + '      <button type="button" class="btn-add-lot-product w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Agregar lote</button>'
+                + '      <button type="button" class="btn-delete-product w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Eliminar</button>'
                 + '    </div>'
                 + '  </div>'
                 + '</td>';
@@ -2645,27 +2727,39 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
 
-        Array.from(tbodyCurrent.querySelectorAll('.btn-deactivate-product')).forEach(btn => {
+        Array.from(tbodyCurrent.querySelectorAll('.btn-add-lot-product')).forEach(btn => {
             btn.addEventListener('click', function () {
                 const id = this.getAttribute('data-product-id') || '';
                 if (!id) return;
                 closeAllMenus();
+                prefillLotProductId = String(id);
+                openAddLot();
+            });
+        });
+
+        Array.from(tbodyCurrent.querySelectorAll('.btn-delete-product')).forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.getAttribute('data-product-id') || '';
+                if (!id) return;
+                closeAllMenus();
+
                 const confirmFn = (window.confirmModal && typeof window.confirmModal === 'function')
                     ? window.confirmModal
                     : function (m) { return Promise.resolve(window.confirm(m)); };
-                confirmFn('¿Seguro que querés desactivar este producto?', 'Desactivar producto', 'Este producto tiene historial. Será desactivado.', { okText: 'Desactivar', cancelText: 'Cancelar' })
+
+                confirmFn('¿Seguro que querés eliminar este producto?', 'Eliminar producto', 'Este producto tiene historial. Será desactivado.', { okText: 'Eliminar', cancelText: 'Cancelar' })
                     .then(function (ok) {
                         if (!ok) return;
                         apiDeleteProduct(id).then(function (res) {
                             if (!res || res.ok !== true) {
-                                if (window.showAlertModal) window.showAlertModal('No se pudo desactivar el producto.', 'Error', 'Operación fallida');
-                                else alert('No se pudo desactivar el producto.');
+                                if (window.showAlertModal) window.showAlertModal('No se pudo eliminar el producto.', 'Error', 'Operación fallida');
+                                else alert('No se pudo eliminar el producto.');
                                 return;
                             }
                             renderAll();
                         }).catch(function () {
-                            if (window.showAlertModal) window.showAlertModal('No se pudo desactivar el producto.', 'Error', 'Operación fallida');
-                            else alert('No se pudo desactivar el producto.');
+                            if (window.showAlertModal) window.showAlertModal('No se pudo eliminar el producto.', 'Error', 'Operación fallida');
+                            else alert('No se pudo eliminar el producto.');
                         });
                     });
             });
@@ -2693,7 +2787,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '<td class="px-4 py-3 text-sm text-gray-500"><div class="max-w-xs truncate">' + (desc || '—') + '</div></td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(l.received_at || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(parseNumeroSeguro(l.qty_initial).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(parseNumeroSeguro(l.unit_cost)) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + formatMoney(parseNumeroSeguro(l.unit_cost)) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l.supplier_name || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + (l.expiration_date ? fmtFecha(l.expiration_date) : '—') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right">'
@@ -3272,6 +3366,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const min = parseNumeroSeguro(prodMin?.value);
             const reorderPoint = parseNumeroSeguro(prodReorder?.value);
             const desc = String(prodDesc?.value || '').trim();
+            const salePrice = parseNumeroSeguro(prodSalePrice?.value);
             const primarySupplierName = String(prodPrimarySupplier?.value || '').trim();
             const primarySupplierId = String(prodPrimarySupplierId?.value || '').trim();
             const active = !!prodActive?.checked;
@@ -3292,7 +3387,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 primary_supplier_id: primarySupplierId,
                 primary_supplier_name: primarySupplierName,
                 active: active,
-                sale_price: 0
+                sale_price: salePrice
             };
 
             const req = editingProductId
@@ -3434,6 +3529,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function goCreateSupplier(target) {
+        if (String(target || '') === 'product') {
+            saveProductDraft();
+        }
         const returnTo = safeReturnToWithTarget(target);
         const qs = [
             'return_to=' + encodeURIComponent(returnTo),

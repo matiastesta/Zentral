@@ -176,7 +176,7 @@ def load_user(user_id):
         try:
             from app.db_context import apply_rls_context
 
-            apply_rls_context(is_login=False)
+            apply_rls_context(is_login=True)
         except Exception:
             try:
                 db.session.rollback()

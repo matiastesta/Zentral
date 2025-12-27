@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">{{ company.name }}</h1>
+        <p class="mt-1 text-sm text-gray-600">Panel de edición y gestión interna de la empresa.</p>
+    </div>
+    <div class="flex items-center gap-2">
+        <a href="{{ url_for('superadmin.index') }}" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md bg-gray-100 hover:bg-gray-200">Volver</a>
+        <a href="{{ url_for('superadmin.company_edit', company_id=company.id) }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Editar empresa</a>
+        <a href="{{ url_for('superadmin.company_users', company_id=company.id) }}" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md bg-gray-100 hover:bg-gray-200">Usuarios</a>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div class="p-5 bg-white rounded-lg shadow lg:col-span-1">
+        <h2 class="text-lg font-medium text-gray-900 mb-3">Datos empresa</h2>
+        <div class="space-y-2 text-sm">
+            <div><span class="text-gray-500">Nombre:</span> <span class="font-medium text-gray-900">{{ company.name }}</span></div>
+            <div><span class="text-gray-500">Slug:</span> <span class="font-medium text-gray-900">{{ company.slug }}</span></div>
+            <div><span class="text-gray-500">Plan:</span> <span class="font-medium text-gray-900">{{ company.plan }}</span></div>
+            <div><span class="text-gray-500">Estado:</span> <span class="font-medium text-gray-900">{{ company.status }}</span></div>
+        </div>
+        <div class="mt-4">
+            <div class="text-xs font-medium text-gray-600 mb-1">Notas internas</div>
+            <div class="text-sm text-gray-800 whitespace-pre-wrap">{{ company.notes or '' }}</div>
+        </div>
+    </div>
+
+    <div class="p-5 bg-white rounded-lg shadow lg:col-span-2">
+        <h2 class="text-lg font-medium text-gray-900 mb-3">Admin principal</h2>
+        {% if admin_user %}
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
+                <div>
+                    <div class="text-xs font-medium text-gray-600 mb-1">Usuario</div>
+                    <div class="font-medium text-gray-900">{{ admin_user.username }}</div>
+                </div>
+                <div>
+                    <div class="text-xs font-medium text-gray-600 mb-1">Contraseña</div>
+                    <div class="font-medium text-gray-900">{{ admin_user.password_plain or '' }}</div>
+                </div>
+            </div>
+        {% else %}
+            <div class="text-sm text-gray-600">No hay admin principal configurado.</div>
+        {% endif %}
+
+        <div class="mt-6">
+            <div class="flex items-center justify-between gap-2 mb-3">
+                <h2 class="text-lg font-medium text-gray-900">Roles</h2>
+                <a href="{{ url_for('superadmin.company_roles', company_id=company.id) }}" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md bg-gray-100 hover:bg-gray-200">Gestionar roles</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                            <th class="px-3 py-2 text-right"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for r in roles %}
+                        <tr>
+                            <td class="px-3 py-2 text-gray-900 font-medium">{{ r.name }}</td>
+                            <td class="px-3 py-2 text-right text-xs text-gray-500">&nbsp;</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="2" class="px-3 py-4 text-center text-gray-500">No hay roles todavía.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-3">Usuarios</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
+                            <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                            <th class="px-3 py-2 text-right"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for u in users %}
+                        <tr>
+                            <td class="px-3 py-2 text-gray-900 font-medium">{{ u.username }}</td>
+                            <td class="px-3 py-2 text-gray-700">{{ u.role }}</td>
+                            <td class="px-3 py-2 text-right">
+                                <a href="{{ url_for('superadmin.company_user_edit', company_id=company.id, user_id=u.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Editar</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="3" class="px-3 py-4 text-center text-gray-500">No hay usuarios todavía.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

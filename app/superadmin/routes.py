@@ -23,6 +23,7 @@ from app.models import (
     Product,
     Sale,
     SaleItem,
+    CompanyRole,
     Supplier,
     User,
 )
@@ -44,6 +45,93 @@ MODULE_KEYS = [
     'settings',
     'user_settings',
 ]
+
+
+def _ensure_default_roles(company_id: str) -> None:
+    cid = str(company_id or '').strip()
+    if not cid:
+        return
+
+    existing = {
+        str(r.name or '').strip()
+        for r in (db.session.query(CompanyRole).filter(CompanyRole.company_id == cid).all() or [])
+    }
+
+    def _mk(name: str, perms: dict) -> None:
+        n = str(name or '').strip()
+        if not n or n in existing:
+            return
+        rr = CompanyRole(company_id=cid, name=n)
+        rr.set_permissions(perms)
+        db.session.add(rr)
+        existing.add(n)
+
+    all_true = {k: True for k in MODULE_KEYS}
+    _mk('company_admin', all_true)
+    _mk('admin', all_true)
+    _mk(
+        'vendedor',
+        {
+            'dashboard': True,
+            'calendar': True,
+            'sales': True,
+            'expenses': False,
+            'inventory': True,
+            'customers': True,
+            'suppliers': False,
+            'employees': False,
+            'movements': True,
+            'reports': False,
+            'settings': False,
+            'user_settings': False,
+        },
+    )
+    _mk(
+        'contador',
+        {
+            'dashboard': True,
+            'calendar': False,
+            'sales': False,
+            'expenses': True,
+            'inventory': False,
+            'customers': False,
+            'suppliers': True,
+            'employees': False,
+            'movements': False,
+            'reports': True,
+            'settings': False,
+            'user_settings': False,
+        },
+    )
+
+
+def _company_role_names(company_id: str) -> list[str]:
+    cid = str(company_id or '').strip()
+    base = ['company_admin', 'admin', 'vendedor', 'contador']
+    if not cid:
+        return base
+
+    try:
+        _ensure_default_roles(cid)
+        db.session.flush()
+    except Exception:
+        pass
+
+    names = list(base)
+    try:
+        rows = (
+            db.session.query(CompanyRole)
+            .filter(CompanyRole.company_id == cid)
+            .order_by(CompanyRole.name.asc())
+            .all()
+        )
+        for r in (rows or []):
+            n = str(getattr(r, 'name', '') or '').strip()
+            if n and n not in names:
+                names.append(n)
+    except Exception:
+        pass
+    return names
 
 
 def _require_zentral_admin():
@@ -68,30 +156,228 @@ def index():
     return render_template('superadmin/index.html', title='Zentral Admin', companies=companies)
 
 
+@bp.get('/companies/<company_id>')
+@login_required
+def company_overview(company_id: str):
+    _require_zentral_admin()
+    c = db.session.get(Company, str(company_id))
+    if not c:
+        flash('Empresa inválida.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    try:
+        _ensure_default_roles(str(c.id))
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+    admin_user = None
+    try:
+        if getattr(c, 'admin_user_id', None):
+            admin_user = db.session.get(User, int(c.admin_user_id))
+    except Exception:
+        admin_user = None
+
+    users = db.session.query(User).filter(User.company_id == str(c.id)).order_by(User.username.asc()).all()
+    roles = (
+        db.session.query(CompanyRole)
+        .filter(CompanyRole.company_id == str(c.id))
+        .order_by(CompanyRole.name.asc())
+        .all()
+    )
+
+    return render_template(
+        'superadmin/company_overview.html',
+        title=f'Editar · {c.name}',
+        company=c,
+        admin_user=admin_user,
+        users=users,
+        roles=roles,
+    )
+
+
 @bp.post('/companies/create')
 @login_required
 def create_company():
     _require_zentral_admin()
-    name = (request.form.get('name') or '').strip()
-    plan = (request.form.get('plan') or 'standard').strip() or 'standard'
-    slug = (request.form.get('slug') or '').strip().lower()
+    name = (request.form.get('company_name') or '').strip()
+    plan = (request.form.get('plan') or '').strip()
+    admin_username = (request.form.get('admin_username') or '').strip()
+    admin_password = (request.form.get('admin_password') or '').strip()
+    notes = (request.form.get('notes') or '').strip() or None
+
     if not name:
         flash('Nombre inválido.', 'error')
         return redirect(url_for('superadmin.index'))
-    if not slug:
-        slug = _slugify(name)
 
-    existing = db.session.query(Company).filter(Company.slug == slug).first()
-    if existing:
-        flash('Ya existe una empresa con ese slug.', 'error')
+    if not plan:
+        flash('Plan inválido.', 'error')
         return redirect(url_for('superadmin.index'))
 
-    c = Company(name=name, slug=slug, plan=plan, status='active')
+    if not admin_username:
+        flash('Usuario administrativo inválido.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    if not admin_password or len(admin_password) < 6:
+        flash('Contraseña inválida (mínimo 6 caracteres).', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    slug = _slugify(name)
+    base_slug = slug
+    i = 1
+    while db.session.query(Company).filter(Company.slug == slug).first():
+        i += 1
+        slug = f'{base_slug}-{i}'
+
+    c = Company(name=name, slug=slug, plan=plan, status='active', notes=notes)
     db.session.add(c)
+    db.session.flush()
+
+    _ensure_default_roles(str(c.id))
+
+    u = User(
+        username=admin_username,
+        email=None,
+        role='company_admin',
+        is_master=False,
+        active=True,
+        company_id=str(c.id),
+        created_by_user_id=int(getattr(current_user, 'id', 0) or 0) or None,
+    )
+    u.set_password(admin_password)
+    u.set_permissions_all(True)
+    db.session.add(u)
+    db.session.flush()
+
+    try:
+        c.admin_user_id = int(getattr(u, 'id', 0) or 0) or None
+    except Exception:
+        pass
+
     db.session.commit()
 
     flash('Empresa creada.', 'success')
-    return redirect(url_for('superadmin.index'))
+    return redirect(url_for('superadmin.company_overview', company_id=c.id))
+
+
+@bp.route('/companies/<company_id>/edit', methods=['GET', 'POST'])
+@login_required
+def company_edit(company_id: str):
+    _require_zentral_admin()
+    c = db.session.get(Company, str(company_id))
+    if not c:
+        flash('Empresa inválida.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    admin_user = None
+    try:
+        if getattr(c, 'admin_user_id', None):
+            admin_user = db.session.get(User, int(c.admin_user_id))
+    except Exception:
+        admin_user = None
+
+    if request.method == 'POST':
+        name = (request.form.get('company_name') or '').strip()
+        plan = (request.form.get('plan') or '').strip()
+        notes = (request.form.get('notes') or '').strip() or None
+        admin_username = (request.form.get('admin_username') or '').strip()
+        admin_password = (request.form.get('admin_password') or '').strip()
+
+        if not name:
+            flash('Nombre inválido.', 'error')
+            return redirect(url_for('superadmin.company_edit', company_id=c.id))
+        if not plan:
+            flash('Plan inválido.', 'error')
+            return redirect(url_for('superadmin.company_edit', company_id=c.id))
+
+        c.name = name
+        c.plan = plan
+        try:
+            c.notes = notes
+        except Exception:
+            pass
+
+        try:
+            _ensure_default_roles(str(c.id))
+        except Exception:
+            pass
+
+        if admin_username or admin_password:
+            if not admin_user:
+                if not admin_username:
+                    flash('Usuario administrativo inválido.', 'error')
+                    return redirect(url_for('superadmin.company_edit', company_id=c.id))
+                if not admin_password or len(admin_password) < 6:
+                    flash('Contraseña inválida (mínimo 6 caracteres).', 'error')
+                    return redirect(url_for('superadmin.company_edit', company_id=c.id))
+
+                exists = (
+                    db.session.query(User)
+                    .filter(User.company_id == str(c.id), User.username == admin_username)
+                    .first()
+                )
+                if exists:
+                    flash('Ya existe otro usuario con ese nombre en esta empresa.', 'error')
+                    return redirect(url_for('superadmin.company_edit', company_id=c.id))
+
+                admin_user = User(
+                    username=admin_username,
+                    email=None,
+                    role='company_admin',
+                    is_master=False,
+                    active=True,
+                    company_id=str(c.id),
+                    created_by_user_id=int(getattr(current_user, 'id', 0) or 0) or None,
+                )
+                admin_user.set_password(admin_password)
+                admin_user.set_permissions_all(True)
+                db.session.add(admin_user)
+                db.session.flush()
+                c.admin_user_id = int(getattr(admin_user, 'id', 0) or 0) or None
+            else:
+                if admin_username and admin_username != (admin_user.username or ''):
+                    exists = (
+                        db.session.query(User)
+                        .filter(User.company_id == str(c.id), User.username == admin_username, User.id != admin_user.id)
+                        .first()
+                    )
+                    if exists:
+                        flash('Ya existe otro usuario con ese nombre en esta empresa.', 'error')
+                        return redirect(url_for('superadmin.company_edit', company_id=c.id))
+                    admin_user.username = admin_username
+
+                if admin_password:
+                    if len(admin_password) < 6:
+                        flash('Contraseña inválida (mínimo 6 caracteres).', 'error')
+                        return redirect(url_for('superadmin.company_edit', company_id=c.id))
+                    admin_user.set_password(admin_password)
+
+                admin_user.active = True
+                admin_user.role = 'company_admin'
+                admin_user.company_id = str(c.id)
+                try:
+                    admin_user.set_permissions_all(True)
+                except Exception:
+                    pass
+
+                try:
+                    c.admin_user_id = int(getattr(admin_user, 'id', 0) or 0) or None
+                except Exception:
+                    pass
+
+        db.session.commit()
+        flash('Empresa actualizada.', 'success')
+        return redirect(url_for('superadmin.company_overview', company_id=c.id))
+
+    return render_template(
+        'superadmin/company_edit.html',
+        title=f'Editar empresa · {c.name}',
+        company=c,
+        admin_user=admin_user,
+    )
 
 
 @bp.post('/companies/<company_id>/pause')
@@ -141,6 +427,7 @@ def delete_company(company_id: str):
     db.session.query(Supplier).filter(Supplier.company_id == cid).delete(synchronize_session=False)
     db.session.query(Employee).filter(Employee.company_id == cid).delete(synchronize_session=False)
     db.session.query(BusinessSettings).filter(BusinessSettings.company_id == cid).delete(synchronize_session=False)
+    db.session.query(CompanyRole).filter(CompanyRole.company_id == cid).delete(synchronize_session=False)
     db.session.query(User).filter(User.company_id == cid).delete(synchronize_session=False)
 
     db.session.delete(c)
@@ -243,11 +530,6 @@ def company_user_edit(company_id: str, user_id: int):
         role = (request.form.get('role') or '').strip() or (u.role or 'vendedor')
         u.role = role
 
-        try:
-            u.level = int(request.form.get('level') or u.level or 2)
-        except Exception:
-            pass
-
         u.active = bool(request.form.get('active') == 'on')
 
         perms = {}
@@ -270,7 +552,16 @@ def company_user_edit(company_id: str, user_id: int):
         flash('Usuario actualizado.', 'success')
         return redirect(url_for('superadmin.company_users', company_id=c.id))
 
-    roles = ['company_admin', 'admin', 'vendedor', 'contador']
+    try:
+        _ensure_default_roles(str(c.id))
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+    roles = _company_role_names(str(c.id))
     perms = u.get_permissions() if getattr(u, 'get_permissions', None) else {}
     return render_template(
         'superadmin/company_user_edit.html',
@@ -308,3 +599,151 @@ def company_users_reset_password(company_id: str, user_id: int):
     db.session.commit()
     flash(f'Contraseña reseteada para {u.username}. Nueva contraseña: {new_pass}', 'success')
     return redirect(url_for('superadmin.company_users', company_id=c.id))
+
+
+@bp.get('/companies/<company_id>/roles')
+@login_required
+def company_roles(company_id: str):
+    _require_zentral_admin()
+    c = db.session.get(Company, str(company_id))
+    if not c:
+        flash('Empresa inválida.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    try:
+        _ensure_default_roles(str(c.id))
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+    roles = (
+        db.session.query(CompanyRole)
+        .filter(CompanyRole.company_id == str(c.id))
+        .order_by(CompanyRole.name.asc())
+        .all()
+    )
+    return render_template('superadmin/company_roles.html', title=f'Roles · {c.name}', company=c, roles=roles, module_keys=MODULE_KEYS)
+
+
+@bp.route('/companies/<company_id>/roles/new', methods=['GET', 'POST'])
+@login_required
+def company_role_new(company_id: str):
+    _require_zentral_admin()
+    c = db.session.get(Company, str(company_id))
+    if not c:
+        flash('Empresa inválida.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    if request.method == 'POST':
+        name = (request.form.get('name') or '').strip()
+        if not name:
+            flash('Nombre de rol inválido.', 'error')
+            return redirect(url_for('superadmin.company_role_new', company_id=c.id))
+
+        existing = (
+            db.session.query(CompanyRole)
+            .filter(CompanyRole.company_id == str(c.id), CompanyRole.name == name)
+            .first()
+        )
+        if existing:
+            flash('Ya existe un rol con ese nombre.', 'error')
+            return redirect(url_for('superadmin.company_role_new', company_id=c.id))
+
+        perms = {}
+        for k in MODULE_KEYS:
+            perms[k] = bool(request.form.get(f'perm_{k}') == 'on')
+
+        r = CompanyRole(company_id=str(c.id), name=name)
+        r.set_permissions(perms)
+        db.session.add(r)
+        db.session.commit()
+        flash('Rol creado.', 'success')
+        return redirect(url_for('superadmin.company_roles', company_id=c.id))
+
+    return render_template(
+        'superadmin/company_role_edit.html',
+        title=f'Nuevo rol · {c.name}',
+        company=c,
+        role=None,
+        module_keys=MODULE_KEYS,
+        perms={},
+    )
+
+
+@bp.route('/companies/<company_id>/roles/<role_id>/edit', methods=['GET', 'POST'])
+@login_required
+def company_role_edit(company_id: str, role_id: str):
+    _require_zentral_admin()
+    c = db.session.get(Company, str(company_id))
+    if not c:
+        flash('Empresa inválida.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    r = db.session.get(CompanyRole, str(role_id))
+    if not r or str(getattr(r, 'company_id', '') or '') != str(c.id):
+        flash('Rol inválido.', 'error')
+        return redirect(url_for('superadmin.company_roles', company_id=c.id))
+
+    if request.method == 'POST':
+        name = (request.form.get('name') or '').strip() or (r.name or '')
+        if not name:
+            flash('Nombre de rol inválido.', 'error')
+            return redirect(url_for('superadmin.company_role_edit', company_id=c.id, role_id=r.id))
+
+        exists = (
+            db.session.query(CompanyRole)
+            .filter(CompanyRole.company_id == str(c.id), CompanyRole.name == name, CompanyRole.id != r.id)
+            .first()
+        )
+        if exists:
+            flash('Ya existe otro rol con ese nombre.', 'error')
+            return redirect(url_for('superadmin.company_role_edit', company_id=c.id, role_id=r.id))
+
+        perms = {}
+        for k in MODULE_KEYS:
+            perms[k] = bool(request.form.get(f'perm_{k}') == 'on')
+
+        r.name = name
+        r.set_permissions(perms)
+        db.session.commit()
+        flash('Rol actualizado.', 'success')
+        return redirect(url_for('superadmin.company_roles', company_id=c.id))
+
+    perms = r.get_permissions() if getattr(r, 'get_permissions', None) else {}
+    return render_template(
+        'superadmin/company_role_edit.html',
+        title=f'Editar rol · {c.name}',
+        company=c,
+        role=r,
+        module_keys=MODULE_KEYS,
+        perms=perms,
+    )
+
+
+@bp.post('/companies/<company_id>/roles/<role_id>/delete')
+@login_required
+def company_role_delete(company_id: str, role_id: str):
+    _require_zentral_admin()
+    c = db.session.get(Company, str(company_id))
+    if not c:
+        flash('Empresa inválida.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    r = db.session.get(CompanyRole, str(role_id))
+    if not r or str(getattr(r, 'company_id', '') or '') != str(c.id):
+        flash('Rol inválido.', 'error')
+        return redirect(url_for('superadmin.company_roles', company_id=c.id))
+
+    try:
+        role_name = str(getattr(r, 'name', '') or '').strip()
+        db.session.query(User).filter(User.company_id == str(c.id), User.role == role_name).update({User.role: 'vendedor'})
+    except Exception:
+        pass
+
+    db.session.delete(r)
+    db.session.commit()
+    flash('Rol eliminado.', 'success')
+    return redirect(url_for('superadmin.company_roles', company_id=c.id))

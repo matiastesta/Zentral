@@ -21,6 +21,7 @@ TENANT_TABLES = [
     'expense',
     'supplier',
     'expense_category',
+    'company_role',
     'user',
 ]
 
@@ -182,7 +183,13 @@ def bootstrap_schema(reset: bool) -> None:
         except Exception:
             pass
 
-        if email_nullable and (not has_unique_username) and has_unique_company_username:
+        has_password_plain = False
+        try:
+            has_password_plain = 'password_plain' in set(cols.keys())
+        except Exception:
+            has_password_plain = False
+
+        if email_nullable and (not has_unique_username) and has_unique_company_username and has_password_plain:
             return
 
         db.session.execute(text('PRAGMA foreign_keys=OFF'))
@@ -197,8 +204,8 @@ def bootstrap_schema(reset: bool) -> None:
                     display_name VARCHAR(120),
                     email VARCHAR(255),
                     password_hash VARCHAR(255) NOT NULL,
+                    password_plain TEXT,
                     role VARCHAR(32) NOT NULL,
-                    level INTEGER NOT NULL,
                     created_by_user_id INTEGER,
                     permissions_json TEXT NOT NULL,
                     is_master BOOLEAN NOT NULL,
@@ -213,13 +220,15 @@ def bootstrap_schema(reset: bool) -> None:
             text(
                 """
                 INSERT INTO "user" (
-                    id, company_id, username, display_name, email, password_hash, role, level,
+                    id, company_id, username, display_name, email, password_hash, password_plain, role,
                     created_by_user_id, permissions_json, is_master, active
                 )
                 SELECT
                     id, company_id, username, NULLIF(TRIM(COALESCE(display_name, '')), ''),
                     NULLIF(TRIM(COALESCE(email, '')), ''),
-                    password_hash, role, level,
+                    password_hash,
+                    NULLIF(TRIM(COALESCE(password_plain, '')), ''),
+                    role,
                     created_by_user_id, permissions_json, is_master, active
                 FROM "user_old"
                 """
@@ -238,7 +247,7 @@ def bootstrap_schema(reset: bool) -> None:
             reset_public_schema()
             db.session.commit()
 
-    from app.models import Company, SystemMeta, User
+    from app.models import Company, CompanyRole, SystemMeta, User
 
     if is_sqlite:
         db.create_all()
@@ -254,6 +263,7 @@ def bootstrap_schema(reset: bool) -> None:
                 CalendarUserConfig,
                 CashCount,
                 Category,
+                CompanyRole,
                 Customer,
                 Employee,
                 Expense,
@@ -268,6 +278,7 @@ def bootstrap_schema(reset: bool) -> None:
 
             for m in (
                 Company,
+                CompanyRole,
                 SystemMeta,
                 User,
                 BusinessSettings,
@@ -336,7 +347,6 @@ def bootstrap_schema(reset: bool) -> None:
                 is_master=True,
                 active=True,
                 company_id=None,
-                level=0,
             )
             admin.set_permissions_all(True)
             db.session.add(admin)
@@ -344,7 +354,6 @@ def bootstrap_schema(reset: bool) -> None:
             admin.is_master = True
             admin.active = True
             admin.company_id = None
-            admin.level = 0
             admin.role = 'zentral_admin'
             admin.set_permissions_all(True)
             admin.username = admin_username
@@ -368,7 +377,6 @@ def bootstrap_schema(reset: bool) -> None:
             is_master=False,
             active=True,
             company_id=str(c.id),
-            level=1,
         )
         demo_user.set_password(demo_pass)
         demo_user.set_permissions_all(True)

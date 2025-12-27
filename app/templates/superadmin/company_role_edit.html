@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">{% if role %}Editar rol{% else %}Nuevo rol{% endif %}</h1>
+        <p class="mt-1 text-sm text-gray-600">Definí permisos por módulo para reutilizar en usuarios.</p>
+    </div>
+    <div class="flex items-center gap-2">
+        <a href="{{ url_for('superadmin.company_roles', company_id=company.id) }}" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md bg-gray-100 hover:bg-gray-200">Volver</a>
+    </div>
+</div>
+
+<div class="p-5 bg-white rounded-lg shadow max-w-3xl">
+    <form method="post" class="space-y-4">
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Nombre del rol</label>
+            <input name="name" class="w-full px-3 py-2 text-sm border rounded-md" value="{{ role.name if role else '' }}" placeholder="Ej: vendedor" required>
+        </div>
+
+        <div class="border border-gray-200 rounded-xl p-3">
+            <div class="text-xs font-semibold text-gray-700">Permisos</div>
+            <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                {% for k in module_keys %}
+                <label class="inline-flex items-center gap-2">
+                    <input name="perm_{{ k }}" type="checkbox" {% if perms.get(k) %}checked{% endif %}>
+                    {{ k }}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="pt-2">
+            <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Guardar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

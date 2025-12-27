@@ -41,20 +41,22 @@
                                 <input id="mov-ventas-range" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white" placeholder="📅 Período" readonly>
                             </th>
                             <th class="px-4 py-1">
-                                <select id="mov-ventas-tipo" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
-                                    <option value="">Tipo (todos)</option>
+                                <select id="mov-ventas-tipo" multiple size="1" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
+                                    <option value="" selected>Tipo (todos)</option>
                                     <option value="Venta">Venta</option>
-                                    <option value="CobroCC">Cobro cuenta corriente</option>
+                                    <option value="Cobro">Cobro</option>
+                                    <option value="CuentaCorriente">Cuenta corriente</option>
+                                    <option value="Cambio">Cambio</option>
                                 </select>
                             </th>
                             <th class="px-4 py-1"></th>
                             <th class="px-4 py-1">
-                                <select id="mov-ventas-pago" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
-                                    <option value="">Pago (todas)</option>
-                                    <option>Efectivo</option>
-                                    <option>Transferencia</option>
-                                    <option>Débito</option>
-                                    <option>Crédito</option>
+                                <select id="mov-ventas-pago" multiple size="1" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
+                                    <option value="" selected>Pago (todas)</option>
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                    <option value="Débito">Débito</option>
+                                    <option value="Crédito">Crédito</option>
                                 </select>
                             </th>
                             <th class="px-4 py-1"></th>
@@ -68,7 +70,8 @@
         </div>
 
         <div id="panel-mov-egresos" class="space-y-3 hidden">
-            <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
+            <div class="bg-white rounded-lg shadow border border-gray-200">
+                <div class="overflow-auto" style="max-height: 65vh;">
                 <table class="min-w-full table-fixed divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
@@ -76,6 +79,7 @@
                             <th class="w-56 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
                             <th class="w-56 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Proveedor</th>
                             <th class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Valor</th>
+                            <th class="w-32 px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">Pago</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nota</th>
                             <th class="w-14 px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase"></th>
                         </tr>
@@ -106,13 +110,23 @@
                                 </div>
                             </th>
                             <th class="px-4 py-1"></th>
+                            <th class="px-4 py-1">
+                                <select id="mov-egresos-pago" multiple size="1" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
+                                    <option value="" selected>Pago (todas)</option>
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                    <option value="Débito">Débito</option>
+                                    <option value="Crédito">Crédito</option>
+                                </select>
+                            </th>
                             <th class="px-4 py-1"></th>
                         </tr>
                     </thead>
                     <tbody id="mov-egresos-tbody" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
+                        <tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
 
@@ -193,6 +207,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const fVentasPago = document.getElementById('mov-ventas-pago');
     const fVentasTipo = document.getElementById('mov-ventas-tipo');
     const fEgresosRange = document.getElementById('mov-egresos-range');
+    const fEgresosPago = document.getElementById('mov-egresos-pago');
     const fEgresosCatBtn = document.getElementById('mov-egresos-cat-btn');
     const fEgresosCatMenu = document.getElementById('mov-egresos-cat-menu');
     const fEgresosCatItems = document.getElementById('mov-egresos-cat-items');
@@ -257,6 +272,61 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function normKey(v) {
         return String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    }
+
+    function getSelectedValues(selectEl) {
+        if (!selectEl) return [];
+        try {
+            if (selectEl.selectedOptions) {
+                return Array.from(selectEl.selectedOptions)
+                    .map(o => String(o.value || '').trim())
+                    .filter(Boolean);
+            }
+        } catch (e) {
+        }
+        const v = String(selectEl.value || '').trim();
+        return v ? [v] : [];
+    }
+
+    function saleKind(s) {
+        const st = String(s?.type || s?.sale_type || '').trim();
+        const pm = normKey(s?.payment_method || '');
+        const onAcc = !!(s && (s.on_account === true || s.on_account === 1 || s.on_account === '1'));
+
+        if (st === 'CobroCC') return 'Cobro';
+        if (st === 'Cambio') return 'Cambio';
+        if (onAcc || pm.includes('cuenta corriente') || pm === 'cuenta corriente') return 'CuentaCorriente';
+        return 'Venta';
+    }
+
+    function labelTipo(s) {
+        const k = saleKind(s);
+        if (k === 'Cobro') return 'Cobro';
+        if (k === 'CuentaCorriente') return 'Cuenta corriente';
+        if (k === 'Cambio') return 'Cambio';
+        return 'Venta';
+    }
+
+    function buildTicketDetail(s) {
+        try {
+            const items = Array.isArray(s?.items) ? s.items : [];
+            if (!items.length) return '';
+            const parts = [];
+            for (let i = 0; i < items.length; i++) {
+                const it = items[i] || {};
+                const name = String(it?.nombre || it?.product_name || 'Producto').trim();
+                const qty = parseNumeroSeguro(it?.cantidad ?? it?.qty);
+                if (!name) continue;
+                const qtxt = (qty && isFinite(qty)) ? (String(qty.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + 'x ') : '';
+                parts.push(qtxt + name);
+                if (parts.length >= 3) break;
+            }
+            if (!parts.length) return '';
+            const suffix = (items.length > parts.length) ? '…' : '';
+            return 'Detalle: ' + parts.join(', ') + suffix;
+        } catch (e) {
+            return '';
+        }
     }
 
     let egresosCatsAll = [];
@@ -506,8 +576,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!tbodyVentas) return;
         const q = String(fVentasQ?.value || '').trim().toLowerCase();
         const rango = parseRangoFechas(fVentasRange?.value);
-        const pago = String(fVentasPago?.value || '').trim();
-        const tipo = String(fVentasTipo?.value || '').trim();
+        const pagos = getSelectedValues(fVentasPago);
+        const tipos = getSelectedValues(fVentasTipo);
 
         tbodyVentas.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
         getSalesFromApi(rango, function (sales) {
@@ -516,28 +586,24 @@ document.addEventListener('DOMContentLoaded', function () {
             list = list.filter(s => {
                 const txt = (String(s?.ticket || '') + ' ' + String(s?.notes || '')).toLowerCase();
                 if (q && !txt.includes(q)) return false;
-                if (pago && String(s?.payment_method || '') !== pago) return false;
-                if (tipo) {
-                    const st = String(s?.type || s?.sale_type || '').trim();
-                    if (tipo === 'CobroCC') {
-                        if (st !== 'CobroCC') return false;
-                    } else if (tipo === 'Venta') {
-                        if (st === 'CobroCC') return false;
-                    } else {
-                        if (st !== tipo) return false;
-                    }
-                }
+                const pm = String(s?.payment_method || '').trim();
+                if (pagos.length && pagos.indexOf(pm) < 0) return false;
+
+                const kind = saleKind(s);
+                if (tipos.length && tipos.indexOf(kind) < 0) return false;
+
                 const dt = parseFecha(s?.fecha || s?.date || '');
                 if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
                 return true;
             });
             list.sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
 
-            const labelTipo = function (s) {
-                const t = String(s?.type || s?.sale_type || '').trim();
-                if (t === 'CobroCC') return 'Cobro CC';
-                if (t) return t;
-                return 'Venta';
+            const buildNotes = function (s) {
+                const base = String(s?.notes || '').trim();
+                const detail = buildTicketDetail(s);
+                if (!detail) return base;
+                if (!base) return detail;
+                return base + ' · ' + detail;
             };
 
             lastRendered = list.map(s => ({
@@ -546,7 +612,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 Tipo: labelTipo(s),
                 Total: formatearMoneda(parseFloat(s?.total || 0) || 0),
                 Pago: s?.payment_method || '',
-                Notas: s?.notes || ''
+                Notas: buildNotes(s)
             }));
 
             tbodyVentas.innerHTML = '';
@@ -564,7 +630,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + labelTipo(s) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(s?.payment_method || '') + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(s?.notes || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(buildNotes(s) || '') + '</td>'
                     + '<td class="px-4 py-3 text-center">'
                     +   '<button type="button" class="btn-del-sale h-8 w-8 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-ticket="' + String(ticket).replace(/"/g, '&quot;') + '" title="Eliminar">'
                     +       '<i class="fas fa-trash text-[12px]"></i>'
@@ -603,6 +669,7 @@ document.addEventListener('DOMContentLoaded', function () {
             updateEgresosFilterOptions(egresos);
 
             const rango = parseRangoFechas(fEgresosRange?.value);
+            const pagos = getSelectedValues(fEgresosPago);
 
             let list = Array.isArray(egresos) ? egresos.slice() : [];
             list = list.filter(e => {
@@ -617,6 +684,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 const dt = parseFecha(e?.fecha || '');
                 if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
+
+                const pay = String(e?.forma_pago || e?.payment_method || e?.pago || '').trim();
+                if (pagos.length && pagos.indexOf(pay) < 0) return false;
+
                 return true;
             });
             list.sort((a, b) => String(b?.fecha || '').localeCompare(String(a?.fecha || '')));
@@ -626,12 +697,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 Categoría: e?.categoria || '',
                 Proveedor: e?.supplier_name || e?.proveedor || '',
                 Valor: formatearMoneda(parseFloat(e?.valor || 0) || 0),
+                Pago: String(e?.forma_pago || e?.payment_method || e?.pago || ''),
                 Nota: e?.nota || ''
             }));
 
             tbodyEgresos.innerHTML = '';
             if (!list.length) {
-                tbodyEgresos.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+                tbodyEgresos.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
                 return;
             }
             list.forEach(e => {
@@ -643,6 +715,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     + '<td class="px-4 py-3 text-sm text-gray-900">' + String(e?.categoria || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.supplier_name || e?.proveedor || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(e?.valor || 0) || 0) + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(e?.forma_pago || e?.payment_method || e?.pago || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.nota || '') + '</td>'
                     + '<td class="px-4 py-3 text-center">'
                     +   '<button type="button" class="btn-del-exp h-8 w-8 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-expense-id="' + String(eid).replace(/"/g, '&quot;') + '" title="Eliminar">'
@@ -741,6 +814,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (tabArqueo) tabArqueo.addEventListener('click', function () { setTab('arqueo'); });
 
     [fVentasQ, fVentasPago, fVentasTipo].forEach(el => { if (el) el.addEventListener('input', renderVentas); if (el) el.addEventListener('change', renderVentas); });
+    if (fEgresosPago) fEgresosPago.addEventListener('change', function () { try { renderEgresos(); } catch (e) { } });
 
     if (fEgresosCatBtn && fEgresosCatMenu) {
         fEgresosCatBtn.addEventListener('click', function () {

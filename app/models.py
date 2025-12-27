@@ -39,10 +39,37 @@ class Company(db.Model):
     name = db.Column(db.String(255), nullable=False)
     slug = db.Column(db.String(64), nullable=False, unique=True, index=True)
     plan = db.Column(db.String(64), nullable=False, default='standard')
+    notes = db.Column(db.Text, nullable=True)
+    admin_user_id = db.Column(db.Integer, nullable=True)
     status = db.Column(db.String(16), nullable=False, default='active')
     paused_at = db.Column(db.DateTime, nullable=True)
     pause_reason = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class CompanyRole(db.Model):
+    __tablename__ = 'company_role'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
+    name = db.Column(db.String(64), nullable=False)
+    permissions_json = db.Column(db.Text, nullable=False, default='{}')
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'name', name='uq_company_role_company_name'),
+    )
+
+    def get_permissions(self) -> dict:
+        try:
+            parsed = json.loads(self.permissions_json or '{}')
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+
+    def set_permissions(self, perms: dict) -> None:
+        payload = perms if isinstance(perms, dict) else {}
+        self.permissions_json = json.dumps(payload, ensure_ascii=False)
 
 
 class User(UserMixin, db.Model):
@@ -52,8 +79,8 @@ class User(UserMixin, db.Model):
     display_name = db.Column(db.String(120), nullable=True)
     email = db.Column(db.String(255), nullable=True, unique=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
+    password_plain = db.Column(db.Text, nullable=True)
     role = db.Column(db.String(32), nullable=False, default='vendedor')
-    level = db.Column(db.Integer, nullable=False, default=2)
     created_by_user_id = db.Column(db.Integer, nullable=True)
     permissions_json = db.Column(db.Text, nullable=False, default='{}')
     is_master = db.Column(db.Boolean, nullable=False, default=False)
@@ -64,7 +91,12 @@ class User(UserMixin, db.Model):
     )
 
     def set_password(self, password: str) -> None:
-        self.password_hash = generate_password_hash(password or '')
+        raw = password or ''
+        self.password_hash = generate_password_hash(raw)
+        try:
+            self.password_plain = raw
+        except Exception:
+            pass
 
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash or '', password or '')
@@ -102,8 +134,23 @@ class User(UserMixin, db.Model):
             return False
         if self.is_master:
             return True
-        if self.role in {'admin', 'company_admin'}:
+        if self.role in {'zentral_admin'}:
             return True
+
+        try:
+            cid = str(getattr(self, 'company_id', '') or '').strip()
+            if cid:
+                role_row = (
+                    db.session.query(CompanyRole)
+                    .filter(CompanyRole.company_id == cid, CompanyRole.name == str(self.role or '').strip())
+                    .first()
+                )
+                if role_row:
+                    perms = role_row.get_permissions()
+                    if bool(perms.get(str(module_name), False)):
+                        return True
+        except Exception:
+            pass
         perms = self.get_permissions()
         return bool(perms.get(str(module_name), False))
 
@@ -122,6 +169,10 @@ class BusinessSettings(db.Model):
     label_customers = db.Column(db.String(64), nullable=True)
     label_products = db.Column(db.String(64), nullable=True)
     primary_color = db.Column(db.String(16), nullable=True)
+
+    background_image_filename = db.Column(db.String(255), nullable=True)
+    background_brightness = db.Column(db.Float, nullable=True)
+    background_contrast = db.Column(db.Float, nullable=True)
 
     insight_margin_delta_pp = db.Column(db.Float, nullable=True)
     insight_profitability_delta_pp = db.Column(db.Float, nullable=True)
@@ -254,7 +305,7 @@ class Sale(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
-    ticket = db.Column(db.String(32), nullable=False, unique=True, index=True)
+    ticket = db.Column(db.String(32), nullable=False, index=True)
     sale_date = db.Column(db.Date, nullable=False, index=True)
     sale_type = db.Column(db.String(16), nullable=False, default='Venta')
     status = db.Column(db.String(16), nullable=False, default='Completada')
@@ -281,6 +332,10 @@ class Sale(db.Model):
     created_by_user_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'ticket', name='uq_sale_company_ticket'),
+    )
 
     items = db.relationship('SaleItem', backref='sale', cascade='all, delete-orphan', lazy=True)
 

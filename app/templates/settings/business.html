@@ -6,31 +6,52 @@
     <p class="mt-1 text-sm text-gray-600">Define los datos básicos, rubro e identidad visual para personalizar la app.</p>
 </div>
 
-<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-    <!-- Datos del negocio -->
-    <div class="p-5 bg-white rounded-lg shadow">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Datos generales</h2>
+<div class="max-w-5xl">
+    <div class="p-5 bg-white rounded-lg shadow border border-gray-100">
+        <h2 class="text-lg font-medium text-gray-900 mb-1">Datos generales</h2>
+        <p class="text-sm text-gray-600 mb-4">Configurá datos del negocio e identidad visual. El color se aplica en botones, menús y acentos.</p>
+
+        {% set _industry = (business.industry if business and business.industry else '') %}
+        {% set _industry_is_known = _industry in ['Tienda', 'Servicios profesionales', 'Otro'] %}
+        {% set _industry_choice = _industry if _industry_is_known else 'Otro' %}
+        {% set _industry_other = '' if _industry_is_known else _industry %}
+
         <form method="post" enctype="multipart/form-data" class="space-y-4">
             <input type="hidden" name="action" value="save_business">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Nombre del negocio</label>
-                <input name="business_name" type="text" value="{{ business.name if business else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Mi Tienda SRL">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Logo</label>
-                <input name="business_logo" type="file" class="mt-1 block w-full text-sm text-gray-500">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Rubro principal</label>
-                <select name="business_industry" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option {% if business and (business.industry or '') == 'Retail / Tienda' %}selected{% endif %}>Retail / Tienda</option>
-                    <option {% if business and (business.industry or '') == 'Gastronomía' %}selected{% endif %}>Gastronomía</option>
-                    <option {% if business and (business.industry or '') == 'Servicios profesionales' %}selected{% endif %}>Servicios profesionales</option>
-                    <option {% if business and (business.industry or '') == 'Salud / Consultorios' %}selected{% endif %}>Salud / Consultorios</option>
-                    <option {% if business and (business.industry or '') == 'Otro' %}selected{% endif %}>Otro</option>
-                </select>
-            </div>
+
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700">Nombre del negocio</label>
+                    <input name="business_name" type="text" value="{{ business.name if business else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Mi Tienda SRL">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Logo</label>
+                    <input name="business_logo" type="file" class="mt-1 block w-full text-sm text-gray-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Color principal (branding)</label>
+                    <div class="mt-1 flex items-center gap-3">
+                        <input id="primary-color" name="primary_color" type="color" value="{{ business.primary_color if business and business.primary_color else '#0d1067' }}" class="h-10 w-16 p-0 border rounded-md">
+                        <div class="text-xs text-gray-500">Se verá reflejado en los azules de la app.</div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Rubro principal</label>
+                    <select id="business-industry" name="business_industry" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md bg-white">
+                        <option value="Tienda" {% if _industry_choice == 'Tienda' %}selected{% endif %}>Tienda</option>
+                        <option value="Servicios profesionales" {% if _industry_choice == 'Servicios profesionales' %}selected{% endif %}>Servicios profesionales</option>
+                        <option value="Otro" {% if _industry_choice == 'Otro' %}selected{% endif %}>Otro</option>
+                    </select>
+                </div>
+
+                <div id="industry-other-wrap" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700">Rubro</label>
+                    <input id="business-industry-other" name="business_industry_other" type="text" value="{{ _industry_other }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Escribí tu rubro">
+                </div>
+
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Email</label>
                     <input name="business_email" type="email" value="{{ business.email if business and business.email else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="contacto@tu-negocio.com">
@@ -39,70 +60,46 @@
                     <label class="block text-sm font-medium text-gray-700">Teléfono</label>
                     <input name="business_phone" type="text" value="{{ business.phone if business and business.phone else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: +54 11 ...">
                 </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700">Dirección</label>
+                    <input name="business_address" type="text" value="{{ business.address if business and business.address else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Calle, número, ciudad, país">
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Dirección fiscal</label>
-                <input name="business_address" type="text" value="{{ business.address if business and business.address else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Calle, número, ciudad, país">
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div class="p-4 rounded-lg border border-gray-200 bg-gray-50">
+                    <div class="text-sm font-semibold text-gray-900">Imagen de fondo</div>
+                    <div class="mt-1 text-xs text-gray-500">Subí un PNG para usar como fondo en todos los módulos.</div>
+                    <div class="mt-3">
+                        <input name="background_image" type="file" accept="image/png" class="block w-full text-sm text-gray-500">
+                    </div>
+                </div>
+
+                <div class="p-4 rounded-lg border border-gray-200 bg-gray-50">
+                    <div class="text-sm font-semibold text-gray-900">Ajustes de fondo</div>
+                    <div class="mt-1 text-xs text-gray-500">Ajustá brillo y contraste para que sea cómodo y estético.</div>
+                    <div class="mt-3 space-y-3">
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <label class="text-xs font-medium text-gray-700">Brillo</label>
+                                <span id="bg-brightness-label" class="text-[11px] text-gray-500"></span>
+                            </div>
+                            <input id="bg-brightness" name="background_brightness" type="range" min="0.6" max="1.6" step="0.05" value="{{ business.background_brightness if business and business.background_brightness else 1.0 }}" class="w-full">
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <label class="text-xs font-medium text-gray-700">Contraste</label>
+                                <span id="bg-contrast-label" class="text-[11px] text-gray-500"></span>
+                            </div>
+                            <input id="bg-contrast" name="background_contrast" type="range" min="0.6" max="1.6" step="0.05" value="{{ business.background_contrast if business and business.background_contrast else 1.0 }}" class="w-full">
+                        </div>
+                    </div>
+                </div>
             </div>
-            <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+
+            <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color: var(--brand-color);">
                 Guardar cambios
-            </button>
-        </form>
-    </div>
-
-    <!-- Personalización multi-rubro -->
-    <div class="p-5 bg-white rounded-lg shadow">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Personalización por rubro</h2>
-        <p class="text-sm text-gray-600 mb-4">Adapta los textos e iconografía según tu tipo de negocio (ej: "Pacientes" en vez de "Clientes").</p>
-        <form method="post" class="space-y-4">
-            <input type="hidden" name="action" value="save_personalization">
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Etiqueta para "Clientes"</label>
-                    <input name="label_customers" type="text" value="{{ business.label_customers if business and business.label_customers else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Clientes / Pacientes">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Etiqueta para "Productos"</label>
-                    <input name="label_products" type="text" value="{{ business.label_products if business and business.label_products else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Productos / Servicios">
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Color principal (branding)</label>
-                <input name="primary_color" type="color" value="{{ business.primary_color if business and business.primary_color else '#0d1067' }}" class="mt-1 h-10 w-16 p-0 border rounded-md">
-            </div>
-            <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
-                Guardar personalización
-            </button>
-        </form>
-    </div>
-
-    <!-- Insights automáticos -->
-    <div class="p-5 bg-white rounded-lg shadow">
-        <h2 class="text-lg font-medium text-gray-900 mb-1">Insights automáticos</h2>
-        <p class="text-sm text-gray-600 mb-4">Define los umbrales para que Zentral priorice dónde mirar primero (sin ser una caja negra).</p>
-        <form method="post" class="space-y-4">
-            <input type="hidden" name="action" value="save_insights">
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Umbral caída/mejora de margen (pp)</label>
-                <input name="insight_margin_delta_pp" type="text" value="{{ business.insight_margin_delta_pp if business and business.insight_margin_delta_pp is not none else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: 5">
-                <div class="mt-1 text-xs text-gray-500">Se usa para detectar cambios significativos en margen bruto vs período anterior.</div>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Umbral mejora/caída de rentabilidad (pp)</label>
-                <input name="insight_profitability_delta_pp" type="text" value="{{ business.insight_profitability_delta_pp if business and business.insight_profitability_delta_pp is not none else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: 4">
-                <div class="mt-1 text-xs text-gray-500">Se usa para detectar variaciones en Resultado neto % vs período anterior.</div>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700">Gastos / Ventas máximo (%)</label>
-                <input name="insight_expenses_ratio_pct" type="text" value="{{ business.insight_expenses_ratio_pct if business and business.insight_expenses_ratio_pct is not none else '' }}" class="mt-1 block w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: 45">
-                <div class="mt-1 text-xs text-gray-500">Se usa para marcar gastos desalineados (operativos + nómina) sobre ventas netas.</div>
-            </div>
-
-            <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
-                Guardar umbrales
             </button>
         </form>
     </div>
@@ -111,4 +108,45 @@
 
 {% block scripts %}
 {{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const selIndustry = document.getElementById('business-industry');
+    const wrapOther = document.getElementById('industry-other-wrap');
+    const inputOther = document.getElementById('business-industry-other');
+
+    function syncIndustryOther() {
+        if (!selIndustry || !wrapOther) return;
+        const v = String(selIndustry.value || '').trim();
+        const on = (v === 'Otro');
+        wrapOther.classList.toggle('hidden', !on);
+        if (inputOther) {
+            if (on) inputOther.focus();
+            if (!on) inputOther.value = '';
+        }
+    }
+
+    const brightness = document.getElementById('bg-brightness');
+    const contrast = document.getElementById('bg-contrast');
+    const brightnessLabel = document.getElementById('bg-brightness-label');
+    const contrastLabel = document.getElementById('bg-contrast-label');
+
+    function fmtRange(v) {
+        const n = parseFloat(String(v || ''));
+        if (!isFinite(n)) return '';
+        return String(n.toFixed(2)).replace('.', ',') + '×';
+    }
+
+    function syncRangeLabels() {
+        if (brightnessLabel && brightness) brightnessLabel.textContent = fmtRange(brightness.value);
+        if (contrastLabel && contrast) contrastLabel.textContent = fmtRange(contrast.value);
+    }
+
+    if (selIndustry) selIndustry.addEventListener('change', syncIndustryOther);
+    if (brightness) brightness.addEventListener('input', syncRangeLabels);
+    if (contrast) contrast.addEventListener('input', syncRangeLabels);
+
+    syncIndustryOther();
+    syncRangeLabels();
+});
+</script>
 {% endblock %}
