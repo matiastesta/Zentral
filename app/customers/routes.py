@@ -11,6 +11,14 @@ from app.permissions import module_required
 from app.customers import bp
 
 
+def _company_id() -> str:
+    try:
+        from flask import g
+        return str(getattr(g, 'company_id', '') or '').strip()
+    except Exception:
+        return ''
+
+
 def _dt_to_ms(dt):
     try:
         return int(dt.timestamp() * 1000) if dt else None
@@ -64,7 +72,11 @@ def list_customers_api():
     if limit <= 0 or limit > 5000:
         limit = 2000
 
-    query = db.session.query(Customer)
+    company_id = _company_id()
+    if not company_id:
+        return jsonify({'ok': True, 'items': []})
+
+    query = db.session.query(Customer).filter(Customer.company_id == company_id)
     if q:
         like = f"%{q}%"
         query = query.filter(
@@ -83,7 +95,10 @@ def list_customers_api():
 @module_required('customers')
 def get_customer_api(customer_id):
     cid = str(customer_id or '').strip()
-    row = db.session.get(Customer, cid)
+    company_id = _company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    row = db.session.query(Customer).filter(Customer.company_id == company_id, Customer.id == cid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     return jsonify({'ok': True, 'item': _serialize_customer(row)})
@@ -122,11 +137,15 @@ def create_customer_api():
     payload = request.get_json(silent=True) or {}
     cid = str(payload.get('id') or '').strip() or uuid4().hex
 
-    row = db.session.get(Customer, cid)
+    company_id = _company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    row = db.session.query(Customer).filter(Customer.company_id == company_id, Customer.id == cid).first()
     if row:
         return jsonify({'ok': False, 'error': 'already_exists'}), 400
 
-    row = Customer(id=cid)
+    row = Customer(id=cid, company_id=company_id)
     _apply_customer_payload(row, payload)
 
     db.session.add(row)
@@ -143,7 +162,10 @@ def create_customer_api():
 @module_required('customers')
 def update_customer_api(customer_id):
     cid = str(customer_id or '').strip()
-    row = db.session.get(Customer, cid)
+    company_id = _company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    row = db.session.query(Customer).filter(Customer.company_id == company_id, Customer.id == cid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
@@ -163,7 +185,10 @@ def update_customer_api(customer_id):
 @module_required('customers')
 def delete_customer_api(customer_id):
     cid = str(customer_id or '').strip()
-    row = db.session.get(Customer, cid)
+    company_id = _company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    row = db.session.query(Customer).filter(Customer.company_id == company_id, Customer.id == cid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     try:
@@ -183,13 +208,17 @@ def upsert_customers_bulk():
     items = payload.get('items')
     items_list = items if isinstance(items, list) else []
 
+    company_id = _company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     out = []
     for it in items_list:
         d = it if isinstance(it, dict) else {}
         cid = str(d.get('id') or '').strip() or uuid4().hex
-        row = db.session.get(Customer, cid)
+        row = db.session.query(Customer).filter(Customer.company_id == company_id, Customer.id == cid).first()
         if not row:
-            row = Customer(id=cid)
+            row = Customer(id=cid, company_id=company_id)
             db.session.add(row)
         _apply_customer_payload(row, d)
         out.append(row)

@@ -1,4 +1,4 @@
-from datetime import date as dt_date, datetime
+from datetime import date as dt_date, datetime, timedelta
 from typing import Any, Dict, List
 
 from flask import current_app, g, jsonify, render_template, request, url_for
@@ -293,6 +293,39 @@ def debt_summary():
         except Exception:
             current_app.logger.exception('Failed to compute dias for sales debt summary')
     return jsonify({'ok': True, 'saldo': saldo, 'dias': dias}), 200
+
+
+@bp.get('/api/sales/overdue-customers')
+@login_required
+@module_required('sales')
+def overdue_customers_count():
+    days = int(request.args.get('days') or 30)
+    if days <= 0 or days > 3650:
+        days = 30
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'count': 0}), 200
+
+    cutoff = dt_date.today() - timedelta(days=days)
+    q = (
+        db.session.query(Sale.customer_id, Sale.customer_name)
+        .filter(Sale.company_id == cid)
+        .filter(Sale.sale_type == 'Venta')
+        .filter(Sale.status != 'Reemplazada')
+        .filter(Sale.due_amount > 0)
+        .filter(Sale.sale_date <= cutoff)
+    )
+    rows = q.all()
+    uniq = set()
+    for r in rows:
+        c_id = str(getattr(r, 'customer_id', '') or '').strip()
+        c_name = str(getattr(r, 'customer_name', '') or '').strip()
+        key = c_id or c_name
+        if key:
+            uniq.add(key)
+
+    return jsonify({'ok': True, 'count': len(uniq)}), 200
 
 
 @bp.post('/api/sales/settle')

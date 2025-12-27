@@ -43,6 +43,45 @@
                     </div>
                 </div>
             </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="expenses_period" data-href="{{ url_for('expenses.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">🧾</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Gastos del período</div>
+                        <div id="kpi-total-expenses" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 hidden" data-default-hidden="1" data-card-key="gross_margin" title="(Ventas – CMV) / Ventas">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">📦</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Margen bruto (%)</div>
+                        <div id="kpi-gross-margin" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Ventas – CMV</div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 hidden" data-default-hidden="1" data-card-key="net_margin" title="Resultado final / Ventas">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">✅</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Margen neto (%)</div>
+                        <div id="kpi-net-margin" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Resultado / Ventas</div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 hidden" data-default-hidden="1" data-card-key="break_even" title="Estimación basada en gastos y CMV del período.">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center">⚖️</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Punto de equilibrio estimado</div>
+                        <div id="kpi-break-even" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Ventas necesarias</div>
+                    </div>
+                </div>
+            </div>
             <div class="p-4 bg-white rounded-lg shadow border border-gray-200" data-card-key="estimated_result" title="Resultado calculado por criterio devengado. No representa flujo de caja.">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">📈</div>
@@ -94,31 +133,36 @@
         <div class="flex items-center justify-between">
             <h2 class="text-sm font-semibold text-gray-900">Alertas críticas</h2>
         </div>
-        <div id="block-alerts" data-block-container="alerts" class="grid grid-cols-1 gap-4 mt-3">
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200" data-card-key="alerts_active">
+        <div id="block-alerts" data-block-container="alerts" class="grid grid-cols-1 gap-4 mt-3 md:grid-cols-3">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="alert_customers_overdue" data-href="{{ url_for('customers.index') }}">
                 <div class="flex items-center gap-3">
-                    <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">🚨</div>
+                    <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">⏰</div>
                     <div class="min-w-0 w-full">
-                        <div class="text-sm font-medium text-gray-500">Alertas activas</div>
-                        <div id="kpi-alerts-total" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
-                        <div id="sk-kpi-alerts-total" class="mt-2 h-4 w-20 bg-gray-100 rounded animate-pulse"></div>
+                        <div class="text-sm font-medium text-gray-500">Clientes con deuda vencida</div>
+                        <div id="kpi-alert-overdue" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Vencidos a la fecha</div>
                     </div>
                 </div>
-                <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                    <button type="button" class="w-full flex items-center justify-between px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50" data-href="{{ url_for('inventory.index') }}">
-                        <span class="text-gray-600">Stock crítico</span>
-                        <span class="font-semibold text-gray-900"><span id="kpi-alert-stock">—</span> <i class="fas fa-arrow-right text-gray-300 ml-1"></i></span>
-                    </button>
-                    <button type="button" class="w-full flex items-center justify-between px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50" data-href="{{ url_for('expenses.index') }}">
-                        <span class="text-gray-600">Gastos fuera de rango</span>
-                        <span class="font-semibold text-gray-900"><span id="kpi-alert-expenses">—</span> <i class="fas fa-arrow-right text-gray-300 ml-1"></i></span>
-                    </button>
-                    <button type="button" class="w-full flex items-center justify-between px-3 py-2 rounded-md border border-gray-200 hover:bg-gray-50" data-href="{{ url_for('customers.index') }}">
-                        <span class="text-gray-600">Vencimientos vencidos</span>
-                        <span class="font-semibold text-gray-900"><span id="kpi-alert-overdue">—</span> <i class="fas fa-arrow-right text-gray-300 ml-1"></i></span>
-                    </button>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="alert_expenses_out_of_range" data-href="{{ url_for('expenses.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center">📉</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Gastos fuera de rango</div>
+                        <div id="kpi-alert-expenses" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Fuera de umbral</div>
+                    </div>
                 </div>
-                <div class="mt-2 text-xs text-gray-500">Un solo bloque de alertas, orientado a acción.</div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="alert_stock_critical" data-href="{{ url_for('inventory.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">📦</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Stock crítico</div>
+                        <div id="kpi-alert-stock" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Bajo mínimo</div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -138,6 +182,55 @@
                     </div>
                 </div>
             </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="sales_today_count" data-href="{{ url_for('sales.index') }}" title="Cantidad total de tickets del día.">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">🔢</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Cantidad de ventas hoy</div>
+                        <div id="kpi-sales-today-count-only" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Tickets emitidos</div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="customers_served" data-href="{{ url_for('customers.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">👥</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Clientes atendidos</div>
+                        <div id="kpi-customers-served" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Únicos en el período</div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 hidden" data-default-hidden="1" data-card-key="sales_daily_pace" title="Promedio diario de ventas del período.">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">📅</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Ritmo de ventas diario</div>
+                        <div id="kpi-sales-daily-pace" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Promedio diario</div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 hidden" data-default-hidden="1" data-card-key="sales_accum_period" title="Ventas acumuladas en el período seleccionado.">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">📌</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Ventas acumuladas del período</div>
+                        <div id="kpi-sales-accum" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 hidden" data-default-hidden="1" data-card-key="sales_vs_prev_period" title="Comparación del último día del período contra el mismo día del período anterior.">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center">🧭</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Ventas vs mismo día período anterior</div>
+                        <div id="kpi-sales-vs-prev" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Δ vs anterior: <span id="kpi-sales-vs-prev-delta">—</span></div>
+                    </div>
+                </div>
+            </div>
             <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="avg_ticket" data-href="{{ url_for('sales.index') }}">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">🎟️</div>
@@ -148,17 +241,6 @@
                         <div id="sk-kpi-avg-ticket" class="mt-2 h-4 w-32 bg-gray-100 rounded animate-pulse"></div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </section>
-    <section>
-        <div class="p-5 bg-white rounded-lg shadow border border-gray-200">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-medium text-gray-900">Ventas, Gastos y Resultado – Evolución</h2>
-                <div class="text-xs text-gray-500" id="chart-evolution-subtitle">—</div>
-            </div>
-            <div class="h-72">
-                <canvas id="evolutionChart" class="w-full h-full"></canvas>
             </div>
         </div>
     </section>
@@ -185,9 +267,76 @@
                         <div class="text-sm font-medium text-gray-500">{{ label_products }} más vendido</div>
                         <div id="kpi-top-product" class="mt-1 text-2xl font-semibold text-gray-900 truncate">—</div>
                         <div class="mt-1 text-xs text-gray-500">Cantidad: <span id="kpi-top-product-qty" class="font-semibold">—</span></div>
+                        <div class="mt-1 text-xs text-gray-500">Venta bruta: <span id="kpi-top-product-gross" class="font-semibold">—</span></div>
                         <div id="sk-kpi-top-product" class="mt-2 h-4 w-40 bg-gray-100 rounded animate-pulse"></div>
                     </div>
                 </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="top_category" data-href="{{ url_for('inventory.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">🗂️</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Categoría más vendida</div>
+                        <div id="kpi-top-category" class="mt-1 text-2xl font-semibold text-gray-900 truncate">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Monto: <span id="kpi-top-category-amount" class="font-semibold">—</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="best_margin_product" data-href="{{ url_for('inventory.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">📈</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Producto con mayor margen</div>
+                        <div id="kpi-best-margin-product" class="mt-1 text-2xl font-semibold text-gray-900 truncate">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Margen: <span id="kpi-best-margin-pct" class="font-semibold">—</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="worst_margin_product" data-href="{{ url_for('inventory.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">📉</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Producto con menor margen</div>
+                        <div id="kpi-worst-margin-product" class="mt-1 text-2xl font-semibold text-gray-900 truncate">—</div>
+                        <div class="mt-1 text-xs text-gray-500">Margen: <span id="kpi-worst-margin-pct" class="font-semibold">—</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section>
+        <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-gray-900">Inventario</h2>
+        </div>
+        <div id="block-inventory" data-block-container="inventory" class="grid grid-cols-1 gap-4 mt-3 md:grid-cols-2">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="stock_total_value" data-href="{{ url_for('inventory.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">💎</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Valor total del stock</div>
+                        <div id="kpi-stock-total-value" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="stock_total_units" data-href="{{ url_for('inventory.index') }}">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-gray-50 text-gray-700 flex items-center justify-center">📦</div>
+                    <div class="min-w-0 w-full">
+                        <div class="text-sm font-medium text-gray-500">Unidades en stock</div>
+                        <div id="kpi-stock-total-units" class="mt-1 text-2xl font-semibold text-gray-900">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section>
+        <div class="p-5 bg-white rounded-lg shadow border border-gray-200">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-medium text-gray-900">Ventas, Gastos y Resultado – Evolución</h2>
+                <div class="text-xs text-gray-500" id="chart-evolution-subtitle">—</div>
+            </div>
+            <div class="h-72">
+                <canvas id="evolutionChart" class="w-full h-full"></canvas>
             </div>
         </div>
     </section>
@@ -299,6 +448,10 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const kpiTotalSales = document.getElementById('kpi-total-sales');
+    const kpiTotalExpenses = document.getElementById('kpi-total-expenses');
+    const kpiGrossMargin = document.getElementById('kpi-gross-margin');
+    const kpiNetMargin = document.getElementById('kpi-net-margin');
+    const kpiBreakEven = document.getElementById('kpi-break-even');
     const kpiEstimatedResult = document.getElementById('kpi-estimated-result');
     const kpiEstimatedMargin = document.getElementById('kpi-estimated-margin');
     const kpiCash = document.getElementById('kpi-cash');
@@ -306,19 +459,34 @@ document.addEventListener('DOMContentLoaded', function() {
     const kpiTotalAvailable = document.getElementById('kpi-total-available');
     const kpiNetCashflow = document.getElementById('kpi-net-cashflow');
 
-    const kpiAlertsTotal = document.getElementById('kpi-alerts-total');
     const kpiAlertStock = document.getElementById('kpi-alert-stock');
     const kpiAlertExpenses = document.getElementById('kpi-alert-expenses');
     const kpiAlertOverdue = document.getElementById('kpi-alert-overdue');
 
     const kpiSalesTodayTotal = document.getElementById('kpi-sales-today-total');
     const kpiSalesTodayCount = document.getElementById('kpi-sales-today-count');
+    const kpiSalesTodayCountOnly = document.getElementById('kpi-sales-today-count-only');
     const kpiAvgTicket = document.getElementById('kpi-avg-ticket');
+    const kpiCustomersServed = document.getElementById('kpi-customers-served');
+    const kpiSalesDailyPace = document.getElementById('kpi-sales-daily-pace');
+    const kpiSalesAccum = document.getElementById('kpi-sales-accum');
+    const kpiSalesVsPrev = document.getElementById('kpi-sales-vs-prev');
+    const kpiSalesVsPrevDelta = document.getElementById('kpi-sales-vs-prev-delta');
 
     const kpiBestCustomer = document.getElementById('kpi-best-customer');
     const kpiBestCustomerAmount = document.getElementById('kpi-best-customer-amount');
     const kpiTopProduct = document.getElementById('kpi-top-product');
     const kpiTopProductQty = document.getElementById('kpi-top-product-qty');
+    const kpiTopProductGross = document.getElementById('kpi-top-product-gross');
+    const kpiTopCategory = document.getElementById('kpi-top-category');
+    const kpiTopCategoryAmount = document.getElementById('kpi-top-category-amount');
+    const kpiBestMarginProduct = document.getElementById('kpi-best-margin-product');
+    const kpiBestMarginPct = document.getElementById('kpi-best-margin-pct');
+    const kpiWorstMarginProduct = document.getElementById('kpi-worst-margin-product');
+    const kpiWorstMarginPct = document.getElementById('kpi-worst-margin-pct');
+
+    const kpiStockTotalValue = document.getElementById('kpi-stock-total-value');
+    const kpiStockTotalUnits = document.getElementById('kpi-stock-total-units');
 
     const emptyState = document.getElementById('dash-empty');
     const dashboardRoot = document.getElementById('dashboard-root');
@@ -326,7 +494,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const skKpiTotalSales = document.getElementById('sk-kpi-total-sales');
     const skKpiEstimatedResult = document.getElementById('sk-kpi-estimated-result');
     const skKpiCash = document.getElementById('sk-kpi-cash');
-    const skKpiAlertsTotal = document.getElementById('sk-kpi-alerts-total');
     const skKpiSalesToday = document.getElementById('sk-kpi-sales-today');
     const skKpiAvgTicket = document.getElementById('sk-kpi-avg-ticket');
     const skKpiBestCustomer = document.getElementById('sk-kpi-best-customer');
@@ -359,7 +526,8 @@ document.addEventListener('DOMContentLoaded', function() {
         general: document.getElementById('block-general'),
         alerts: document.getElementById('block-alerts'),
         activity: document.getElementById('block-activity'),
-        rankings: document.getElementById('block-rankings')
+        rankings: document.getElementById('block-rankings'),
+        inventory: document.getElementById('block-inventory')
     };
 
     function deepClone(obj) {
@@ -385,12 +553,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function getDefaultLayoutFromDom() {
         const order = {};
+        const hidden = new Set();
         Object.keys(blockContainers).forEach(block => {
             const el = blockContainers[block];
             const cards = el ? Array.from(el.querySelectorAll('[data-card-key]')) : [];
             order[block] = cards.map(c => String(c.getAttribute('data-card-key') || '')).filter(Boolean);
+            cards.forEach(c => {
+                const k = String(c.getAttribute('data-card-key') || '').trim();
+                if (!k) return;
+                const defHidden = String(c.getAttribute('data-default-hidden') || '').trim();
+                if (defHidden === '1' || defHidden.toLowerCase() === 'true') hidden.add(k);
+            });
         });
-        return { hiddenKeys: [], order: order };
+        return { hiddenKeys: Array.from(hidden), order: order };
     }
 
     function normalizeLayout(cfg) {
@@ -461,7 +636,8 @@ document.addEventListener('DOMContentLoaded', function() {
             { key: 'general', title: 'Estado general del negocio' },
             { key: 'alerts', title: 'Alertas y riesgos' },
             { key: 'activity', title: 'Actividad comercial' },
-            { key: 'rankings', title: 'Rankings simples' }
+            { key: 'rankings', title: 'Rankings simples' },
+            { key: 'inventory', title: 'Inventario' }
         ];
 
         const makeTile = function (blockKey, k) {
@@ -725,7 +901,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (skKpiEstimatedResult) skKpiEstimatedResult.classList.toggle('hidden', hide);
         if (skKpiCash) skKpiCash.classList.toggle('hidden', hide);
         if (skKpiNetCashflow) skKpiNetCashflow.classList.toggle('hidden', hide);
-        if (skKpiAlertsTotal) skKpiAlertsTotal.classList.toggle('hidden', hide);
         if (skKpiSalesToday) skKpiSalesToday.classList.toggle('hidden', hide);
         if (skKpiAvgTicket) skKpiAvgTicket.classList.toggle('hidden', hide);
         if (skKpiBestCustomer) skKpiBestCustomer.classList.toggle('hidden', hide);
@@ -877,7 +1052,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return { kind: 'day', labels: bucketByDay(range.from, range.to) };
     }
 
-    function tryGetAllData() {
+    function tryGetAllData(range) {
         if (!window.StorageService) {
             return Promise.resolve({ sales: [], expenses: [], products: [], lots: [], customers: [], suppliers: [], movements: [] });
         }
@@ -886,31 +1061,81 @@ document.addEventListener('DOMContentLoaded', function() {
             return Promise.resolve(p).catch(function () { return fallback; });
         }
 
-        const s = (typeof window.StorageService.getSales === 'function') ? window.StorageService.getSales() : [];
-        const e = (typeof window.StorageService.getExpenses === 'function') ? window.StorageService.getExpenses() : [];
-        const p = (typeof window.StorageService.getInventoryProducts === 'function') ? window.StorageService.getInventoryProducts() : [];
-        const l = (typeof window.StorageService.getInventoryLots === 'function') ? window.StorageService.getInventoryLots() : [];
-        const c = (typeof window.StorageService.getCustomers === 'function') ? window.StorageService.getCustomers() : [];
-        const sup = (typeof window.StorageService.getSuppliers === 'function') ? window.StorageService.getSuppliers() : [];
-        const mv = (typeof window.StorageService.getInventoryMovements === 'function') ? window.StorageService.getInventoryMovements() : [];
+        const r = (range && range.from && range.to) ? range : getRangeOrDefault();
+        const histFrom = new Date(r.from.getTime() - (1000 * 60 * 60 * 24 * 120));
+        histFrom.setHours(0, 0, 0, 0);
+
+        const fromIso = fmtDateYmd(histFrom);
+        const toIso = fmtDateYmd(r.to);
+
+        const today = new Date();
+        const todayFrom = toStartOfDay(today);
+        const todayTo = toEndOfDay(today);
+        const todayFromIso = fmtDateYmd(todayFrom);
+        const todayToIso = fmtDateYmd(todayTo);
+
+        const cashFrom = new Date(todayFrom.getTime() - (1000 * 60 * 60 * 24 * 30));
+        cashFrom.setHours(0, 0, 0, 0);
+        const cashFromIso = fmtDateYmd(cashFrom);
+
+        const s = (typeof window.StorageService.getSales === 'function')
+            ? window.StorageService.getSales({ from: fromIso, to: toIso, limit: 20000, include_replaced: 1, exclude_cc: 0 })
+            : [];
+        const sToday = (typeof window.StorageService.getSales === 'function')
+            ? window.StorageService.getSales({ from: todayFromIso, to: todayToIso, limit: 20000, include_replaced: 0, exclude_cc: 1 })
+            : [];
+
+        const e = (typeof window.StorageService.getExpenses === 'function')
+            ? window.StorageService.getExpenses({ from: fromIso, to: toIso, limit: 10000 })
+            : [];
+
+        const p = (typeof window.StorageService.getInventoryProducts === 'function')
+            ? window.StorageService.getInventoryProducts({ limit: 5000, active: 1 })
+            : [];
+        const l = (typeof window.StorageService.getInventoryLots === 'function')
+            ? window.StorageService.getInventoryLots({ limit: 20000 })
+            : [];
+        const c = (typeof window.StorageService.getCustomers === 'function')
+            ? window.StorageService.getCustomers({ limit: 5000 })
+            : [];
+        const sup = (typeof window.StorageService.getSuppliers === 'function')
+            ? window.StorageService.getSuppliers({})
+            : [];
+        const mv = (typeof window.StorageService.getInventoryMovements === 'function')
+            ? window.StorageService.getInventoryMovements({ from: fromIso, to: toIso, limit: 5000 })
+            : [];
+
+        const cashCounts = (typeof window.StorageService.getCashCounts === 'function')
+            ? window.StorageService.getCashCounts({ from: cashFromIso, to: todayToIso })
+            : [];
+
+        const overdueCustomersCount = (typeof window.StorageService.getOverdueCustomersCount === 'function')
+            ? window.StorageService.getOverdueCustomersCount({ days: 30 })
+            : 0;
 
         return Promise.all([
             safe(s, []),
+            safe(sToday, []),
             safe(e, []),
             safe(p, []),
             safe(l, []),
             safe(c, []),
             safe(sup, []),
-            safe(mv, [])
+            safe(mv, []),
+            safe(cashCounts, []),
+            safe(overdueCustomersCount, 0)
         ]).then(function (vals) {
             return {
                 sales: Array.isArray(vals[0]) ? vals[0] : [],
-                expenses: Array.isArray(vals[1]) ? vals[1] : [],
-                products: Array.isArray(vals[2]) ? vals[2] : [],
-                lots: Array.isArray(vals[3]) ? vals[3] : [],
-                customers: Array.isArray(vals[4]) ? vals[4] : [],
-                suppliers: Array.isArray(vals[5]) ? vals[5] : [],
-                movements: Array.isArray(vals[6]) ? vals[6] : []
+                salesToday: Array.isArray(vals[1]) ? vals[1] : [],
+                expenses: Array.isArray(vals[2]) ? vals[2] : [],
+                products: Array.isArray(vals[3]) ? vals[3] : [],
+                lots: Array.isArray(vals[4]) ? vals[4] : [],
+                customers: Array.isArray(vals[5]) ? vals[5] : [],
+                suppliers: Array.isArray(vals[6]) ? vals[6] : [],
+                movements: Array.isArray(vals[7]) ? vals[7] : [],
+                cashCounts: Array.isArray(vals[8]) ? vals[8] : [],
+                overdueCustomersCount: (typeof vals[9] === 'number' && isFinite(vals[9])) ? vals[9] : 0
             };
         });
     }
@@ -1136,22 +1361,27 @@ document.addEventListener('DOMContentLoaded', function() {
         const isoToday = fmtDateYmd(today);
         let overdue = 0;
 
-        // Clientes: no hay fecha de vencimiento explícita; usamos deuda > 0 como "vencido" si pasaron 30 días desde created_at.
-        const sales = Array.isArray(payload?.sales) ? payload.sales : [];
-        const ccMap = new Map();
-        sales.forEach(s => {
-            if (!isCompletedSale(s)) return;
-            if (String(s?.type || '').trim() !== 'Venta') return;
-            const due = safeNum(s?.due_amount);
-            if (due <= 0) return;
-            const createdAtMs = safeNum(s?.created_at);
-            const days = createdAtMs ? Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24)) : 0;
-            if (days >= 30) {
-                const cid = String(s?.customer_id || '').trim() || String(s?.customer_name || '').trim();
-                if (cid) ccMap.set(cid, true);
-            }
-        });
-        overdue += ccMap.size;
+        const apiCount = payload && typeof payload.overdueCustomersCount === 'number' ? payload.overdueCustomersCount : null;
+        if (apiCount != null && isFinite(apiCount)) {
+            overdue += Math.max(0, Math.floor(apiCount));
+        } else {
+            // Fallback: si no está disponible el endpoint, aproximar con ventas cargadas.
+            const sales = Array.isArray(payload?.sales) ? payload.sales : [];
+            const ccMap = new Map();
+            sales.forEach(s => {
+                if (!isCompletedSale(s)) return;
+                if (String(s?.type || '').trim() !== 'Venta') return;
+                const due = safeNum(s?.due_amount);
+                if (due <= 0) return;
+                const createdAtMs = safeNum(s?.created_at);
+                const days = createdAtMs ? Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24)) : 0;
+                if (days >= 30) {
+                    const cid = String(s?.customer_id || '').trim() || String(s?.customer_name || '').trim();
+                    if (cid) ccMap.set(cid, true);
+                }
+            });
+            overdue += ccMap.size;
+        }
 
         // Proveedores: cc schedule está en meta.supplier_cc.schedule; contar cuotas abiertas con due_date < hoy.
         const exps = Array.isArray(payload?.expenses) ? payload.expenses : [];
@@ -1223,6 +1453,125 @@ document.addEventListener('DOMContentLoaded', function() {
         return { key: bestKey, qty: bestQty };
     }
 
+    function buildProductById(products) {
+        const map = new Map();
+        (Array.isArray(products) ? products : []).forEach(p => {
+            const id = String(p?.id ?? '').trim();
+            if (!id) return;
+            map.set(id, p);
+        });
+        return map;
+    }
+
+    function computeInventoryTotals(products, lots) {
+        const ps = Array.isArray(products) ? products : [];
+        const ls = Array.isArray(lots) ? lots : [];
+        let units = 0;
+        let value = 0;
+        ps.forEach(p => {
+            const rel = ls.filter(l => String(l?.product_id) === String(p?.id));
+            const qty = rel.reduce((acc, l) => acc + safeNum(l?.qty_available), 0);
+            const val = rel.reduce((acc, l) => acc + (safeNum(l?.qty_available) * safeNum(l?.unit_cost)), 0);
+            units += qty;
+            value += val;
+        });
+        return { units, value };
+    }
+
+    function computeTopCategoryByRevenue(salesRange, products) {
+        const byId = buildProductById(products);
+        const map = new Map();
+        (Array.isArray(salesRange) ? salesRange : []).forEach(s => {
+            if (!isCompletedSale(s) || !isRealSale(s)) return;
+            const items = Array.isArray(s?.items) ? s.items : [];
+            items.forEach(it => {
+                const pid = String(it?.product_id || '').trim();
+                if (!pid) return;
+                const p = byId.get(pid);
+                const cat = String(p?.category || p?.category_name || '').trim() || 'Sin categoría';
+                map.set(cat, (map.get(cat) || 0) + safeNum(it?.subtotal));
+            });
+        });
+        let bestKey = '';
+        let bestAmount = 0;
+        map.forEach((amt, k) => {
+            if ((amt || 0) > bestAmount) { bestAmount = amt || 0; bestKey = k; }
+        });
+        return { category: bestKey, amount: bestAmount };
+    }
+
+    function computeMarginExtremes(salesRange, products, lots) {
+        const byId = buildProductById(products);
+        const avgCost = buildAvgCostByProduct(products, lots);
+        const agg = new Map();
+        (Array.isArray(salesRange) ? salesRange : []).forEach(s => {
+            if (!isCompletedSale(s) || !isRealSale(s)) return;
+            const items = Array.isArray(s?.items) ? s.items : [];
+            items.forEach(it => {
+                const pid = String(it?.product_id || '').trim();
+                if (!pid) return;
+                const qty = safeNum(it?.cantidad);
+                const revenue = safeNum(it?.subtotal);
+                const cost = (avgCost.get(pid) || 0) * qty;
+                const cur = agg.get(pid) || { revenue: 0, cost: 0, qty: 0 };
+                cur.revenue += revenue;
+                cur.cost += cost;
+                cur.qty += qty;
+                agg.set(pid, cur);
+            });
+        });
+
+        let best = { pid: '', pct: null };
+        let worst = { pid: '', pct: null };
+        agg.forEach((v, pid) => {
+            const rev = v.revenue || 0;
+            if (rev <= 0) return;
+            const pct = ((rev - (v.cost || 0)) / rev) * 100;
+            if (best.pct == null || pct > best.pct) best = { pid, pct };
+            if (worst.pct == null || pct < worst.pct) worst = { pid, pct };
+        });
+
+        const bestName = best.pid ? String(byId.get(best.pid)?.name || '') : '';
+        const worstName = worst.pid ? String(byId.get(worst.pid)?.name || '') : '';
+        return {
+            bestName,
+            bestPct: best.pct,
+            worstName,
+            worstPct: worst.pct
+        };
+    }
+
+    function computeCustomersServed(salesRange) {
+        const set = new Set();
+        (Array.isArray(salesRange) ? salesRange : []).forEach(s => {
+            if (!isCompletedSale(s) || !isRealSale(s)) return;
+            const id = String(s?.customer_id || '').trim();
+            const name = String(s?.customer_name || '').trim();
+            const k = id || name;
+            if (k) set.add(k);
+        });
+        return set.size;
+    }
+
+    function computeSalesDailyPace(totalSales, range) {
+        const days = Math.max(1, Math.ceil((range.to.getTime() - range.from.getTime()) / (1000 * 60 * 60 * 24)));
+        return totalSales / days;
+    }
+
+    function computeSalesVsPrevPeriodDay(salesAll, range) {
+        const end = new Date(range.to.getTime());
+        end.setHours(0, 0, 0, 0);
+        const prev = new Date(end.getTime() - (1000 * 60 * 60 * 24 * 30));
+        const curDay = { from: toStartOfDay(end), to: toEndOfDay(end) };
+        const prevDay = { from: toStartOfDay(prev), to: toEndOfDay(prev) };
+
+        const curSales = salesInRange(salesAll, curDay);
+        const prevSales = salesInRange(salesAll, prevDay);
+        const curTotal = sumNetSalesDevengadas(curSales);
+        const prevTotal = sumNetSalesDevengadas(prevSales);
+        return { curTotal, prevTotal, delta: curTotal - prevTotal };
+    }
+
     function computeEvolution(range, payload, avgCostByProduct) {
         const bucket = chooseBucket(range);
         const labels = bucket.labels;
@@ -1279,11 +1628,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function calculateDashboardKPIs(payload, range) {
         const salesAll = Array.isArray(payload?.sales) ? payload.sales : [];
+        const salesTodayPayload = Array.isArray(payload?.salesToday) ? payload.salesToday : [];
         const expensesAll = Array.isArray(payload?.expenses) ? payload.expenses : [];
         const products = Array.isArray(payload?.products) ? payload.products : [];
         const lots = Array.isArray(payload?.lots) ? payload.lots : [];
         const customers = Array.isArray(payload?.customers) ? payload.customers : [];
         const movements = Array.isArray(payload?.movements) ? payload.movements : [];
+        const cashCounts = Array.isArray(payload?.cashCounts) ? payload.cashCounts : [];
 
         const salesRange = salesInRange(salesAll, range);
         const expRange = expensesInRange(expensesAll, range);
@@ -1299,7 +1650,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const estimatedResult = totalSales - cmv - totalExpenses;
         const estimatedMarginPct = totalSales > 0 ? ((estimatedResult / totalSales) * 100) : 0;
 
-        const caja = computeCashAndBanks(salesAll, expensesAll);
+        const grossMarginPct = totalSales > 0 ? (((totalSales - cmv) / totalSales) * 100) : 0;
+        const netMarginPct = totalSales > 0 ? ((estimatedResult / totalSales) * 100) : 0;
+        const breakEven = (grossMarginPct > 0) ? (totalExpenses / (grossMarginPct / 100)) : 0;
+
+        let caja = computeCashAndBanks(salesAll, expensesAll);
+        if (cashCounts.length) {
+            const sorted = cashCounts.slice().sort((a, b) => String(b?.date || '').localeCompare(String(a?.date || '')));
+            const last = sorted[0] || {};
+            const closing = safeNum(last?.closing_amount);
+            caja = { cash: closing, banks: 0, total: closing };
+        }
         const cashIn = sumCashCollected(salesRange);
         const cashOut = (Array.isArray(expRange) ? expRange : []).reduce((acc, e) => acc + (isPaidExpense(e) ? safeNum(e?.valor) : 0), 0);
         const netCashflow = cashIn - cashOut;
@@ -1308,11 +1669,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const expensesOutOfRange = computeOutOfRangeExpenses(expensesAll, range);
         const overdue = computeOverdueCounts(payload);
 
-        const today = new Date();
-        const todayRange = { from: toStartOfDay(today), to: toEndOfDay(today) };
-        const salesToday = salesInRange(salesAll, todayRange);
-        const salesTodayTotal = sumNetSalesDevengadas(salesToday);
-        const salesTodayCount = (Array.isArray(salesToday) ? salesToday : []).filter(s => isCompletedSale(s) && isRealSale(s)).length;
+        const salesTodayTotal = sumNetSalesDevengadas(salesTodayPayload);
+        const salesTodayCount = (Array.isArray(salesTodayPayload) ? salesTodayPayload : []).filter(s => isCompletedSale(s) && isRealSale(s)).length;
+        const customersServed = computeCustomersServed(salesRange);
+        const salesDailyPace = computeSalesDailyPace(totalSales, range);
+        const salesAccum = totalSales;
+        const salesVsPrev = computeSalesVsPrevPeriodDay(salesAll, range);
 
         const avgTicket = salesRange.length > 0 ? (totalSales / salesRange.length) : 0;
 
@@ -1342,32 +1704,61 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const topProd = computeTopProductByQty(salesRange);
         const topProdName = topProd.key ? String(topProd.key) : '';
-
-        const alertsTotal = (stockCrit.criticalCount || 0) + (expensesOutOfRange || 0) + (overdue || 0);
+        const topProdGross = (Array.isArray(salesRange) ? salesRange : []).reduce((acc, s) => {
+            if (!isCompletedSale(s)) return acc;
+            if (!isRealSale(s)) return acc;
+            const items = Array.isArray(s?.items) ? s.items : [];
+            const sum = items.reduce((a, it) => {
+                const name = String(it?.nombre || it?.product_name || '').trim();
+                if (!name) return a;
+                if (String(name) !== String(topProdName)) return a;
+                return a + safeNum(it?.subtotal);
+            }, 0);
+            return acc + sum;
+        }, 0);
 
         const evolution = computeEvolution(range, payload, buildAvgCostByProduct(products, lots));
+
+        const inv = computeInventoryTotals(products, lots);
+        const topCategory = computeTopCategoryByRevenue(salesRange, products);
+        const margins = computeMarginExtremes(salesRange, products, lots);
 
         return {
             totalSales,
             totalExpenses,
             estimatedResult,
             estimatedMarginPct,
+            grossMarginPct,
+            netMarginPct,
+            breakEven,
             cmv,
             cash: caja.cash,
             banks: caja.banks,
             totalAvailable: caja.total,
             netCashflow,
-            alertsTotal,
             alertStock: stockCrit.criticalCount,
             alertExpenses: expensesOutOfRange,
             alertOverdue: overdue,
             salesTodayTotal,
             salesTodayCount,
+            customersServed,
+            salesDailyPace,
+            salesAccum,
+            salesVsPrev,
             avgTicket,
             bestCustomerName,
             bestCustomerAmount,
             topProductName: topProdName,
             topProductQty: topProd.qty,
+            topProductGross,
+            stockTotalUnits: inv.units,
+            stockTotalValue: inv.value,
+            topCategoryName: topCategory.category,
+            topCategoryAmount: topCategory.amount,
+            bestMarginProductName: margins.bestName,
+            bestMarginPct: margins.bestPct,
+            worstMarginProductName: margins.worstName,
+            worstMarginPct: margins.worstPct,
             periodLabel: String(dashRange?.value || '').trim() || '—',
             evolution
         };
@@ -1375,6 +1766,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderKPIs(kpis) {
         if (kpiTotalSales) kpiTotalSales.textContent = formatearMoneda(kpis.totalSales);
+        if (kpiTotalExpenses) kpiTotalExpenses.textContent = formatearMoneda(kpis.totalExpenses);
+        if (kpiGrossMargin) kpiGrossMargin.textContent = (kpis.totalSales > 0 ? (kpis.grossMarginPct || 0).toFixed(1) + '%' : '—');
+        if (kpiNetMargin) kpiNetMargin.textContent = (kpis.totalSales > 0 ? (kpis.netMarginPct || 0).toFixed(1) + '%' : '—');
+        if (kpiBreakEven) kpiBreakEven.textContent = (kpis.breakEven > 0 ? formatearMoneda(kpis.breakEven) : '—');
 
         if (kpiEstimatedResult) {
             kpiEstimatedResult.textContent = formatearMoneda(kpis.estimatedResult);
@@ -1391,21 +1786,42 @@ document.addEventListener('DOMContentLoaded', function() {
         if (kpiBanks) kpiBanks.textContent = formatearMoneda(kpis.banks);
         if (kpiTotalAvailable) kpiTotalAvailable.textContent = formatearMoneda(kpis.totalAvailable);
         if (kpiNetCashflow) kpiNetCashflow.textContent = formatearMoneda(kpis.netCashflow || 0);
-
-        if (kpiAlertsTotal) kpiAlertsTotal.textContent = String(kpis.alertsTotal || 0);
         if (kpiAlertStock) kpiAlertStock.textContent = String(kpis.alertStock || 0);
         if (kpiAlertExpenses) kpiAlertExpenses.textContent = String(kpis.alertExpenses || 0);
         if (kpiAlertOverdue) kpiAlertOverdue.textContent = String(kpis.alertOverdue || 0);
 
         if (kpiSalesTodayTotal) kpiSalesTodayTotal.textContent = formatearMoneda(kpis.salesTodayTotal || 0);
         if (kpiSalesTodayCount) kpiSalesTodayCount.textContent = String(kpis.salesTodayCount || 0);
+        if (kpiSalesTodayCountOnly) kpiSalesTodayCountOnly.textContent = String(kpis.salesTodayCount || 0);
         if (kpiAvgTicket) kpiAvgTicket.textContent = formatearMoneda(kpis.avgTicket || 0);
+
+        if (kpiCustomersServed) kpiCustomersServed.textContent = String(kpis.customersServed || 0);
+        if (kpiSalesDailyPace) kpiSalesDailyPace.textContent = formatearMoneda(kpis.salesDailyPace || 0);
+        if (kpiSalesAccum) kpiSalesAccum.textContent = formatearMoneda(kpis.salesAccum || 0);
+        if (kpiSalesVsPrev) kpiSalesVsPrev.textContent = formatearMoneda(kpis.salesVsPrev?.curTotal || 0);
+        if (kpiSalesVsPrevDelta) {
+            const d = safeNum(kpis.salesVsPrev?.delta);
+            const sign = d >= 0 ? '+' : '';
+            kpiSalesVsPrevDelta.textContent = sign + formatearMoneda(d);
+        }
 
         if (kpiBestCustomer) kpiBestCustomer.textContent = String(kpis.bestCustomerName || '—');
         if (kpiBestCustomerAmount) kpiBestCustomerAmount.textContent = kpis.bestCustomerName ? formatearMoneda(kpis.bestCustomerAmount || 0) : '—';
 
         if (kpiTopProduct) kpiTopProduct.textContent = String(kpis.topProductName || '—');
         if (kpiTopProductQty) kpiTopProductQty.textContent = String(kpis.topProductQty || 0);
+        if (kpiTopProductGross) kpiTopProductGross.textContent = (kpis.topProductName ? formatearMoneda(kpis.topProductGross || 0) : '—');
+
+        if (kpiStockTotalValue) kpiStockTotalValue.textContent = formatearMoneda(kpis.stockTotalValue || 0);
+        if (kpiStockTotalUnits) kpiStockTotalUnits.textContent = String(Math.round(safeNum(kpis.stockTotalUnits || 0)));
+
+        if (kpiTopCategory) kpiTopCategory.textContent = String(kpis.topCategoryName || '—');
+        if (kpiTopCategoryAmount) kpiTopCategoryAmount.textContent = (kpis.topCategoryName ? formatearMoneda(kpis.topCategoryAmount || 0) : '—');
+
+        if (kpiBestMarginProduct) kpiBestMarginProduct.textContent = String(kpis.bestMarginProductName || '—');
+        if (kpiBestMarginPct) kpiBestMarginPct.textContent = (kpis.bestMarginPct != null ? (Number(kpis.bestMarginPct).toFixed(1) + '%') : '—');
+        if (kpiWorstMarginProduct) kpiWorstMarginProduct.textContent = String(kpis.worstMarginProductName || '—');
+        if (kpiWorstMarginPct) kpiWorstMarginPct.textContent = (kpis.worstMarginPct != null ? (Number(kpis.worstMarginPct).toFixed(1) + '%') : '—');
     }
 
     function calcAndRender() {
@@ -1413,7 +1829,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setSkeleton(true);
         setEmpty(false);
 
-        return tryGetAllData().then(function (payload) {
+        return tryGetAllData(range).then(function (payload) {
             const kpis = calculateDashboardKPIs(payload, range);
 
             const hasAny = (kpis.totalSales > 0) || (kpis.totalExpenses > 0) || (kpis.salesTodayTotal > 0) || (Math.abs(Number(kpis.netCashflow || 0)) > 0.0001);

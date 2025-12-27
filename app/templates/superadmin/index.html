@@ -7,93 +7,219 @@
         <p class="mt-1 text-sm text-gray-600">Gestión de empresas, pausa/reactivación y acceso soporte.</p>
     </div>
     <div class="flex items-center gap-2">
-        <a href="#create-company" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Crear empresa</a>
+        <button id="btn-open-manage-plans" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md bg-gray-100 hover:bg-gray-200">Administrar planes</button>
+        <button id="btn-open-create-company" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Crear empresa</button>
     </div>
 </div>
 
-<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-    <div id="create-company" class="p-5 bg-white rounded-lg shadow lg:col-span-1">
-        <h2 class="text-lg font-medium text-gray-900 mb-3">Crear empresa</h2>
-        <form method="post" action="{{ url_for('superadmin.create_company') }}" class="space-y-3">
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
-                <input name="company_name" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Mi Empresa SRL" required>
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Plan</label>
-                <input name="plan" class="w-full px-3 py-2 text-sm border rounded-md" value="standard" required>
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Usuario administrativo principal</label>
-                <input name="admin_username" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: admin" required>
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Contraseña usuario administrativo</label>
-                <input name="admin_password" type="password" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Mínimo 6 caracteres" required>
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Notas internas (opcional)</label>
-                <textarea name="notes" rows="3" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Observaciones internas..."></textarea>
-            </div>
-            <button type="submit" class="w-full inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Crear</button>
-        </form>
+<div class="p-5 bg-white rounded-lg shadow">
+    <h2 class="text-lg font-medium text-gray-900 mb-3">Empresas</h2>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Empresa</th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Plan</th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                    <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for c in companies %}
+                <tr>
+                    <td class="px-3 py-2">
+                        <div class="font-medium text-gray-900">{{ c.name }}</div>
+                    </td>
+                    <td class="px-3 py-2 text-gray-700">{{ c.plan }}</td>
+                    <td class="px-3 py-2">
+                        {% if c.status == 'paused' %}
+                            <span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-red-50 text-red-700">paused</span>
+                        {% else %}
+                            <span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">active</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-2 text-right space-x-2 whitespace-nowrap">
+                        <a href="{{ url_for('superadmin.company_overview', company_id=c.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Editar</a>
+                        <form method="post" action="{{ url_for('superadmin.impersonate_company', company_id=c.id) }}" class="inline">
+                            <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Soporte</button>
+                        </form>
+                        {% if c.status == 'paused' %}
+                            <form method="post" action="{{ url_for('superadmin.reactivate_company', company_id=c.id) }}" class="inline">
+                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700">Reactivar</button>
+                            </form>
+                        {% else %}
+                            <form method="post" action="{{ url_for('superadmin.pause_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Pausar empresa" data-confirm-message="¿Querés pausar {{ c.name }}?" data-confirm-ok="Pausar" data-confirm-cancel="Cancelar">
+                                <input type="hidden" name="reason" value="">
+                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700">Pausar</button>
+                            </form>
+                        {% endif %}
+                        <form method="post" action="{{ url_for('superadmin.delete_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar empresa" data-confirm-message="Vas a eliminar {{ c.name }} y TODA su información. Esta acción no se puede deshacer." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
+                            <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="px-3 py-4 text-center text-gray-500">No hay empresas todavía.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
+</div>
 
-    <div class="p-5 bg-white rounded-lg shadow lg:col-span-2">
-        <h2 class="text-lg font-medium text-gray-900 mb-3">Empresas</h2>
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-sm">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Empresa</th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Plan</th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                        <th class="px-3 py-2 text-right"></th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for c in companies %}
-                    <tr>
-                        <td class="px-3 py-2">
-                            <div class="font-medium text-gray-900">{{ c.name }}</div>
-                            <div class="text-xs text-gray-500">{{ c.slug }}</div>
-                        </td>
-                        <td class="px-3 py-2 text-gray-700">{{ c.plan }}</td>
-                        <td class="px-3 py-2">
-                            {% if c.status == 'paused' %}
-                                <span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-red-50 text-red-700">paused</span>
-                            {% else %}
-                                <span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">active</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-3 py-2 text-right space-x-2 whitespace-nowrap">
-                            <a href="{{ url_for('superadmin.company_overview', company_id=c.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Editar</a>
-                            <form method="post" action="{{ url_for('superadmin.impersonate_company', company_id=c.id) }}" class="inline">
-                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Soporte</button>
-                            </form>
-                            {% if c.status == 'paused' %}
-                                <form method="post" action="{{ url_for('superadmin.reactivate_company', company_id=c.id) }}" class="inline">
-                                    <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700">Reactivar</button>
-                                </form>
-                            {% else %}
-                                <form method="post" action="{{ url_for('superadmin.pause_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Pausar empresa" data-confirm-message="¿Querés pausar {{ c.name }}?" data-confirm-ok="Pausar" data-confirm-cancel="Cancelar">
-                                    <input type="hidden" name="reason" value="">
-                                    <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700">Pausar</button>
-                                </form>
-                            {% endif %}
-                            <form method="post" action="{{ url_for('superadmin.delete_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar empresa" data-confirm-message="Vas a eliminar {{ c.name }} y TODA su información. Esta acción no se puede deshacer." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
-                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="4" class="px-3 py-4 text-center text-gray-500">No hay empresas todavía.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<div id="modal-create-company" class="hidden fixed inset-0 z-50" aria-hidden="true">
+    <div class="absolute inset-0 bg-black/30" data-close="1"></div>
+    <div class="absolute inset-y-0 right-0 w-full max-w-md bg-white shadow-xl flex flex-col">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+                <h2 class="text-base font-semibold text-gray-900">Crear empresa</h2>
+                <p class="mt-1 text-xs text-gray-500">Creá una nueva empresa y su usuario admin principal.</p>
+            </div>
+            <button id="btn-close-create-company" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600" title="Cerrar">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-5 overflow-y-auto">
+            <form method="post" action="{{ url_for('superadmin.create_company') }}" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
+                    <input name="company_name" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Mi Empresa SRL" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Plan</label>
+                    <select id="select-plan" name="plan" class="w-full px-3 py-2 text-sm border rounded-md bg-white" required>
+                        {% for p in plans %}
+                            <option value="{{ p }}">{{ p }}</option>
+                        {% endfor %}
+                        <option value="__new__">Agregar nuevo plan</option>
+                    </select>
+                </div>
+                <div id="plan-new-wrap" class="hidden">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Nuevo plan</label>
+                    <input id="input-plan-new" name="plan_new" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: premium-mensual">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Usuario administrativo principal</label>
+                    <input name="admin_username" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: admin" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Contraseña del usuario administrativo principal</label>
+                    <input name="admin_password" type="password" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Mínimo 6 caracteres" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Notas internas (opcional)</label>
+                    <textarea name="notes" rows="3" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Observaciones internas..."></textarea>
+                </div>
+                <button type="submit" class="w-full inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Crear</button>
+            </form>
         </div>
     </div>
 </div>
+
+<div id="modal-manage-plans" class="hidden fixed inset-0 z-50" aria-hidden="true">
+    <div class="absolute inset-0 bg-black/30" data-close="1"></div>
+    <div class="absolute inset-y-0 right-0 w-full max-w-md bg-white shadow-xl flex flex-col">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+                <h2 class="text-base font-semibold text-gray-900">Administrar planes</h2>
+                <p class="mt-1 text-xs text-gray-500">Creá o eliminá planes disponibles para empresas.</p>
+            </div>
+            <button id="btn-close-manage-plans" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600" title="Cerrar">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-5 overflow-y-auto space-y-4">
+            <form method="post" action="{{ url_for('superadmin.plan_create') }}" class="space-y-2">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Nuevo plan</label>
+                    <input name="plan_code" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: premium-mensual" required>
+                </div>
+                <button type="submit" class="w-full inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Agregar plan</button>
+            </form>
+
+            <div class="border-t pt-4">
+                <div class="text-sm font-semibold text-gray-900 mb-2">Planes existentes</div>
+                <div class="space-y-2">
+                    {% for p in plans_rows %}
+                        <div class="flex items-center justify-between gap-2 p-2 rounded-md border">
+                            <div class="text-sm">
+                                <div class="font-medium text-gray-900">{{ p.code }}</div>
+                                {% if p.active %}
+                                    <div class="text-xs text-green-700">activo</div>
+                                {% else %}
+                                    <div class="text-xs text-gray-500">inactivo</div>
+                                {% endif %}
+                            </div>
+                            <div class="flex items-center gap-2">
+                                {% if p.active %}
+                                    <form method="post" action="{{ url_for('superadmin.plan_disable', plan_code=p.code) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar plan" data-confirm-message="Vas a eliminar el plan {{ p.code }}. No se podrá seleccionar para nuevas empresas." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
+                                        <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
+                                    </form>
+                                {% else %}
+                                    <form method="post" action="{{ url_for('superadmin.plan_create') }}" class="inline">
+                                        <input type="hidden" name="plan_code" value="{{ p.code }}">
+                                        <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Reactivar</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="text-sm text-gray-500">No hay planes todavía.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('modal-create-company');
+    const btnOpen = document.getElementById('btn-open-create-company');
+    const btnClose = document.getElementById('btn-close-create-company');
+    const plansModal = document.getElementById('modal-manage-plans');
+    const btnOpenPlans = document.getElementById('btn-open-manage-plans');
+    const btnClosePlans = document.getElementById('btn-close-manage-plans');
+    const planSelect = document.getElementById('select-plan');
+    const planNewWrap = document.getElementById('plan-new-wrap');
+    const planNewInput = document.getElementById('input-plan-new');
+    function open() {
+        if (modal) modal.classList.remove('hidden');
+        try { if (planSelect) planSelect.focus(); } catch (e) { }
+    }
+    function close() { if (modal) modal.classList.add('hidden'); }
+    function syncPlanNew() {
+        const isNew = planSelect && String(planSelect.value || '') === '__new__';
+        if (planNewWrap) planNewWrap.classList.toggle('hidden', !isNew);
+        if (planNewInput) planNewInput.required = !!isNew;
+        if (isNew && planNewInput) {
+            try { planNewInput.focus(); } catch (e) { }
+        }
+    }
+    if (btnOpen) btnOpen.addEventListener('click', open);
+    if (btnClose) btnClose.addEventListener('click', close);
+    if (btnOpenPlans) btnOpenPlans.addEventListener('click', function () {
+        if (plansModal) plansModal.classList.remove('hidden');
+    });
+    if (btnClosePlans) btnClosePlans.addEventListener('click', function () {
+        if (plansModal) plansModal.classList.add('hidden');
+    });
+    if (modal) modal.addEventListener('click', function (e) {
+        const el = e.target;
+        if (el && el.getAttribute && el.getAttribute('data-close') === '1') close();
+    });
+    if (plansModal) plansModal.addEventListener('click', function (e) {
+        const el = e.target;
+        if (el && el.getAttribute && el.getAttribute('data-close') === '1') {
+            plansModal.classList.add('hidden');
+        }
+    });
+    if (planSelect) planSelect.addEventListener('change', syncPlanNew);
+    syncPlanNew();
+});
+</script>
 {% endblock %}

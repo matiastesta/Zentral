@@ -7,7 +7,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.models import User, BusinessSettings
+from app.models import User, BusinessSettings, CompanyRole
 from app.permissions import module_required
 from app.user_settings import bp
 
@@ -26,6 +26,43 @@ MODULE_KEYS = [
     'settings',
     'user_settings',
 ]
+
+
+def _normalize_role_name(raw: str) -> str:
+    s = str(raw or '').strip().lower()
+    s = '_'.join([p for p in s.split() if p])
+    cleaned = []
+    for ch in s:
+        if (ch.isalnum()) or ch in {'_', '-'}:
+            cleaned.append(ch)
+    out = ''.join(cleaned)
+    while '__' in out:
+        out = out.replace('__', '_')
+    while '--' in out:
+        out = out.replace('--', '-')
+    return out.strip('_-')
+
+
+def _ensure_company_role_exists(company_id: str, raw_role: str) -> str:
+    cid = str(company_id or '').strip()
+    role = _normalize_role_name(raw_role)
+    if not cid or not role:
+        return ''
+    try:
+        existing = (
+            db.session.query(CompanyRole)
+            .filter(CompanyRole.company_id == cid, CompanyRole.name == role)
+            .first()
+        )
+        if existing:
+            return role
+        rr = CompanyRole(company_id=cid, name=role)
+        rr.set_permissions({})
+        db.session.add(rr)
+        db.session.flush()
+        return role
+    except Exception:
+        return ''
 
 
 @bp.route('/', methods=['GET', 'POST'])
@@ -105,7 +142,10 @@ def index():
             display_name = (request.form.get('display_name') or '').strip()
             email = (request.form.get('email') or '').strip().lower()
             password = request.form.get('password') or ''
-            role = (request.form.get('role') or 'vendedor').strip()
+            role_raw = (request.form.get('role') or 'vendedor').strip()
+            if role_raw == '__new__':
+                role_raw = (request.form.get('role_new') or '').strip()
+            role = _ensure_company_role_exists(str(g.company_id or ''), role_raw) or role_raw
 
             if not username or not password:
                 flash('Completá usuario y contraseña.', 'error')
@@ -158,7 +198,10 @@ def index():
                     return redirect(url_for('user_settings.index'))
             u.email = (email or None)
 
-            role = (request.form.get('role') or u.role).strip()
+            role_raw = (request.form.get('role') or u.role).strip()
+            if role_raw == '__new__':
+                role_raw = (request.form.get('role_new') or '').strip()
+            role = _ensure_company_role_exists(str(getattr(u, 'company_id', '') or ''), role_raw) or role_raw
             u.role = role
 
             active = bool(request.form.get('active') == 'on')
@@ -204,6 +247,21 @@ def index():
     users = q.order_by(User.is_master.desc(), User.username.asc()).all()
 
     roles = ['company_admin', 'admin', 'vendedor', 'contador']
+    try:
+        cid = str(getattr(g, 'company_id', '') or '').strip()
+        if cid:
+            rows = (
+                db.session.query(CompanyRole)
+                .filter(CompanyRole.company_id == cid)
+                .order_by(CompanyRole.name.asc())
+                .all()
+            )
+            for r in (rows or []):
+                n = str(getattr(r, 'name', '') or '').strip()
+                if n and n not in roles:
+                    roles.append(n)
+    except Exception:
+        pass
     business = BusinessSettings.get_for_company(g.company_id)
     return render_template('user_settings/index.html', title='Configuración de Usuario', users=users, roles=roles, business=business, company=getattr(g, 'company', None))
 
@@ -274,7 +332,10 @@ def user_detail(user_id: int):
             display_name = (request.form.get('display_name') or '').strip()
             u.display_name = (display_name or None)
 
-            role = (request.form.get('role') or u.role).strip()
+            role_raw = (request.form.get('role') or u.role).strip()
+            if role_raw == '__new__':
+                role_raw = (request.form.get('role_new') or '').strip()
+            role = _ensure_company_role_exists(str(getattr(u, 'company_id', '') or ''), role_raw) or role_raw
             u.role = role
 
             u.active = bool(request.form.get('active') == 'on')
@@ -320,6 +381,21 @@ def user_detail(user_id: int):
             return redirect(url_for('user_settings.user_detail', user_id=u.id))
 
     roles = ['company_admin', 'admin', 'vendedor', 'contador']
+    try:
+        cid = str(getattr(u, 'company_id', '') or '').strip()
+        if cid:
+            rows = (
+                db.session.query(CompanyRole)
+                .filter(CompanyRole.company_id == cid)
+                .order_by(CompanyRole.name.asc())
+                .all()
+            )
+            for r in (rows or []):
+                n = str(getattr(r, 'name', '') or '').strip()
+                if n and n not in roles:
+                    roles.append(n)
+    except Exception:
+        pass
     perms = u.get_permissions()
     can_edit_all = bool(can_manage_users and (not u.is_master))
     can_change_password = bool(is_self or (can_manage_users and (not u.is_master)))

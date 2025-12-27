@@ -24,6 +24,7 @@ from app.models import (
     Sale,
     SaleItem,
     CompanyRole,
+    Plan,
     Supplier,
     User,
 )
@@ -148,12 +149,131 @@ def _slugify(name: str) -> str:
     return s or 'empresa'
 
 
+def _normalize_code(raw: str) -> str:
+    s = str(raw or '').strip().lower()
+    s = re.sub(r'[^a-z0-9_-]+', '-', s)
+    s = re.sub(r'-{2,}', '-', s).strip('-')
+    return s
+
+
+def _ensure_plan_exists(raw_code: str) -> str:
+    code = _normalize_code(raw_code)
+    if not code:
+        return ''
+    try:
+        row = db.session.get(Plan, code)
+        if row:
+            try:
+                row.active = True
+            except Exception:
+                pass
+            return code
+        db.session.add(Plan(code=code, active=True))
+        db.session.flush()
+        return code
+    except Exception:
+        return ''
+
+
+@bp.post('/plans/create')
+@login_required
+def plan_create():
+    _require_zentral_admin()
+    raw = (request.form.get('plan_code') or '').strip()
+    code = _ensure_plan_exists(raw)
+    if not code:
+        flash('Plan inválido.', 'error')
+        return redirect(url_for('superadmin.index'))
+    try:
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+    flash('Plan creado.', 'success')
+    return redirect(url_for('superadmin.index'))
+
+
+@bp.post('/plans/<plan_code>/disable')
+@login_required
+def plan_disable(plan_code: str):
+    _require_zentral_admin()
+    code = _normalize_code(plan_code)
+    if not code:
+        flash('Plan inválido.', 'error')
+        return redirect(url_for('superadmin.index'))
+    row = db.session.get(Plan, code)
+    if not row:
+        flash('Plan inválido.', 'error')
+        return redirect(url_for('superadmin.index'))
+    try:
+        row.active = False
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        flash('No se pudo eliminar el plan.', 'error')
+        return redirect(url_for('superadmin.index'))
+    flash('Plan eliminado.', 'success')
+    return redirect(url_for('superadmin.index'))
+
+
+def _normalize_role_name(raw: str) -> str:
+    s = str(raw or '').strip().lower()
+    s = re.sub(r'\s+', '_', s)
+    s = re.sub(r'[^a-z0-9_-]+', '', s)
+    s = re.sub(r'_{2,}', '_', s).strip('_')
+    s = re.sub(r'-{2,}', '-', s).strip('-')
+    return s
+
+
+def _ensure_company_role_exists(company_id: str, raw_role: str) -> str:
+    cid = str(company_id or '').strip()
+    role = _normalize_role_name(raw_role)
+    if not cid or not role:
+        return ''
+
+    try:
+        _ensure_default_roles(cid)
+    except Exception:
+        pass
+
+    try:
+        exists = (
+            db.session.query(CompanyRole)
+            .filter(CompanyRole.company_id == cid, CompanyRole.name == role)
+            .first()
+        )
+        if exists:
+            return role
+        rr = CompanyRole(company_id=cid, name=role)
+        rr.set_permissions({})
+        db.session.add(rr)
+        db.session.flush()
+        return role
+    except Exception:
+        return ''
+
+
 @bp.get('/')
 @login_required
 def index():
     _require_zentral_admin()
     companies = db.session.query(Company).order_by(Company.created_at.desc()).all()
-    return render_template('superadmin/index.html', title='Zentral Admin', companies=companies)
+    plans = []
+    try:
+        plans = [p.code for p in (db.session.query(Plan).filter(Plan.active == True).order_by(Plan.code.asc()).all() or [])]
+    except Exception:
+        plans = []
+    plans_rows = []
+    try:
+        plans_rows = (db.session.query(Plan).order_by(Plan.code.asc()).all() or [])
+    except Exception:
+        plans_rows = []
+    return render_template('superadmin/index.html', title='Zentral Admin', companies=companies, plans=plans, plans_rows=plans_rows)
 
 
 @bp.get('/companies/<company_id>')
@@ -205,6 +325,7 @@ def create_company():
     _require_zentral_admin()
     name = (request.form.get('company_name') or '').strip()
     plan = (request.form.get('plan') or '').strip()
+    plan_new = (request.form.get('plan_new') or '').strip()
     admin_username = (request.form.get('admin_username') or '').strip()
     admin_password = (request.form.get('admin_password') or '').strip()
     notes = (request.form.get('notes') or '').strip() or None
@@ -213,7 +334,11 @@ def create_company():
         flash('Nombre inválido.', 'error')
         return redirect(url_for('superadmin.index'))
 
-    if not plan:
+    effective_plan = plan
+    if plan == '__new__':
+        effective_plan = plan_new
+    effective_plan = _ensure_plan_exists(effective_plan)
+    if not effective_plan:
         flash('Plan inválido.', 'error')
         return redirect(url_for('superadmin.index'))
 
@@ -232,7 +357,7 @@ def create_company():
         i += 1
         slug = f'{base_slug}-{i}'
 
-    c = Company(name=name, slug=slug, plan=plan, status='active', notes=notes)
+    c = Company(name=name, slug=slug, plan=effective_plan, status='active', notes=notes)
     db.session.add(c)
     db.session.flush()
 
@@ -282,6 +407,7 @@ def company_edit(company_id: str):
     if request.method == 'POST':
         name = (request.form.get('company_name') or '').strip()
         plan = (request.form.get('plan') or '').strip()
+        plan_new = (request.form.get('plan_new') or '').strip()
         notes = (request.form.get('notes') or '').strip() or None
         admin_username = (request.form.get('admin_username') or '').strip()
         admin_password = (request.form.get('admin_password') or '').strip()
@@ -289,12 +415,16 @@ def company_edit(company_id: str):
         if not name:
             flash('Nombre inválido.', 'error')
             return redirect(url_for('superadmin.company_edit', company_id=c.id))
-        if not plan:
+        effective_plan = plan
+        if plan == '__new__':
+            effective_plan = plan_new
+        effective_plan = _ensure_plan_exists(effective_plan)
+        if not effective_plan:
             flash('Plan inválido.', 'error')
             return redirect(url_for('superadmin.company_edit', company_id=c.id))
 
         c.name = name
-        c.plan = plan
+        c.plan = effective_plan
         try:
             c.notes = notes
         except Exception:
@@ -372,11 +502,28 @@ def company_edit(company_id: str):
         flash('Empresa actualizada.', 'success')
         return redirect(url_for('superadmin.company_overview', company_id=c.id))
 
+    plans = []
+    try:
+        plans = [p.code for p in (db.session.query(Plan).filter(Plan.active == True).order_by(Plan.code.asc()).all() or [])]
+    except Exception:
+        plans = []
+    cur_plan = str(getattr(c, 'plan', '') or '').strip()
+    if cur_plan and cur_plan not in plans:
+        plans = [cur_plan] + plans
+
+    plans_rows = []
+    try:
+        plans_rows = (db.session.query(Plan).order_by(Plan.code.asc()).all() or [])
+    except Exception:
+        plans_rows = []
+
     return render_template(
         'superadmin/company_edit.html',
         title=f'Editar empresa · {c.name}',
         company=c,
         admin_user=admin_user,
+        plans=plans,
+        plans_rows=plans_rows,
     )
 
 
@@ -527,7 +674,13 @@ def company_user_edit(company_id: str, user_id: int):
 
         u.display_name = ((request.form.get('display_name') or '').strip() or None)
 
-        role = (request.form.get('role') or '').strip() or (u.role or 'vendedor')
+        role_raw = (request.form.get('role') or '').strip() or (u.role or 'vendedor')
+        if role_raw == '__new__':
+            role_raw = (request.form.get('role_new') or '').strip()
+        role = _ensure_company_role_exists(str(c.id), role_raw)
+        if not role:
+            flash('Rol inválido.', 'error')
+            return redirect(url_for('superadmin.company_user_edit', company_id=c.id, user_id=u.id))
         u.role = role
 
         u.active = bool(request.form.get('active') == 'on')

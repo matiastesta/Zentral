@@ -133,6 +133,12 @@ def _supplier_is_inventory_supplier(supplier_id: str) -> bool:
     row = db.session.get(Supplier, sid)
     if not row:
         return False
+    try:
+        cid = str(getattr(g, 'company_id', '') or '').strip()
+        if cid and str(getattr(row, 'company_id', '') or '') != cid:
+            return False
+    except Exception:
+        return False
     raw = str(getattr(row, 'categories_json', '') or '').strip()
     if not raw:
         return False
@@ -233,7 +239,11 @@ def list_expenses_api():
     d_from = _parse_date_iso(raw_from, None)
     d_to = _parse_date_iso(raw_to, None)
 
-    q = db.session.query(Expense)
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+
+    q = db.session.query(Expense).filter(Expense.company_id == cid)
     if d_from:
         q = q.filter(Expense.expense_date >= d_from)
     if d_to:
@@ -250,7 +260,10 @@ def list_expenses_api():
 @module_required('expenses')
 def get_expense_api(expense_id):
     eid = str(expense_id or '').strip()
-    row = db.session.get(Expense, eid)
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    row = db.session.query(Expense).filter(Expense.company_id == cid, Expense.id == eid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     return jsonify({'ok': True, 'item': _serialize_expense(row)})
@@ -261,15 +274,18 @@ def get_expense_api(expense_id):
 @module_required('expenses')
 def create_expense_api():
     payload = request.get_json(silent=True) or {}
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
     if _payload_uses_inventory_supplier(payload):
         return jsonify({'ok': False, 'error': 'inventory_supplier_forbidden'}), 400
     eid = str(payload.get('id') or '').strip() or uuid4().hex
 
-    row = db.session.get(Expense, eid)
+    row = db.session.query(Expense).filter(Expense.company_id == cid, Expense.id == eid).first()
     if row:
         return jsonify({'ok': False, 'error': 'already_exists'}), 400
 
-    row = Expense(id=eid, expense_date=dt_date.today())
+    row = Expense(id=eid, company_id=cid, expense_date=dt_date.today())
     _apply_expense_payload(row, payload)
     db.session.add(row)
 
@@ -286,7 +302,10 @@ def create_expense_api():
 @module_required('expenses')
 def update_expense_api(expense_id):
     eid = str(expense_id or '').strip()
-    row = db.session.get(Expense, eid)
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    row = db.session.query(Expense).filter(Expense.company_id == cid, Expense.id == eid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
@@ -308,7 +327,10 @@ def update_expense_api(expense_id):
 @module_required('expenses')
 def delete_expense_api(expense_id):
     eid = str(expense_id or '').strip()
-    row = db.session.get(Expense, eid)
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    row = db.session.query(Expense).filter(Expense.company_id == cid, Expense.id == eid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     try:
@@ -325,7 +347,10 @@ def delete_expense_api(expense_id):
 @module_required('expenses')
 def upload_expense_attachments_api(expense_id):
     eid = str(expense_id or '').strip()
-    row = db.session.get(Expense, eid)
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    row = db.session.query(Expense).filter(Expense.company_id == cid, Expense.id == eid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
@@ -404,7 +429,10 @@ def upload_expense_attachments_api(expense_id):
 def download_expense_attachment_api(expense_id, attachment_id):
     eid = str(expense_id or '').strip()
     aid = str(attachment_id or '').strip()
-    row = db.session.get(Expense, eid)
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    row = db.session.query(Expense).filter(Expense.company_id == cid, Expense.id == eid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 

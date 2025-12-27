@@ -9,6 +9,11 @@ from app.permissions import module_required
 from app.movements import bp
 
 
+def _company_id() -> str:
+    from flask_login import current_user
+    return str(getattr(current_user, 'company_id', '') or '').strip()
+
+
 @bp.route('/')
 @bp.route('/index')
 @login_required
@@ -25,6 +30,10 @@ def list_cash_counts():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
 
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+
     def parse_iso(s):
         try:
             return dt_date.fromisoformat(s) if s else None
@@ -34,7 +43,7 @@ def list_cash_counts():
     d_from = parse_iso(raw_from)
     d_to = parse_iso(raw_to)
 
-    q = db.session.query(CashCount)
+    q = db.session.query(CashCount).filter(CashCount.company_id == cid)
     if d_from:
         q = q.filter(CashCount.count_date >= d_from)
     if d_to:

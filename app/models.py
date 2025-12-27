@@ -32,6 +32,14 @@ class SystemMeta(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+class Plan(db.Model):
+    __tablename__ = 'plan'
+
+    code = db.Column(db.String(64), primary_key=True)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class Company(db.Model):
     __tablename__ = 'company'
 
@@ -81,6 +89,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     password_plain = db.Column(db.Text, nullable=True)
     role = db.Column(db.String(32), nullable=False, default='vendedor')
+    level = db.Column(db.Integer, nullable=False, default=0)
     created_by_user_id = db.Column(db.Integer, nullable=True)
     permissions_json = db.Column(db.Text, nullable=False, default='{}')
     is_master = db.Column(db.Boolean, nullable=False, default=False)
@@ -361,10 +370,14 @@ class CalendarUserConfig(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
-    user_id = db.Column(db.Integer, nullable=False, unique=True, index=True)
+    user_id = db.Column(db.Integer, nullable=False, index=True)
     config_json = db.Column(db.Text, nullable=False, default='{}')
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'user_id', name='uq_calendar_user_config_company_user'),
+    )
 
     def get_config(self) -> dict:
         try:
@@ -383,7 +396,7 @@ class CashCount(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
-    count_date = db.Column(db.Date, nullable=False, unique=True, index=True)
+    count_date = db.Column(db.Date, nullable=False, index=True)
     employee_id = db.Column(db.String(64), nullable=True)
     employee_name = db.Column(db.String(255), nullable=True)
     opening_amount = db.Column(db.Float, nullable=False, default=0.0)
@@ -393,6 +406,10 @@ class CashCount(db.Model):
     created_by_user_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'count_date', name='uq_cash_count_company_date'),
+    )
 
 
 class Customer(db.Model):

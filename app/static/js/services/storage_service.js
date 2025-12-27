@@ -44,16 +44,16 @@
 
         getAdapter: function () {
             if (this._adapter) return this._adapter;
-            if (window.LocalStorageAdapter) {
-                this._adapter = window.LocalStorageAdapter;
+            if (window.ApiAdapter) {
+                this._adapter = window.ApiAdapter;
                 return this._adapter;
             }
             throw new Error('No storage adapter available');
         },
 
-        getExpenses: function () {
+        getExpenses: function (opts) {
             const a = this.getAdapter();
-            const res = a.getExpenses();
+            const res = a.getExpenses(opts);
             if (res && typeof res.then === 'function') return res.then(arr => ensureArray(arr).map(normalizeExpense));
             return ensureArray(res).map(normalizeExpense);
         },
@@ -92,9 +92,9 @@
             return this.upsertExpense(e);
         },
 
-        getInventoryProducts: function () {
+        getInventoryProducts: function (opts) {
             const a = this.getAdapter();
-            const res = a.getInventoryProducts();
+            const res = a.getInventoryProducts(opts);
             return (res && typeof res.then === 'function') ? res.then(ensureArray) : ensureArray(res);
         },
 
@@ -120,9 +120,9 @@
             return this.saveInventoryProducts(arr);
         },
 
-        getInventoryLots: function () {
+        getInventoryLots: function (opts) {
             const a = this.getAdapter();
-            const res = a.getInventoryLots();
+            const res = a.getInventoryLots(opts);
             return (res && typeof res.then === 'function') ? res.then(ensureArray) : ensureArray(res);
         },
 
@@ -131,10 +131,10 @@
             return a.saveInventoryLots(ensureArray(arr));
         },
 
-        getInventoryMovements: function () {
+        getInventoryMovements: function (opts) {
             const a = this.getAdapter();
             if (!a || typeof a.getInventoryMovements !== 'function') return [];
-            const res = a.getInventoryMovements();
+            const res = a.getInventoryMovements(opts);
             return (res && typeof res.then === 'function') ? res.then(ensureArray) : ensureArray(res);
         },
 
@@ -195,9 +195,9 @@
             return a.saveEmployees(ensureArray(arr));
         },
 
-        getSuppliers: function () {
+        getSuppliers: function (opts) {
             const a = this.getAdapter();
-            const res = a.getSuppliers();
+            const res = a.getSuppliers(opts);
             return (res && typeof res.then === 'function') ? res.then(ensureArray) : ensureArray(res);
         },
 
@@ -206,9 +206,9 @@
             return a.saveSuppliers(ensureArray(arr));
         },
 
-        getCustomers: function () {
+        getCustomers: function (opts) {
             const a = this.getAdapter();
-            const res = a.getCustomers();
+            const res = a.getCustomers(opts);
             return (res && typeof res.then === 'function') ? res.then(ensureArray) : ensureArray(res);
         },
 
@@ -217,10 +217,24 @@
             return a.saveCustomers(ensureArray(arr));
         },
 
-        getSales: function () {
+        getSales: function (opts) {
             const a = this.getAdapter();
-            const res = a.getSales();
+            const res = a.getSales(opts);
             return (res && typeof res.then === 'function') ? res.then(ensureArray) : ensureArray(res);
+        },
+
+        getCashCounts: function (opts) {
+            const a = this.getAdapter();
+            if (!a || typeof a.getCashCounts !== 'function') return [];
+            const res = a.getCashCounts(opts);
+            return (res && typeof res.then === 'function') ? res.then(ensureArray) : ensureArray(res);
+        },
+
+        getOverdueCustomersCount: function (opts) {
+            const a = this.getAdapter();
+            if (!a || typeof a.getOverdueCustomersCount !== 'function') return 0;
+            const res = a.getOverdueCustomersCount(opts);
+            return (res && typeof res.then === 'function') ? res.then(x => (typeof x === 'number' ? x : 0)) : (typeof res === 'number' ? res : 0);
         },
 
         saveSales: function (arr) {

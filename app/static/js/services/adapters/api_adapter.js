@@ -1,4 +1,22 @@
 (function () {
+    function _qs(params) {
+        try {
+            const p = params && typeof params === 'object' ? params : {};
+            const q = new URLSearchParams();
+            Object.keys(p).forEach(k => {
+                const v = p[k];
+                if (v == null) return;
+                const s = String(v).trim();
+                if (!s) return;
+                q.set(String(k), s);
+            });
+            const out = q.toString();
+            return out ? ('?' + out) : '';
+        } catch (e) {
+            return '';
+        }
+    }
+
     async function _json(url, options) {
         const res = await fetch(url, {
             credentials: 'same-origin',
@@ -16,8 +34,14 @@
     }
 
     const ApiAdapter = {
-        getExpenses: async function () {
-            const data = await _json('/expenses/api/expenses');
+        getExpenses: async function (opts) {
+            const o = opts && typeof opts === 'object' ? opts : {};
+            const data = await _json('/expenses/api/expenses' + _qs({
+                from: o.from,
+                to: o.to,
+                category: o.category,
+                limit: o.limit
+            }));
             return Array.isArray(data.items) ? data.items : [];
         },
         saveExpenses: async function (arr) {
@@ -55,8 +79,12 @@
             return Array.isArray(data.items) ? data.items : [];
         },
 
-        getCustomers: async function () {
-            const data = await _json('/customers/api/customers');
+        getCustomers: async function (opts) {
+            const o = opts && typeof opts === 'object' ? opts : {};
+            const data = await _json('/customers/api/customers' + _qs({
+                q: o.q,
+                limit: o.limit
+            }));
             return Array.isArray(data.items) ? data.items : [];
         },
         saveCustomers: async function (arr) {
@@ -81,8 +109,12 @@
             return Array.isArray(data.items) ? data.items : [];
         },
 
-        getInventoryProducts: async function () {
-            const data = await _json('/inventory/api/products?limit=5000');
+        getInventoryProducts: async function (opts) {
+            const o = opts && typeof opts === 'object' ? opts : {};
+            const data = await _json('/inventory/api/products' + _qs({
+                limit: o.limit || 5000,
+                active: o.active
+            }));
             return Array.isArray(data.items) ? data.items : [];
         },
         saveInventoryProducts: async function (arr) {
@@ -118,8 +150,12 @@
             return out;
         },
 
-        getInventoryLots: async function () {
-            const data = await _json('/inventory/api/lots?limit=10000');
+        getInventoryLots: async function (opts) {
+            const o = opts && typeof opts === 'object' ? opts : {};
+            const data = await _json('/inventory/api/lots' + _qs({
+                limit: o.limit || 10000,
+                product_id: o.product_id
+            }));
             return Array.isArray(data.items) ? data.items : [];
         },
         saveInventoryLots: async function (arr) {
@@ -127,8 +163,14 @@
             return Array.isArray(arr) ? arr : [];
         },
 
-        getInventoryMovements: async function () {
-            const data = await _json('/inventory/api/movements?limit=2000');
+        getInventoryMovements: async function (opts) {
+            const o = opts && typeof opts === 'object' ? opts : {};
+            const data = await _json('/inventory/api/movements' + _qs({
+                from: o.from,
+                to: o.to,
+                product_id: o.product_id,
+                limit: o.limit || 2000
+            }));
             return Array.isArray(data.items) ? data.items : [];
         },
         saveInventoryMovements: async function (arr) {
@@ -136,8 +178,15 @@
             return Array.isArray(arr) ? arr : [];
         },
 
-        getSales: async function () {
-            const data = await _json('/sales/api/sales');
+        getSales: async function (opts) {
+            const o = opts && typeof opts === 'object' ? opts : {};
+            const data = await _json('/sales/api/sales' + _qs({
+                from: o.from,
+                to: o.to,
+                include_replaced: o.include_replaced,
+                exclude_cc: o.exclude_cc,
+                limit: o.limit
+            }));
             return Array.isArray(data.items) ? data.items : [];
         },
         saveSales: async function (arr) {
@@ -171,6 +220,23 @@
                 }
             }
             return out;
+        },
+
+        getCashCounts: async function (opts) {
+            const o = opts && typeof opts === 'object' ? opts : {};
+            const data = await _json('/movements/api/cash-counts' + _qs({
+                from: o.from,
+                to: o.to
+            }));
+            return Array.isArray(data.items) ? data.items : [];
+        },
+
+        getOverdueCustomersCount: async function (opts) {
+            const o = opts && typeof opts === 'object' ? opts : {};
+            const data = await _json('/sales/api/sales/overdue-customers' + _qs({
+                days: o.days
+            }));
+            return data && typeof data.count === 'number' ? data.count : 0;
         }
     };
 

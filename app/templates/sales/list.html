@@ -2534,11 +2534,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (e) {
             // fallback
         }
-        try {
-            window.localStorage.setItem('customers_dummy', JSON.stringify(Array.isArray(arr) ? arr : []));
-        } catch (e) {
-            // noop
-        }
         return null;
     }
 
@@ -4167,13 +4162,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } catch (e) {
             }
-            try {
-                const raw = window.localStorage.getItem('egresos_dummy');
-                const parsed = raw ? JSON.parse(raw) : [];
-                return Array.isArray(parsed) ? parsed : [];
-            } catch (e) {
-                return [];
-            }
+            return [];
         };
 
         const res = getExpenses();

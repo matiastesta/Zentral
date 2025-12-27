@@ -9,6 +9,10 @@ from app.permissions import module_required
 from app.main import bp
 
 
+def _company_id() -> str:
+    return str(getattr(current_user, 'company_id', '') or '').strip()
+
+
 @bp.route('/')
 @bp.route('/index')
 @login_required
@@ -27,12 +31,29 @@ def index():
 
     upcoming_calendar_events = []
     if getattr(current_user, 'can', None) and current_user.can('calendar'):
-        cfg = db.session.query(CalendarUserConfig).filter_by(user_id=current_user.id).first()
+        cid = _company_id()
+        if not cid:
+            return render_template(
+                'main/index.html',
+                title='Dashboard',
+                today_revenue=today_revenue,
+                weekly_revenue=weekly_revenue,
+                monthly_revenue=monthly_revenue,
+                recent_sales=recent_sales,
+                low_stock_products=low_stock_products,
+                upcoming_calendar_events=upcoming_calendar_events,
+            )
+        cfg = None
+        if cid:
+            cfg = (
+                db.session.query(CalendarUserConfig)
+                .filter(CalendarUserConfig.company_id == cid, CalendarUserConfig.user_id == current_user.id)
+                .first()
+            )
         cfg_data = cfg.get_config() if cfg else {}
-        alerts = cfg_data.get('alerts') if isinstance(cfg_data, dict) else {}
         dashboard_enabled = True
-        if isinstance(alerts, dict):
-            dashboard_enabled = bool(alerts.get('dashboard_integration', True))
+        if isinstance(cfg_data, dict):
+            dashboard_enabled = bool(cfg_data.get('dashboard_integration', True))
 
         if dashboard_enabled:
             today = date.today()
@@ -41,6 +62,8 @@ def index():
             q = db.session.query(CalendarEvent)
             q = q.filter(CalendarEvent.status != 'done')
             q = q.filter(CalendarEvent.event_date <= horizon)
+            if cid:
+                q = q.filter(CalendarEvent.company_id == cid)
             q = q.filter((CalendarEvent.assigned_user_id.is_(None)) | (CalendarEvent.assigned_user_id == current_user.id))
 
             events = list(q.order_by(CalendarEvent.event_date.asc(), CalendarEvent.id.asc()).limit(50).all())

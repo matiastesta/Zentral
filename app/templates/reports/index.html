@@ -546,38 +546,58 @@
                 <div id="finance-chart" class="mt-3 h-72 relative overflow-hidden border border-gray-200 rounded-lg bg-white"></div>
             </div>
 
-            <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4" id="finance-trend-block">
-                <div class="p-4 rounded-xl border border-gray-200 bg-white">
-                    <div class="text-sm font-semibold text-gray-900">Análisis de tendencia</div>
-                    <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                            <div class="text-[11px] uppercase tracking-wide text-gray-500">Ingresos</div>
-                            <div id="fin-trend-income" class="mt-1 text-sm font-semibold text-gray-900">—</div>
-                        </div>
-                        <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                            <div class="text-[11px] uppercase tracking-wide text-gray-500">Gastos</div>
-                            <div id="fin-trend-expense" class="mt-1 text-sm font-semibold text-gray-900">—</div>
-                        </div>
+            <div class="mt-4 p-4 rounded-xl border border-gray-200 bg-white" id="finance-advanced">
+                <div class="text-sm font-semibold text-gray-900">Análisis financiero avanzado</div>
+                <div class="mt-1 text-xs text-gray-500">Resultado, estructura de gastos, punto de equilibrio y riesgos de sostenibilidad.</div>
+
+                <div class="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                    <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                        <div class="text-[11px] uppercase tracking-wide text-gray-500">Resultado acumulado</div>
+                        <div id="fin-adv-result-acc" class="mt-1 text-sm font-semibold text-gray-900">—</div>
                     </div>
-                    <div id="fin-trend-msg" class="mt-2 text-xs text-gray-600">—</div>
+                    <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                        <div class="text-[11px] uppercase tracking-wide text-gray-500">Margen neto</div>
+                        <div id="fin-adv-net-margin" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                    </div>
+                    <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                        <div class="text-[11px] uppercase tracking-wide text-gray-500">Punto de equilibrio</div>
+                        <div id="fin-adv-breakeven" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                    </div>
+                    <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                        <div class="text-[11px] uppercase tracking-wide text-gray-500">Concentración de ventas</div>
+                        <div id="fin-adv-concentration" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                    </div>
                 </div>
-                <div class="p-4 rounded-xl border border-gray-200 bg-white">
-                    <div class="text-sm font-semibold text-gray-900">Meses positivos vs negativos</div>
-                    <div class="mt-2 grid grid-cols-3 gap-3">
-                        <div class="p-3 rounded-lg border border-emerald-100 bg-emerald-50">
-                            <div class="text-[11px] uppercase tracking-wide text-emerald-800">Positivos</div>
-                            <div id="fin-months-pos" class="mt-1 text-lg font-semibold text-emerald-900">0</div>
-                        </div>
-                        <div class="p-3 rounded-lg border border-rose-100 bg-rose-50">
-                            <div class="text-[11px] uppercase tracking-wide text-rose-800">Negativos</div>
-                            <div id="fin-months-neg" class="mt-1 text-lg font-semibold text-rose-900">0</div>
-                        </div>
-                        <div class="p-3 rounded-lg border border-amber-100 bg-amber-50">
-                            <div class="text-[11px] uppercase tracking-wide text-amber-800">Equilibrio</div>
-                            <div id="fin-months-eq" class="mt-1 text-lg font-semibold text-amber-900">0</div>
+
+                <div class="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div class="p-3 rounded-lg border border-gray-200 bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Estructura de gastos</div>
+                        <div class="mt-2 text-xs text-gray-600">Estimación fija vs variable (heurística).</div>
+                        <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                                <div class="text-[11px] uppercase tracking-wide text-gray-500">Fijos (estimado)</div>
+                                <div id="fin-adv-fixed" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                                <div class="text-[11px] uppercase tracking-wide text-gray-500">Variables (estimado)</div>
+                                <div id="fin-adv-variable" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="mt-2 text-xs text-gray-500">Equilibrio = resultado cercano a 0 (±1% de ingresos).</div>
+                    <div class="p-3 rounded-lg border border-gray-200 bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Sostenibilidad</div>
+                        <div class="mt-2 text-xs text-gray-600">Ingresos mínimos necesarios y margen bruto.</div>
+                        <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                                <div class="text-[11px] uppercase tracking-wide text-gray-500">Margen bruto</div>
+                                <div id="fin-adv-gross-margin" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                                <div class="text-[11px] uppercase tracking-wide text-gray-500">CMV</div>
+                                <div id="fin-adv-cmv" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -942,12 +962,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const finKpiResult = document.getElementById('fin-kpi-result');
     const finKpiResultPct = document.getElementById('fin-kpi-result-pct');
     const finKpiRatio = document.getElementById('fin-kpi-ratio');
-    const finTrendIncome = document.getElementById('fin-trend-income');
-    const finTrendExpense = document.getElementById('fin-trend-expense');
-    const finTrendMsg = document.getElementById('fin-trend-msg');
-    const finMonthsPos = document.getElementById('fin-months-pos');
-    const finMonthsNeg = document.getElementById('fin-months-neg');
-    const finMonthsEq = document.getElementById('fin-months-eq');
+    const finAdvResultAcc = document.getElementById('fin-adv-result-acc');
+    const finAdvNetMargin = document.getElementById('fin-adv-net-margin');
+    const finAdvBreakeven = document.getElementById('fin-adv-breakeven');
+    const finAdvConcentration = document.getElementById('fin-adv-concentration');
+    const finAdvFixed = document.getElementById('fin-adv-fixed');
+    const finAdvVariable = document.getElementById('fin-adv-variable');
+    const finAdvGrossMargin = document.getElementById('fin-adv-gross-margin');
+    const finAdvCmv = document.getElementById('fin-adv-cmv');
     const finBreakIncome = document.getElementById('fin-break-income');
     const finBreakExpense = document.getElementById('fin-break-expense');
     const finInsightsWrap = document.getElementById('finance-insights');
@@ -1230,15 +1252,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (finKpiRatio) finKpiRatio.textContent = String((Number(k.expense_income_ratio || 0) * 100.0).toFixed(2)).replace('.', ',') + '%';
 
-            const t = data.trends || {};
-            if (finTrendIncome) finTrendIncome.textContent = String(t.income || '—');
-            if (finTrendExpense) finTrendExpense.textContent = String(t.expense || '—');
-            if (finTrendMsg) finTrendMsg.textContent = String(t.message || '');
+            // Advanced block
+            if (finAdvResultAcc) finAdvResultAcc.textContent = formatMoneyARS(k.result_accumulated || 0);
+            if (finAdvNetMargin) finAdvNetMargin.textContent = String(Number(k.net_margin_pct || 0).toFixed(2)).replace('.', ',') + '%';
 
-            const ms = data.months_summary || {};
-            if (finMonthsPos) finMonthsPos.textContent = String(ms.positive || 0);
-            if (finMonthsNeg) finMonthsNeg.textContent = String(ms.negative || 0);
-            if (finMonthsEq) finMonthsEq.textContent = String(ms.breakeven || 0);
+            if (finAdvBreakeven) {
+                const be = k.break_even_income_estimate;
+                finAdvBreakeven.textContent = (be === null || typeof be === 'undefined') ? '—' : formatMoneyARS(be);
+            }
+
+            if (finAdvConcentration) {
+                const dc = (k && k.day_concentration) ? k.day_concentration : (data && data.kpis && data.kpis.day_concentration ? data.kpis.day_concentration : {});
+                const top3 = dc && (typeof dc.top3_share_pct !== 'undefined') ? Number(dc.top3_share_pct || 0) : 0;
+                finAdvConcentration.textContent = 'Top 3 días: ' + String(top3.toFixed(2)).replace('.', ',') + '%';
+            }
+
+            if (finAdvFixed) finAdvFixed.textContent = formatMoneyARS(k.fixed_cost_estimate || 0);
+            if (finAdvVariable) finAdvVariable.textContent = formatMoneyARS(k.variable_cost_estimate || 0);
+
+            if (finAdvGrossMargin) {
+                const gm = Number(k.gross_margin_total || 0);
+                const gmPct = Number(k.gross_margin_pct || 0);
+                finAdvGrossMargin.textContent = formatMoneyARS(gm) + ' (' + String(gmPct.toFixed(2)).replace('.', ',') + '%)';
+            }
+            if (finAdvCmv) finAdvCmv.textContent = formatMoneyARS(k.cmv_total || 0);
 
             renderFinanceChart(data.series);
             renderFinanceBreakdowns(data.breakdowns);

@@ -189,7 +189,13 @@ def bootstrap_schema(reset: bool) -> None:
         except Exception:
             has_password_plain = False
 
-        if email_nullable and (not has_unique_username) and has_unique_company_username and has_password_plain:
+        has_level = False
+        try:
+            has_level = 'level' in set(cols.keys())
+        except Exception:
+            has_level = False
+
+        if email_nullable and (not has_unique_username) and has_unique_company_username and has_password_plain and has_level:
             return
 
         db.session.execute(text('PRAGMA foreign_keys=OFF'))
@@ -206,6 +212,7 @@ def bootstrap_schema(reset: bool) -> None:
                     password_hash VARCHAR(255) NOT NULL,
                     password_plain TEXT,
                     role VARCHAR(32) NOT NULL,
+                    level INTEGER NOT NULL DEFAULT 0,
                     created_by_user_id INTEGER,
                     permissions_json TEXT NOT NULL,
                     is_master BOOLEAN NOT NULL,
@@ -220,7 +227,7 @@ def bootstrap_schema(reset: bool) -> None:
             text(
                 """
                 INSERT INTO "user" (
-                    id, company_id, username, display_name, email, password_hash, password_plain, role,
+                    id, company_id, username, display_name, email, password_hash, password_plain, role, level,
                     created_by_user_id, permissions_json, is_master, active
                 )
                 SELECT
@@ -229,6 +236,7 @@ def bootstrap_schema(reset: bool) -> None:
                     password_hash,
                     NULLIF(TRIM(COALESCE(password_plain, '')), ''),
                     role,
+                    COALESCE(level, 0),
                     created_by_user_id, permissions_json, is_master, active
                 FROM "user_old"
                 """
@@ -247,7 +255,7 @@ def bootstrap_schema(reset: bool) -> None:
             reset_public_schema()
             db.session.commit()
 
-    from app.models import Company, CompanyRole, SystemMeta, User
+    from app.models import Company, CompanyRole, Plan, SystemMeta, User
 
     if is_sqlite:
         db.create_all()
@@ -264,6 +272,7 @@ def bootstrap_schema(reset: bool) -> None:
                 CashCount,
                 Category,
                 CompanyRole,
+                Plan,
                 Customer,
                 Employee,
                 Expense,
@@ -279,6 +288,7 @@ def bootstrap_schema(reset: bool) -> None:
             for m in (
                 Company,
                 CompanyRole,
+                Plan,
                 SystemMeta,
                 User,
                 BusinessSettings,
@@ -307,81 +317,6 @@ def bootstrap_schema(reset: bool) -> None:
     meta = db.session.get(SystemMeta, 'initialized')
     if not meta:
         db.session.add(SystemMeta(key='initialized', value='1'))
-
-    admin_username = (os.environ.get('ZENTRAL_ADMIN_USERNAME') or 'zentra').strip()
-    admin_email = (os.environ.get('ZENTRAL_ADMIN_EMAIL') or 'zentra@zentral.local').strip().lower()
-    admin_pass = os.environ.get('ZENTRAL_ADMIN_PASSWORD') or 'zentra'
-
-    with db.session.no_autoflush:
-        admin = db.session.query(User).filter(User.role == 'zentral_admin').first()
-        admin_id = int(getattr(admin, 'id', 0) or 0) if admin else 0
-
-        # Free up username/email if they are already used by another user
-        uname_conflict = (
-            db.session.query(User)
-            .filter(func.lower(User.username) == admin_username.strip().lower())
-            .filter(User.id != admin_id if admin_id else True)
-            .first()
-        )
-        if uname_conflict:
-            base = str(getattr(uname_conflict, 'username', '') or 'user').strip() or 'user'
-            suffix = str(getattr(uname_conflict, 'id', '') or '').strip() or 'x'
-            uname_conflict.username = f"{base}_{suffix}"
-
-        email_conflict = (
-            db.session.query(User)
-            .filter(func.lower(User.email) == admin_email.strip().lower())
-            .filter(User.id != admin_id if admin_id else True)
-            .first()
-        )
-        if email_conflict:
-            # Keep it simple; generate an address that stays unique.
-            suffix = str(getattr(email_conflict, 'id', '') or '').strip() or 'x'
-            email_conflict.email = f"conflict_{suffix}@zentral.local"
-
-        if not admin:
-            admin = User(
-                username=admin_username,
-                email=admin_email,
-                role='zentral_admin',
-                is_master=True,
-                active=True,
-                company_id=None,
-            )
-            admin.set_permissions_all(True)
-            db.session.add(admin)
-        else:
-            admin.is_master = True
-            admin.active = True
-            admin.company_id = None
-            admin.role = 'zentral_admin'
-            admin.set_permissions_all(True)
-            admin.username = admin_username
-            admin.email = admin_email
-
-        admin.set_password(admin_pass)
-
-    if not db.session.query(Company).first():
-        demo_slug = (os.environ.get('DEFAULT_COMPANY_SLUG') or 'demo').strip().lower()
-        demo_name = (os.environ.get('DEFAULT_COMPANY_NAME') or 'Empresa Demo').strip()
-        c = Company(name=demo_name, slug=demo_slug)
-        db.session.add(c)
-        db.session.flush()
-
-        demo_email = (os.environ.get('DEFAULT_COMPANY_ADMIN_EMAIL') or f'admin@{demo_slug}.local').strip().lower()
-        demo_pass = os.environ.get('DEFAULT_COMPANY_ADMIN_PASSWORD') or 'admin'
-        demo_user = User(
-            username=f'admin_{demo_slug}',
-            email=demo_email,
-            role='company_admin',
-            is_master=False,
-            active=True,
-            company_id=str(c.id),
-        )
-        demo_user.set_password(demo_pass)
-        demo_user.set_permissions_all(True)
-        db.session.add(demo_user)
-
     db.session.commit()
 
     if not is_sqlite:

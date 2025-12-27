@@ -299,54 +299,68 @@
                 {% set sources = (cfg.get('event_sources') if cfg else {}) %}
                 {% if not sources %}{% set sources = {} %}{% endif %}
                 {% set clientes_src = sources.get('clientes', {}) %}
-                {% set empleados_src = sources.get('empleados', {}) %}
-                {% set ventas_src = sources.get('ventas', {}) %}
-                {% set movimientos_src = sources.get('movimientos', {}) %}
-                {% set inventario_src = sources.get('inventario', {}) %}
-                {% set gastos_src = sources.get('gastos', {}) %}
                 {% set proveedores_src = sources.get('proveedores', {}) %}
-                {% set reportes_src = sources.get('reportes', {}) %}
-                {% set config_src = sources.get('configuracion', {}) %}
-                {% set sistema_src = sources.get('sistema', {}) %}
+                {% set inventario_src = sources.get('inventario', {}) %}
+                {% set movimientos_src = sources.get('movimientos', {}) %}
+                {% set empleados_src = sources.get('empleados', {}) %}
                 {% set manual_src = sources.get('manual', {}) %}
-                {% set alerts_cfg = (cfg.get('alerts') if cfg else {}) %}
-                {% if not alerts_cfg %}{% set alerts_cfg = {} %}{% endif %}
 
                 <div class="border border-gray-200 rounded-xl p-3">
                     <div class="text-xs font-semibold text-gray-700">Fuentes de eventos</div>
-                    <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                        <label class="inline-flex items-center gap-2"><input name="src_clientes_cumpleanos" type="checkbox" {% if clientes_src.get('cumpleanos', True) %}checked{% endif %}>Clientes · Cumpleaños</label>
-                        <label class="inline-flex items-center gap-2"><input name="src_clientes_deudas" type="checkbox" {% if clientes_src.get('deudas', True) %}checked{% endif %}>Clientes · Deudas</label>
-                        <label class="inline-flex items-center gap-2"><input name="src_clientes_inactivos" type="checkbox" {% if clientes_src.get('inactivos', False) %}checked{% endif %}>Clientes · Inactivos</label>
+                    <div class="mt-3 space-y-3">
+                        <div class="border border-gray-100 rounded-lg p-3">
+                            <div class="text-xs font-semibold text-gray-700">Clientes</div>
+                            <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                                <label class="inline-flex items-center gap-2"><input name="src_clientes_cumpleanos" type="checkbox" {% if clientes_src.get('cumpleanos', True) %}checked{% endif %}>Cumpleaños</label>
+                                <label class="inline-flex items-center gap-2"><input name="src_clientes_deuda_vencida" type="checkbox" {% if clientes_src.get('deuda_vencida', True) %}checked{% endif %}>Deuda vencida</label>
+                                <label class="inline-flex items-center gap-2"><input name="src_clientes_deuda_critica" type="checkbox" {% if clientes_src.get('deuda_critica', True) %}checked{% endif %}>Deuda crítica</label>
+                            </div>
+                        </div>
 
-                        <label class="inline-flex items-center gap-2"><input name="src_empleados_cumpleanos" type="checkbox" {% if empleados_src.get('cumpleanos', True) %}checked{% endif %}>Empleados · Cumpleaños</label>
-                        <label class="inline-flex items-center gap-2"><input name="src_empleados_avisos" type="checkbox" {% if empleados_src.get('avisos', True) %}checked{% endif %}>Empleados · Avisos</label>
-                        <label class="inline-flex items-center gap-2"><input name="src_empleados_licencias" type="checkbox" {% if empleados_src.get('licencias', True) %}checked{% endif %}>Empleados · Licencias</label>
+                        <div class="border border-gray-100 rounded-lg p-3">
+                            <div class="text-xs font-semibold text-gray-700">Proveedores</div>
+                            <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                                <label class="inline-flex items-center gap-2"><input name="src_proveedores_deuda_vencida" type="checkbox" {% if proveedores_src.get('deuda_vencida', True) %}checked{% endif %}>Deuda vencida</label>
+                                <label class="inline-flex items-center gap-2"><input name="src_proveedores_proximo_vencimiento" type="checkbox" {% if proveedores_src.get('proximo_vencimiento', True) %}checked{% endif %}>Próximo vencimiento</label>
+                            </div>
+                        </div>
 
-                        <label class="inline-flex items-center gap-2"><input name="src_ventas_vencimientos" type="checkbox" {% if ventas_src.get('vencimientos', True) %}checked{% endif %}>Ventas · Vencimientos</label>
-                        <label class="inline-flex items-center gap-2"><input name="src_ventas_pagos" type="checkbox" {% if ventas_src.get('pagos_pactados', True) %}checked{% endif %}>Ventas · Pagos pactados</label>
+                        <div class="border border-gray-100 rounded-lg p-3">
+                            <div class="text-xs font-semibold text-gray-700">Inventario</div>
+                            <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                                <label class="inline-flex items-center gap-2"><input name="src_inventario_stock_critico" type="checkbox" {% if inventario_src.get('stock_critico', True) %}checked{% endif %}>Stock crítico</label>
+                                <label class="inline-flex items-center gap-2"><input name="src_inventario_reposicion" type="checkbox" {% if inventario_src.get('reposicion', True) %}checked{% endif %}>Reposición</label>
+                            </div>
+                        </div>
 
-                        <label class="inline-flex items-center gap-2"><input name="src_mov_vencimientos" type="checkbox" {% if movimientos_src.get('vencimientos_financieros', True) %}checked{% endif %}>Movimientos · Vencimientos</label>
-                        <label class="inline-flex items-center gap-2"><input name="src_mov_arqueo" type="checkbox" {% if movimientos_src.get('arqueo_caja', True) %}checked{% endif %}>Movimientos · Arqueo</label>
+                        <div class="border border-gray-100 rounded-lg p-3">
+                            <div class="text-xs font-semibold text-gray-700">Movimientos</div>
+                            <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                                <label class="inline-flex items-center gap-2"><input name="src_movimientos_arqueo_pendiente" type="checkbox" {% if movimientos_src.get('arqueo_pendiente', True) %}checked{% endif %}>Arqueo pendiente</label>
+                                <label class="inline-flex items-center gap-2"><input name="src_movimientos_diferencias_caja" type="checkbox" {% if movimientos_src.get('diferencias_caja', True) %}checked{% endif %}>Diferencias de caja</label>
+                            </div>
+                        </div>
 
-                        <label class="inline-flex items-center gap-2"><input name="src_inventario_recordatorios" type="checkbox" {% if inventario_src.get('recordatorios', True) %}checked{% endif %}>Inventario · Recordatorios</label>
-                        <label class="inline-flex items-center gap-2"><input name="src_gastos_recordatorios" type="checkbox" {% if gastos_src.get('recordatorios', True) %}checked{% endif %}>Gastos · Recordatorios</label>
-                        <label class="inline-flex items-center gap-2"><input name="src_proveedores_recordatorios" type="checkbox" {% if proveedores_src.get('recordatorios', True) %}checked{% endif %}>Proveedores · Recordatorios</label>
-                        <label class="inline-flex items-center gap-2"><input name="src_reportes_recordatorios" type="checkbox" {% if reportes_src.get('recordatorios', True) %}checked{% endif %}>Reportes · Recordatorios</label>
-                        <label class="inline-flex items-center gap-2"><input name="src_config_recordatorios" type="checkbox" {% if config_src.get('recordatorios', True) %}checked{% endif %}>Configuración · Recordatorios</label>
+                        <div class="border border-gray-100 rounded-lg p-3">
+                            <div class="text-xs font-semibold text-gray-700">Empleados</div>
+                            <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                                <label class="inline-flex items-center gap-2"><input name="src_empleados_cumpleanos" type="checkbox" {% if empleados_src.get('cumpleanos', True) %}checked{% endif %}>Cumpleaños</label>
+                            </div>
+                        </div>
 
-                        <label class="inline-flex items-center gap-2"><input name="src_sys_cierres" type="checkbox" {% if sistema_src.get('cierres', True) %}checked{% endif %}>Sistema · Cierres</label>
-                        <label class="inline-flex items-center gap-2"><input name="src_sys_mant" type="checkbox" {% if sistema_src.get('mantenimientos', True) %}checked{% endif %}>Sistema · Mantenimientos</label>
-
-                        <label class="inline-flex items-center gap-2"><input name="src_manual_notas" type="checkbox" {% if manual_src.get('notas', True) %}checked{% endif %}>Manual · Notas/avisos</label>
+                        <div class="border border-gray-100 rounded-lg p-3">
+                            <div class="text-xs font-semibold text-gray-700">Manual</div>
+                            <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                                <label class="inline-flex items-center gap-2"><input name="src_manual_notas_avisos" type="checkbox" {% if manual_src.get('notas_avisos', True) %}checked{% endif %}>Notas / avisos</label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="border border-gray-200 rounded-xl p-3">
-                    <div class="text-xs font-semibold text-gray-700">Alertas</div>
+                    <div class="text-xs font-semibold text-gray-700">Dashboard</div>
                     <div class="mt-2 space-y-2 text-xs">
-                        <label class="inline-flex items-center gap-2"><input name="alerts_enabled" type="checkbox" {% if alerts_cfg.get('enabled', True) %}checked{% endif %}>Activar alertas (10/15/30 días)</label>
-                        <label class="inline-flex items-center gap-2"><input name="alerts_dashboard" type="checkbox" {% if alerts_cfg.get('dashboard_integration', True) %}checked{% endif %}>Eventos críticos visibles en Dashboard</label>
+                        <label class="inline-flex items-center gap-2"><input name="calendar_dashboard_integration" type="checkbox" {% if cfg.get('dashboard_integration', True) %}checked{% endif %}>Mostrar eventos críticos en Dashboard</label>
                     </div>
                 </div>
 
@@ -500,194 +514,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function safeStr(v) { return String(v == null ? '' : v); }
     function ensureArray(x) { return Array.isArray(x) ? x : []; }
 
-    function readEmployees() {
-        try {
-            const raw = window.localStorage.getItem('empleados_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return ensureArray(parsed);
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function readCustomers() {
-        try {
-            if (window.StorageService && typeof window.StorageService.getCustomers === 'function') {
-                const res = window.StorageService.getCustomers();
-                if (res && typeof res.then === 'function') return res;
-                return ensureArray(res);
-            }
-        } catch (e) {
-        }
-        try {
-            const raw = window.localStorage.getItem('customers_dummy');
-            const parsed = raw ? JSON.parse(raw) : [];
-            return ensureArray(parsed);
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function normalizeName(first, last) {
-        const f = safeStr(first).trim();
-        const l = safeStr(last).trim();
-        return (f + ' ' + l).trim() || 'Sin nombre';
-    }
-
-    function mkBirthdayEvent(kind, obj, targetYear) {
-        const id = safeStr(obj?.id || obj?.employee_id || obj?.customer_id || '') || safeStr(Date.now());
-        const name = normalizeName(obj?.first_name, obj?.last_name);
-        const birth = safeStr(obj?.birth_date || obj?.birthday || '').trim();
-        const d = parseISODate(birth);
-        if (!d) return null;
-        const month = d.getMonth();
-        const day = d.getDate();
-        const evDate = new Date(targetYear, month, day);
-        const iso = ymd(evDate);
-        if (kind === 'employee') {
-            return {
-                iso,
-                title: 'Cumpleaños: ' + name,
-                module: 'empleados',
-                priority: 'media',
-                href: EMPLOYEE_EDIT_URL + '?id=' + encodeURIComponent(id)
-            };
-        }
-        return {
-            iso,
-            title: 'Cumpleaños: ' + name,
-            module: 'clientes',
-            priority: 'media',
-            href: CUSTOMER_INDEX_URL + '?open_legajo=' + encodeURIComponent(id)
-        };
-    }
-
-    function appendToMonth(ev) {
-        const cell = document.querySelector('[data-day="' + ev.iso + '"]');
-        if (!cell) return;
-        const list = cell.querySelector('div.mt-1.space-y-1');
-        if (!list) return;
-
-        const dot = prioDots[ev.priority] || prioDots.media;
-        const modCls = moduleClasses[ev.module] || moduleClasses.manual;
-
-        const a = document.createElement('a');
-        a.href = ev.href;
-        a.className = 'block w-full text-left px-2 py-1 rounded-md border text-gray-900 ' + modCls + ' hover:bg-white/60';
-        a.style.fontSize = '9px';
-        a.style.lineHeight = '1.15';
-        a.title = ev.title;
-
-        a.innerHTML = ''
-            + '<div class="flex items-start gap-1">'
-            +   '<span class="shrink-0 mt-0.5 h-2.5 w-2.5 rounded-full ' + dot + '" title="' + ev.priority + '"></span>'
-            +   '<span class="font-medium" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + ev.title + '</span>'
-            + '</div>';
-
-        list.appendChild(a);
-    }
-
-    function appendToList(ev) {
-        const container = document.querySelector('[data-group-items="' + ev.iso + '"]');
-        const dot = prioDots[ev.priority] || prioDots.media;
-        const modCls = moduleClasses[ev.module] || moduleClasses.manual;
-
-        const rowHtml = (function () {
-            const wrap = document.createElement('div');
-            wrap.className = 'p-3 border rounded-lg flex items-start justify-between gap-3 ' + modCls;
-            wrap.innerHTML = ''
-                + '<div class="min-w-0">'
-                +   '<div class="flex items-center gap-2">'
-                +     '<span class="h-2.5 w-2.5 rounded-full ' + dot + '" title="' + ev.priority + '"></span>'
-                +     '<span class="px-2 py-0.5 rounded text-[10px] border bg-white/40 border-black/10 text-gray-900">' + ev.module + '</span>'
-                +     '<div class="text-sm font-semibold text-gray-900" title="' + ev.title.replace(/\"/g, '&quot;') + '" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + ev.title + '</div>'
-                +   '</div>'
-                +   '<div class="mt-1 text-xs text-gray-500">' + ev.iso.split('-').reverse().join('/') + '</div>'
-                + '</div>'
-                + '<a href="' + ev.href + '" class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 hover:bg-gray-50 text-gray-700" title="Abrir">'
-                +   '<i class="fas fa-arrow-right"></i>'
-                + '</a>';
-            return wrap;
-        })();
-
-        if (container) {
-            container.appendChild(rowHtml);
-            return;
-        }
-
-        // Si no existe el día en la lista (porque no había eventos manuales), lo creamos.
-        const listRoot = document.querySelector('.space-y-4');
-        if (!listRoot) return;
-
-        const group = document.createElement('div');
-        group.setAttribute('data-group-date', ev.iso);
-        group.innerHTML = ''
-            + '<div class="text-xs font-semibold text-gray-700 mb-2">' + ev.iso.split('-').reverse().join('/') + '</div>'
-            + '<div class="space-y-2" data-group-items="' + ev.iso + '"></div>';
-        const items = group.querySelector('[data-group-items]');
-        if (items) items.appendChild(rowHtml);
-
-        // Insertar ordenado por fecha
-        const existing = Array.from(listRoot.querySelectorAll('[data-group-date]'));
-        let inserted = false;
-        for (const el of existing) {
-            const k = el.getAttribute('data-group-date') || '';
-            if (k && ev.iso < k) {
-                listRoot.insertBefore(group, el);
-                inserted = true;
-                break;
-            }
-        }
-        if (!inserted) listRoot.appendChild(group);
-    }
-
-    function injectBirthdays(employees, customers) {
-        const y = parseInt(bootstrap.year || 0, 10) || (new Date()).getFullYear();
-        const m = parseInt(bootstrap.month || 0, 10) || ((new Date()).getMonth() + 1);
-
-        const isList = safeStr(bootstrap.view) === 'list';
-        const rangeStart = safeStr(bootstrap.range_start);
-        const rangeEnd = safeStr(bootstrap.range_end);
-
-        const events = [];
-        if (enableEmpBday) {
-            ensureArray(employees).forEach(e => {
-                const ev = mkBirthdayEvent('employee', e, y);
-                if (!ev) return;
-                events.push(ev);
-            });
-        }
-        if (enableCustBday) {
-            ensureArray(customers).forEach(c => {
-                const ev = mkBirthdayEvent('customer', c, y);
-                if (!ev) return;
-                events.push(ev);
-            });
-        }
-
-        events.forEach(ev => {
-            if (isList) {
-                if (!rangeStart || !rangeEnd || !inRange(ev.iso, rangeStart, rangeEnd)) return;
-                appendToList(ev);
-            } else {
-                // mensual: solo los del mes visible
-                const parts = ev.iso.split('-');
-                const mm = parseInt(parts[1], 10);
-                if (mm !== m) return;
-                appendToMonth(ev);
-            }
-        });
-    }
-
-    const emp = readEmployees();
-    const cust = readCustomers();
-    if (cust && typeof cust.then === 'function') {
-        cust.then(function (customers) {
-            injectBirthdays(emp, customers);
-        });
-    } else {
-        injectBirthdays(emp, cust);
-    }
+    // Cumpleaños (clientes/empleados) y demás eventos automáticos se generan server-side
+    // en calendar/routes.py a partir de la base de datos, y se filtran por configuración.
 });
 </script>
 {% endblock %}

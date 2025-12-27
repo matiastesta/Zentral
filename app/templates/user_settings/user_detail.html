@@ -46,11 +46,16 @@
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Rol</label>
-                    <select name="role" class="w-full px-3 py-2 text-sm border rounded-md bg-white" {% if not can_edit_all %}disabled{% endif %}>
+                    <select id="select-role" name="role" class="w-full px-3 py-2 text-sm border rounded-md bg-white" {% if not can_edit_all %}disabled{% endif %}>
                         {% for r in roles %}
                             <option value="{{ r }}" {% if user.role == r %}selected{% endif %}>{{ r }}</option>
                         {% endfor %}
+                        <option value="__new__">Agregar nuevo rol</option>
                     </select>
+                </div>
+                <div id="role-new-wrap" class="hidden">
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Nuevo rol</label>
+                    <input id="input-role-new" name="role_new" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: marketing" {% if not can_edit_all %}disabled{% endif %}>
                 </div>
             </div>
 
@@ -133,6 +138,20 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const roleSelect = document.getElementById('select-role');
+    const roleNewWrap = document.getElementById('role-new-wrap');
+    const roleNewInput = document.getElementById('input-role-new');
+    function syncRoleNew() {
+        const isNew = roleSelect && String(roleSelect.value || '') === '__new__';
+        if (roleNewWrap) roleNewWrap.classList.toggle('hidden', !isNew);
+        if (roleNewInput) roleNewInput.required = !!isNew;
+        if (isNew && roleNewInput) {
+            try { roleNewInput.focus(); } catch (e) { }
+        }
+    }
+    if (roleSelect) roleSelect.addEventListener('change', syncRoleNew);
+    syncRoleNew();
+
     document.querySelectorAll('[data-toggle-pass]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const inputId = btn.getAttribute('data-toggle-pass');

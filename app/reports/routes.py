@@ -1067,7 +1067,7 @@ def sales_analysis_api():
         # Map product info
         prod_map = {}
         try:
-            p_rows = db.session.query(Product).all()
+            p_rows = db.session.query(Product).filter(Product.company_id == cid).all()
             for p in (p_rows or []):
                 pid = str(getattr(p, 'id', '') or '').strip()
                 if pid:
@@ -1078,11 +1078,11 @@ def sales_analysis_api():
         # Category map
         cat_map = {}
         try:
-            c_rows = db.session.query(Category).all()
+            c_rows = db.session.query(Category).filter(Category.company_id == cid).all()
             for c in (c_rows or []):
-                cid = str(getattr(c, 'id', '') or '').strip()
-                if cid:
-                    cat_map[cid] = c
+                cat_key = str(getattr(c, 'id', '') or '').strip()
+                if cat_key:
+                    cat_map[cat_key] = c
         except Exception:
             cat_map = {}
 
@@ -1107,6 +1107,7 @@ def sales_analysis_api():
             try:
                 rows = (
                     db.session.query(InventoryMovement.product_id, db.func.coalesce(db.func.sum(InventoryMovement.total_cost), 0.0))
+                    .filter(InventoryMovement.company_id == cid)
                     .filter(InventoryMovement.type == 'return')
                     .filter(InventoryMovement.sale_ticket.in_(return_tickets))
                     .group_by(InventoryMovement.product_id)
@@ -1133,18 +1134,18 @@ def sales_analysis_api():
                         pid = str(getattr(pp, 'id', '') or '').strip() or pid
                         break
 
-            cid = ''
+            cat_id = ''
             cname = ''
             try:
-                cid = str(getattr(p, 'category_id', '') or '').strip() if p else ''
-                cname = str(getattr(cat_map.get(cid), 'name', '') or '').strip() if cid else ''
+                cat_id = str(getattr(p, 'category_id', '') or '').strip() if p else ''
+                cname = str(getattr(cat_map.get(cat_id), 'name', '') or '').strip() if cat_id else ''
             except Exception:
-                cid = ''
+                cat_id = ''
                 cname = ''
 
-            if category_id and cid and str(cid) != str(category_id):
+            if category_id and cat_id and str(cat_id) != str(category_id):
                 continue
-            if category_id and not cid:
+            if category_id and not cat_id:
                 continue
 
             sales_amt = _num(a.get('sales'))
@@ -1161,7 +1162,7 @@ def sales_analysis_api():
                 'key': pid or (str(pname or '').strip() or '—'),
                 'product_id': pid or None,
                 'label': str(pname or '').strip() or (str(getattr(p, 'name', '') or '').strip() if p else 'Producto'),
-                'category_id': cid or None,
+                'category_id': cat_id or None,
                 'category': cname or 'Sin categoría',
                 'sales': round(sales_amt, 2),
                 'cmv': round(cmv_amt, 2),
@@ -1600,41 +1601,112 @@ def finance_api():
         neg = 0
         eq = 0
 
-    income_trend = 'Estable'
-    expense_trend = 'Controlados'
-    trend_msg = ''
+    # Advanced analysis (replace simple trend/months messaging)
+    # 1) Compute CMV to estimate contribution margin and breakeven.
+    cmv_total = 0.0
     try:
-        if len(series) >= 2:
-            first_inc = _num(series[0].get('income_total'))
-            last_inc = _num(series[-1].get('income_total'))
-            first_exp = _num(series[0].get('expense_total'))
-            last_exp = _num(series[-1].get('expense_total'))
-
-            inc_pct = _safe_pct(last_inc - first_inc, abs(first_inc) if abs(first_inc) > 1e-9 else last_inc)  # 0..1
-            exp_pct = _safe_pct(last_exp - first_exp, abs(first_exp) if abs(first_exp) > 1e-9 else last_exp)
-
-            if inc_pct >= 0.05:
-                income_trend = 'Creciente'
-            elif inc_pct <= -0.05:
-                income_trend = 'Decreciente'
-
-            if exp_pct <= inc_pct + 0.03:
-                expense_trend = 'Controlados'
-            elif exp_pct >= inc_pct + 0.08:
-                expense_trend = 'Desalineados'
-            else:
-                expense_trend = 'Crecientes'
-
-            if expense_trend in ('Desalineados', 'Crecientes') and income_trend != 'Creciente':
-                trend_msg = 'Gastos creciendo más rápido que ingresos.'
-            elif income_trend == 'Creciente' and expense_trend == 'Controlados':
-                trend_msg = 'Ingresos en crecimiento con gastos controlados.'
-            else:
-                trend_msg = 'Tendencia estable.'
+        sales_rows = (
+            db.session.query(Sale)
+            .filter(Sale.company_id == cid)
+            .filter(Sale.sale_date >= d_from)
+            .filter(Sale.sale_date <= d_to)
+            .filter(Sale.sale_type == 'Venta')
+            .filter(db.func.lower(Sale.status).like('completad%'))
+            .all()
+        )
+        sale_tickets = [str(r.ticket) for r in (sales_rows or []) if str(getattr(r, 'ticket', '') or '').strip()]
+        if sale_tickets:
+            cmv_total = (
+                db.session.query(db.func.coalesce(db.func.sum(InventoryMovement.total_cost), 0.0))
+                .filter(InventoryMovement.company_id == cid)
+                .filter(InventoryMovement.type == 'sale')
+                .filter(InventoryMovement.sale_ticket.in_(sale_tickets))
+                .scalar()
+            )
+            cmv_total = _num(cmv_total)
     except Exception:
-        income_trend = 'Estable'
-        expense_trend = 'Controlados'
-        trend_msg = ''
+        cmv_total = 0.0
+
+    income_total = _num(cur.get('income_total'))
+    expense_total = _num(cur.get('expense_total'))
+    result_total = _num(cur.get('result_total'))
+
+    gross_margin = income_total - cmv_total
+    gross_margin_pct = round(_safe_pct(gross_margin, income_total) * 100.0, 2)
+    net_margin_pct = round(_safe_pct(result_total, income_total) * 100.0, 2)
+
+    # Contribution margin ratio for breakeven
+    contrib_ratio = _safe_pct(gross_margin, income_total)
+    break_even_income = None
+    if contrib_ratio > 1e-9:
+        break_even_income = expense_total / contrib_ratio
+
+    # Result accumulated (from series)
+    result_acc = 0.0
+    try:
+        result_acc = sum(_num(r.get('result_total')) for r in (series or []))
+    except Exception:
+        result_acc = 0.0
+
+    # Expense structure heuristic: fixed vs variable
+    fixed_cost = 0.0
+    variable_cost = 0.0
+    fixed_payroll = 0.0
+    fixed_recurring = 0.0
+    try:
+        exp_rows = (
+            db.session.query(Expense)
+            .filter(Expense.company_id == cid)
+            .filter(Expense.expense_date >= d_from)
+            .filter(Expense.expense_date <= d_to)
+            .all()
+        )
+        for e in (exp_rows or []):
+            if _is_supplier_cc_payment(e):
+                continue
+            amt = _num(getattr(e, 'amount', 0.0))
+            if amt <= 0:
+                continue
+            if _is_payroll_expense(e):
+                fixed_cost += amt
+                fixed_payroll += amt
+                continue
+            freq = str(getattr(e, 'frequency', '') or '').strip().lower()
+            if freq:
+                fixed_cost += amt
+                fixed_recurring += amt
+            else:
+                variable_cost += amt
+    except Exception:
+        fixed_cost = 0.0
+        variable_cost = 0.0
+        fixed_payroll = 0.0
+        fixed_recurring = 0.0
+
+    # Dependence on high-sales days
+    day_concentration = {'top1_share_pct': 0.0, 'top3_share_pct': 0.0}
+    try:
+        rows = (
+            db.session.query(Sale.sale_date, db.func.coalesce(db.func.sum(Sale.total), 0.0))
+            .filter(Sale.company_id == cid)
+            .filter(Sale.sale_date >= d_from)
+            .filter(Sale.sale_date <= d_to)
+            .filter(Sale.sale_type == 'Venta')
+            .filter(db.func.lower(Sale.status).like('completad%'))
+            .group_by(Sale.sale_date)
+            .all()
+        )
+        vals = sorted([_num(v) for _, v in (rows or [])], reverse=True)
+        tot = sum(vals) if vals else 0.0
+        if tot > 1e-9:
+            top1 = (vals[0] if len(vals) >= 1 else 0.0)
+            top3 = sum(vals[:3])
+            day_concentration = {
+                'top1_share_pct': round(_safe_pct(top1, tot) * 100.0, 2),
+                'top3_share_pct': round(_safe_pct(top3, tot) * 100.0, 2),
+            }
+    except Exception:
+        day_concentration = {'top1_share_pct': 0.0, 'top3_share_pct': 0.0}
 
     def _top_n(d: dict, n: int):
         items = []
@@ -1711,68 +1783,71 @@ def finance_api():
 
     insights = []
     try:
-        max_streak = 0
-        cur_streak = 0
-        for r in (series or []):
-            if _num(r.get('result_total')) < 0:
-                cur_streak += 1
-                max_streak = max(max_streak, cur_streak)
-            else:
-                cur_streak = 0
-        if max_streak >= 2:
+        # Result quality signals
+        if _num(cur.get('income_total')) <= 1e-9:
             insights.append({
-                'kind': 'warning',
-                'severity': 'alta' if max_streak >= 3 else 'media',
-                'key': 'finance.negative_streak',
-                'title': 'Meses consecutivos negativos',
-                'detail': f'El negocio tuvo {max_streak} mes(es) consecutivo(s) con resultado negativo.',
+                'kind': 'info',
+                'severity': 'media',
+                'key': 'finance.no_income',
+                'title': 'Sin ingresos en el período',
+                'detail': 'No hay ventas registradas en el período seleccionado. El resultado depende completamente de los gastos.',
             })
 
-        if total_expenses > 0:
-            share = _safe_pct(payroll_expenses, total_expenses)
-            if share >= 0.45:
+        if _num(cur.get('result_total')) < 0:
+            insights.append({
+                'kind': 'warning',
+                'severity': 'alta',
+                'key': 'finance.negative_result',
+                'title': 'Resultado negativo',
+                'detail': 'El período cerró con resultado negativo. Ajustá gastos y/o mejorá el margen de ventas para volver al equilibrio.',
+            })
+
+        # Expense ratio
+        ratio = _num(cur.get('expense_income_ratio'))
+        if _num(cur.get('income_total')) > 1e-9 and ratio >= 0.75:
+            insights.append({
+                'kind': 'warning',
+                'severity': 'alta' if ratio >= 0.9 else 'media',
+                'key': 'finance.high_expense_ratio',
+                'title': 'Gastos muy altos sobre ingresos',
+                'detail': 'El ratio de gastos/ingresos es alto. Revisá el desglose de gastos y recortá lo no esencial.',
+            })
+
+        # Break-even gap
+        if break_even_income is not None and _num(cur.get('income_total')) > 1e-9:
+            gap = _num(break_even_income) - _num(cur.get('income_total'))
+            if gap > max(1.0, _num(cur.get('income_total')) * 0.05):
                 insights.append({
                     'kind': 'warning',
-                    'severity': 'media',
-                    'key': 'finance.payroll_share',
-                    'title': 'Peso de sueldos',
-                    'detail': ('Los sueldos representan el ' + str(round(share * 100.0, 1)).replace('.', ',') + '% de los gastos totales.'),
+                    'severity': 'alta' if gap > _num(cur.get('income_total')) * 0.25 else 'media',
+                    'key': 'finance.break_even_gap',
+                    'title': 'Falta volumen para cubrir costos',
+                    'detail': 'Con el margen bruto actual, falta volumen de ventas para cubrir los gastos del período.',
+                    'key_data': {
+                        'break_even_income': round(_num(break_even_income), 2),
+                        'income_total': round(_num(cur.get('income_total')), 2),
+                        'gap': round(_num(gap), 2),
+                    },
                 })
 
-        if len(series) >= 4:
-            n3 = series[-3:]
-            p3 = series[-6:-3] if len(series) >= 6 else series[:-3]
-            if n3 and p3:
-                inc_n = sum(_num(r.get('income_total')) for r in n3) / len(n3)
-                exp_n = sum(_num(r.get('expense_total')) for r in n3) / len(n3)
-                inc_p = sum(_num(r.get('income_total')) for r in p3) / len(p3)
-                exp_p = sum(_num(r.get('expense_total')) for r in p3) / len(p3)
-                inc_growth = _safe_pct(inc_n - inc_p, inc_p)
-                exp_growth = _safe_pct(exp_n - exp_p, exp_p)
-                if exp_growth >= inc_growth + 0.08:
-                    insights.append({
-                        'kind': 'warning',
-                        'severity': 'alta' if exp_growth >= inc_growth + 0.15 else 'media',
-                        'key': 'finance.expenses_growing_faster',
-                        'title': 'Gastos creciendo más rápido que ingresos',
-                        'detail': 'En los últimos meses, los gastos crecieron más rápido que los ingresos.',
-                    })
-                elif inc_growth >= 0.10 and exp_growth <= 0.03:
-                    insights.append({
-                        'kind': 'ok',
-                        'severity': 'media',
-                        'key': 'finance.income_up_expense_stable',
-                        'title': 'Crecimiento saludable',
-                        'detail': 'Los ingresos crecieron mientras los gastos se mantuvieron estables.',
-                    })
+        # Concentration risk
+        if _num(day_concentration.get('top3_share_pct')) >= 45.0:
+            insights.append({
+                'kind': 'warning',
+                'severity': 'media',
+                'key': 'finance.concentration_risk',
+                'title': 'Dependencia de pocos días',
+                'detail': 'Una parte importante de los ingresos se concentró en pocos días. Si esos días fallan, el período puede volverse negativo.',
+                'key_data': day_concentration,
+            })
 
         if not insights:
             insights.append({
-                'kind': 'info',
+                'kind': 'ok',
                 'severity': 'baja',
                 'key': 'finance.no_strong_signals',
-                'title': 'Sin señales fuertes',
-                'detail': 'No se detectaron señales relevantes con las reglas actuales. Ordená por % gasto sobre ingresos y mirá los meses negativos.',
+                'title': 'Sin alertas fuertes',
+                'detail': 'No se detectaron alertas críticas con las reglas actuales. Usá el punto de equilibrio y la estructura de gastos para afinar decisiones.',
             })
     except Exception:
         insights = [{'kind': 'info', 'severity': 'baja', 'title': 'Sin insights', 'detail': 'No se pudo generar insights para el período.'}]
@@ -1781,12 +1856,25 @@ def finance_api():
         'ok': True,
         'period': {'from': d_from.isoformat(), 'to': d_to.isoformat()},
         'compare_mode': raw_compare if raw_compare in ('prev', 'yoy') else 'none',
-        'kpis': cur,
+        'kpis': {
+            **cur,
+            'cmv_total': round(_num(cmv_total), 2),
+            'gross_margin_total': round(_num(gross_margin), 2),
+            'gross_margin_pct': gross_margin_pct,
+            'net_margin_pct': net_margin_pct,
+            'result_accumulated': round(_num(result_acc), 2),
+            'fixed_cost_estimate': round(_num(fixed_cost), 2),
+            'variable_cost_estimate': round(_num(variable_cost), 2),
+            'fixed_cost_payroll': round(_num(fixed_payroll), 2),
+            'fixed_cost_recurring': round(_num(fixed_recurring), 2),
+            'break_even_income_estimate': round(_num(break_even_income), 2) if break_even_income is not None else None,
+            'day_concentration': day_concentration,
+        },
         'kpis_prev': prev if prev else None,
         'deltas': deltas,
         'series': series,
-        'trends': {'income': income_trend, 'expense': expense_trend, 'message': trend_msg},
-        'months_summary': {'positive': int(pos), 'negative': int(neg), 'breakeven': int(eq)},
+        'trends': {},
+        'months_summary': {},
         'breakdowns': {
             'net_sales_by_payment_method': _top_n(net_sales_by_payment, 10),
             'expenses_by_category': exp_cat_items,
@@ -1802,6 +1890,9 @@ def inventory_rotation_api():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
     raw_compare = (request.args.get('compare') or '').strip().lower()  # none | prev | yoy
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'period': {'from': '', 'to': ''}, 'compare_mode': 'none', 'kpis': {}, 'kpis_prev': None, 'deltas': {}, 'rows': [], 'sub': {}, 'insights': []})
     d_from = _parse_date_iso(raw_from, None)
     d_to = _parse_date_iso(raw_to, None)
     if not d_from or not d_to:
@@ -1905,7 +1996,9 @@ def inventory_rotation_api():
                 db.func.coalesce(db.func.sum(-InventoryMovement.qty_delta), 0.0),
             )
             .join(Sale, Sale.ticket == InventoryMovement.sale_ticket)
+            .filter(InventoryMovement.company_id == cid)
             .filter(InventoryMovement.type == 'sale')
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_type == 'Venta')
             .filter(db.func.lower(Sale.status).like('completad%'))
             .filter(Sale.sale_date >= d_from)
@@ -1925,7 +2018,9 @@ def inventory_rotation_api():
                 db.func.coalesce(db.func.sum(InventoryMovement.qty_delta), 0.0),
             )
             .join(Sale, Sale.ticket == InventoryMovement.sale_ticket)
+            .filter(InventoryMovement.company_id == cid)
             .filter(InventoryMovement.type == 'return')
+            .filter(Sale.company_id == cid)
             .filter(Sale.sale_type == 'Cambio')
             .filter(Sale.sale_date >= d_from)
             .filter(Sale.sale_date <= d_to)
@@ -1999,9 +2094,9 @@ def inventory_rotation_api():
 
         cat_name = ''
         try:
-            cid = getattr(p, 'category_id', None)
-            if cid is not None and int(cid) in cat_map:
-                cat_name = str(getattr(cat_map[int(cid)], 'name', '') or '').strip()
+            cat_id = getattr(p, 'category_id', None)
+            if cat_id is not None and int(cat_id) in cat_map:
+                cat_name = str(getattr(cat_map[int(cat_id)], 'name', '') or '').strip()
         except Exception:
             cat_name = ''
 
@@ -2130,6 +2225,7 @@ def inventory_rotation_api():
                 try:
                     rows = (
                         db.session.query(InventoryMovement.product_id, db.func.coalesce(db.func.sum(InventoryMovement.qty_delta), 0.0))
+                        .filter(InventoryMovement.company_id == cid)
                         .filter(InventoryMovement.movement_date > prev_to)
                         .group_by(InventoryMovement.product_id)
                         .all()
@@ -2142,6 +2238,7 @@ def inventory_rotation_api():
                 try:
                     rows = (
                         db.session.query(InventoryMovement.product_id, db.func.coalesce(db.func.sum(InventoryMovement.qty_delta), 0.0))
+                        .filter(InventoryMovement.company_id == cid)
                         .filter(InventoryMovement.movement_date >= prev_from)
                         .filter(InventoryMovement.movement_date <= prev_to)
                         .group_by(InventoryMovement.product_id)
@@ -2159,7 +2256,9 @@ def inventory_rotation_api():
                     rows = (
                         db.session.query(InventoryMovement.product_id, db.func.coalesce(db.func.sum(-InventoryMovement.qty_delta), 0.0))
                         .join(Sale, Sale.ticket == InventoryMovement.sale_ticket)
+                        .filter(InventoryMovement.company_id == cid)
                         .filter(InventoryMovement.type == 'sale')
+                        .filter(Sale.company_id == cid)
                         .filter(Sale.sale_type == 'Venta')
                         .filter(db.func.lower(Sale.status).like('completad%'))
                         .filter(Sale.sale_date >= prev_from)
@@ -2176,7 +2275,9 @@ def inventory_rotation_api():
                     rows = (
                         db.session.query(InventoryMovement.product_id, db.func.coalesce(db.func.sum(InventoryMovement.qty_delta), 0.0))
                         .join(Sale, Sale.ticket == InventoryMovement.sale_ticket)
+                        .filter(InventoryMovement.company_id == cid)
                         .filter(InventoryMovement.type == 'return')
+                        .filter(Sale.company_id == cid)
                         .filter(Sale.sale_type == 'Cambio')
                         .filter(Sale.sale_date >= prev_from)
                         .filter(Sale.sale_date <= prev_to)
@@ -2280,7 +2381,11 @@ def lookup_categories_api():
     if limit <= 0 or limit > 300:
         limit = 100
 
-    query = db.session.query(Category).filter(Category.active.is_(True))
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+
+    query = db.session.query(Category).filter(Category.company_id == cid).filter(Category.active.is_(True))
     if q:
         like = f"%{q}%"
         query = query.filter(Category.name.ilike(like))
@@ -2301,7 +2406,11 @@ def lookup_products_api():
     if limit <= 0 or limit > 300:
         limit = 100
 
-    query = db.session.query(Product).filter(Product.active.is_(True))
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+
+    query = db.session.query(Product).filter(Product.company_id == cid).filter(Product.active.is_(True))
     if category_id:
         try:
             query = query.filter(Product.category_id == int(category_id))
@@ -2338,7 +2447,11 @@ def lookup_customers_api():
     if limit <= 0 or limit > 300:
         limit = 100
 
-    query = db.session.query(Customer)
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+
+    query = db.session.query(Customer).filter(Customer.company_id == cid)
     if q:
         like = f"%{q}%"
         query = query.filter(
@@ -2369,7 +2482,11 @@ def lookup_payment_methods_api():
     if limit <= 0 or limit > 200:
         limit = 50
 
-    query = db.session.query(Sale.payment_method).distinct().order_by(Sale.payment_method.asc())
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+
+    query = db.session.query(Sale.payment_method).filter(Sale.company_id == cid).distinct().order_by(Sale.payment_method.asc())
     rows = query.limit(400).all()
     items = []
     for (pm,) in (rows or []):
