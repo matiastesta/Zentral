@@ -37,6 +37,14 @@ def _company_id() -> str:
         return ''
 
 
+@bp.route('/')
+@bp.route('/index')
+@login_required
+@module_required('sales')
+def index():
+    return render_template('sales/list.html', title='Ventas')
+
+
 def _serialize_sale(row: Sale):
     has_venta_libre = False
     venta_libre_count = 0
