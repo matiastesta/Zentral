@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.models import CashCount, Category, InventoryLot, InventoryMovement, Product, Sale, SaleItem
-from app.permissions import module_required
+from app.permissions import module_required, module_required_any
 from app.sales import bp
 
 
@@ -171,7 +171,7 @@ def _serialize_lot_for_sales(l: InventoryLot):
 
 @bp.get('/api/sales')
 @login_required
-@module_required('sales')
+@module_required_any('sales', 'dashboard')
 def list_sales():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
@@ -297,7 +297,7 @@ def debt_summary():
 
 @bp.get('/api/sales/overdue-customers')
 @login_required
-@module_required('sales')
+@module_required_any('sales', 'dashboard')
 def overdue_customers_count():
     days = int(request.args.get('days') or 30)
     if days <= 0 or days > 3650:

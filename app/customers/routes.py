@@ -7,7 +7,7 @@ from flask_login import login_required
 
 from app import db
 from app.models import Customer
-from app.permissions import module_required
+from app.permissions import module_required, module_required_any
 from app.customers import bp
 
 
@@ -65,20 +65,20 @@ def index():
 
 @bp.get('/api/customers')
 @login_required
-@module_required('customers')
+@module_required_any('customers', 'dashboard')
 def list_customers_api():
-    q = (request.args.get('q') or '').strip().lower()
-    limit = int(request.args.get('limit') or 2000)
-    if limit <= 0 or limit > 5000:
-        limit = 2000
+    qraw = (request.args.get('q') or '').strip()
+    limit = int(request.args.get('limit') or 5000)
+    if limit <= 0 or limit > 10000:
+        limit = 5000
 
     company_id = _company_id()
     if not company_id:
         return jsonify({'ok': True, 'items': []})
 
     query = db.session.query(Customer).filter(Customer.company_id == company_id)
-    if q:
-        like = f"%{q}%"
+    if qraw:
+        like = f"%{qraw}%"
         query = query.filter(
             (Customer.name.ilike(like))
             | (Customer.first_name.ilike(like))

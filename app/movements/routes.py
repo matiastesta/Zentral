@@ -5,7 +5,7 @@ from flask_login import login_required
 
 from app import db
 from app.models import CashCount
-from app.permissions import module_required
+from app.permissions import module_required, module_required_any
 from app.movements import bp
 
 
@@ -25,7 +25,7 @@ def index():
 
 @bp.get('/api/cash-counts')
 @login_required
-@module_required('movements')
+@module_required_any('movements', 'dashboard')
 def list_cash_counts():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()

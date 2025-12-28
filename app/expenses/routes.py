@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from app.models import Expense, ExpenseCategory, BusinessSettings, Employee, Supplier
-from app.permissions import module_required
+from app.permissions import module_required, module_required_any
 from app.expenses import bp
 
 
@@ -104,7 +104,7 @@ def _format_currency_ars(amount):
 @bp.route("/")
 @bp.route("/index")
 @login_required
-@module_required('expenses')
+@module_required_any('expenses', 'dashboard')
 def index():
     """Listado básico de gastos."""
     return render_template("expenses/list.html", title="Gastos")
@@ -227,7 +227,7 @@ def _apply_expense_category_payload(row: ExpenseCategory, payload: dict):
 
 @bp.get('/api/expenses')
 @login_required
-@module_required('expenses')
+@module_required_any('expenses', 'dashboard')
 def list_expenses_api():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()

@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from app.models import Category, InventoryLot, InventoryMovement, Product, Supplier
-from app.permissions import module_required
+from app.permissions import module_required, module_required_any
 from app.inventory import bp
 
 
@@ -195,7 +195,7 @@ def _serialize_movement(m: InventoryMovement):
 
 @bp.get('/api/products')
 @login_required
-@module_required('inventory')
+@module_required_any('inventory', 'dashboard')
 def list_products():
     limit = int(request.args.get('limit') or 500)
     if limit <= 0 or limit > 5000:
@@ -453,11 +453,11 @@ def bulk_update_product_prices():
 
 @bp.get('/api/lots')
 @login_required
-@module_required('inventory')
+@module_required_any('inventory', 'dashboard')
 def list_lots():
-    limit = int(request.args.get('limit') or 2000)
-    if limit <= 0 or limit > 10000:
-        limit = 2000
+    limit = int(request.args.get('limit') or 5000)
+    if limit <= 0 or limit > 20000:
+        limit = 5000
     product_id = (request.args.get('product_id') or '').strip()
     q = db.session.query(InventoryLot).join(Product)
     if product_id:
@@ -676,12 +676,12 @@ def delete_lot(lot_id: int):
 
 @bp.get('/api/movements')
 @login_required
-@module_required('inventory')
+@module_required_any('inventory', 'dashboard')
 def list_inventory_movements():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
     product_id = (request.args.get('product_id') or '').strip()
-    limit = int(request.args.get('limit') or 500)
+    limit = int(request.args.get('limit') or 2000)
     if limit <= 0 or limit > 5000:
         limit = 500
 

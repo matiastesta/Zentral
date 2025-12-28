@@ -33,7 +33,7 @@
             <h2 class="text-sm font-semibold text-gray-900">Estado general del negocio</h2>
         </div>
         <div id="block-general" data-block-container="general" class="grid grid-cols-1 gap-4 mt-3 md:grid-cols-2 xl:grid-cols-4">
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="sales_period" data-href="{{ url_for('sales.index') }}">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="sales_period" data-href="{{ url_for('sales.index') }}" data-module="sales">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">💰</div>
                     <div class="min-w-0">
@@ -43,7 +43,7 @@
                     </div>
                 </div>
             </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="expenses_period" data-href="{{ url_for('expenses.index') }}">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="expenses_period" data-href="{{ url_for('expenses.index') }}" data-module="expenses">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">🧾</div>
                     <div class="min-w-0 w-full">
@@ -96,7 +96,7 @@
                     </div>
                 </div>
             </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="cash_available" data-href="{{ url_for('movements.index') }}" title="Liquidez disponible. No representa rentabilidad.">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="cash_available" data-href="{{ url_for('movements.index') }}" data-module="movements" title="Liquidez disponible. No representa rentabilidad.">
                 <div class="flex items-start gap-3">
                     <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">🏦</div>
                     <div class="min-w-0 w-full">
@@ -116,7 +116,7 @@
                     </div>
                 </div>
             </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="net_cashflow" data-href="{{ url_for('movements.index') }}" title="Ingresos cobrados – Egresos pagados del período seleccionado.">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="net_cashflow" data-href="{{ url_for('movements.index') }}" data-module="movements" title="Ingresos cobrados – Egresos pagados del período seleccionado.">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-violet-50 text-violet-700 flex items-center justify-center">💧</div>
                     <div class="min-w-0 w-full">
@@ -134,7 +134,7 @@
             <h2 class="text-sm font-semibold text-gray-900">Alertas críticas</h2>
         </div>
         <div id="block-alerts" data-block-container="alerts" class="grid grid-cols-1 gap-4 mt-3 md:grid-cols-3">
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="alert_customers_overdue" data-href="{{ url_for('customers.index') }}">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="alert_customers_overdue" data-href="{{ url_for('customers.index') }}" data-module="customers">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">⏰</div>
                     <div class="min-w-0 w-full">
@@ -144,7 +144,7 @@
                     </div>
                 </div>
             </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="alert_expenses_out_of_range" data-href="{{ url_for('expenses.index') }}">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="alert_expenses_out_of_range" data-href="{{ url_for('expenses.index') }}" data-module="expenses">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center">📉</div>
                     <div class="min-w-0 w-full">
@@ -154,7 +154,7 @@
                     </div>
                 </div>
             </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="alert_stock_critical" data-href="{{ url_for('inventory.index') }}">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="alert_stock_critical" data-href="{{ url_for('inventory.index') }}" data-module="inventory">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center">📦</div>
                     <div class="min-w-0 w-full">
@@ -171,7 +171,7 @@
             <h2 class="text-sm font-semibold text-gray-900">Actividad comercial</h2>
         </div>
         <div id="block-activity" data-block-container="activity" class="grid grid-cols-1 gap-4 mt-3 md:grid-cols-2">
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="sales_today" data-href="{{ url_for('sales.index') }}" title="Este KPI no depende del período seleccionado.">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="sales_today" data-href="{{ url_for('sales.index') }}" data-module="sales" title="Este KPI no depende del período seleccionado.">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">🧾</div>
                     <div class="min-w-0 w-full">
@@ -182,7 +182,7 @@
                     </div>
                 </div>
             </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="sales_today_count" data-href="{{ url_for('sales.index') }}" title="Cantidad total de tickets del día.">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="sales_today_count" data-href="{{ url_for('sales.index') }}" data-module="sales" title="Cantidad total de tickets del día.">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">🔢</div>
                     <div class="min-w-0 w-full">
@@ -192,7 +192,7 @@
                     </div>
                 </div>
             </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="customers_served" data-href="{{ url_for('customers.index') }}">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer hidden" data-default-hidden="1" data-card-key="customers_served" data-href="{{ url_for('customers.index') }}" data-module="customers">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">👥</div>
                     <div class="min-w-0 w-full">
@@ -231,7 +231,7 @@
                     </div>
                 </div>
             </div>
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="avg_ticket" data-href="{{ url_for('sales.index') }}">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="avg_ticket" data-href="{{ url_for('sales.index') }}" data-module="sales">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">🎟️</div>
                     <div class="min-w-0 w-full">
@@ -249,7 +249,7 @@
             <h2 class="text-sm font-semibold text-gray-900">Rankings simples</h2>
         </div>
         <div id="block-rankings" data-block-container="rankings" class="grid grid-cols-1 gap-4 mt-3 md:grid-cols-2">
-            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="best_customer" data-href="{{ url_for('customers.index') }}">
+            <div class="p-4 bg-white rounded-lg shadow border border-gray-200 cursor-pointer" data-card-key="best_customer" data-href="{{ url_for('customers.index') }}" data-module="customers">
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center">🏆</div>
                     <div class="min-w-0 w-full">
@@ -446,6 +446,18 @@
 
 {% block scripts %}
 {{ super() }}
+<script id="dash-permissions" type="application/json">{{ {
+    'dashboard': (current_user.is_authenticated and current_user.can('dashboard')),
+    'sales': (current_user.is_authenticated and current_user.can('sales')),
+    'expenses': (current_user.is_authenticated and current_user.can('expenses')),
+    'inventory': (current_user.is_authenticated and current_user.can('inventory')),
+    'customers': (current_user.is_authenticated and current_user.can('customers')),
+    'suppliers': (current_user.is_authenticated and current_user.can('suppliers')),
+    'employees': (current_user.is_authenticated and current_user.can('employees')),
+    'movements': (current_user.is_authenticated and current_user.can('movements')),
+    'reports': (current_user.is_authenticated and current_user.can('reports')),
+    'settings': (current_user.is_authenticated and current_user.can('settings')),
+} | tojson }}</script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const kpiTotalSales = document.getElementById('kpi-total-sales');
@@ -522,6 +534,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnExportXls = document.getElementById('btn-export-dashboard-xls');
 
     const currentUserId = Number('{{ current_user.id if current_user.is_authenticated else 0 }}') || 0;
+    let userCan = {};
+    try {
+        const elPerms = document.getElementById('dash-permissions');
+        userCan = elPerms ? JSON.parse(String(elPerms.textContent || '{}')) : {};
+    } catch (e) {
+        userCan = {};
+    }
     const layoutKey = 'dashboard_layout_u_' + String(currentUserId);
     const blockContainers = {
         general: document.getElementById('block-general'),
@@ -842,8 +861,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function formatearMoneda(valor) {
-        const numero = isNaN(valor) ? 0 : valor;
-        return '$' + numero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const numero = safeNum(valor);
+        try {
+            return '$' + Number(numero || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        } catch (e) {
+            return '$' + String(numero || 0);
+        }
     }
 
     function fmtDateYmd(d) {
@@ -1228,7 +1251,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function safeNum(v) {
-        const n = parseFloat(String(v ?? '').replace(',', '.'));
+        const raw = String(v ?? '').trim();
+        if (!raw) return 0;
+
+        // Normalize common locale formats:
+        // - 1.234,56 (AR) -> 1234.56
+        // - 1,234.56 (US) -> 1234.56
+        let s = raw.replace(/\s+/g, '');
+        const hasDot = s.includes('.');
+        const hasComma = s.includes(',');
+        if (hasDot && hasComma) {
+            const lastDot = s.lastIndexOf('.');
+            const lastComma = s.lastIndexOf(',');
+            if (lastComma > lastDot) {
+                // Dot is thousands, comma is decimal
+                s = s.replace(/\./g, '').replace(/,/g, '.');
+            } else {
+                // Comma is thousands, dot is decimal
+                s = s.replace(/,/g, '');
+            }
+        } else if (hasComma && !hasDot) {
+            s = s.replace(/,/g, '.');
+        }
+
+        const n = parseFloat(s);
         return isNaN(n) ? 0 : n;
     }
 
@@ -1751,7 +1797,7 @@ document.addEventListener('DOMContentLoaded', function() {
             bestCustomerAmount,
             topProductName: topProdName,
             topProductQty: topProd.qty,
-            topProductGross,
+            topProductGross: topProdGross,
             stockTotalUnits: inv.units,
             stockTotalValue: inv.value,
             topCategoryName: topCategory.category,
@@ -1854,7 +1900,56 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             return null;
-        }).catch(function () {
+        }).catch(function (err) {
+            try { console.error('[Dashboard] calcAndRender failed', err); } catch (e) { }
+            try {
+                if (window.showAlertModal) {
+                    window.showAlertModal('No se pudieron calcular los KPIs del dashboard. Revisá la consola para más detalles.', 'Error', 'Dashboard');
+                }
+            } catch (e) {
+            }
+
+            // Fallback: render at least zeros so the UI doesn't stay in placeholder state.
+            try {
+                renderKPIs({
+                    totalSales: 0,
+                    totalExpenses: 0,
+                    estimatedResult: 0,
+                    estimatedMarginPct: 0,
+                    grossMarginPct: 0,
+                    netMarginPct: 0,
+                    breakEven: 0,
+                    cmv: 0,
+                    cash: 0,
+                    banks: 0,
+                    totalAvailable: 0,
+                    netCashflow: 0,
+                    alertStock: 0,
+                    alertExpenses: 0,
+                    alertOverdue: 0,
+                    salesTodayTotal: 0,
+                    salesTodayCount: 0,
+                    customersServed: 0,
+                    salesDailyPace: 0,
+                    salesAccum: 0,
+                    salesVsPrev: { curTotal: 0, prevTotal: 0, delta: 0 },
+                    avgTicket: 0,
+                    bestCustomerName: '—',
+                    bestCustomerAmount: 0,
+                    topProductName: '—',
+                    topProductQty: 0,
+                    topProductGross: 0,
+                    stockTotalUnits: 0,
+                    stockTotalValue: 0,
+                    topCategoryName: '—',
+                    topCategoryAmount: 0,
+                    bestMarginProductName: '—',
+                    bestMarginPct: null,
+                    worstMarginProductName: '—',
+                    worstMarginPct: null,
+                });
+            } catch (e) {
+            }
             setEmpty(true);
         }).finally(function () {
             setSkeleton(false);
@@ -2102,6 +2197,21 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!el || typeof el.closest !== 'function') return;
             const card = el.closest('[data-href]');
             if (!card) return;
+            const requiredModule = String(card.getAttribute('data-module') || '').trim();
+            if (requiredModule) {
+                const allowed = !!userCan?.[requiredModule];
+                if (!allowed) {
+                    try {
+                        if (window.showAlertModal) {
+                            window.showAlertModal('No tenés permisos para acceder a este módulo.', 'Acceso denegado', 'Permisos');
+                        } else {
+                            alert('No tenés permisos para acceder a este módulo.');
+                        }
+                    } catch (err) {
+                    }
+                    return;
+                }
+            }
             const href = card.getAttribute('data-href');
             if (href) window.location.href = href;
         });
