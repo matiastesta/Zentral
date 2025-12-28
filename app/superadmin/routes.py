@@ -3,7 +3,7 @@ from datetime import datetime
 import secrets
 import string
 
-from flask import abort, flash, redirect, render_template, request, session, url_for
+from flask import abort, current_app, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -172,6 +172,10 @@ def _ensure_plan_exists(raw_code: str) -> str:
         db.session.flush()
         return code
     except Exception:
+        try:
+            current_app.logger.exception('Failed to ensure plan exists')
+        except Exception:
+            pass
         return ''
 
 
@@ -180,9 +184,12 @@ def _ensure_plan_exists(raw_code: str) -> str:
 def plan_create():
     _require_zentral_admin()
     raw = (request.form.get('plan_code') or '').strip()
+    if not raw:
+        flash('Plan inválido.', 'error')
+        return redirect(url_for('superadmin.index'))
     code = _ensure_plan_exists(raw)
     if not code:
-        flash('Plan inválido.', 'error')
+        flash('No se pudo crear el plan. Revisá los logs del servidor.', 'error')
         return redirect(url_for('superadmin.index'))
     try:
         db.session.commit()
@@ -191,6 +198,12 @@ def plan_create():
             db.session.rollback()
         except Exception:
             pass
+        try:
+            current_app.logger.exception('Failed to create plan')
+        except Exception:
+            pass
+        flash('No se pudo crear el plan. Revisá los logs del servidor.', 'error')
+        return redirect(url_for('superadmin.index'))
     flash('Plan creado.', 'success')
     return redirect(url_for('superadmin.index'))
 
@@ -382,7 +395,19 @@ def create_company():
     except Exception:
         pass
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            current_app.logger.exception('Failed to create company')
+        except Exception:
+            pass
+        flash('No se pudo crear la empresa. Revisá los logs del servidor.', 'error')
+        return redirect(url_for('superadmin.index'))
 
     flash('Empresa creada.', 'success')
     return redirect(url_for('superadmin.company_overview', company_id=c.id))

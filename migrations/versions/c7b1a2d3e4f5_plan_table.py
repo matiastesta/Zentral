@@ -11,7 +11,7 @@ def upgrade() -> None:
     op.create_table(
         'plan',
         sa.Column('code', sa.String(length=64), nullable=False),
-        sa.Column('active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
+        sa.Column('active', sa.Boolean(), nullable=False, server_default=sa.text('true')),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint('code'),
     )

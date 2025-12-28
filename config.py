@@ -30,16 +30,13 @@ class Config:
         if raw in ('sqlite://', 'sqlite:///:memory:'):
             _db_url = None
         else:
-            try:
-                import psycopg  # noqa: F401
-
-                if raw.startswith('postgres://'):
-                    raw = 'postgresql+psycopg://' + raw[len('postgres://'):]
-                elif raw.startswith('postgresql://') and 'postgresql+' not in raw:
-                    raw = 'postgresql+psycopg://' + raw[len('postgresql://'):]
-                _db_url = raw
-            except Exception:
-                _db_url = raw
+            if raw.startswith('postgresql+psycopg2://'):
+                raw = 'postgresql+psycopg://' + raw[len('postgresql+psycopg2://'):]
+            elif raw.startswith('postgres://'):
+                raw = 'postgresql+psycopg://' + raw[len('postgres://'):]
+            elif raw.startswith('postgresql://') and 'postgresql+' not in raw:
+                raw = 'postgresql+psycopg://' + raw[len('postgresql://'):]
+            _db_url = raw
 
     SQLALCHEMY_DATABASE_URI = _db_url or ('sqlite:///' + os.path.join(basedir, 'app.db'))
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -74,8 +71,7 @@ class TestingConfig(Config):
     WTF_CSRF_ENABLED = False
 
 class ProductionConfig(Config):
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///' + os.path.join(basedir, 'app.db')
+    pass
 
 config = {
     'development': DevelopmentConfig,

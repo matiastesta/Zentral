@@ -26,6 +26,14 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
 
     try:
+        if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_PROJECT_ID') or os.environ.get('RAILWAY_SERVICE_ID'):
+            from werkzeug.middleware.proxy_fix import ProxyFix
+
+            app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
+    except Exception:
+        app.logger.exception('Failed to apply ProxyFix')
+
+    try:
         debug_env = str(os.environ.get('APP_DEBUG') or '').strip().lower() in ('1', 'true', 'yes', 'on')
         reload_env = str(os.environ.get('APP_RELOAD') or '').strip().lower() in ('1', 'true', 'yes', 'on')
         flask_debug_env = str(os.environ.get('FLASK_DEBUG') or '').strip().lower() in ('1', 'true', 'yes', 'on')
