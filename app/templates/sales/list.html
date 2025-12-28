@@ -5046,9 +5046,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     closing_amount: closing
                 })
             })
-                .then(r => r.json())
+                .then(async (r) => {
+                    let data = null;
+                    try {
+                        data = await r.json();
+                    } catch (e) {
+                        data = null;
+                    }
+                    if (!r.ok) {
+                        const msg = (data && (data.message || data.error)) ? String(data.message || data.error) : 'No se pudo guardar el arqueo.';
+                        mostrarMensajesArqueo({ ok: false, detalle: msg });
+                        throw new Error(msg);
+                    }
+                    return data;
+                })
                 .then(data => {
-                    if (!data || !data.ok) return;
+                    if (!data || !data.ok) {
+                        const msg = (data && (data.message || data.error)) ? String(data.message || data.error) : 'No se pudo guardar el arqueo.';
+                        mostrarMensajesArqueo({ ok: false, detalle: msg });
+                        return;
+                    }
                     arqueoLastSavedAtMs = Date.now();
                     setArqueoBadge('realizado');
                     if (msgArqueoGuardado) {
@@ -5057,7 +5074,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     validarCierreArqueo();
                 })
-                .catch(() => {
+                .catch((e) => {
+                    const msg = e && e.message ? String(e.message) : 'No se pudo guardar el arqueo.';
+                    mostrarMensajesArqueo({ ok: false, detalle: msg });
                 });
         });
     }

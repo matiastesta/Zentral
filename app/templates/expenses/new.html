@@ -610,9 +610,25 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             ...(options || {})
         });
-        const data = await res.json().catch(() => ({}));
+
+        let data = {};
+        let rawText = '';
+        try {
+            data = await res.json();
+        } catch (e) {
+            try {
+                rawText = await res.text();
+            } catch (e2) {
+                rawText = '';
+            }
+            data = {};
+        }
+
         if (!res.ok || (data && data.ok === false)) {
-            const msg = (data && (data.message || data.error)) ? (data.message || data.error) : ('HTTP ' + res.status);
+            const base = 'HTTP ' + res.status;
+            const fromJson = (data && (data.message || data.error)) ? String(data.message || data.error) : '';
+            const fromText = rawText ? String(rawText).slice(0, 200) : '';
+            const msg = (fromJson || fromText) ? (base + ' · ' + (fromJson || fromText)) : base;
             throw new Error(msg);
         }
         return data;

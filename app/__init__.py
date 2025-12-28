@@ -107,7 +107,10 @@ def create_app(config_class=Config):
 
     def _wants_json() -> bool:
         try:
-            if str(request.path or '').startswith('/api/'):
+            path = str(request.path or '')
+            if path.startswith('/api/'):
+                return True
+            if '/api/' in path:
                 return True
             accept = request.headers.get('Accept') or ''
             if 'application/json' in accept:

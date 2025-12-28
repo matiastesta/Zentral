@@ -1,5 +1,6 @@
 from datetime import date as dt_date, datetime, timedelta
 from typing import Any, Dict, List
+import uuid
 
 from flask import current_app, g, jsonify, render_template, request, url_for
 from flask_login import login_required
@@ -35,6 +36,34 @@ def _company_id() -> str:
         return str(getattr(g, 'company_id', '') or '').strip()
     except Exception:
         return ''
+
+
+def _tmp_ticket(prefix: str = '') -> str:
+    try:
+        p = str(prefix or '')
+        return f"{p}__tmp__{uuid.uuid4().hex[:10]}"
+    except Exception:
+        return f"__tmp__{datetime.utcnow().timestamp()}"
+
+
+def _ticket_from_sale_id(sale_id: int) -> str:
+    try:
+        n = int(sale_id or 0)
+        if n <= 0:
+            return '#0000'
+        return '#' + str(n).zfill(4)
+    except Exception:
+        return '#0000'
+
+
+def _exchange_ticket_from_sale_id(sale_id: int) -> str:
+    try:
+        n = int(sale_id or 0)
+        if n <= 0:
+            return '#C0000'
+        return '#C' + str(n).zfill(4)
+    except Exception:
+        return '#C0000'
 
 
 @bp.route('/')
@@ -376,12 +405,13 @@ def settle_sale_due_amount():
         return jsonify({'ok': False, 'error': 'amount_exceeds_due'}), 400
 
     settle_date = dt_date.today()
-    payment_ticket = _next_ticket()
+    payment_ticket = _tmp_ticket('P')
     ref = str(row.ticket or '').strip()
     note = f"Cobro cuenta corriente (Ticket {ref})"
 
     payment_sale = Sale(
         ticket=payment_ticket,
+        company_id=cid,
         sale_date=settle_date,
         sale_type='CobroCC',
         status='Completada',
@@ -420,6 +450,11 @@ def settle_sale_due_amount():
 
     db.session.add(payment_sale)
     try:
+        db.session.flush()
+        try:
+            payment_sale.ticket = _ticket_from_sale_id(int(getattr(payment_sale, 'id', 0) or 0))
+        except Exception:
+            payment_sale.ticket = _ticket_from_sale_id(0)
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
@@ -491,10 +526,14 @@ def create_exchange():
     is_gift = bool(payload.get('is_gift'))
     gift_code = str(payload.get('gift_code') or '').strip() or None
 
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     # En una transacción: registrar 2 movimientos (Devolución + Venta)
     try:
-        return_ticket = _next_exchange_ticket()
-        sale_ticket = _next_ticket()
+        return_ticket = _tmp_ticket('C')
+        sale_ticket = _tmp_ticket('V')
 
         base_notes = notes
         rel_return = f"Relacionado a venta {sale_ticket}"
@@ -504,6 +543,7 @@ def create_exchange():
 
         return_row = Sale(
             ticket=return_ticket,
+            company_id=cid,
             sale_date=sale_date,
             sale_type='Cambio',
             status='Cambio',
@@ -529,6 +569,7 @@ def create_exchange():
 
         sale_row = Sale(
             ticket=sale_ticket,
+            company_id=cid,
             sale_date=sale_date,
             sale_type='Venta',
             status='Completada',
@@ -568,6 +609,16 @@ def create_exchange():
         db.session.add(sale_row)
         db.session.flush()
 
+        # Reemplazar tickets por formato final basado en IDs (único global)
+        try:
+            return_row.ticket = _exchange_ticket_from_sale_id(int(getattr(return_row, 'id', 0) or 0))
+        except Exception:
+            return_row.ticket = _exchange_ticket_from_sale_id(0)
+        try:
+            sale_row.ticket = _ticket_from_sale_id(int(getattr(sale_row, 'id', 0) or 0))
+        except Exception:
+            sale_row.ticket = _ticket_from_sale_id(0)
+
         for it in return_items_list:
             d = it if isinstance(it, dict) else {}
             return_row.items.append(SaleItem(
@@ -592,8 +643,8 @@ def create_exchange():
                 subtotal=_num(d.get('subtotal')),
             ))
 
-        _apply_inventory_for_sale(sale_ticket=return_ticket, sale_date=sale_date, items=return_items_inv)
-        _apply_inventory_for_sale(sale_ticket=sale_ticket, sale_date=sale_date, items=new_items_inv)
+        _apply_inventory_for_sale(sale_ticket=return_row.ticket, sale_date=sale_date, items=return_items_inv)
+        _apply_inventory_for_sale(sale_ticket=sale_row.ticket, sale_date=sale_date, items=new_items_inv)
 
         db.session.commit()
     except IntegrityError:
@@ -610,8 +661,8 @@ def create_exchange():
 
     return jsonify({
         'ok': True,
-        'return_ticket': return_ticket,
-        'new_ticket': sale_ticket,
+        'return_ticket': return_row.ticket,
+        'new_ticket': sale_row.ticket,
         'items': {
             'return': _serialize_sale(return_row),
             'sale': _serialize_sale(sale_row),
@@ -842,8 +893,13 @@ def create_sale():
     status = str(payload.get('status') or ('Cambio' if sale_type == 'Cambio' else 'Completada')).strip() or 'Completada'
     payment_method = str(payload.get('payment_method') or 'Efectivo').strip() or 'Efectivo'
 
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     row = Sale(
-        ticket=_next_ticket(),
+        ticket=_tmp_ticket('V'),
+        company_id=cid,
         sale_date=sale_date,
         sale_type=sale_type,
         status=status,
@@ -895,22 +951,31 @@ def create_sale():
     db.session.add(row)
     try:
         db.session.flush()
+
+        # Ticket final (único global por id de Sale)
+        try:
+            row.ticket = _ticket_from_sale_id(int(getattr(row, 'id', 0) or 0))
+        except Exception:
+            row.ticket = _ticket_from_sale_id(0)
+
         try:
             _apply_inventory_for_sale(sale_ticket=row.ticket, sale_date=sale_date, items=items_list)
         except ValueError as e:
             db.session.rollback()
             return jsonify({'ok': False, 'error': 'stock_insufficient', 'message': str(e)}), 400
+
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
         return jsonify({
             'ok': False,
             'error': 'ticket_duplicate',
-            'message': 'No se pudo registrar la venta: ticket duplicado. Esto puede ocurrir si el ticket es único global y hay múltiples empresas. Se recomienda que el ticket sea único por empresa.',
+            'message': 'No se pudo registrar la venta: ticket duplicado.',
         }), 400
     except Exception:
         db.session.rollback()
         return jsonify({'ok': False, 'error': 'db_error'}), 400
+
     return jsonify({'ok': True, 'item': _serialize_sale(row)})
 
 
@@ -1124,8 +1189,17 @@ def upsert_cash_count():
 
     row = db.session.query(CashCount).filter(CashCount.company_id == cid, CashCount.count_date == d).first()
     if not row:
-        row = CashCount(count_date=d, company_id=cid)
-        db.session.add(row)
+        # Compat: algunas DB viejas (SQLite) pueden tener UNIQUE(count_date) y no (company_id, count_date)
+        # En ese caso, si existe un arqueo para la fecha, hay que actualizarlo en vez de insertar.
+        row = db.session.query(CashCount).filter(CashCount.count_date == d).first()
+        if not row:
+            row = CashCount(count_date=d, company_id=cid)
+            db.session.add(row)
+        else:
+            try:
+                row.company_id = cid
+            except Exception:
+                pass
 
     row.employee_id = employee_id
     row.employee_name = employee_name
@@ -1139,6 +1213,39 @@ def upsert_cash_count():
     except Exception:
         row.created_by_user_id = None
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        # Compat fuerte: si la DB tiene UNIQUE(count_date) y estamos intentando insertar,
+        # reintentar como UPDATE del registro existente para esa fecha.
+        db.session.rollback()
+        try:
+            existing = db.session.query(CashCount).filter(CashCount.count_date == d).first()
+        except Exception:
+            existing = None
+
+        if existing:
+            try:
+                existing.company_id = cid
+            except Exception:
+                pass
+            existing.employee_id = employee_id
+            existing.employee_name = employee_name
+            existing.opening_amount = opening
+            existing.cash_day_amount = cash_day
+            existing.closing_amount = closing
+            existing.difference_amount = diff
+            existing.created_by_user_id = row.created_by_user_id
+            try:
+                db.session.commit()
+                row = existing
+            except Exception:
+                db.session.rollback()
+                return jsonify({'ok': False, 'error': 'db_error'}), 400
+        else:
+            return jsonify({'ok': False, 'error': 'already_exists', 'message': 'Ya existe un arqueo para esa fecha.'}), 400
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
 
     return jsonify({'ok': True, 'item': {'date': row.count_date.isoformat(), 'difference_amount': row.difference_amount}})
