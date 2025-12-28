@@ -93,7 +93,7 @@
             {% for week in weeks %}
                 {% for cell in week %}
                     {% set d = cell.date %}
-                    <div class="bg-white h-24 p-2 overflow-hidden {% if not cell.in_month %}opacity-50{% endif %} {% if d == today %}ring-2 ring-blue-400 ring-inset bg-blue-50/30{% endif %}" data-day="{{ d.isoformat() }}" style="height:104px;">
+                    <div class="bg-white h-24 p-2 overflow-hidden cursor-pointer transition {% if not cell.in_month %}opacity-50{% endif %} {% if d == today %}ring-2 ring-blue-400 ring-inset bg-blue-50/30{% endif %} hover:bg-gray-50/70 hover:ring-1 hover:ring-blue-200 hover:ring-inset" data-day="{{ d.isoformat() }}" style="height:104px;">
                         <div class="flex items-center justify-between">
                             <div class="font-semibold {% if d == today %}text-blue-700{% else %}text-gray-700{% endif %}" style="font-size:12px;">{{ d.day }}</div>
                             <div class="text-gray-400" style="font-size:9px;">{{ d.strftime('%a') }}</div>
@@ -162,7 +162,7 @@
                                     <div class="min-w-0">
                                         <div class="flex items-center gap-2">
                                             <span class="h-2.5 w-2.5 rounded-full {{ pr_info.dot }}" title="{{ pr_info.label }}"></span>
-                                            <span class="px-2 py-0.5 rounded text-[10px] border bg-white/40 border-black/10 text-gray-900">{{ mod }}</span>
+                                            <span class="px-2 py-0.5 rounded text-[10px] border bg-white/40 border-black/10 text-gray-900">{{ mod|capitalize }}</span>
                                             <div class="text-sm font-semibold text-gray-900" title="{{ ev.title|e }}" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ ev.title }}</div>
                                             {% if row.overdue %}<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-100">vencido</span>{% endif %}
                                             {% if ev.status == 'done' %}<span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 border border-gray-200">resuelto</span>{% endif %}
@@ -190,6 +190,7 @@
 </div>
 
 <script id="calendar-bootstrap" type="application/json">{{ {
+    'index_url': url_for('calendar.index'),
     'employee_edit_url': url_for('employees.new'),
     'customer_index_url': url_for('customers.index'),
     'cfg_sources': (cfg.get('event_sources') if cfg else {}),
@@ -510,6 +511,8 @@ document.addEventListener('DOMContentLoaded', function () {
         bootstrap = {};
     }
 
+    const CALENDAR_INDEX_URL = safeStr(bootstrap.index_url);
+
     const EMPLOYEE_EDIT_URL = safeStr(bootstrap.employee_edit_url);
     const CUSTOMER_INDEX_URL = safeStr(bootstrap.customer_index_url);
     const cfgSources = (bootstrap && typeof bootstrap.cfg_sources === 'object' && bootstrap.cfg_sources) ? bootstrap.cfg_sources : {};
@@ -538,6 +541,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function safeStr(v) { return String(v == null ? '' : v); }
     function ensureArray(x) { return Array.isArray(x) ? x : []; }
+
+    function openDayListByIso(iso) {
+        const s = String(iso || '').trim();
+        if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return;
+        if (!CALENDAR_INDEX_URL) return;
+        const y = s.slice(0, 4);
+        const m = String(parseInt(s.slice(5, 7), 10) || '').padStart(2, '0');
+        const d = String(parseInt(s.slice(8, 10), 10) || '').padStart(2, '0');
+        const base = CALENDAR_INDEX_URL.split('?')[0];
+        const url = base + '?view=list&range=day&year=' + encodeURIComponent(y)
+            + '&month=' + encodeURIComponent(m)
+            + '&day=' + encodeURIComponent(d);
+        window.location.href = url;
+    }
+
+    // Month view UX: click a day cell to open list view for that day.
+    document.querySelectorAll('[data-day]').forEach(function (cell) {
+        cell.addEventListener('click', function (ev) {
+            const t = ev.target;
+            // If user clicked an event edit button, keep existing behavior.
+            if (t && typeof t.closest === 'function' && t.closest('[data-edit-event]')) return;
+            const iso = cell.getAttribute('data-day');
+            openDayListByIso(iso);
+        });
+    });
 
     // Cumpleaños (clientes/empleados) y demás eventos automáticos se generan server-side
     // en calendar/routes.py a partir de la base de datos, y se filtran por configuración.

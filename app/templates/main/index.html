@@ -1727,10 +1727,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const bestMap = new Map();
         salesRange.forEach(s => {
+            if (!isCompletedSale(s) || !isRealSale(s)) return;
             const name = String(s?.customer_name || s?.cliente || s?.customer || '').trim();
             const id = String(s?.customer_id || s?.customerId || '').trim();
-            const key = id || name;
-            if (!key) return;
+            const key = (id || name) ? (id || name) : 'Consumidor final';
             const total = safeNum(s?.total);
             bestMap.set(key, (bestMap.get(key) || 0) + total);
         });
@@ -1749,8 +1749,15 @@ document.addEventListener('DOMContentLoaded', function() {
             else bestCustomerName = String(bestCustomerKey);
         }
 
-        const topProd = computeTopProductByQty(salesRange);
-        const topProdName = topProd.key ? String(topProd.key) : '';
+        if (!bestCustomerName) bestCustomerName = '—';
+
+        const topProd = computeTopProductByQty(salesRange.filter(s => isCompletedSale(s) && isRealSale(s)));
+        let topProdName = '';
+        if (topProd.key) {
+            const keyRaw = String(topProd.key);
+            const byId = products.find(p => String(p?.id || '') === keyRaw) || null;
+            topProdName = String(byId?.name || byId?.nombre || '').trim() || keyRaw;
+        }
         const topProdGross = (Array.isArray(salesRange) ? salesRange : []).reduce((acc, s) => {
             if (!isCompletedSale(s)) return acc;
             if (!isRealSale(s)) return acc;

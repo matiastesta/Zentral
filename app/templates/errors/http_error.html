@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title or 'Error' }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto mt-10">
+    <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-100">
+            <div class="text-sm text-gray-500">Código: {{ code }}</div>
+            <h1 class="mt-1 text-xl font-semibold text-gray-900">{{ title or 'Error' }}</h1>
+        </div>
+        <div class="px-6 py-6">
+            {% if code == 401 %}
+                <p class="text-sm text-gray-700">Necesitás iniciar sesión para acceder a este contenido.</p>
+            {% elif code == 403 %}
+                <p class="text-sm text-gray-700">No tenés permisos suficientes para acceder a este contenido.</p>
+            {% elif code == 404 %}
+                <p class="text-sm text-gray-700">No encontramos la página solicitada.</p>
+            {% else %}
+                <p class="text-sm text-gray-700">No se pudo completar la solicitud.</p>
+            {% endif %}
+
+            <div class="mt-5 flex flex-col sm:flex-row gap-2">
+                <button type="button" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50" onclick="history.back()">Volver</button>
+                <a href="{{ url_for('main.index') }}" class="px-4 py-2 text-sm font-medium rounded-md text-white" style="background-color:#0d1067;">Ir al Dashboard</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

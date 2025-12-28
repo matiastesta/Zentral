@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from flask import Flask, g
+from flask import Flask, g, jsonify, render_template, request
 from flask_login import LoginManager
 from flask_babel import Babel
 from flask_sqlalchemy import SQLAlchemy
@@ -104,6 +104,35 @@ def create_app(config_class=Config):
     app.register_blueprint(user_settings_bp, url_prefix='/user-settings')
     app.register_blueprint(calendar_bp, url_prefix='/calendar')
     app.register_blueprint(superadmin_bp, url_prefix='/superadmin')
+
+    def _wants_json() -> bool:
+        try:
+            if str(request.path or '').startswith('/api/'):
+                return True
+            accept = request.headers.get('Accept') or ''
+            if 'application/json' in accept:
+                return True
+        except Exception:
+            return False
+        return False
+
+    @app.errorhandler(401)
+    def _err_401(err):
+        if _wants_json():
+            return jsonify({'ok': False, 'error': 'unauthorized'}), 401
+        return render_template('errors/http_error.html', title='Acceso requerido', code=401), 401
+
+    @app.errorhandler(403)
+    def _err_403(err):
+        if _wants_json():
+            return jsonify({'ok': False, 'error': 'forbidden'}), 403
+        return render_template('errors/http_error.html', title='Acceso denegado', code=403), 403
+
+    @app.errorhandler(404)
+    def _err_404(err):
+        if _wants_json():
+            return jsonify({'ok': False, 'error': 'not_found'}), 404
+        return render_template('errors/http_error.html', title='No encontrado', code=404), 404
 
     @app.before_request
     def _apply_tenant_context():
