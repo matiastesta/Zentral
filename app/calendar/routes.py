@@ -4,7 +4,7 @@ import json
 
 from flask import render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
 
 from app import db
@@ -73,7 +73,11 @@ def _load_meta(meta_json: str | None) -> dict:
 
 
 def _company_id() -> str:
-    return str(getattr(current_user, 'company_id', '') or '').strip()
+    try:
+        from flask import g
+        return str(getattr(g, 'company_id', '') or '').strip()
+    except Exception:
+        return ''
 
 
 def _get_user_config():
@@ -444,26 +448,35 @@ def _get_system_events(cfg_data: dict, start: date, end: date):
 
     # Inventario · Stock crítico (resumen en hoy)
     if _is_source_enabled(cfg_data, 'inventario', 'stock_critico') and start <= today <= end:
+        stock_subq = (
+            db.session.query(
+                InventoryLot.product_id.label('pid'),
+                func.coalesce(func.sum(InventoryLot.qty_available), 0.0).label('stock'),
+            )
+            .filter(InventoryLot.company_id == cid)
+            .group_by(InventoryLot.product_id)
+            .subquery()
+        )
+
         ps = (
-            db.session.query(Product)
+            db.session.query(
+                Product.id,
+                Product.min_stock,
+                Product.reorder_point,
+                func.coalesce(stock_subq.c.stock, 0.0).label('stock'),
+            )
+            .outerjoin(stock_subq, stock_subq.c.pid == Product.id)
             .filter(Product.company_id == cid)
             .filter(Product.active.is_(True))
             .limit(5000)
             .all()
         )
-        ls = (
-            db.session.query(InventoryLot)
-            .filter(InventoryLot.company_id == cid)
-            .limit(20000)
-            .all()
-        )
         critical = 0
         needs_restock = 0
-        for p in ps:
-            pid = str(getattr(p, 'id', ''))
-            stock = sum([float(getattr(l, 'qty_available', 0.0) or 0.0) for l in ls if str(getattr(l, 'product_id', '')) == pid])
-            min_stock = float(getattr(p, 'min_stock', 0.0) or 0.0)
-            reorder_point = float(getattr(p, 'reorder_point', 0.0) or 0.0)
+        for pid, min_stock_v, reorder_point_v, stock_v in (ps or []):
+            stock = float(stock_v or 0.0)
+            min_stock = float(min_stock_v or 0.0)
+            reorder_point = float(reorder_point_v or 0.0)
             is_crit = (min_stock > 0 and stock <= min_stock) or (min_stock <= 0 and stock <= 0)
             if is_crit:
                 critical += 1

@@ -1,4 +1,6 @@
 import os
+import time
+import uuid
 from datetime import datetime
 from flask import Flask, g, jsonify, render_template, request
 from flask_login import LoginManager
@@ -80,6 +82,13 @@ def create_app(config_class=Config):
     except Exception:
         app.logger.exception('Failed to configure SQLite tenant guards')
 
+    try:
+        from app.db_context import configure_session_tenant_context_hooks
+
+        configure_session_tenant_context_hooks()
+    except Exception:
+        app.logger.exception('Failed to configure session tenant context hooks')
+
     # Registrar blueprints principales
     from app.auth import bp as auth_bp
     from app.main import bp as main_bp
@@ -144,6 +153,118 @@ def create_app(config_class=Config):
         if _wants_json():
             return jsonify({'ok': False, 'error': 'not_found'}), 404
         return render_template('errors/http_error.html', title='No encontrado', code=404), 404
+
+    @app.before_request
+    def _request_logging_context():
+        try:
+            rid = (request.headers.get('X-Request-Id') or request.headers.get('X-Request-ID') or '').strip()
+            g.request_id = rid or uuid.uuid4().hex
+        except Exception:
+            g.request_id = uuid.uuid4().hex
+        try:
+            g._request_start_ts = time.perf_counter()
+        except Exception:
+            g._request_start_ts = None
+
+    @app.after_request
+    def _log_request(response):
+        try:
+            start = getattr(g, '_request_start_ts', None)
+            dur_ms = None
+            if start is not None:
+                try:
+                    dur_ms = int((time.perf_counter() - float(start)) * 1000)
+                except Exception:
+                    dur_ms = None
+
+            company_id = str(getattr(g, 'company_id', '') or '').strip()
+            imp_company_id = ''
+            auth_company_id = ''
+            is_admin_flag = ''
+            try:
+                from flask import session
+
+                imp_company_id = str(session.get('impersonate_company_id') or '').strip()
+                auth_company_id = str(session.get('auth_company_id') or '').strip()
+                is_admin_flag = str(session.get('auth_is_zentral_admin') or '').strip()
+            except Exception:
+                imp_company_id = ''
+                auth_company_id = ''
+                is_admin_flag = ''
+            user_id = None
+            role = ''
+            try:
+                from flask_login import current_user
+
+                if getattr(current_user, 'is_authenticated', False):
+                    user_id = getattr(current_user, 'id', None)
+                    role = str(getattr(current_user, 'role', '') or '')
+            except Exception:
+                user_id = None
+                role = ''
+
+            app.logger.info(
+                'REQ id=%s method=%s path=%s status=%s dur_ms=%s company_id=%s auth_company_id=%s imp_company_id=%s admin=%s user_id=%s role=%s',
+                str(getattr(g, 'request_id', '') or ''),
+                str(getattr(request, 'method', '') or ''),
+                str(getattr(request, 'path', '') or ''),
+                int(getattr(response, 'status_code', 0) or 0),
+                dur_ms if dur_ms is not None else '',
+                company_id,
+                auth_company_id,
+                imp_company_id,
+                is_admin_flag,
+                user_id if user_id is not None else '',
+                role,
+            )
+        except Exception:
+            pass
+        return response
+
+    @app.teardown_request
+    def _log_exception(err):
+        if err is None:
+            return
+        try:
+            company_id = str(getattr(g, 'company_id', '') or '').strip()
+            imp_company_id = ''
+            auth_company_id = ''
+            is_admin_flag = ''
+            try:
+                from flask import session
+
+                imp_company_id = str(session.get('impersonate_company_id') or '').strip()
+                auth_company_id = str(session.get('auth_company_id') or '').strip()
+                is_admin_flag = str(session.get('auth_is_zentral_admin') or '').strip()
+            except Exception:
+                imp_company_id = ''
+                auth_company_id = ''
+                is_admin_flag = ''
+            user_id = None
+            role = ''
+            try:
+                from flask_login import current_user
+
+                if getattr(current_user, 'is_authenticated', False):
+                    user_id = getattr(current_user, 'id', None)
+                    role = str(getattr(current_user, 'role', '') or '')
+            except Exception:
+                user_id = None
+                role = ''
+            app.logger.exception(
+                'REQ_ERROR id=%s method=%s path=%s company_id=%s auth_company_id=%s imp_company_id=%s admin=%s user_id=%s role=%s',
+                str(getattr(g, 'request_id', '') or ''),
+                str(getattr(request, 'method', '') or ''),
+                str(getattr(request, 'path', '') or ''),
+                company_id,
+                auth_company_id,
+                imp_company_id,
+                is_admin_flag,
+                user_id if user_id is not None else '',
+                role,
+            )
+        except Exception:
+            pass
 
     @app.before_request
     def _apply_tenant_context():

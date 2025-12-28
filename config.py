@@ -13,11 +13,14 @@ class Config:
     # necesitás SESSION_COOKIE_DOMAIN='.' + dominio_base para que el navegador comparta la cookie.
     SESSION_COOKIE_DOMAIN = os.environ.get('SESSION_COOKIE_DOMAIN') or None
     SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE') or 'Lax'
-    SESSION_COOKIE_SECURE = str(os.environ.get('SESSION_COOKIE_SECURE') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+    _is_railway = bool(os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_PROJECT_ID') or os.environ.get('RAILWAY_SERVICE_ID'))
+    _session_secure_raw = str(os.environ.get('SESSION_COOKIE_SECURE') or '').strip().lower()
+    SESSION_COOKIE_SECURE = (_session_secure_raw in {'1', 'true', 'yes', 'on'}) if _session_secure_raw else _is_railway
 
     REMEMBER_COOKIE_DOMAIN = os.environ.get('REMEMBER_COOKIE_DOMAIN') or SESSION_COOKIE_DOMAIN
     REMEMBER_COOKIE_SAMESITE = os.environ.get('REMEMBER_COOKIE_SAMESITE') or SESSION_COOKIE_SAMESITE
-    REMEMBER_COOKIE_SECURE = str(os.environ.get('REMEMBER_COOKIE_SECURE') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+    _remember_secure_raw = str(os.environ.get('REMEMBER_COOKIE_SECURE') or '').strip().lower()
+    REMEMBER_COOKIE_SECURE = (_remember_secure_raw in {'1', 'true', 'yes', 'on'}) if _remember_secure_raw else SESSION_COOKIE_SECURE
     try:
         _remember_days = int(str(os.environ.get('REMEMBER_COOKIE_DAYS') or '30').strip())
     except Exception:

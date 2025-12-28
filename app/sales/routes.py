@@ -6,6 +6,7 @@ from flask import current_app, g, jsonify, render_template, request, url_for
 from flask_login import login_required
 
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
 from app import db
 from app.models import CashCount, Category, InventoryLot, InventoryMovement, Product, Sale, SaleItem
@@ -216,7 +217,11 @@ def list_sales():
     cid = _company_id()
     if not cid:
         return jsonify({'ok': True, 'items': []})
-    q = db.session.query(Sale).filter(Sale.company_id == cid)
+    q = (
+        db.session.query(Sale)
+        .options(selectinload(Sale.items))
+        .filter(Sale.company_id == cid)
+    )
     if d_from:
         q = q.filter(Sale.sale_date >= d_from)
     if d_to:
@@ -246,16 +251,28 @@ def get_sale(ticket):
 @login_required
 @module_required('sales')
 def list_products_for_sales():
-    limit = int(request.args.get('limit') or 5000)
-    if limit <= 0 or limit > 10000:
-        limit = 5000
+    qraw = str(request.args.get('q') or '').strip()
+    limit = int(request.args.get('limit') or 500)
+    if limit <= 0 or limit > 5000:
+        limit = 500
+    offset = int(request.args.get('offset') or 0)
+    if offset < 0:
+        offset = 0
     cid = _company_id()
     if not cid:
-        return jsonify({'ok': True, 'items': []})
+        return jsonify({'ok': True, 'items': [], 'has_more': False, 'next_offset': None})
     q = db.session.query(Product).filter(Product.company_id == cid).filter(Product.active == True)  # noqa: E712
-    q = q.order_by(Product.name.asc()).limit(limit)
-    rows = q.all()
-    return jsonify({'ok': True, 'items': [_serialize_product_for_sales(r) for r in rows]})
+    if qraw:
+        like = f"%{qraw}%"
+        q = q.filter(Product.name.ilike(like))
+    q = q.order_by(Product.name.asc(), Product.id.asc())
+
+    rows = q.offset(offset).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    if has_more:
+        rows = rows[:limit]
+    next_offset = (offset + limit) if has_more else None
+    return jsonify({'ok': True, 'items': [_serialize_product_for_sales(r) for r in rows], 'has_more': has_more, 'next_offset': next_offset})
 
 
 @bp.get('/api/lots')

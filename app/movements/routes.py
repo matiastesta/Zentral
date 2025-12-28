@@ -10,8 +10,11 @@ from app.movements import bp
 
 
 def _company_id() -> str:
-    from flask_login import current_user
-    return str(getattr(current_user, 'company_id', '') or '').strip()
+    try:
+        from flask import g
+        return str(getattr(g, 'company_id', '') or '').strip()
+    except Exception:
+        return ''
 
 
 @bp.route('/')

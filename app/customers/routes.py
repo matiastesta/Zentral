@@ -68,13 +68,16 @@ def index():
 @module_required_any('customers', 'dashboard')
 def list_customers_api():
     qraw = (request.args.get('q') or '').strip()
-    limit = int(request.args.get('limit') or 5000)
-    if limit <= 0 or limit > 10000:
-        limit = 5000
+    limit = int(request.args.get('limit') or 500)
+    if limit <= 0 or limit > 5000:
+        limit = 500
+    offset = int(request.args.get('offset') or 0)
+    if offset < 0:
+        offset = 0
 
     company_id = _company_id()
     if not company_id:
-        return jsonify({'ok': True, 'items': []})
+        return jsonify({'ok': True, 'items': [], 'has_more': False, 'next_offset': None})
 
     query = db.session.query(Customer).filter(Customer.company_id == company_id)
     if qraw:
@@ -86,8 +89,13 @@ def list_customers_api():
             | (Customer.email.ilike(like))
             | (Customer.phone.ilike(like))
         )
-    rows = query.order_by(Customer.updated_at.desc(), Customer.created_at.desc()).limit(limit).all()
-    return jsonify({'ok': True, 'items': [_serialize_customer(r) for r in rows]})
+    query = query.order_by(Customer.updated_at.desc(), Customer.created_at.desc(), Customer.id.asc())
+    rows = query.offset(offset).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    if has_more:
+        rows = rows[:limit]
+    next_offset = (offset + limit) if has_more else None
+    return jsonify({'ok': True, 'items': [_serialize_customer(r) for r in rows], 'has_more': has_more, 'next_offset': next_offset})
 
 
 @bp.get('/api/customers/<customer_id>')

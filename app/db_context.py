@@ -8,6 +8,65 @@ from app.tenancy import ensure_request_context, resolve_company_slug
 
 
 _SQLITE_TENANT_GUARDS_CONFIGURED = False
+_SESSION_TENANT_CONTEXT_HOOKS_CONFIGURED = False
+
+
+def _rls_settings(*, is_login: bool, login_email: str | None = None) -> dict:
+    if not has_request_context():
+        return {
+            'slug': '',
+            'cid': '',
+            'is_admin': '0',
+            'is_login': '0',
+            'login_email': '',
+        }
+
+    slug = resolve_company_slug() or ''
+
+    ensure_request_context()
+    cid = str(getattr(g, 'company_id', None) or '').strip()
+
+    is_admin = '1' if (session.get('auth_is_zentral_admin') == '1') else '0'
+    impersonating = bool(session.get('impersonate_company_id'))
+    if is_admin != '1':
+        try:
+            from flask_login import current_user
+
+            if getattr(current_user, 'is_authenticated', False) and str(getattr(current_user, 'role', '') or '') == 'zentral_admin':
+                is_admin = '1'
+        except Exception:
+            pass
+
+    if is_admin == '1' and impersonating and cid:
+        is_admin = '0'
+
+    is_login_v = '1' if is_login else '0'
+    login_email_v = (str(login_email or '').strip().lower() if is_login else '')
+
+    return {
+        'slug': slug,
+        'cid': cid,
+        'is_admin': is_admin,
+        'is_login': is_login_v,
+        'login_email': login_email_v,
+    }
+
+
+def _apply_rls_settings_on_connection(conn, *, is_login: bool, login_email: str | None = None) -> None:
+    settings = _rls_settings(is_login=is_login, login_email=login_email)
+    conn.execute(
+        text(
+            """
+            SELECT
+                set_config('app.company_slug', :slug, true),
+                set_config('app.current_company_id', :cid, true),
+                set_config('app.is_zentral_admin', :is_admin, true),
+                set_config('app.is_login', :is_login, true),
+                set_config('app.login_email', :login_email, true)
+            """
+        ),
+        settings,
+    )
 
 
 def apply_rls_context(*, is_login: bool, login_email: str | None = None) -> None:
@@ -37,72 +96,64 @@ def apply_rls_context(*, is_login: bool, login_email: str | None = None) -> None
         g._login_email = (str(login_email or '').strip().lower() if is_login else '')
         return
 
-    slug = resolve_company_slug() or ''
-
-    pre_company_id = ''
-    is_admin = '1' if (session.get('auth_is_zentral_admin') == '1') else '0'
-    if is_admin != '1':
-        try:
-            from flask_login import current_user
-
-            if getattr(current_user, 'is_authenticated', False) and str(getattr(current_user, 'role', '') or '') == 'zentral_admin':
-                is_admin = '1'
-        except Exception:
-            pass
-    if is_admin == '1':
-        imp = session.get('impersonate_company_id')
-        pre_company_id = str(imp) if imp else ''
-    else:
-        cid = session.get('auth_company_id')
-        pre_company_id = str(cid) if cid else ''
-    is_login_v = '1' if is_login else '0'
-
-    login_email_v = (str(login_email or '').strip().lower() if is_login else '')
+    ensure_request_context()
 
     try:
-        db.session.execute(
-            text(
-                """
-                SELECT
-                    set_config('app.company_slug', :slug, true),
-                    set_config('app.current_company_id', :cid, true),
-                    set_config('app.is_zentral_admin', :is_admin, true),
-                    set_config('app.is_login', :is_login, true),
-                    set_config('app.login_email', :login_email, true)
-                """
-            ),
-            {
-                'slug': slug,
-                'cid': pre_company_id,
-                'is_admin': is_admin,
-                'is_login': is_login_v,
-                'login_email': login_email_v,
-            },
-        )
-        try:
-            ensure_request_context()
-
-            cid2 = str(getattr(g, 'company_id', None) or '')
-            db.session.execute(
-                text("SELECT set_config('app.current_company_id', :cid, true)"),
-                {'cid': cid2},
-            )
-        except Exception as e:
-            # During first boot on Postgres the schema may not be migrated yet.
-            # Avoid hard failing requests (login/bootstrap) when tenant tables are missing.
-            if isinstance(e, ProgrammingError) or _is_missing_company_table(e):
-                try:
-                    db.session.rollback()
-                except Exception:
-                    pass
-                return
-            raise
+        g._is_login = bool(is_login)
+        g._login_email = (str(login_email or '').strip().lower() if is_login else '')
     except Exception:
+        pass
+
+    try:
+        _apply_rls_settings_on_connection(db.session.connection(), is_login=is_login, login_email=login_email)
+    except Exception as e:
+        if isinstance(e, ProgrammingError) or _is_missing_company_table(e):
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return
         try:
             db.session.rollback()
         except Exception:
             pass
         raise
+
+
+def configure_session_tenant_context_hooks() -> None:
+    global _SESSION_TENANT_CONTEXT_HOOKS_CONFIGURED
+    if _SESSION_TENANT_CONTEXT_HOOKS_CONFIGURED:
+        return
+
+    @event.listens_for(Session, 'after_begin')
+    def _reapply_rls_context_after_begin(sess, transaction, connection):
+        if not has_request_context():
+            return
+
+        try:
+            engine_drivername = str(connection.engine.url.drivername)
+        except Exception:
+            engine_drivername = ''
+        if engine_drivername.startswith('sqlite'):
+            return
+
+        try:
+            is_login = bool(getattr(g, '_is_login', False))
+            login_email = str(getattr(g, '_login_email', '') or '')
+        except Exception:
+            is_login = False
+            login_email = ''
+
+        try:
+            _apply_rls_settings_on_connection(connection, is_login=is_login, login_email=login_email)
+        except Exception:
+            try:
+                sess.rollback()
+            except Exception:
+                pass
+            raise
+
+    _SESSION_TENANT_CONTEXT_HOOKS_CONFIGURED = True
 
 
 def configure_sqlite_tenant_guards() -> None:
@@ -138,8 +189,10 @@ def configure_sqlite_tenant_guards() -> None:
                 return
         except Exception:
             pass
+
         try:
-            if not str(db.engine.url.drivername).startswith('sqlite'):
+            stmt = execute_state.statement
+            if not hasattr(stmt, 'options'):
                 return
         except Exception:
             return
@@ -234,11 +287,6 @@ def configure_sqlite_tenant_guards() -> None:
     @event.listens_for(Session, 'before_flush')
     def _sqlite_tenant_write_guard(sess, flush_context, instances):
         if not has_request_context():
-            return
-        try:
-            if not str(db.engine.url.drivername).startswith('sqlite'):
-                return
-        except Exception:
             return
 
         try:

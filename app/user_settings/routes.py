@@ -88,8 +88,13 @@ def index():
             if not u:
                 flash('Usuario inválido.', 'error')
                 return redirect(url_for('user_settings.index'))
-            if getattr(current_user, 'role', '') != 'zentral_admin':
-                if str(getattr(u, 'company_id', '') or '') != str(getattr(current_user, 'company_id', '') or ''):
+            if getattr(current_user, 'role', '') == 'zentral_admin':
+                if str(getattr(g, 'company_id', '') or ''):
+                    if str(getattr(u, 'company_id', '') or '') != str(getattr(g, 'company_id', '') or ''):
+                        flash('Usuario inválido.', 'error')
+                        return redirect(url_for('user_settings.index'))
+            else:
+                if str(getattr(u, 'company_id', '') or '') != str(getattr(g, 'company_id', '') or ''):
                     flash('Usuario inválido.', 'error')
                     return redirect(url_for('user_settings.index'))
             if u.is_master:
@@ -176,8 +181,13 @@ def index():
             if not u:
                 flash('Usuario inválido.', 'error')
                 return redirect(url_for('user_settings.index'))
-            if getattr(current_user, 'role', '') != 'zentral_admin':
-                if str(getattr(u, 'company_id', '') or '') != str(getattr(current_user, 'company_id', '') or ''):
+            if getattr(current_user, 'role', '') == 'zentral_admin':
+                if str(getattr(g, 'company_id', '') or ''):
+                    if str(getattr(u, 'company_id', '') or '') != str(getattr(g, 'company_id', '') or ''):
+                        flash('Usuario inválido.', 'error')
+                        return redirect(url_for('user_settings.index'))
+            else:
+                if str(getattr(u, 'company_id', '') or '') != str(getattr(g, 'company_id', '') or ''):
                     flash('Usuario inválido.', 'error')
                     return redirect(url_for('user_settings.index'))
             if u.is_master:
@@ -226,8 +236,13 @@ def index():
             if not u:
                 flash('Usuario inválido.', 'error')
                 return redirect(url_for('user_settings.index'))
-            if getattr(current_user, 'role', '') != 'zentral_admin':
-                if str(getattr(u, 'company_id', '') or '') != str(getattr(current_user, 'company_id', '') or ''):
+            if getattr(current_user, 'role', '') == 'zentral_admin':
+                if str(getattr(g, 'company_id', '') or ''):
+                    if str(getattr(u, 'company_id', '') or '') != str(getattr(g, 'company_id', '') or ''):
+                        flash('Usuario inválido.', 'error')
+                        return redirect(url_for('user_settings.index'))
+            else:
+                if str(getattr(u, 'company_id', '') or '') != str(getattr(g, 'company_id', '') or ''):
                     flash('Usuario inválido.', 'error')
                     return redirect(url_for('user_settings.index'))
             if u.is_master:
@@ -242,8 +257,8 @@ def index():
             return redirect(url_for('user_settings.index'))
 
     q = db.session.query(User)
-    if getattr(current_user, 'role', '') != 'zentral_admin':
-        q = q.filter(User.company_id == str(getattr(current_user, 'company_id', '') or ''))
+    if str(getattr(g, 'company_id', '') or '').strip():
+        q = q.filter(User.company_id == str(getattr(g, 'company_id', '') or ''))
     users = q.order_by(User.is_master.desc(), User.username.asc()).all()
 
     roles = ['company_admin', 'admin', 'vendedor', 'contador']
@@ -274,8 +289,13 @@ def user_detail(user_id: int):
         flash('Usuario inválido.', 'error')
         return redirect(url_for('main.index'))
 
-    if getattr(current_user, 'role', '') != 'zentral_admin':
-        if str(getattr(u, 'company_id', '') or '') != str(getattr(current_user, 'company_id', '') or ''):
+    if getattr(current_user, 'role', '') == 'zentral_admin':
+        if str(getattr(g, 'company_id', '') or ''):
+            if str(getattr(u, 'company_id', '') or '') != str(getattr(g, 'company_id', '') or ''):
+                flash('Usuario inválido.', 'error')
+                return redirect(url_for('main.index'))
+    else:
+        if str(getattr(u, 'company_id', '') or '') != str(getattr(g, 'company_id', '') or ''):
             flash('Usuario inválido.', 'error')
             return redirect(url_for('main.index'))
 
