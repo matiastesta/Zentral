@@ -226,6 +226,10 @@ def create_app(config_class=Config):
         if err is None:
             return
         try:
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
             company_id = str(getattr(g, 'company_id', '') or '').strip()
             imp_company_id = ''
             auth_company_id = ''

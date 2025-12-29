@@ -28,14 +28,6 @@ def _rls_settings(*, is_login: bool, login_email: str | None = None) -> dict:
 
     is_admin = '1' if (session.get('auth_is_zentral_admin') == '1') else '0'
     impersonating = bool(session.get('impersonate_company_id'))
-    if is_admin != '1':
-        try:
-            from flask_login import current_user
-
-            if getattr(current_user, 'is_authenticated', False) and str(getattr(current_user, 'role', '') or '') == 'zentral_admin':
-                is_admin = '1'
-        except Exception:
-            pass
 
     if is_admin == '1' and impersonating and cid:
         is_admin = '0'

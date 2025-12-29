@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime
 
 from flask_login import UserMixin
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db
@@ -197,8 +198,15 @@ class BusinessSettings(db.Model):
             return bs
         bs = BusinessSettings(company_id=cid, name='Nombre del negocio')
         db.session.add(bs)
-        db.session.commit()
-        return bs
+        try:
+            db.session.flush()
+            return bs
+        except IntegrityError:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return db.session.query(BusinessSettings).filter(BusinessSettings.company_id == cid).first()
 
 
 class CalendarEvent(db.Model):

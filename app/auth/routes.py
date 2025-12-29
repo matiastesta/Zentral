@@ -15,9 +15,20 @@ def login():
     Por ahora solo muestra el formulario y, si se envía, redirige al índice
     sin validar credenciales ni crear sesión persistente.
     """
-    if current_user.is_authenticated:
+    if current_user.is_authenticated and request.method == 'GET':
         return redirect(url_for('main.index'))
     form = LoginForm()
+    if current_user.is_authenticated and request.method == 'POST':
+        try:
+            logout_user()
+        except Exception:
+            pass
+        try:
+            session.pop('auth_is_zentral_admin', None)
+            session.pop('auth_company_id', None)
+            session.pop('impersonate_company_id', None)
+        except Exception:
+            pass
     if form.validate_on_submit():
         ident = (form.login.data or '').strip()
         ident_norm = ident.strip().lower()
