@@ -29,7 +29,8 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
 
     try:
-        if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_PROJECT_ID') or os.environ.get('RAILWAY_SERVICE_ID'):
+        is_railway = bool(os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_PROJECT_ID') or os.environ.get('RAILWAY_SERVICE_ID'))
+        if is_railway:
             from werkzeug.middleware.proxy_fix import ProxyFix
 
             app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
@@ -70,7 +71,11 @@ def create_app(config_class=Config):
     try:
         with app.app_context():
             if not str(db.engine.url.drivername).startswith('sqlite'):
-                auto_bootstrap = str(os.environ.get('AUTO_BOOTSTRAP_DB') or '').strip().lower() in ('1', 'true', 'yes', 'on')
+                auto_bootstrap_raw = str(os.environ.get('AUTO_BOOTSTRAP_DB') or '').strip().lower()
+                if auto_bootstrap_raw:
+                    auto_bootstrap = auto_bootstrap_raw in ('1', 'true', 'yes', 'on')
+                else:
+                    auto_bootstrap = bool(os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_PROJECT_ID') or os.environ.get('RAILWAY_SERVICE_ID'))
                 if auto_bootstrap:
                     auto_reset = str(os.environ.get('AUTO_RESET_DB') or '').strip().lower() in ('1', 'true', 'yes', 'on')
                     from app.rls import bootstrap_schema
