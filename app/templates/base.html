@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %} - Zentral</title>
-    {% if business and business.logo_filename %}
+    {% if business and business.logo_file_id %}
+        <link rel="icon" type="image/png" href="{{ url_for('files.download_file_api', file_id=business.logo_file_id) }}">
+        <link rel="apple-touch-icon" href="{{ url_for('files.download_file_api', file_id=business.logo_file_id) }}">
+    {% elif business and business.logo_filename %}
         <link rel="icon" type="image/png" href="{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}">
         <link rel="apple-touch-icon" href="{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}">
     {% else %}
@@ -23,7 +26,7 @@
 {% set brand_color = (business.primary_color if business and business.primary_color else '#0d1067') %}
 {% set bg_brightness = (business.background_brightness if business and business.background_brightness else 1.0) %}
 {% set bg_contrast = (business.background_contrast if business and business.background_contrast else 1.0) %}
-{% set bg_img = (url_for('static', filename='uploads/' ~ business.background_image_filename) if business and business.background_image_filename else '') %}
+{% set bg_img = (url_for('files.download_file_api', file_id=business.background_file_id) if business and business.background_file_id else (url_for('static', filename='uploads/' ~ business.background_image_filename) if business and business.background_image_filename else '')) %}
 <body class="bg-gray-100" style="background-color: #fbf9f5; --brand-color: {{ brand_color }}; --app-bg-brightness: {{ bg_brightness }}; --app-bg-contrast: {{ bg_contrast }}; --app-bg-image: {% if bg_img %}url('{{ bg_img }}'){% else %}none{% endif %};">
     {% set ep = request.endpoint or '' %}
     {% set label_customers = 'Clientes' %}
@@ -39,6 +42,8 @@
                         <div class="h-9 w-9 rounded-full bg-white bg-opacity-10 flex items-center justify-center border border-white border-opacity-30 overflow-hidden">
                             {% if request.path.startswith('/superadmin') and current_user.is_authenticated and current_user.role == 'zentral_admin' and not is_support_mode %}
                                 <i class="fas fa-user-shield"></i>
+                            {% elif business and business.logo_file_id %}
+                                <img src="{{ url_for('files.download_file_api', file_id=business.logo_file_id) }}" alt="Logo" class="h-9 w-9 object-cover">
                             {% elif business and business.logo_filename %}
                                 <img src="{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}" alt="Logo" class="h-9 w-9 object-cover">
                             {% else %}

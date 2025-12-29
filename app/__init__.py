@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import uuid
 from datetime import datetime
@@ -57,9 +58,12 @@ def create_app(config_class=Config):
     try:
         with app.app_context():
             if str(db.engine.url.drivername).startswith('sqlite'):
-                from app.rls import bootstrap_schema
+                if 'db' in [str(a or '').strip().lower() for a in (sys.argv or [])]:
+                    pass
+                else:
+                    from app.rls import bootstrap_schema
 
-                bootstrap_schema(reset=False)
+                    bootstrap_schema(reset=False)
     except Exception:
         app.logger.exception('Failed to bootstrap SQLite schema')
 
@@ -105,6 +109,7 @@ def create_app(config_class=Config):
     from app.user_settings import bp as user_settings_bp
     from app.calendar import bp as calendar_bp
     from app.superadmin import bp as superadmin_bp
+    from app.files import bp as files_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(main_bp)
@@ -121,6 +126,7 @@ def create_app(config_class=Config):
     app.register_blueprint(user_settings_bp, url_prefix='/user-settings')
     app.register_blueprint(calendar_bp, url_prefix='/calendar')
     app.register_blueprint(superadmin_bp, url_prefix='/superadmin')
+    app.register_blueprint(files_bp)
 
     def _wants_json() -> bool:
         try:
@@ -153,6 +159,19 @@ def create_app(config_class=Config):
         if _wants_json():
             return jsonify({'ok': False, 'error': 'not_found'}), 404
         return render_template('errors/http_error.html', title='No encontrado', code=404), 404
+
+    @app.errorhandler(400)
+    def _err_400(err):
+        if _wants_json():
+            try:
+                detail = str(getattr(err, 'description', '') or '')
+            except Exception:
+                detail = ''
+            payload = {'ok': False, 'error': 'bad_request'}
+            if detail:
+                payload['detail'] = detail
+            return jsonify(payload), 400
+        return render_template('errors/http_error.html', title='Solicitud inválida', code=400), 400
 
     @app.before_request
     def _request_logging_context():

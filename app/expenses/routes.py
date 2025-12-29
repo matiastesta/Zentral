@@ -6,11 +6,13 @@ import json
 import os
 import time
 
-from flask import g, jsonify, render_template, request, current_app, send_file, url_for
+from flask import g, jsonify, render_template, request, current_app, send_file, url_for, redirect
 from flask_login import login_required
 from werkzeug.utils import secure_filename
 
 from app import db
+from app.files.storage import upload_to_r2_and_create_asset
+from app.models import FileAsset
 from app.models import Expense, ExpenseCategory, BusinessSettings, Employee, Supplier
 from app.permissions import module_required, module_required_any
 from app.expenses import bp
@@ -367,7 +369,6 @@ def upload_expense_attachments_api(expense_id):
     if not files:
         return jsonify({'ok': False, 'error': 'no_file'}), 400
 
-    upload_dir = _get_expense_upload_dir(eid)
     meta_obj = _load_meta_obj(row)
     comp = meta_obj.get('comprobante')
     comp_list = comp if isinstance(comp, list) else []
@@ -375,36 +376,27 @@ def upload_expense_attachments_api(expense_id):
     out = []
     for f in files:
         original_name = str(f.filename or '').strip() or 'archivo'
-        safe_name = secure_filename(original_name) or 'archivo'
-        att_id = uuid4().hex
-        stored_name = att_id + '_' + safe_name
-
-        abs_path = os.path.abspath(os.path.join(upload_dir, stored_name))
-        abs_base = os.path.abspath(upload_dir)
-        if not abs_path.startswith(abs_base):
-            continue
-
         try:
-            f.save(abs_path)
+            asset = upload_to_r2_and_create_asset(
+                company_id=cid,
+                file_storage=f,
+                entity_type='expense',
+                entity_id=eid,
+                key_prefix='expenses/attachments',
+            )
         except Exception:
-            current_app.logger.exception('Failed to save expense attachment file')
+            current_app.logger.exception('Failed to upload expense attachment to R2')
             continue
-
-        try:
-            size = int(os.path.getsize(abs_path))
-        except Exception:
-            current_app.logger.exception('Failed to get size of expense attachment file')
-            size = 0
 
         mime = str(getattr(f, 'mimetype', '') or '').strip()
-        url = url_for('expenses.download_expense_attachment_api', expense_id=eid, attachment_id=att_id)
+        url = url_for('files.download_file_api', file_id=asset.id)
 
         item = {
-            'id': att_id,
+            'id': asset.id,
+            'file_id': asset.id,
             'name': original_name,
-            'size': size,
+            'size': int(getattr(asset, 'size_bytes', 0) or 0),
             'type': mime,
-            'stored_name': stored_name,
             'url': url,
             'created_at': int(time.time() * 1000),
         }
@@ -449,6 +441,12 @@ def download_expense_attachment_api(expense_id, attachment_id):
     if not item:
         return jsonify({'ok': False, 'error': 'attachment_not_found'}), 404
 
+    fid = str(item.get('file_id') or item.get('id') or '').strip()
+    if fid:
+        row_asset = db.session.query(FileAsset).filter(FileAsset.company_id == cid, FileAsset.id == fid).first()
+        if row_asset:
+            return redirect(url_for('files.download_file_api', file_id=fid), code=302)
+
     stored_name = str(item.get('stored_name') or '').strip()
     if not stored_name:
         return jsonify({'ok': False, 'error': 'attachment_missing_path'}), 404
@@ -490,6 +488,15 @@ def delete_expense_attachment_api(expense_id, attachment_id):
         keep.append(x)
     if removed is None:
         return jsonify({'ok': False, 'error': 'attachment_not_found'}), 404
+
+    fid = str(removed.get('file_id') or removed.get('id') or '').strip()
+    if fid:
+        try:
+            fa = db.session.query(FileAsset).filter(FileAsset.company_id == str(getattr(row, 'company_id', '') or ''), FileAsset.id == fid).first()
+            if fa:
+                fa.status = 'deleted'
+        except Exception:
+            current_app.logger.exception('Failed to mark FileAsset as deleted')
 
     stored_name = str(removed.get('stored_name') or '').strip()
     if stored_name:

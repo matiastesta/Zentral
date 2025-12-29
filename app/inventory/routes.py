@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from app.models import Category, InventoryLot, InventoryMovement, Product, Supplier
+from app.files.storage import upload_to_r2_and_create_asset
 from app.permissions import module_required, module_required_any
 from app.inventory import bp
 
@@ -50,6 +51,12 @@ def _serialize_category(cat: Optional[Category]):
 
 
 def _image_url(p: Product):
+    file_id = str(getattr(p, 'image_file_id', '') or '').strip()
+    if file_id:
+        try:
+            return url_for('files.download_file_api', file_id=file_id)
+        except Exception:
+            return ''
     filename = str(getattr(p, 'image_filename', '') or '').strip()
     if not filename:
         return ''
@@ -373,20 +380,25 @@ def upload_product_image(product_id: int):
     if not _allowed_image(f.filename):
         return jsonify({'ok': False, 'error': 'invalid_file_type'}), 400
 
-    filename = secure_filename(f.filename)
-    ext = os.path.splitext(filename)[1].lower()
-    safe_name = f'prod_{row.id}_{uuid4().hex[:10]}{ext}'
     try:
-        upload_dir = current_app.config.get('UPLOAD_FOLDER') or os.path.join(current_app.root_path, 'static', 'uploads')
-        os.makedirs(upload_dir, exist_ok=True)
-        path = os.path.join(upload_dir, safe_name)
-        f.save(path)
+        asset = upload_to_r2_and_create_asset(
+            company_id=str(getattr(row, 'company_id', '') or '').strip(),
+            file_storage=f,
+            entity_type='product',
+            entity_id=str(row.id),
+            key_prefix='products/images',
+        )
+        row.image_file_id = asset.id
+        row.image_filename = None
+        db.session.commit()
+        return jsonify({'ok': True, 'item': _serialize_product(row)})
     except Exception:
+        current_app.logger.exception('Failed to upload product image to R2')
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
         return jsonify({'ok': False, 'error': 'upload_failed'}), 400
-
-    row.image_filename = safe_name
-    db.session.commit()
-    return jsonify({'ok': True, 'item': _serialize_product(row)})
 
 
 @bp.delete('/api/products/<int:product_id>')

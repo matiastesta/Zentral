@@ -176,11 +176,13 @@ class BusinessSettings(db.Model):
     phone = db.Column(db.String(64), nullable=True)
     address = db.Column(db.String(255), nullable=True)
     logo_filename = db.Column(db.String(255), nullable=True)
+    logo_file_id = db.Column(db.String(64), nullable=True, index=True)
     label_customers = db.Column(db.String(64), nullable=True)
     label_products = db.Column(db.String(64), nullable=True)
     primary_color = db.Column(db.String(16), nullable=True)
 
     background_image_filename = db.Column(db.String(255), nullable=True)
+    background_file_id = db.Column(db.String(64), nullable=True, index=True)
     background_brightness = db.Column(db.Float, nullable=True)
     background_contrast = db.Column(db.Float, nullable=True)
 
@@ -258,6 +260,7 @@ class Product(db.Model):
     barcode = db.Column(db.String(64), nullable=True, unique=True, index=True)
 
     image_filename = db.Column(db.String(255), nullable=True)
+    image_file_id = db.Column(db.String(64), nullable=True, index=True)
 
     unit_name = db.Column(db.String(32), nullable=True)
     uses_lots = db.Column(db.Boolean, nullable=False, default=True)
@@ -521,3 +524,32 @@ class ExpenseCategory(db.Model):
     name = db.Column(db.String(255), nullable=False, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class FileAsset(db.Model):
+    __tablename__ = 'file_asset'
+
+    id = db.Column(db.String(64), primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
+
+    entity_type = db.Column(db.String(32), nullable=True, index=True)
+    entity_id = db.Column(db.String(64), nullable=True, index=True)
+
+    storage_provider = db.Column(db.String(16), nullable=False, default='r2')
+    bucket = db.Column(db.String(128), nullable=True)
+    object_key = db.Column(db.String(512), nullable=True, index=True)
+
+    original_name = db.Column(db.String(255), nullable=True)
+    content_type = db.Column(db.String(128), nullable=True)
+    size_bytes = db.Column(db.Integer, nullable=False, default=0)
+
+    checksum_sha256 = db.Column(db.String(64), nullable=True)
+    etag = db.Column(db.String(128), nullable=True)
+
+    status = db.Column(db.String(16), nullable=False, default='active')
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'storage_provider', 'bucket', 'object_key', name='uq_file_asset_company_object'),
+    )

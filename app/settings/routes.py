@@ -5,6 +5,7 @@ from flask_login import login_required
 from werkzeug.utils import secure_filename
 
 from app import db
+from app.files.storage import upload_to_r2_and_create_asset
 from app.models import BusinessSettings
 from app.permissions import module_required
 from app.settings import bp
@@ -62,13 +63,21 @@ def business_settings():
                 if allowed and ext.lstrip('.') not in allowed:
                     flash('Formato de logo no permitido.', 'error')
                     return redirect(url_for('settings.business_settings'))
-                folder = current_app.config.get('UPLOAD_FOLDER')
-                if folder:
-                    os.makedirs(folder, exist_ok=True)
-                    final_name = 'business_logo' + ext
-                    path = os.path.join(folder, final_name)
-                    f.save(path)
-                    bs.logo_filename = final_name
+
+                try:
+                    asset = upload_to_r2_and_create_asset(
+                        company_id=str(getattr(g, 'company_id', '') or '').strip(),
+                        file_storage=f,
+                        entity_type='business_logo',
+                        entity_id=str(getattr(g, 'company_id', '') or '').strip(),
+                        key_prefix='business/logo',
+                    )
+                    bs.logo_file_id = asset.id
+                    bs.logo_filename = None
+                except Exception:
+                    current_app.logger.exception('Failed to upload business logo to R2')
+                    flash('No se pudo subir el logo. Intentá nuevamente.', 'error')
+                    return redirect(url_for('settings.business_settings'))
 
             bg = request.files.get('background_image')
             if bg and getattr(bg, 'filename', ''):
@@ -77,13 +86,21 @@ def business_settings():
                 if ext != '.png':
                     flash('La imagen de fondo debe ser PNG.', 'error')
                     return redirect(url_for('settings.business_settings'))
-                folder = current_app.config.get('UPLOAD_FOLDER')
-                if folder:
-                    os.makedirs(folder, exist_ok=True)
-                    final_name = 'business_background' + ext
-                    path = os.path.join(folder, final_name)
-                    bg.save(path)
-                    bs.background_image_filename = final_name
+
+                try:
+                    asset = upload_to_r2_and_create_asset(
+                        company_id=str(getattr(g, 'company_id', '') or '').strip(),
+                        file_storage=bg,
+                        entity_type='business_background',
+                        entity_id=str(getattr(g, 'company_id', '') or '').strip(),
+                        key_prefix='business/background',
+                    )
+                    bs.background_file_id = asset.id
+                    bs.background_image_filename = None
+                except Exception:
+                    current_app.logger.exception('Failed to upload business background to R2')
+                    flash('No se pudo subir la imagen de fondo. Intentá nuevamente.', 'error')
+                    return redirect(url_for('settings.business_settings'))
 
             db.session.add(bs)
             db.session.commit()

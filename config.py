@@ -64,6 +64,17 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max upload size
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
+    # Cloudflare R2 (S3 compatible) - private objects with presigned URLs
+    R2_ENDPOINT_URL = os.environ.get('R2_ENDPOINT_URL') or ''
+    R2_ACCESS_KEY_ID = os.environ.get('R2_ACCESS_KEY_ID') or ''
+    R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY') or ''
+    R2_BUCKET = os.environ.get('R2_BUCKET') or ''
+    R2_REGION = os.environ.get('R2_REGION') or 'auto'
+    try:
+        R2_PRESIGNED_EXPIRES_SECONDS = int(str(os.environ.get('R2_PRESIGNED_EXPIRES_SECONDS') or '120').strip())
+    except Exception:
+        R2_PRESIGNED_EXPIRES_SECONDS = 120
+
 class DevelopmentConfig(Config):
     DEBUG = True
     SQLALCHEMY_ECHO = True

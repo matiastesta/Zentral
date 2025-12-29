@@ -3615,7 +3615,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'px-3 py-1 rounded-full bg-indigo-600 text-white shadow-sm inline-flex items-center gap-2';
-        btn.innerHTML = '<span>Categorias</span><i class="fas fa-chevron-down text-[10px] opacity-80"></i>';
+        const activeLabel = (String(active || '').trim() && String(active || '').trim() !== 'Todos') ? String(active || '').trim() : 'Categorías';
+        btn.innerHTML = '<span>' + activeLabel + '</span><i class="fas fa-chevron-down text-[10px] opacity-80"></i>';
 
         const menu = document.createElement('div');
         menu.className = 'hidden absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden';
@@ -3908,6 +3909,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     renderCategoryPills(pillsCategoriasVentaWrap, cats, selectedCategoriaVenta, function (cat) {
                         selectedCategoriaVenta = cat;
                         applyVentaProductsFilter();
+                        renderCategoryPills(pillsCategoriasVentaWrap, cats, selectedCategoriaVenta, arguments.callee);
                     });
                 }
                 applyVentaProductsFilter();
@@ -3978,6 +3980,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     renderCategoryPills(pillsCategoriasCambioWrap, cats, selectedCategoriaCambio, function (cat) {
                         selectedCategoriaCambio = cat;
                         applyCambioProductsFilter();
+                        renderCategoryPills(pillsCategoriasCambioWrap, cats, selectedCategoriaCambio, arguments.callee);
                     });
                 }
                 applyCambioProductsFilter();
@@ -4048,6 +4051,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     renderCategoryPills(pillsCategoriasCambioVentaWrap, cats, selectedCategoriaCambioVenta, function (cat) {
                         selectedCategoriaCambioVenta = cat;
                         applyCambioVentaProductsFilter();
+                        renderCategoryPills(pillsCategoriasCambioVentaWrap, cats, selectedCategoriaCambioVenta, arguments.callee);
                     });
                 }
                 applyCambioVentaProductsFilter();
@@ -4198,6 +4202,10 @@ document.addEventListener('DOMContentLoaded', function() {
             set('Realizado', { bg: '#d1fae5', color: '#065f46', border: '#10b981' });
             return;
         }
+        if (s === 'falta_cierre' || s === 'faltacierre' || s === 'falta cierre') {
+            set('Falta cierre', { bg: '#fee2e2', color: '#991b1b', border: '#ef4444' });
+            return;
+        }
         if (s === 'pendiente') {
             set('Pendiente', { bg: '#fef3c7', color: '#92400e', border: '#f59e0b' });
             return;
@@ -4239,7 +4247,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (montoEfectivoDia) montoEfectivoDia.value = String(item.cash_day_amount ?? '');
                 if (selectArqueoEmployee) selectArqueoEmployee.value = String(item.employee_id || '');
                 arqueoLastSavedAtMs = parseIsoToMs(item.updated_at) || 0;
-                setArqueoBadge('realizado');
+                const openingV = parseFloat(item.opening_amount || 0) || 0;
+                const closingV = parseFloat(item.closing_amount || 0) || 0;
+                const hasEmployee = String(item.employee_id || '').trim().length > 0;
+                const hasOpening = openingV > 0;
+                const hasClosing = closingV > 0;
+                if (hasEmployee && hasOpening && !hasClosing) {
+                    setArqueoBadge('falta_cierre');
+                } else {
+                    setArqueoBadge('realizado');
+                }
                 validarCierreArqueo();
                 checkArqueoStaleForDate(fecha);
             })
@@ -5067,7 +5084,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         return;
                     }
                     arqueoLastSavedAtMs = Date.now();
-                    setArqueoBadge('realizado');
+                    const opening = parseFloat(montoApertura.value || '0') || 0;
+                    const closing = parseFloat(montoCierre.value || '0') || 0;
+                    const employeeId = String(selectArqueoEmployee?.value || '').trim();
+                    if (employeeId && opening > 0 && !(closing > 0)) {
+                        setArqueoBadge('falta_cierre');
+                    } else {
+                        setArqueoBadge('realizado');
+                    }
                     if (msgArqueoGuardado) {
                         msgArqueoGuardado.classList.remove('hidden');
                         window.setTimeout(function () { msgArqueoGuardado.classList.add('hidden'); }, 2000);
