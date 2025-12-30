@@ -77,10 +77,12 @@ def create_app(config_class=Config):
                 else:
                     auto_bootstrap = bool(os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_PROJECT_ID') or os.environ.get('RAILWAY_SERVICE_ID'))
                 if auto_bootstrap:
-                    auto_reset = str(os.environ.get('AUTO_RESET_DB') or '').strip().lower() in ('1', 'true', 'yes', 'on')
                     from app.rls import bootstrap_schema
 
-                    bootstrap_schema(reset=auto_reset)
+                    # Never reset Postgres schema automatically at startup.
+                    # Schema resets are destructive (DROP SCHEMA public CASCADE) and must be
+                    # performed only via the explicit CLI command guarded by confirmation.
+                    bootstrap_schema(reset=False)
     except Exception:
         app.logger.exception('Failed to bootstrap Postgres schema')
 

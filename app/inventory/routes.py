@@ -4,6 +4,7 @@ import os
 from uuid import uuid4
 
 from flask import current_app, jsonify, render_template, request, url_for
+from flask import g
 from flask_login import login_required
 from sqlalchemy import func, or_
 from typing import Optional
@@ -13,6 +14,7 @@ from app import db
 from app.models import Category, InventoryLot, InventoryMovement, Product, Supplier
 from app.files.storage import upload_to_r2_and_create_asset
 from app.permissions import module_required, module_required_any
+from app.tenancy import ensure_request_context
 from app.inventory import bp
 
 
@@ -128,7 +130,15 @@ def list_categories_api():
     limit = int(request.args.get('limit') or 5000)
     if limit <= 0 or limit > 10000:
         limit = 5000
-    q = db.session.query(Category).filter(Category.parent_id == None)  # noqa: E711
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+
+    q = db.session.query(Category).filter(Category.company_id == cid, Category.parent_id == None)  # noqa: E711
     active = (request.args.get('active') or '').strip()
     if active in ('1', 'true', 'True'):
         q = q.filter(Category.active == True)  # noqa: E712
@@ -142,14 +152,26 @@ def list_categories_api():
 @module_required('inventory')
 def create_category_api():
     payload = request.get_json(silent=True) or {}
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     name = str(payload.get('name') or '').strip()
     if not name:
         return jsonify({'ok': False, 'error': 'name_required'}), 400
     norm = _normalize_name(name)
-    existing = db.session.query(Category).filter(func.lower(Category.name) == norm, Category.parent_id == None).first()  # noqa: E711
+    existing = (
+        db.session.query(Category)
+        .filter(Category.company_id == cid, func.lower(Category.name) == norm, Category.parent_id == None)
+        .first()
+    )  # noqa: E711
     if existing:
         return jsonify({'ok': False, 'error': 'already_exists', 'item': _serialize_category(existing)}), 400
-    row = Category(name=name, active=bool(payload.get('active', True)))
+    row = Category(company_id=cid, name=name, active=bool(payload.get('active', True)))
     db.session.add(row)
     db.session.commit()
     return jsonify({'ok': True, 'item': _serialize_category(row)})
