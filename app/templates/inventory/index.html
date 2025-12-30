@@ -641,6 +641,9 @@
                                     <button id="btn-open-create-cat" type="button" class="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700" title="Crear categoría">
                                         <i class="fas fa-plus"></i>
                                     </button>
+                                    <button id="btn-del-selected-cat" type="button" class="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-md border border-gray-200 bg-white hover:bg-red-50 text-red-600 disabled:opacity-40 disabled:hover:bg-white" title="Borrar categoría seleccionada" disabled>
+                                        <i class="fas fa-trash"></i>
+                                    </button>
                                 </div>
                             </div>
                             <div class="md:col-span-2">
@@ -1038,6 +1041,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const prodName = document.getElementById('prod-name');
     const prodCatId = document.getElementById('prod-cat-id');
+    const btnDelSelectedCat = document.getElementById('btn-del-selected-cat');
     const prodUnit = document.getElementById('prod-unit');
     const wrapProdUnit = document.getElementById('wrap-prod-unit');
     const prodUnitOther = document.getElementById('prod-unit-other');
@@ -1872,6 +1876,10 @@ document.addEventListener('DOMContentLoaded', function () {
             prodCatId.appendChild(opt);
         });
         prodCatId.value = cur;
+        try {
+            if (btnDelSelectedCat) btnDelSelectedCat.disabled = !String(prodCatId.value || '').trim();
+        } catch (e) {
+        }
     }
 
     function badgeStatus(st) {
@@ -2392,6 +2400,10 @@ document.addEventListener('DOMContentLoaded', function () {
     function clearProductForm() {
         if (prodName) prodName.value = '';
         if (prodCatId) prodCatId.value = '';
+        try {
+            if (btnDelSelectedCat) btnDelSelectedCat.disabled = true;
+        } catch (e) {
+        }
         if (prodUnit) prodUnit.value = 'Unidad';
         if (prodUnitOther) prodUnitOther.value = '';
         if (wrapProdUnit) wrapProdUnit.classList.add('hidden');
@@ -3559,6 +3571,57 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (btnOpenCreateCat) btnOpenCreateCat.addEventListener('click', openCreateCategory);
+    if (prodCatId) {
+        prodCatId.addEventListener('change', function () {
+            try {
+                if (btnDelSelectedCat) btnDelSelectedCat.disabled = !String(prodCatId.value || '').trim();
+            } catch (e) {
+            }
+        });
+    }
+    if (btnDelSelectedCat) {
+        btnDelSelectedCat.addEventListener('click', async function () {
+            const id = String(prodCatId?.value || '').trim();
+            if (!id) return;
+            const cats2 = Array.isArray(cacheCategories) ? cacheCategories : [];
+            const cat = cats2.find(c => String(c?.id || '') === id);
+            const name = String(cat?.name || '').trim() || 'esta categoría';
+            const ok = await (window.confirmModal ? window.confirmModal(
+                '¿Querés borrar "' + name + '"?',
+                'Borrar categoría',
+                'Esta acción no se puede deshacer.',
+                { okText: 'Borrar', cancelText: 'Cancelar' }
+            ) : Promise.resolve(window.confirm('¿Querés borrar "' + name + '"?')));
+            if (!ok) return;
+            apiDeleteCategory(id).then(function (res) {
+                if (!res || res.ok !== true) {
+                    const err = String(res?.error || '').trim();
+                    if (err === 'in_use') {
+                        if (window.showAlertModal) window.showAlertModal('No se puede borrar: hay productos usando esta categoría.', 'Atención', 'Operación bloqueada');
+                        else alert('No se puede borrar: hay productos usando esta categoría.');
+                    } else if (err === 'has_children') {
+                        if (window.showAlertModal) window.showAlertModal('No se puede borrar: la categoría tiene subcategorías.', 'Atención', 'Operación bloqueada');
+                        else alert('No se puede borrar: la categoría tiene subcategorías.');
+                    } else if (err === 'not_found') {
+                        if (window.showAlertModal) window.showAlertModal('La categoría no existe o ya fue borrada.', 'Atención', 'Operación');
+                        else alert('La categoría no existe o ya fue borrada.');
+                    } else {
+                        if (window.showAlertModal) window.showAlertModal('No se pudo borrar la categoría.', 'Error', 'Operación fallida');
+                        else alert('No se pudo borrar la categoría.');
+                    }
+                    return;
+                }
+                loadCategories(function () {
+                    if (prodCatId) prodCatId.value = '';
+                    refreshCategorySelect('');
+                    renderCategoryList();
+                });
+            }).catch(function () {
+                if (window.showAlertModal) window.showAlertModal('No se pudo borrar la categoría.', 'Error', 'Operación fallida');
+                else alert('No se pudo borrar la categoría.');
+            });
+        });
+    }
     if (btnCloseCreateCat) btnCloseCreateCat.addEventListener('click', closeCreateCategory);
     if (btnCancelCreateCat) btnCancelCreateCat.addEventListener('click', closeCreateCategory);
     if (btnSaveCreateCat) {
