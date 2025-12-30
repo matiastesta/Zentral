@@ -2314,7 +2314,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return null;
     }
 
-    const logoUrl = "{{ url_for('static', filename='images/zentra-consultora-horizontal.png.png') }}";
+    const logoUrl = "{% if business and business.logo_file_id %}{{ url_for('files.download_file_api', file_id=business.logo_file_id) }}{% elif business and business.logo_filename %}{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}{% else %}{{ url_for('static', filename='images/zentra-consultora-horizontal.png.png') }}{% endif %}";
     const defaultFecha = "{{ now.strftime('%Y-%m-%d') }}";
 
     function isPromise(x) {

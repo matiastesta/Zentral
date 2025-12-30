@@ -159,6 +159,13 @@ def _make_gift_code(ticket: str, items_list: list) -> str:
 
 
 def _image_url(p: Product):
+    file_id = str(getattr(p, 'image_file_id', '') or '').strip()
+    if file_id:
+        try:
+            return url_for('files.download_file_api', file_id=file_id)
+        except Exception:
+            current_app.logger.exception('Failed to generate image url')
+            return ''
     filename = str(getattr(p, 'image_filename', '') or '').strip()
     if not filename:
         return ''
