@@ -1,6 +1,7 @@
 import re
 
 from flask import g, request, session
+from flask_login import current_user
 
 from app import db
 from app.models import Company
@@ -21,6 +22,15 @@ def _host_subdomain(hostname: str | None) -> str | None:
 
 
 def resolve_company_slug() -> str | None:
+    try:
+        sr = str(getattr(request, 'script_root', '') or '').strip()
+        m = re.match(r'^/c/([^/]+)$', sr)
+        if m:
+            v = str(m.group(1) or '').strip().lower()
+            if v:
+                return v
+    except Exception:
+        pass
     qp = str(request.args.get('company') or '').strip().lower()
     if qp:
         return qp
@@ -43,6 +53,18 @@ def effective_company_id() -> str | None:
     cid = session.get('auth_company_id')
     if cid:
         return str(cid)
+
+    # If the session cookie is missing/rotated (common after deploy or with multiple replicas),
+    # Flask-Login may still restore the user from the remember cookie.
+    # In that case we must derive the tenant from the authenticated user, otherwise RLS will
+    # filter everything out and the UI will look "empty" intermittently.
+    try:
+        if getattr(current_user, 'is_authenticated', False) and str(getattr(current_user, 'role', '') or '') != 'zentral_admin':
+            u_cid = str(getattr(current_user, 'company_id', '') or '').strip()
+            if u_cid:
+                return u_cid
+    except Exception:
+        pass
 
     c = resolve_company()
     return str(c.id) if c else None
@@ -74,6 +96,11 @@ def ensure_request_context() -> None:
             imp = session.get('impersonate_company_id')
             if imp:
                 company = db.session.get(Company, str(imp))
+        if company is None and company_id:
+            # Prefer resolving by explicit company_id (session/user) when available.
+            # This is critical when multiple companies share the same host (e.g. Railway default domain),
+            # where slug resolution would always point to the host slug.
+            company = db.session.get(Company, str(company_id))
         if company is None:
             company = resolve_company()
 

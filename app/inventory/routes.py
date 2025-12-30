@@ -177,6 +177,40 @@ def create_category_api():
     return jsonify({'ok': True, 'item': _serialize_category(row)})
 
 
+@bp.delete('/api/categories/<int:category_id>')
+@login_required
+@module_required('inventory')
+def delete_category_api(category_id: int):
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    try:
+        cat_id = int(category_id)
+    except Exception:
+        return jsonify({'ok': False, 'error': 'invalid_id'}), 400
+
+    row = db.session.query(Category).filter(Category.company_id == cid, Category.id == cat_id).first()
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    child = db.session.query(Category.id).filter(Category.company_id == cid, Category.parent_id == row.id).first()
+    if child:
+        return jsonify({'ok': False, 'error': 'has_children'}), 400
+
+    used = db.session.query(Product.id).filter(Product.company_id == cid, Product.category_id == row.id).first()
+    if used:
+        return jsonify({'ok': False, 'error': 'in_use'}), 400
+
+    db.session.delete(row)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
 @bp.get('/api/products/<int:product_id>/method_lock')
 @login_required
 @module_required('inventory')

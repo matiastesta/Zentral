@@ -3,8 +3,9 @@ from datetime import datetime
 import secrets
 import string
 
-from flask import abort, current_app, flash, redirect, render_template, request, session, url_for
+from flask import abort, current_app, flash, redirect, render_template, request, session, url_for, jsonify
 from flask_login import current_user, login_required
+from sqlalchemy import func
 
 from app import db
 from app.models import (
@@ -20,6 +21,7 @@ from app.models import (
     ExpenseCategory,
     InventoryLot,
     InventoryMovement,
+    FileAsset,
     Product,
     Sale,
     SaleItem,
@@ -645,6 +647,59 @@ def clear_impersonation():
     session.pop('impersonate_company_id', None)
     flash('Modo soporte desactivado.', 'success')
     return redirect(url_for('superadmin.index'))
+
+
+@bp.get('/api/companies/<company_id>/stats')
+@login_required
+def company_stats_api(company_id: str):
+    _require_zentral_admin()
+    # Only allow while NOT impersonating; otherwise RLS context sets is_admin=0.
+    if session.get('impersonate_company_id'):
+        return {
+            'ok': False,
+            'error': 'impersonation_active',
+            'message': 'Salí del modo soporte para ver stats globales.'
+        }, 400
+
+    cid = str(company_id or '').strip()
+    c = db.session.get(Company, cid)
+    if not c:
+        return {'ok': False, 'error': 'not_found'}, 404
+
+    def _count(model):
+        try:
+            return int(db.session.query(func.count()).select_from(model).filter(model.company_id == cid).scalar() or 0)
+        except Exception:
+            return 0
+
+    payload = {
+        'ok': True,
+        'company': {
+            'id': str(c.id),
+            'name': str(getattr(c, 'name', '') or ''),
+            'slug': str(getattr(c, 'slug', '') or ''),
+            'status': str(getattr(c, 'status', '') or ''),
+        },
+        'counts': {
+            'users': _count(User),
+            'company_roles': _count(CompanyRole),
+            'business_settings': _count(BusinessSettings),
+            'categories': _count(Category),
+            'products': _count(Product),
+            'inventory_lots': _count(InventoryLot),
+            'inventory_movements': _count(InventoryMovement),
+            'sales': _count(Sale),
+            'sale_items': _count(SaleItem),
+            'customers': _count(Customer),
+            'suppliers': _count(Supplier),
+            'expenses': _count(Expense),
+            'expense_categories': _count(ExpenseCategory),
+            'calendar_events': _count(CalendarEvent),
+            'cash_counts': _count(CashCount),
+            'file_assets': _count(FileAsset),
+        },
+    }
+    return payload
 
 
 @bp.get('/companies/<company_id>/users')

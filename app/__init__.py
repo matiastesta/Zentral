@@ -3,7 +3,8 @@ import sys
 import time
 import uuid
 from datetime import datetime
-from flask import Flask, g, jsonify, render_template, request
+import re
+from flask import Flask, g, jsonify, render_template, request, redirect, session
 from flask_login import LoginManager
 from flask_babel import Babel
 from flask_sqlalchemy import SQLAlchemy
@@ -27,6 +28,30 @@ def create_app(config_class=Config):
             config_class = Config
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    try:
+        class _TenantPrefixMiddleware:
+            def __init__(self, wsgi_app):
+                self.wsgi_app = wsgi_app
+
+            def __call__(self, environ, start_response):
+                path = str(environ.get('PATH_INFO') or '')
+                # Tenant prefix format: /c/<slug>/...
+                m = re.match(r'^/c/([^/]+)(/.*)?$', path)
+                if m:
+                    slug = str(m.group(1) or '').strip().lower()
+                    rest = m.group(2) or '/'
+                    if not rest.startswith('/'):
+                        rest = '/' + rest
+                    prefix = '/c/' + slug
+                    environ['SCRIPT_NAME'] = prefix
+                    environ['PATH_INFO'] = rest
+                    environ['ZENTRAL_TENANT_SLUG'] = slug
+                return self.wsgi_app(environ, start_response)
+
+        app.wsgi_app = _TenantPrefixMiddleware(app.wsgi_app)
+    except Exception:
+        app.logger.exception('Failed to apply tenant prefix middleware')
 
     try:
         is_railway = bool(os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_PROJECT_ID') or os.environ.get('RAILWAY_SERVICE_ID'))
@@ -192,6 +217,64 @@ def create_app(config_class=Config):
         except Exception:
             g._request_start_ts = None
 
+    @app.before_request
+    def _enforce_tenant_prefix():
+        try:
+            if str(session.get('auth_is_zentral_admin') or '') == '1':
+                return None
+
+            # Use session-only checks to avoid triggering Flask-Login user loading
+            # before tenant context has been applied (can cause RLS to hide the user row).
+            cid = str(session.get('auth_company_id') or '').strip()
+            if not cid:
+                return None
+
+            script_root = ''
+            try:
+                script_root = str(getattr(request, 'script_root', '') or '').strip()
+            except Exception:
+                script_root = ''
+            slug = str(session.get('auth_company_slug') or '').strip().lower()
+            if not slug:
+                return None
+
+            # If user is already under /c/<other>, force them back to their tenant prefix.
+            if script_root.startswith('/c/'):
+                try:
+                    m = re.match(r'^/c/([^/]+)$', script_root)
+                    current_slug = str(m.group(1) or '').strip().lower() if m else ''
+                except Exception:
+                    current_slug = ''
+                if current_slug == slug:
+                    return None
+                try:
+                    path_info = str(request.environ.get('PATH_INFO') or '/')
+                except Exception:
+                    path_info = '/'
+                qs = ''
+                try:
+                    qs = str(request.query_string.decode('utf-8') if request.query_string else '')
+                except Exception:
+                    qs = ''
+                dest = '/c/' + slug + (path_info if path_info.startswith('/') else ('/' + path_info))
+                if qs:
+                    dest = dest + ('&' if '?' in dest else '?') + qs
+                return redirect(dest)
+
+            path = str(getattr(request, 'path', '') or '')
+            if path.startswith('/c/'):
+                return None
+            # Keep superadmin on root
+            if path.startswith('/superadmin'):
+                return None
+            # Avoid redirect loops on static
+            if path.startswith('/static'):
+                return None
+
+            return redirect('/c/' + slug + path)
+        except Exception:
+            return None
+
     @app.after_request
     def _log_request(response):
         try:
@@ -243,6 +326,66 @@ def create_app(config_class=Config):
                 user_id if user_id is not None else '',
                 role,
             )
+        except Exception:
+            pass
+        return response
+
+    @app.after_request
+    def _tenant_cookie_path_isolation(response):
+        try:
+            prefix = str(request.script_root or '').strip()
+        except Exception:
+            prefix = ''
+        if not prefix or not prefix.startswith('/c/'):
+            try:
+                slug = str(session.get('auth_company_slug') or '').strip().lower()
+            except Exception:
+                slug = ''
+            if slug:
+                prefix = '/c/' + slug
+        if not prefix or not prefix.startswith('/c/'):
+            return response
+        try:
+            cookies = response.headers.getlist('Set-Cookie')
+        except Exception:
+            cookies = []
+        if not cookies:
+            return response
+        patched = []
+        for c in cookies:
+            s = str(c or '')
+            if not s:
+                continue
+            if 'Path=' in s:
+                s = re.sub(r'(?i)\bPath=[^;]*', 'Path=' + prefix, s)
+            else:
+                s = s + '; Path=' + prefix
+            patched.append(s)
+        try:
+            del response.headers['Set-Cookie']
+        except Exception:
+            pass
+        for s in patched:
+            try:
+                response.headers.add('Set-Cookie', s)
+            except Exception:
+                pass
+
+        # Clear root-path cookies to avoid a global cookie overriding tenant-scoped cookies.
+        try:
+            session_cookie = str(current_app.config.get('SESSION_COOKIE_NAME') or 'session').strip() or 'session'
+        except Exception:
+            session_cookie = 'session'
+        try:
+            remember_cookie = str(current_app.config.get('REMEMBER_COOKIE_NAME') or 'remember_token').strip() or 'remember_token'
+        except Exception:
+            remember_cookie = 'remember_token'
+        try:
+            response.headers.add('Set-Cookie', f"{session_cookie}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/")
+        except Exception:
+            pass
+        try:
+            response.headers.add('Set-Cookie', f"{remember_cookie}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/")
         except Exception:
             pass
         return response
@@ -308,6 +451,40 @@ def create_app(config_class=Config):
             except Exception:
                 pass
             app.logger.exception('Failed to apply tenant context')
+
+    @app.before_request
+    def _guard_broken_login_state():
+        # If Flask-Login thinks there's a user but RLS/tenant settings hide that row,
+        # accessing current_user attributes can raise ObjectDeletedError.
+        # In that case, force logout and redirect to the correct tenant login.
+        try:
+            from flask_login import current_user, logout_user
+
+            if not getattr(current_user, 'is_authenticated', False):
+                return None
+            _ = str(getattr(current_user, 'role', '') or '')
+            return None
+        except Exception:
+            try:
+                from flask_login import logout_user
+
+                logout_user()
+            except Exception:
+                pass
+            try:
+                session.pop('auth_company_id', None)
+                session.pop('auth_company_slug', None)
+                session.pop('auth_is_zentral_admin', None)
+                session.pop('impersonate_company_id', None)
+            except Exception:
+                pass
+            try:
+                sr = str(getattr(request, 'script_root', '') or '').strip()
+            except Exception:
+                sr = ''
+            if sr.startswith('/c/'):
+                return redirect(sr + '/auth/login')
+            return redirect('/auth/login')
 
     @app.context_processor
     def inject_now():
@@ -378,7 +555,7 @@ def load_user(user_id):
         try:
             from app.db_context import apply_rls_context
 
-            apply_rls_context(is_login=True)
+            apply_rls_context(is_login=False)
         except Exception:
             try:
                 db.session.rollback()

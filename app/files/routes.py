@@ -8,11 +8,12 @@ from botocore.exceptions import BotoCoreError, ClientError
 from flask import current_app, g, jsonify, redirect, request, session
 from flask_login import login_required
 from flask_login import current_user
+from sqlalchemy import text
 from werkzeug.utils import secure_filename
 
 from app import db
 from app.files import bp
-from app.models import FileAsset
+from app.models import BusinessSettings, FileAsset
 
 
 def _require_company_id() -> str | None:
@@ -87,6 +88,91 @@ def debug_context_api():
         'impersonate_company_id': str(session.get('impersonate_company_id') or ''),
         'user_id': user_id,
         'role': role,
+    })
+
+
+@bp.get('/api/debug/db_settings')
+@login_required
+def debug_db_settings_api():
+    try:
+        row = db.session.execute(
+            text(
+                """
+                SELECT
+                    current_setting('app.company_slug', true) AS company_slug,
+                    current_setting('app.current_company_id', true) AS current_company_id,
+                    current_setting('app.is_zentral_admin', true) AS is_zentral_admin,
+                    current_setting('app.is_login', true) AS is_login,
+                    current_setting('app.login_email', true) AS login_email
+                """
+            )
+        ).mappings().first()
+    except Exception as e:
+        try:
+            current_app.logger.exception('Failed to read db_settings')
+        except Exception:
+            pass
+        return jsonify({'ok': False, 'error': 'db_error', 'detail': str(e)[:200]}), 400
+
+    payload = {
+        'ok': True,
+        'db_company_slug': str((row or {}).get('company_slug') or ''),
+        'db_current_company_id': str((row or {}).get('current_company_id') or ''),
+        'db_is_zentral_admin': str((row or {}).get('is_zentral_admin') or ''),
+        'db_is_login': str((row or {}).get('is_login') or ''),
+        'db_login_email': str((row or {}).get('login_email') or ''),
+    }
+    return jsonify(payload)
+
+
+@bp.get('/api/debug/business')
+@login_required
+def debug_business_api():
+    try:
+        cid = str(getattr(g, 'company_id', '') or '').strip()
+    except Exception:
+        cid = ''
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    bs = None
+    try:
+        bs = db.session.query(BusinessSettings).filter(BusinessSettings.company_id == cid).first()
+    except Exception:
+        bs = None
+
+    logo_id = str(getattr(bs, 'logo_file_id', '') or '').strip() if bs else ''
+    bg_id = str(getattr(bs, 'background_file_id', '') or '').strip() if bs else ''
+
+    logo_asset = None
+    bg_asset = None
+    try:
+        if logo_id:
+            logo_asset = db.session.query(FileAsset.id).filter(FileAsset.company_id == cid, FileAsset.id == logo_id).first()
+    except Exception:
+        logo_asset = None
+    try:
+        if bg_id:
+            bg_asset = db.session.query(FileAsset.id).filter(FileAsset.company_id == cid, FileAsset.id == bg_id).first()
+    except Exception:
+        bg_asset = None
+
+    return jsonify({
+        'ok': True,
+        'company_id': cid,
+        'business_exists': bool(bs is not None),
+        'business': {
+            'name': str(getattr(bs, 'name', '') or '') if bs else '',
+            'primary_color': str(getattr(bs, 'primary_color', '') or '') if bs else '',
+            'logo_file_id': logo_id,
+            'background_file_id': bg_id,
+            'background_brightness': getattr(bs, 'background_brightness', None) if bs else None,
+            'background_contrast': getattr(bs, 'background_contrast', None) if bs else None,
+        },
+        'assets': {
+            'logo_asset_exists': bool(logo_asset is not None) if logo_id else False,
+            'background_asset_exists': bool(bg_asset is not None) if bg_id else False,
+        }
     })
 
 

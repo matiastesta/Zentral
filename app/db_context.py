@@ -248,6 +248,12 @@ def configure_sqlite_tenant_guards() -> None:
     if _SQLITE_TENANT_GUARDS_CONFIGURED:
         return
 
+    def _is_sqlite() -> bool:
+        try:
+            return str(db.engine.url.drivername).startswith('sqlite')
+        except Exception:
+            return False
+
     def _from_table_name(f):
         try:
             n = str(getattr(f, 'name', '') or '').strip().lower()
@@ -266,6 +272,8 @@ def configure_sqlite_tenant_guards() -> None:
 
     @event.listens_for(Session, 'do_orm_execute')
     def _sqlite_tenant_filter(execute_state):
+        if not _is_sqlite():
+            return
         if not getattr(execute_state, 'is_select', False):
             return
         if not has_request_context():
@@ -375,6 +383,8 @@ def configure_sqlite_tenant_guards() -> None:
 
     @event.listens_for(Session, 'before_flush')
     def _sqlite_tenant_write_guard(sess, flush_context, instances):
+        if not _is_sqlite():
+            return
         if not has_request_context():
             return
 

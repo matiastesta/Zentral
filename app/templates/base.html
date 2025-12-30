@@ -629,6 +629,31 @@
 
     <script>
         (function () {
+            try {
+                const sr = (String('{{ request.script_root or "" }}') || '').trim();
+                if (sr && sr.startsWith('/c/')) {
+                    const origFetch = window.fetch;
+                    window.fetch = function (input, init) {
+                        try {
+                            if (typeof input === 'string') {
+                                const url = input;
+                                if (url.startsWith('/') && !url.startsWith(sr + '/')) {
+                                    input = sr + url;
+                                }
+                            } else if (input && typeof input === 'object' && input.url) {
+                                const url = String(input.url || '');
+                                if (url.startsWith('/') && !url.startsWith(sr + '/')) {
+                                    input = new Request(sr + url, input);
+                                }
+                            }
+                        } catch (e) {
+                        }
+                        return origFetch(input, init);
+                    };
+                }
+            } catch (e) {
+            }
+
             function getStorageKey(key) {
                 return 'kpi_collapsed_' + String(key || '').trim();
             }

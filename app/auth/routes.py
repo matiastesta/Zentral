@@ -81,16 +81,25 @@ def login():
             pass
 
         is_zentral_admin = str(getattr(user, 'role', '') or '') == 'zentral_admin'
-        remember_flag = bool(is_zentral_admin or (getattr(form, 'remember_me', None) and form.remember_me.data))
+        # IMPORTANT: For tenant users, do not use remember cookies.
+        # If the session cookie is lost/rotated (deploy, multiple replicas), Flask-Login may restore
+        # a different user from the remember cookie (typically the last login in that browser),
+        # which makes the UI look like it "switched companies".
+        remember_flag = bool(is_zentral_admin)
         login_user(user, remember=remember_flag)
 
         session.pop('impersonate_company_id', None)
         if is_zentral_admin:
             session['auth_is_zentral_admin'] = '1'
             session.pop('auth_company_id', None)
+            session.pop('auth_company_slug', None)
         else:
             session['auth_is_zentral_admin'] = '0'
             session['auth_company_id'] = str(getattr(user, 'company_id', '') or '').strip()
+            try:
+                session['auth_company_slug'] = str(getattr(c, 'slug', '') or '').strip().lower()
+            except Exception:
+                session.pop('auth_company_slug', None)
 
         return redirect(url_for('main.index'))
     return render_template('auth/login.html', title='Iniciar Sesión', form=form)
@@ -100,8 +109,10 @@ def logout():
     logout_user()
     session.pop('auth_is_zentral_admin', None)
     session.pop('auth_company_id', None)
+    session.pop('auth_company_slug', None)
     session.pop('impersonate_company_id', None)
-    return redirect(url_for('auth.login'))
+    # Redirect to non-tenant login so the URL doesn't keep /c/<slug> after logout.
+    return redirect('/auth/login')
 
 @bp.route('/register', methods=['GET', 'POST'])
 def register():
