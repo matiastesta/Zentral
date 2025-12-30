@@ -1,7 +1,7 @@
 from datetime import date as dt_date
 from uuid import uuid4
 
-from flask import jsonify, render_template, request
+from flask import g, jsonify, render_template, request
 from flask_login import login_required
 from sqlalchemy import and_, func, or_
 
@@ -43,6 +43,11 @@ def _serialize_employee(row: Employee):
         'notes': row.notes or '',
         'active': bool(row.active),
     }
+
+
+def _get_company_id() -> str | None:
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    return cid or None
 
 
 @bp.route('/')
@@ -127,7 +132,11 @@ def list_employees_api():
     if limit <= 0 or limit > 5000:
         limit = 2000
 
-    query = db.session.query(Employee)
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    query = db.session.query(Employee).filter(Employee.company_id == company_id)
     if q:
         like = f"%{q}%"
         query = query.filter(
@@ -148,8 +157,11 @@ def list_employees_api():
 @login_required
 @module_required('employees')
 def get_employee_api(employee_id):
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
     eid = str(employee_id or '').strip()
-    row = db.session.get(Employee, eid)
+    row = db.session.query(Employee).filter(Employee.company_id == company_id, Employee.id == eid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     return jsonify({'ok': True, 'item': _serialize_employee(row)})
@@ -159,8 +171,11 @@ def get_employee_api(employee_id):
 @login_required
 @module_required('employees')
 def employee_legajo_api(employee_id):
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
     eid = str(employee_id or '').strip()
-    row = db.session.get(Employee, eid)
+    row = db.session.query(Employee).filter(Employee.company_id == company_id, Employee.id == eid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
@@ -182,7 +197,12 @@ def employee_legajo_api(employee_id):
         match_filter = (Expense.employee_id == eid)
     category_filter = or_(Expense.category.ilike('%nomina%'), Expense.category.ilike('%nómina%'))
 
-    base_query = db.session.query(Expense).filter(match_filter).filter(category_filter)
+    base_query = (
+        db.session.query(Expense)
+        .filter(Expense.company_id == company_id)
+        .filter(match_filter)
+        .filter(category_filter)
+    )
 
     today = dt_date.today()
     month_start = today.replace(day=1)
@@ -193,12 +213,14 @@ def employee_legajo_api(employee_id):
 
     all_total = (
         db.session.query(func.coalesce(func.sum(Expense.amount), 0.0))
+        .filter(Expense.company_id == company_id)
         .filter(match_filter)
         .filter(category_filter)
         .scalar()
     )
     month_total = (
         db.session.query(func.coalesce(func.sum(Expense.amount), 0.0))
+        .filter(Expense.company_id == company_id)
         .filter(match_filter)
         .filter(category_filter)
         .filter(Expense.expense_date >= month_start)
@@ -253,11 +275,19 @@ def create_employee_api():
     payload = request.get_json(silent=True) or {}
     eid = str(payload.get('id') or '').strip() or uuid4().hex
 
-    row = db.session.get(Employee, eid)
-    if row:
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    # Prevent cross-tenant collisions (id is global PK)
+    existing = db.session.get(Employee, eid)
+    if existing:
+        if str(existing.company_id or '').strip() != company_id:
+            return jsonify({'ok': False, 'error': 'forbidden'}), 403
         return jsonify({'ok': False, 'error': 'already_exists'}), 400
 
     row = Employee(id=eid)
+    row.company_id = company_id
     _apply_employee_payload(row, payload)
     db.session.add(row)
 
@@ -273,8 +303,11 @@ def create_employee_api():
 @login_required
 @module_required('employees')
 def update_employee_api(employee_id):
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
     eid = str(employee_id or '').strip()
-    row = db.session.get(Employee, eid)
+    row = db.session.query(Employee).filter(Employee.company_id == company_id, Employee.id == eid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
@@ -293,8 +326,11 @@ def update_employee_api(employee_id):
 @login_required
 @module_required('employees')
 def delete_employee_api(employee_id):
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
     eid = str(employee_id or '').strip()
-    row = db.session.get(Employee, eid)
+    row = db.session.query(Employee).filter(Employee.company_id == company_id, Employee.id == eid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     row.active = False
@@ -317,13 +353,22 @@ def upsert_employees_bulk():
     items = payload.get('items')
     items_list = items if isinstance(items, list) else []
 
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     out = []
     for it in items_list:
         d = it if isinstance(it, dict) else {}
         eid = str(d.get('id') or '').strip() or uuid4().hex
-        row = db.session.get(Employee, eid)
+        existing = db.session.get(Employee, eid)
+        if existing and str(existing.company_id or '').strip() != company_id:
+            return jsonify({'ok': False, 'error': 'forbidden'}), 403
+
+        row = existing
         if not row:
             row = Employee(id=eid)
+            row.company_id = company_id
             db.session.add(row)
         _apply_employee_payload(row, d)
         out.append(row)
