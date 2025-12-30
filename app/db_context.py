@@ -145,12 +145,22 @@ def apply_rls_context(*, is_login: bool, login_email: str | None = None) -> None
         conn = db.session.connection()
         _apply_rls_settings_payload_on_connection(conn, settings=initial_settings)
 
+        try:
+            g._rls_settings_payload = dict(initial_settings)
+        except Exception:
+            pass
+
         ensure_request_context()
         resolved_cid = str(getattr(g, 'company_id', None) or '').strip()
         if resolved_cid and resolved_cid != str(cid_from_session or '').strip():
             updated = dict(initial_settings)
             updated['cid'] = resolved_cid
             _apply_rls_settings_payload_on_connection(conn, settings=updated)
+
+            try:
+                g._rls_settings_payload = dict(updated)
+            except Exception:
+                pass
     except Exception as e:
         if isinstance(e, ProgrammingError) or _is_missing_company_table(e):
             try:
@@ -190,7 +200,39 @@ def configure_session_tenant_context_hooks() -> None:
             login_email = ''
 
         try:
-            _apply_rls_settings_on_connection(connection, is_login=is_login, login_email=login_email)
+            # IMPORTANT: do not call ensure_request_context() (or any ORM query) here.
+            # after_begin fires while the Session is provisioning a new connection and
+            # concurrent ORM operations are not permitted.
+            payload = None
+            try:
+                payload = getattr(g, '_rls_settings_payload', None)
+            except Exception:
+                payload = None
+
+            if not isinstance(payload, dict):
+                slug = resolve_company_slug() or ''
+                try:
+                    is_admin_v = '1' if (session.get('auth_is_zentral_admin') == '1') else '0'
+                except Exception:
+                    is_admin_v = '0'
+                try:
+                    cid = ''
+                    if is_admin_v == '1':
+                        cid = str(session.get('impersonate_company_id') or '').strip()
+                    if not cid:
+                        cid = str(session.get('auth_company_id') or '').strip()
+                except Exception:
+                    cid = ''
+
+                payload = {
+                    'slug': slug,
+                    'cid': cid,
+                    'is_admin': is_admin_v,
+                    'is_login': '1' if is_login else '0',
+                    'login_email': (str(login_email or '').strip().lower() if is_login else ''),
+                }
+
+            _apply_rls_settings_payload_on_connection(connection, settings=payload)
         except Exception:
             try:
                 sess.rollback()
