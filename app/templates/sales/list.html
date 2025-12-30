@@ -169,16 +169,16 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
                                 <label class="block font-medium text-gray-600 mb-1 text-xs">Apertura</label>
-                                <input id="monto-apertura" type="number" class="w-full px-3 py-2 border rounded-md text-sm" placeholder="Ej: 50000">
+                                <input id="monto-apertura" type="text" inputmode="decimal" class="w-full px-3 py-2 border rounded-md text-sm" placeholder="$0" data-currency="ars">
                             </div>
                             <div>
                                 <label class="block font-medium text-gray-600 mb-1 text-xs">Efectivo del día (calculado)</label>
-                                <input id="monto-efectivo-dia" type="number" class="w-full px-3 py-2 border rounded-md text-sm bg-gray-50" placeholder="Se calcula solo" readonly>
+                                <input id="monto-efectivo-dia" type="text" inputmode="decimal" class="w-full px-3 py-2 border rounded-md text-sm bg-gray-50" placeholder="Se calcula solo" readonly data-currency="ars">
                                 <div class="mt-1 text-xs text-gray-500 whitespace-nowrap">Ventas en efectivo – Egresos en efectivo</div>
                             </div>
                             <div>
                                 <label class="block font-medium text-gray-600 mb-1 text-xs">Cierre</label>
-                                <input id="monto-cierre" type="number" class="w-full px-3 py-2 border rounded-md text-sm" placeholder="Ej: 70000">
+                                <input id="monto-cierre" type="text" inputmode="decimal" class="w-full px-3 py-2 border rounded-md text-sm" placeholder="$0" data-currency="ars">
                             </div>
                         </div>
 
@@ -331,15 +331,15 @@
                     <div class="p-3 border border-gray-200 rounded-lg">
                         <div class="flex items-center justify-between gap-2">
                             <div class="text-[11px] text-gray-500">Total del ticket</div>
-                            <div id="cc-total" class="text-sm font-semibold text-gray-900">$0,00</div>
+                            <div id="cc-total" class="text-sm font-semibold text-gray-900">$0</div>
                         </div>
                         <div class="mt-3 flex items-center justify-between gap-2">
                             <label class="text-[11px] text-gray-600">Abona ahora</label>
-                            <input id="cc-paid" type="number" min="0" step="0.01" class="w-32 px-2 py-1 border rounded-md text-right text-sm" value="0">
+                            <input id="cc-paid" type="text" inputmode="decimal" class="w-32 px-2 py-1 border rounded-md text-right text-sm" value="$0" data-currency="ars">
                         </div>
                         <div class="mt-2 flex items-center justify-between gap-2">
                             <span class="text-[11px] text-gray-600">Saldo a deber</span>
-                            <span id="cc-due" class="px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-100 text-[11px] font-semibold">$0,00</span>
+                            <span id="cc-due" class="px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-100 text-[11px] font-semibold">$0</span>
                         </div>
                     </div>
                 </div>
@@ -2178,7 +2178,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function recalcularArqueoAutomatico() {
         if (!montoEfectivoDia) return;
         const efectivo = calcularEfectivoDelDiaDesdeHistorial();
-        montoEfectivoDia.value = (isNaN(efectivo) ? 0 : efectivo).toFixed(2);
+        setMonedaARSInput(montoEfectivoDia, (isNaN(efectivo) ? 0 : efectivo));
         validarCierreArqueo();
     }
 
@@ -2196,7 +2196,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function formatearMoneda(valor) {
         const numero = isNaN(valor) ? 0 : valor;
-        return '$' + numero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (window.formatCurrencyARS) return window.formatCurrencyARS(numero);
+        const abs = Math.abs(numero);
+        const formatted = abs.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        return (numero < 0 ? '-$' : '$') + formatted;
     }
 
     function formatFechaDisplay(raw) {
@@ -2249,6 +2252,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const n = parseFloat(s);
         return isNaN(n) ? 0 : n;
+    }
+
+    function parseMonedaARSInput(value) {
+        if (window.parseCurrencyARS) return window.parseCurrencyARS(value);
+        return parseNumeroFlexible(value);
+    }
+
+    function setMonedaARSInput(el, value) {
+        if (!el) return;
+        const n = (typeof value === 'number') ? value : parseMonedaARSInput(value);
+        if (window.formatCurrencyARS) {
+            el.value = window.formatCurrencyARS(n);
+        } else {
+            const x = isNaN(n) ? 0 : n;
+            const abs = Math.abs(x);
+            el.value = (x < 0 ? '-$' : '$') + abs.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        }
     }
 
     function parseDateToTs(raw) {
@@ -3008,11 +3028,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (ccCliente) ccCliente.textContent = selectedCustomer.name || '—';
         if (ccTotal) ccTotal.textContent = formatearMoneda(total);
-        if (ccPaid) ccPaid.value = String(Math.max(0, Math.min(total, cambioPaidAmount || 0)));
-        if (ccDue) ccDue.textContent = formatearMoneda(Math.max(0, total - (parseFloat(ccPaid?.value || '0') || 0)));
+        setMonedaARSInput(ccPaid, Math.max(0, Math.min(total, cambioPaidAmount || 0)));
+        if (ccDue) ccDue.textContent = formatearMoneda(Math.max(0, total - (parseMonedaARSInput(ccPaid?.value || '0') || 0)));
         if (ccError) ccError.classList.add('hidden');
 
-        const dueNow = Math.max(0, total - (parseFloat(ccPaid?.value || '0') || 0));
+        const dueNow = Math.max(0, total - (parseMonedaARSInput(ccPaid?.value || '0') || 0));
         updateCcDebtInfo(dueNow, debt);
 
         apiDebtSummary(selectedCustomer).then(function (ds) {
@@ -3301,11 +3321,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (ccCliente) ccCliente.textContent = selectedCustomer.name || '—';
         if (ccTotal) ccTotal.textContent = formatearMoneda(total);
-        if (ccPaid) ccPaid.value = String(Math.max(0, Math.min(total, ventaPaidAmount || 0)));
-        if (ccDue) ccDue.textContent = formatearMoneda(Math.max(0, total - (parseFloat(ccPaid?.value || '0') || 0)));
+        setMonedaARSInput(ccPaid, Math.max(0, Math.min(total, ventaPaidAmount || 0)));
+        if (ccDue) ccDue.textContent = formatearMoneda(Math.max(0, total - (parseMonedaARSInput(ccPaid?.value || '0') || 0)));
         if (ccError) ccError.classList.add('hidden');
 
-        const dueNow = Math.max(0, total - (parseFloat(ccPaid?.value || '0') || 0));
+        const dueNow = Math.max(0, total - (parseMonedaARSInput(ccPaid?.value || '0') || 0));
         updateCcDebtInfo(dueNow, debt);
 
         apiDebtSummary(selectedCustomer).then(function (ds) {
@@ -3341,7 +3361,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function syncCcDuePreview() {
         const total = (ccContext === 'cambio') ? (ccTargetTotal || 0) : (computeTicketTotals().total || 0);
-        const paid = parseFloat(String(ccPaid?.value || '0').replace(',', '.')) || 0;
+        const paid = parseMonedaARSInput(ccPaid?.value || '0') || 0;
         const due = Math.max(0, total - Math.max(0, paid));
         if (ccDue) ccDue.textContent = formatearMoneda(due);
         updateCcDebtInfo(due);
@@ -3372,12 +3392,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function acceptCuentaCorriente() {
         const total = (ccContext === 'cambio') ? (ccTargetTotal || 0) : (computeTicketTotals().total || 0);
-        let paid = parseFloat(String(ccPaid?.value || '0').replace(',', '.')) || 0;
+        let paid = parseMonedaARSInput(ccPaid?.value || '0') || 0;
         if (paid < 0) paid = 0;
         if (paid > total) paid = total;
         const due = Math.max(0, total - paid);
 
-        if (ccPaid) ccPaid.value = String(paid.toFixed(2));
+        setMonedaARSInput(ccPaid, paid);
         if (ccDue) ccDue.textContent = formatearMoneda(due);
 
         if (ccContext === 'cambio') {
@@ -4089,6 +4109,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function parseMoneda(texto) {
         if (texto === null || texto === undefined) return 0;
+        if (window.parseCurrencyARS) return window.parseCurrencyARS(texto);
         const limpio = String(texto)
             .replace(/\s/g, '')
             .replace(/\$/g, '')
@@ -4247,13 +4268,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                if (montoApertura) montoApertura.value = String(item.opening_amount ?? '');
-                if (montoCierre) montoCierre.value = String(item.closing_amount ?? '');
-                if (montoEfectivoDia) montoEfectivoDia.value = String(item.cash_day_amount ?? '');
+                setMonedaARSInput(montoApertura, item.opening_amount ?? '');
+                setMonedaARSInput(montoCierre, item.closing_amount ?? '');
+                setMonedaARSInput(montoEfectivoDia, item.cash_day_amount ?? '');
                 if (selectArqueoEmployee) selectArqueoEmployee.value = String(item.employee_id || '');
                 arqueoLastSavedAtMs = parseIsoToMs(item.updated_at) || 0;
-                const openingV = parseFloat(item.opening_amount || 0) || 0;
-                const closingV = parseFloat(item.closing_amount || 0) || 0;
+                const openingV = parseMonedaARSInput(item.opening_amount || 0) || 0;
+                const closingV = parseMonedaARSInput(item.closing_amount || 0) || 0;
                 const hasEmployee = String(item.employee_id || '').trim().length > 0;
                 const hasOpening = openingV > 0;
                 const hasClosing = closingV > 0;
@@ -4273,8 +4294,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function validarCierreArqueo() {
         if (!montoApertura || !montoCierre || !montoEfectivoDia) return;
-        const apertura = parseFloat(montoApertura.value || '0') || 0;
-        const efectivoDia = parseFloat(montoEfectivoDia.value || '0') || 0;
+        const apertura = parseMonedaARSInput(montoApertura.value || '0') || 0;
+        const efectivoDia = parseMonedaARSInput(montoEfectivoDia.value || '0') || 0;
         const cierreStr = (montoCierre.value || '').trim();
         // No mostrar validación hasta que el usuario ingrese el cierre
         if (!cierreStr) {
@@ -4283,7 +4304,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (msgArqueoDetalle) msgArqueoDetalle.classList.add('hidden');
             return;
         }
-        const cierre = parseFloat(cierreStr) || 0;
+        const cierre = parseMonedaARSInput(cierreStr || '0') || 0;
 
         const cierreIdeal = apertura + efectivoDia;
         const diferencia = Math.abs(cierreIdeal - cierre);
@@ -5039,6 +5060,7 @@ document.addEventListener('DOMContentLoaded', function() {
         btnGuardarArqueo.addEventListener('click', function() {
             // Asegurar cálculo y validación antes de guardar
             recalcularArqueoAutomatico();
+            validarCierreArqueo();
 
             if (msgArqueoEmployeeRequired) msgArqueoEmployeeRequired.classList.add('hidden');
             const employeeId = String(selectArqueoEmployee?.value || '').trim();
@@ -5051,14 +5073,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const fecha = String(document.getElementById('fecha-arqueo')?.value || '').trim();
             if (!fecha) return;
 
-            const opening = parseFloat(montoApertura.value || '0') || 0;
-            const cashDay = parseFloat(montoEfectivoDia.value || '0') || 0;
-            const closing = parseFloat(montoCierre.value || '0') || 0;
+            const opening = parseMonedaARSInput(montoApertura.value || '0') || 0;
+            const cashDay = parseMonedaARSInput(montoEfectivoDia.value || '0') || 0;
+            const closing = parseMonedaARSInput(montoCierre.value || '0') || 0;
 
             fetch('/sales/api/cash-count', {
                 method: 'POST',
-                credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
                 body: JSON.stringify({
                     date: fecha,
                     employee_id: employeeId,
@@ -5089,8 +5111,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         return;
                     }
                     arqueoLastSavedAtMs = Date.now();
-                    const opening = parseFloat(montoApertura.value || '0') || 0;
-                    const closing = parseFloat(montoCierre.value || '0') || 0;
+                    const opening = parseMonedaARSInput(montoApertura.value || '0') || 0;
+                    const closing = parseMonedaARSInput(montoCierre.value || '0') || 0;
                     const employeeId = String(selectArqueoEmployee?.value || '').trim();
                     if (employeeId && opening > 0 && !(closing > 0)) {
                         setArqueoBadge('falta_cierre');

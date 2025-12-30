@@ -116,7 +116,7 @@
                     </div>
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Costo unitario</label>
-                        <input id="edit-lot-cu" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
+                        <input id="edit-lot-cu" type="text" inputmode="decimal" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="$0" data-currency="ars">
                     </div>
 
                     <div class="md:col-span-4">
@@ -669,67 +669,64 @@
                             </div>
                             <div class="md:col-span-3">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Precio de Lista</label>
-                                <input id="prod-sale-price" type="number" min="0" step="0.01" class="w-full h-10 px-3 py-2 text-sm border rounded-md" placeholder="0">
-                            </div>
-                            <div class="md:col-span-4">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor principal (opcional)</label>
-                                <div class="relative">
-                                    <input id="prod-primary-supplier" type="text" class="w-full h-10 px-2 py-2 text-sm border rounded-md bg-white" placeholder="Buscar y seleccionar proveedor" autocomplete="off">
-                                    <input id="prod-primary-supplier-id" type="hidden" value="">
-                                </div>
-                                <div class="mt-2 flex gap-2">
-                                    <a id="link-create-supplier-product" href="{{ url_for('suppliers.new') }}" class="flex-1 text-center px-2 py-1.5 text-xs font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50">Crear</a>
-                                    <button id="btn-select-supplier-product" type="button" class="flex-1 px-2 py-1.5 text-xs font-medium rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">Seleccionar</button>
-                                </div>
-                                <div class="mt-1 text-[5px] leading-none text-gray-500" style="font-size:11px;line-height:1;">Autocompleta al cargar un lote.</div>
+                                <input id="prod-sale-price" type="text" inputmode="decimal" class="w-full h-10 px-3 py-2 text-sm border rounded-md" placeholder="$0" data-currency="ars">
                             </div>
                         </div>
                     </div>
 
                     <div>
-                        <div class="text-sm font-semibold text-gray-900">Imagen del producto</div>
-                        <div class="mt-2 grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
-                            <div class="md:col-span-3">
-                                <div class="h-24 w-24 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
-                                    <img id="prod-image-preview" src="" alt="" class="h-full w-full object-cover hidden">
-                                    <div id="prod-image-placeholder" class="text-gray-400 text-sm"><i class="fas fa-image"></i></div>
-                                </div>
-                            </div>
-                            <div class="md:col-span-9">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Subir imagen (PNG/JPG)</label>
-                                <input id="prod-image" type="file" accept="image/png,image/jpeg" class="w-full text-sm">
-                                <div class="mt-1 text-[5px] leading-none text-gray-500" style="font-size:11px;line-height:1;">Opcional. Si no cargás imagen, se mostrará un placeholder. Podés editarla cuando quieras.</div>
-                            </div>
-                        </div>
+                        <button id="btn-toggle-prod-extra" type="button" class="w-full inline-flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50" aria-expanded="false">
+                            <span>Información Complementaria</span>
+                            <i id="icon-toggle-prod-extra" class="fas fa-chevron-down text-gray-500"></i>
+                        </button>
                     </div>
 
-                    <div>
-                        <div class="text-sm font-semibold text-gray-900">Configuración de stock</div>
-                        <div class="mt-2 grid grid-cols-1 md:grid-cols-12 gap-3">
-                            <div class="md:col-span-3">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Maneja lotes</label>
-                                <label class="w-full inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-md bg-white cursor-pointer select-none">
-                                    <input id="prod-lots" type="checkbox" class="rounded border-gray-300" checked>
-                                    <span id="prod-lots-label" class="text-sm text-gray-700">Sí</span>
-                                </label>
+                    <div id="prod-extra" class="hidden space-y-4">
+                        <div>
+                            <div class="text-sm font-semibold text-gray-900">Imagen del producto</div>
+                            <div class="mt-2 grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                                <div class="md:col-span-3">
+                                    <div class="h-24 w-24 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
+                                        <img id="prod-image-preview" src="" alt="" class="h-full w-full object-cover hidden">
+                                        <div id="prod-image-placeholder" class="text-gray-400 text-sm"><i class="fas fa-image"></i></div>
+                                    </div>
+                                </div>
+                                <div class="md:col-span-9">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Subir imagen (PNG/JPG)</label>
+                                    <input id="prod-image" type="file" accept="image/png,image/jpeg" class="w-full text-sm">
+                                    <div class="mt-1 text-[5px] leading-none text-gray-500" style="font-size:11px;line-height:1;">Opcional. Si no cargás imagen, se mostrará un placeholder. Podés editarla cuando quieras.</div>
+                                </div>
                             </div>
-                            <div class="md:col-span-3">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Metodología</label>
-                                <select id="prod-method" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                                    <option value="FIFO">PEPS</option>
-                                    <option value="Average">Costo promedio</option>
-                                </select>
-                                <div id="prod-method-lock-msg" class="hidden mt-1 text-[9px] leading-tight text-amber-700">La metodología no puede modificarse una vez que el producto tiene movimientos.</div>
-                            </div>
-                            <div class="md:col-span-3">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Stock mínimo</label>
-                                <input id="prod-min" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
-                                <div class="mt-1 text-[5px] leading-none text-gray-500" style="font-size:11px;line-height:1;">Alerta crítica.</div>
-                            </div>
-                            <div class="md:col-span-3">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Punto de pedido</label>
-                                <input id="prod-reorder" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
-                                <div class="mt-1 text-[5px] leading-none text-gray-500" style="font-size:11px;line-height:1;">Alerta preventiva (“Reponer”).</div>
+                        </div>
+
+                        <div>
+                            <div class="text-sm font-semibold text-gray-900">Configuración de stock</div>
+                            <div class="mt-2 grid grid-cols-1 md:grid-cols-12 gap-3">
+                                <div class="md:col-span-3">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Maneja lotes</label>
+                                    <label class="w-full inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-md bg-white cursor-pointer select-none">
+                                        <input id="prod-lots" type="checkbox" class="rounded border-gray-300" checked>
+                                        <span id="prod-lots-label" class="text-sm text-gray-700">Sí</span>
+                                    </label>
+                                </div>
+                                <div class="md:col-span-3">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Metodología</label>
+                                    <select id="prod-method" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                                        <option value="FIFO">PEPS</option>
+                                        <option value="Average">Costo promedio</option>
+                                    </select>
+                                    <div id="prod-method-lock-msg" class="hidden mt-1 text-[9px] leading-tight text-amber-700">La metodología no puede modificarse una vez que el producto tiene movimientos.</div>
+                                </div>
+                                <div class="md:col-span-3">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Stock mínimo</label>
+                                    <input id="prod-min" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
+                                    <div class="mt-1 text-[5px] leading-none text-gray-500" style="font-size:11px;line-height:1;">Alerta crítica.</div>
+                                </div>
+                                <div class="md:col-span-3">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Punto de pedido</label>
+                                    <input id="prod-reorder" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
+                                    <div class="mt-1 text-[5px] leading-none text-gray-500" style="font-size:11px;line-height:1;">Alerta preventiva (“Reponer”).</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -766,7 +763,7 @@
 
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Costo unitario</label>
-                        <input id="lot-cu" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
+                        <input id="lot-cu" type="text" inputmode="decimal" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="$0" data-currency="ars">
                     </div>
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
@@ -774,7 +771,7 @@
                     </div>
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Costo total</label>
-                        <input id="lot-ct" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" value="$0,00" readonly>
+                        <input id="lot-ct" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" value="$0" readonly>
                     </div>
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Vencimiento</label>
@@ -1043,12 +1040,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const prodMin = document.getElementById('prod-min');
     const prodReorder = document.getElementById('prod-reorder');
     const prodDesc = document.getElementById('prod-desc');
-    const prodPrimarySupplier = document.getElementById('prod-primary-supplier');
-    const prodPrimarySupplierId = document.getElementById('prod-primary-supplier-id');
-    const btnSelectSupplierProduct = document.getElementById('btn-select-supplier-product');
-    const linkCreateSupplierProduct = document.getElementById('link-create-supplier-product');
     const btnSaveProduct = document.getElementById('btn-save-product');
     const prodSalePrice = document.getElementById('prod-sale-price');
+    const btnToggleProdExtra = document.getElementById('btn-toggle-prod-extra');
+    const iconToggleProdExtra = document.getElementById('icon-toggle-prod-extra');
+    const prodExtra = document.getElementById('prod-extra');
 
     const lotProduct = document.getElementById('lot-product');
     const lotDate = document.getElementById('lot-date');
@@ -1134,7 +1130,7 @@ document.addEventListener('DOMContentLoaded', function () {
              if (prodMethod && d.method != null) prodMethod.value = String(d.method || 'FIFO') || 'FIFO';
              if (prodMin && d.min_stock != null) prodMin.value = String(d.min_stock ?? '');
              if (prodReorder && d.reorder_point != null) prodReorder.value = String(d.reorder_point ?? '');
-             if (prodSalePrice && d.sale_price != null) prodSalePrice.value = String(d.sale_price ?? '');
+             if (prodSalePrice && d.sale_price != null) prodSalePrice.value = formatMonedaARS(parseMonedaARS(d.sale_price));
 
              syncProductToggleLabels();
              sessionStorage.removeItem(PRODUCT_DRAFT_KEY);
@@ -1182,6 +1178,26 @@ document.addEventListener('DOMContentLoaded', function () {
     function parseNumeroSeguro(v) {
         const n = parseFloat(String(v ?? '').replace(',', '.'));
         return isNaN(n) ? 0 : n;
+    }
+
+    function parseMonedaARS(v) {
+        if (window.parseCurrencyARS) return window.parseCurrencyARS(v);
+        const s = String(v ?? '').replace(/\$/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+        const n = parseFloat(s);
+        return isNaN(n) ? 0 : n;
+    }
+
+    function formatMonedaARS(v) {
+        if (window.formatCurrencyARS) return window.formatCurrencyARS(v);
+        const n = parseFloat(String(v ?? 0));
+        const x = isNaN(n) ? 0 : n;
+        try {
+            const abs = Math.abs(x);
+            const formatted = abs.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            return (x < 0 ? '-$' : '$') + formatted;
+        } catch (e) {
+            return (x < 0 ? '-$' : '$') + String(Math.abs(x));
+        }
     }
 
     function openAddLot() {
@@ -1603,10 +1619,7 @@ document.addEventListener('DOMContentLoaded', function () {
             suppressSupplierInputClear = false;
             return;
         }
-        suppressSupplierInputClear = true;
-        if (prodPrimarySupplierId) prodPrimarySupplierId.value = id;
-        if (prodPrimarySupplier) prodPrimarySupplier.value = name;
-        suppressSupplierInputClear = false;
+        return;
     }
 
     function renderSupplierModalList(q) {
@@ -2386,8 +2399,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (prodUnitOther) prodUnitOther.value = '';
         if (wrapProdUnit) wrapProdUnit.classList.add('hidden');
         if (prodActive) prodActive.checked = true;
-        if (prodPrimarySupplier) prodPrimarySupplier.value = '';
-        if (prodPrimarySupplierId) prodPrimarySupplierId.value = '';
         if (prodReorder) prodReorder.value = '';
         if (prodLots) prodLots.checked = true;
         syncProductToggleLabels();
@@ -2406,6 +2417,12 @@ document.addEventListener('DOMContentLoaded', function () {
             prodImagePreview.classList.add('hidden');
         }
         if (prodImagePlaceholder) prodImagePlaceholder.classList.remove('hidden');
+        if (prodExtra) prodExtra.classList.add('hidden');
+        if (btnToggleProdExtra) btnToggleProdExtra.setAttribute('aria-expanded', 'false');
+        if (iconToggleProdExtra) {
+            iconToggleProdExtra.classList.remove('fa-chevron-up');
+            iconToggleProdExtra.classList.add('fa-chevron-down');
+        }
     }
 
     function resetCreateModal() {
@@ -2453,9 +2470,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (prodMethod) prodMethod.value = String(prod?.method || 'FIFO');
         if (prodMin) prodMin.value = String(prod?.min_stock ?? '');
         if (prodReorder) prodReorder.value = String(prod?.reorder_point ?? '');
-        if (prodSalePrice) prodSalePrice.value = String(prod?.sale_price ?? '');
-        if (prodPrimarySupplierId) prodPrimarySupplierId.value = String(prod?.primary_supplier_id || '').trim();
-        if (prodPrimarySupplier) prodPrimarySupplier.value = String(prod?.primary_supplier_name || '');
+        if (prodSalePrice) prodSalePrice.value = formatMonedaARS(parseNumeroSeguro(prod?.sale_price));
         if (prodActive) prodActive.checked = (prod?.active !== false);
         if (prodDesc) prodDesc.value = String(prod?.description || '');
         syncProductToggleLabels();
@@ -2925,7 +2940,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (editLotSubtitle) editLotSubtitle.textContent = String(prod?.name || lot?.product_name || '');
         if (editLotProduct) editLotProduct.textContent = String(prod?.name || lot?.product_name || '');
         if (editLotQty) editLotQty.value = String(parseNumeroSeguro(lot?.qty_initial) || '');
-        if (editLotCu) editLotCu.value = String(parseNumeroSeguro(lot?.unit_cost) || '');
+        if (editLotCu) editLotCu.value = formatMonedaARS(parseNumeroSeguro(lot?.unit_cost));
 
         if (editLotCode) editLotCode.value = String(lot?.lot_code || '');
         if (editLotDate) editLotDate.value = String(lot?.received_at || '').slice(0, 10);
@@ -2950,7 +2965,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!id) return;
 
         const qtyInitial = parseNumeroSeguro(editLotQty?.value);
-        const unitCost = parseNumeroSeguro(editLotCu?.value);
+        const unitCost = parseMonedaARS(editLotCu?.value);
 
         const payload = {
             lot_code: String(editLotCode?.value || '').trim(),
@@ -3039,10 +3054,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateLotCt() {
-        const cu = parseNumeroSeguro(lotCu?.value);
+        const cu = parseMonedaARS(lotCu?.value);
         const qty = parseNumeroSeguro(lotQty?.value);
         const ct = cu * qty;
-        if (lotCt) lotCt.value = formatMoney(ct);
+        if (lotCt) lotCt.value = formatMonedaARS(ct);
     }
 
     function crearEgresoDesdeInventario({ fecha, proveedor, valor, nota }) {
@@ -3402,9 +3417,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const min = parseNumeroSeguro(prodMin?.value);
             const reorderPoint = parseNumeroSeguro(prodReorder?.value);
             const desc = String(prodDesc?.value || '').trim();
-            const salePrice = parseNumeroSeguro(prodSalePrice?.value);
-            const primarySupplierName = String(prodPrimarySupplier?.value || '').trim();
-            const primarySupplierId = String(prodPrimarySupplierId?.value || '').trim();
+            const salePrice = parseMonedaARS(prodSalePrice?.value);
             const active = !!prodActive?.checked;
 
             if (!name) { if (window.showAlertModal) window.showAlertModal('Completá el nombre del producto.', 'Atención', 'Validación requerida'); else alert('Completá el nombre del producto.'); return; }
@@ -3420,8 +3433,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 min_stock: min,
                 reorder_point: reorderPoint,
                 description: desc,
-                primary_supplier_id: primarySupplierId,
-                primary_supplier_name: primarySupplierName,
                 active: active,
                 sale_price: salePrice
             };
@@ -3607,10 +3618,16 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    if (prodPrimarySupplier) {
-        prodPrimarySupplier.addEventListener('input', function () {
-            if (suppressSupplierInputClear) return;
-            if (prodPrimarySupplierId) prodPrimarySupplierId.value = '';
+    if (btnToggleProdExtra) {
+        btnToggleProdExtra.addEventListener('click', function () {
+            if (!prodExtra) return;
+            const nextOpen = prodExtra.classList.contains('hidden');
+            prodExtra.classList.toggle('hidden', !nextOpen);
+            btnToggleProdExtra.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+            if (iconToggleProdExtra) {
+                iconToggleProdExtra.classList.toggle('fa-chevron-down', !nextOpen);
+                iconToggleProdExtra.classList.toggle('fa-chevron-up', nextOpen);
+            }
         });
     }
 
@@ -3635,21 +3652,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function goCreateSupplier(target) {
-        if (String(target || '') === 'product') {
-            saveProductDraft();
-        }
         const returnTo = safeReturnToWithTarget(target);
         const qs = [
             'return_to=' + encodeURIComponent(returnTo),
             'prefill_category=' + encodeURIComponent('Inventario')
         ];
         window.location.href = '/suppliers/new?' + qs.join('&');
-    }
-
-    if (btnSelectSupplierProduct) {
-        btnSelectSupplierProduct.addEventListener('click', function () {
-            openSupplierModal('product');
-        });
     }
     if (btnSelectSupplierLot) {
         btnSelectSupplierLot.addEventListener('click', function () {
@@ -3670,13 +3678,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (linkCreateSupplierFromInv) {
         linkCreateSupplierFromInv.addEventListener('click', function (ev) {
             ev.preventDefault();
-            goCreateSupplier(currentSupplierTarget || 'product');
-        });
-    }
-    if (linkCreateSupplierProduct) {
-        linkCreateSupplierProduct.addEventListener('click', function (ev) {
-            ev.preventDefault();
-            goCreateSupplier('product');
+            goCreateSupplier(currentSupplierTarget || 'lot');
         });
     }
     if (linkCreateSupplierLot) {

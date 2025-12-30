@@ -629,8 +629,197 @@
 
     <script>
         (function () {
+            function formatCurrencyARS(value) {
+                let n;
+                if (typeof value === 'number') n = value;
+                else n = parseFloat(String(value ?? '').replace(',', '.'));
+                if (!isFinite(n)) n = 0;
+                try {
+                    const abs = Math.abs(n);
+                    const formatted = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(abs);
+                    return (n < 0 ? '-$' : '$') + formatted;
+                } catch (e) {
+                    try {
+                        const abs = Math.abs(n);
+                        const formatted = abs.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                        return (n < 0 ? '-$' : '$') + formatted;
+                    } catch (err) {
+                        return (n < 0 ? '-$' : '$') + String(Math.abs(n));
+                    }
+                }
+            }
+
+            function _formatCurrencyARSFixed(n, fracDigits) {
+                const x = (typeof n === 'number' && isFinite(n)) ? n : 0;
+                const d = Math.max(0, Math.min(2, parseInt(fracDigits || 0, 10) || 0));
+                try {
+                    const abs = Math.abs(x);
+                    const formatted = new Intl.NumberFormat('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d }).format(abs);
+                    return (x < 0 ? '-$' : '$') + formatted;
+                } catch (e) {
+                    try {
+                        const abs = Math.abs(x);
+                        const formatted = abs.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d });
+                        return (x < 0 ? '-$' : '$') + formatted;
+                    } catch (err) {
+                        return (x < 0 ? '-$' : '$') + String(Math.abs(x));
+                    }
+                }
+            }
+
+            function parseCurrencyARS(raw) {
+                const input = String(raw ?? '').trim();
+                if (!input) return 0;
+                let s = input.replace(/\$/g, '').replace(/\s/g, '');
+                let sign = 1;
+                if (s.startsWith('-')) {
+                    sign = -1;
+                    s = s.slice(1);
+                }
+                if (!s) return 0;
+
+                if (s.indexOf(',') >= 0) {
+                    const parts = s.split(',');
+                    const intPart = String(parts[0] || '').replace(/\./g, '').replace(/[^0-9]/g, '');
+                    const decPart = String(parts.slice(1).join(',') || '').replace(/[^0-9]/g, '');
+                    const num = parseFloat((intPart || '0') + '.' + (decPart || '0'));
+                    return isNaN(num) ? 0 : (sign * num);
+                }
+
+                const isThousandsOnly = /^\d{1,3}(\.\d{3})+$/.test(s);
+                if (isThousandsOnly) {
+                    const num = parseFloat(s.replace(/\./g, ''));
+                    return isNaN(num) ? 0 : (sign * num);
+                }
+
+                const cleaned = s.replace(/[^0-9.]/g, '');
+                const num = parseFloat(cleaned);
+                return isNaN(num) ? 0 : (sign * num);
+            }
+
+            function bindCurrencyInputsARS(root) {
+                const scope = root || document;
+                const nodes = scope.querySelectorAll('input[data-currency="ars"]');
+                Array.from(nodes).forEach(function (el) {
+                    try {
+                        if (!el || el.getAttribute('data-currency-bound') === '1') return;
+                        el.setAttribute('data-currency-bound', '1');
+
+                        const setCaretByDigits = function (inputEl, formattedValue, digitsBeforeCaret) {
+                            try {
+                                if (!inputEl || typeof inputEl.setSelectionRange !== 'function') return;
+                                const targetDigits = Math.max(0, parseInt(digitsBeforeCaret || 0, 10) || 0);
+                                if (!targetDigits) {
+                                    const pos = String(formattedValue || '').length;
+                                    inputEl.setSelectionRange(pos, pos);
+                                    return;
+                                }
+                                let seen = 0;
+                                const s = String(formattedValue || '');
+                                for (let i = 0; i < s.length; i++) {
+                                    if (s[i] >= '0' && s[i] <= '9') {
+                                        seen++;
+                                        if (seen >= targetDigits) {
+                                            inputEl.setSelectionRange(i + 1, i + 1);
+                                            return;
+                                        }
+                                    }
+                                }
+                                inputEl.setSelectionRange(s.length, s.length);
+                            } catch (e) {
+                            }
+                        };
+
+                        const countDigitsBeforeCaret = function (rawValue, caretPos) {
+                            try {
+                                const s = String(rawValue || '');
+                                const p = Math.max(0, Math.min(s.length, parseInt(caretPos || 0, 10) || 0));
+                                let c = 0;
+                                for (let i = 0; i < p; i++) {
+                                    if (s[i] >= '0' && s[i] <= '9') c++;
+                                }
+                                return c;
+                            } catch (e) {
+                                return 0;
+                            }
+                        };
+
+                        if (el.disabled || el.readOnly) {
+                            const v0 = String(el.value ?? '').trim();
+                            if (v0) el.value = formatCurrencyARS(parseCurrencyARS(v0));
+                            return;
+                        }
+
+                        el.addEventListener('input', function () {
+                            const raw = String(el.value ?? '');
+                            const trimmed = raw.trim();
+                            if (!trimmed) return;
+                            if (/^\s*-?\$?\s*$/.test(raw)) return;
+                            const digitsBefore = countDigitsBeforeCaret(raw, el.selectionStart);
+                            const rawNoSpace = raw.replace(/\s/g, '');
+                            const trailingComma = /,$/.test(rawNoSpace);
+
+                            const n = parseCurrencyARS(raw);
+                            let fracDigits = 0;
+                            try {
+                                const m = trailingComma ? null : String(raw).match(/,([^,]*)$/);
+                                if (m && typeof m[1] === 'string') {
+                                    const dec = m[1].replace(/[^0-9]/g, '');
+                                    if (dec.length >= 2) fracDigits = 2;
+                                    else if (dec.length === 1) fracDigits = 1;
+                                }
+                            } catch (e) {
+                            }
+                            let formatted = fracDigits ? _formatCurrencyARSFixed(n, fracDigits) : formatCurrencyARS(n);
+                            if (trailingComma) {
+                                if (formatted.indexOf(',') < 0) formatted = formatted + ',';
+                            }
+                            el.value = formatted;
+                            if (trailingComma) {
+                                try {
+                                    const pos = formatted.length;
+                                    el.setSelectionRange(pos, pos);
+                                } catch (e) {
+                                }
+                            } else {
+                                setCaretByDigits(el, formatted, digitsBefore);
+                            }
+                        });
+
+                        el.addEventListener('blur', function () {
+                            const v = String(el.value ?? '').trim();
+                            if (!v) {
+                                el.value = '';
+                                return;
+                            }
+                            el.value = formatCurrencyARS(parseCurrencyARS(v));
+                        });
+
+                        const vv = String(el.value ?? '').trim();
+                        if (vv) el.value = formatCurrencyARS(parseCurrencyARS(vv));
+                    } catch (e) {
+                    }
+                });
+            }
+
+            window.formatCurrencyARS = formatCurrencyARS;
+            window.parseCurrencyARS = parseCurrencyARS;
+            window.bindCurrencyInputsARS = bindCurrencyInputsARS;
+
+            document.addEventListener('DOMContentLoaded', function () {
+                bindCurrencyInputsARS(document);
+            });
+        })();
+    </script>
+
+    <script>
+        (function () {
             try {
                 const sr = (String('{{ request.script_root or "" }}') || '').trim();
+                try {
+                    if (sr) window.__storage_ns = sr;
+                } catch (e) {
+                }
                 if (sr && sr.startsWith('/c/')) {
                     const origFetch = window.fetch;
                     window.fetch = function (input, init) {

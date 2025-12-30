@@ -1,7 +1,21 @@
 (function () {
+    function _nsPrefix() {
+        try {
+            const ns = String(window.__storage_ns || '').trim();
+            if (!ns) return '';
+            return 'ns:' + ns + ':';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function nsKey(key) {
+        return _nsPrefix() + String(key || '');
+    }
+
     function readJson(key) {
         try {
-            const raw = window.localStorage.getItem(key);
+            const raw = window.localStorage.getItem(nsKey(key));
             const parsed = raw ? JSON.parse(raw) : [];
             return Array.isArray(parsed) ? parsed : [];
         } catch (e) {
@@ -11,7 +25,7 @@
 
     function writeJson(key, value) {
         try {
-            window.localStorage.setItem(key, JSON.stringify(value));
+            window.localStorage.setItem(nsKey(key), JSON.stringify(value));
         } catch (e) {
         }
     }

@@ -4,7 +4,7 @@ from datetime import date as dt_date
 from datetime import timedelta
 from uuid import uuid4
 
-from flask import abort, jsonify, render_template, request, redirect, url_for
+from flask import abort, g, jsonify, render_template, request, redirect, url_for
 from flask_login import login_required, current_user
 from sqlalchemy import or_
 
@@ -38,6 +38,14 @@ def _serialize_supplier(row: Supplier):
         'notes': row.notes or '',
         'meta_json': row.meta_json or ''
     }
+
+
+def _get_company_id() -> str | None:
+    try:
+        cid = str(getattr(g, 'company_id', '') or '').strip()
+        return cid or None
+    except Exception:
+        return None
 
 
 def _module_required_any(*module_names: str):
@@ -224,9 +232,13 @@ def _is_payment_expense(meta_obj: dict) -> bool:
 @module_required('suppliers')
 def supplier_cc_ledger_api(supplier_id):
     try:
+        company_id = _get_company_id()
+        if not company_id:
+            return jsonify({'ok': False, 'error': 'no_company'}), 400
+
         sid = str(supplier_id or '').strip()
         supplier = db.session.get(Supplier, sid)
-        if not supplier:
+        if (not supplier) or (str(getattr(supplier, 'company_id', '') or '').strip() != company_id):
             return jsonify({'ok': False, 'error': 'not_found'}), 404
 
         sname = str(supplier.name or '').strip()
@@ -234,6 +246,7 @@ def supplier_cc_ledger_api(supplier_id):
         rows = (
             db.session.query(Expense)
             .filter(
+                Expense.company_id == company_id,
                 or_(
                     Expense.supplier_id == sid,
                     (Expense.supplier_id.is_(None) & (Expense.supplier_name.ilike(sname)))
@@ -332,9 +345,13 @@ def supplier_cc_ledger_api(supplier_id):
 @login_required
 @module_required('suppliers')
 def supplier_cc_payment_api(supplier_id):
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     sid = str(supplier_id or '').strip()
     supplier = db.session.get(Supplier, sid)
-    if not supplier:
+    if (not supplier) or (str(getattr(supplier, 'company_id', '') or '').strip() != company_id):
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
     sname = str(supplier.name or '').strip()
@@ -351,7 +368,7 @@ def supplier_cc_payment_api(supplier_id):
         return jsonify({'ok': False, 'error': 'invalid_method'}), 400
 
     row = db.session.get(Expense, expense_id)
-    if not row:
+    if (not row) or (str(getattr(row, 'company_id', '') or '').strip() != company_id):
         return jsonify({'ok': False, 'error': 'expense_not_found'}), 404
     row_sid = str(row.supplier_id or '').strip()
     row_name = str(row.supplier_name or '').strip()
@@ -390,6 +407,7 @@ def supplier_cc_payment_api(supplier_id):
     pay_exp_id = uuid4().hex
     pay_exp = Expense(
         id=pay_exp_id,
+        company_id=company_id,
         expense_date=dt_date.today(),
         payment_method=method,
         amount=round(pay_amount, 2),
@@ -429,8 +447,17 @@ def supplier_cc_payment_api(supplier_id):
 @module_required('suppliers')
 def index():
     """Gestor de proveedores."""
+    company_id = _get_company_id()
+    if not company_id:
+        return render_template('suppliers/index.html', title='Proveedores', suppliers=[])
     try:
-        rows = db.session.query(Supplier).order_by(Supplier.updated_at.desc(), Supplier.created_at.desc()).limit(5000).all()
+        rows = (
+            db.session.query(Supplier)
+            .filter(Supplier.company_id == company_id)
+            .order_by(Supplier.updated_at.desc(), Supplier.created_at.desc())
+            .limit(5000)
+            .all()
+        )
         suppliers = [_serialize_supplier(r) for r in rows]
     except Exception:
         suppliers = []
@@ -452,7 +479,12 @@ def list_suppliers_api():
     limit = int(request.args.get('limit') or 5000)
     if limit <= 0 or limit > 10000:
         limit = 5000
-    query = db.session.query(Supplier)
+
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    query = db.session.query(Supplier).filter(Supplier.company_id == company_id)
     if q:
         like = f"%{q}%"
         query = query.filter(Supplier.name.ilike(like))
@@ -464,9 +496,13 @@ def list_suppliers_api():
 @login_required
 @_module_required_any('suppliers', 'inventory')
 def get_supplier_api(supplier_id):
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     sid = str(supplier_id or '').strip()
     row = db.session.get(Supplier, sid)
-    if not row:
+    if (not row) or (str(getattr(row, 'company_id', '') or '').strip() != company_id):
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     return jsonify({'ok': True, 'item': _serialize_supplier(row)})
 
@@ -475,12 +511,16 @@ def get_supplier_api(supplier_id):
 @login_required
 @_module_required_any('suppliers', 'inventory')
 def create_supplier_api():
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     payload = request.get_json(silent=True) or {}
     sid = str(payload.get('id') or '').strip() or uuid4().hex
     row = db.session.get(Supplier, sid)
     if row:
         return jsonify({'ok': False, 'error': 'already_exists'}), 400
-    row = Supplier(id=sid, name=str(payload.get('name') or '').strip() or 'Proveedor')
+    row = Supplier(id=sid, company_id=company_id, name=str(payload.get('name') or '').strip() or 'Proveedor')
     _apply_supplier_payload(row, payload)
     db.session.add(row)
     try:
@@ -495,9 +535,13 @@ def create_supplier_api():
 @login_required
 @_module_required_any('suppliers', 'inventory')
 def update_supplier_api(supplier_id):
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     sid = str(supplier_id or '').strip()
     row = db.session.get(Supplier, sid)
-    if not row:
+    if (not row) or (str(getattr(row, 'company_id', '') or '').strip() != company_id):
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     payload = request.get_json(silent=True) or {}
     _apply_supplier_payload(row, payload)
@@ -513,9 +557,13 @@ def update_supplier_api(supplier_id):
 @login_required
 @module_required('suppliers')
 def delete_supplier_api(supplier_id):
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     sid = str(supplier_id or '').strip()
     row = db.session.get(Supplier, sid)
-    if not row:
+    if (not row) or (str(getattr(row, 'company_id', '') or '').strip() != company_id):
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     try:
         db.session.delete(row)
@@ -530,6 +578,10 @@ def delete_supplier_api(supplier_id):
 @login_required
 @module_required('suppliers')
 def upsert_suppliers_bulk():
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     payload = request.get_json(silent=True) or {}
     items = payload.get('items')
     items_list = items if isinstance(items, list) else []
@@ -538,8 +590,11 @@ def upsert_suppliers_bulk():
         d = it if isinstance(it, dict) else {}
         sid = str(d.get('id') or '').strip() or uuid4().hex
         row = db.session.get(Supplier, sid)
+        if row and (str(getattr(row, 'company_id', '') or '').strip() != company_id):
+            sid = uuid4().hex
+            row = None
         if not row:
-            row = Supplier(id=sid, name=str(d.get('name') or '').strip() or 'Proveedor')
+            row = Supplier(id=sid, company_id=company_id, name=str(d.get('name') or '').strip() or 'Proveedor')
             db.session.add(row)
         _apply_supplier_payload(row, d)
         out.append(row)

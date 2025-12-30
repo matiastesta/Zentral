@@ -1804,11 +1804,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function formatMoneyARS(amount) {
         const n = Number(amount || 0);
+        if (window.formatCurrencyARS) return window.formatCurrencyARS(n);
         try {
-            return n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
+            const abs = Math.abs(n);
+            const formatted = abs.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            return (n < 0 ? '-$' : '$') + formatted;
         } catch (e) {
-            const s = n.toFixed(2).replace('.', ',');
-            return '$' + s;
+            return (n < 0 ? '-$' : '$') + String(Math.abs(n));
         }
     }
 
@@ -2494,7 +2496,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Axis labels
         const axisLabels = [
-            '<text x="' + (padX - 38) + '" y="' + (padY + innerH / 2).toFixed(2) + '" transform="rotate(-90 ' + (padX - 38) + ' ' + (padY + innerH / 2).toFixed(2) + ')" text-anchor="middle" font-size="11" fill="#374151">Monto (ARS)</text>',
+            '<text x="' + (padX - 38) + '" y="' + (padY + innerH / 2).toFixed(2) + '" transform="rotate(-90 ' + (padX - 38) + ' ' + (padY + innerH / 2).toFixed(2) + ')" text-anchor="middle" font-size="11" fill="#374151">Monto ($)</text>',
             '<text x="' + (padX + innerW / 2).toFixed(2) + '" y="' + (padY + innerH + 26).toFixed(2) + '" text-anchor="middle" font-size="11" fill="#374151">Día del mes</text>',
         ];
 

@@ -54,7 +54,7 @@
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Valor ($)</label>
-                <input id="egreso-valor" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: 12000">
+                <input id="egreso-valor" type="text" inputmode="decimal" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="$0" data-currency="ars">
             </div>
 
             <div id="wrap-egreso-proveedor" class="lg:col-span-2">
@@ -309,6 +309,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const employeesNewUrl = "{{ url_for('employees.new') }}";
 
     function parseNumeroSeguro(v) {
+        if (window.parseCurrencyARS) return window.parseCurrencyARS(v);
         const n = parseFloat(String(v || '').replace(',', '.'));
         return isNaN(n) ? 0 : n;
     }
@@ -1063,7 +1064,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 aplicarVisibilidadPorCategoria();
                 poblarEmpleados();
 
-                if (inputValor) inputValor.value = String(parseNumeroSeguro(found.valor));
+                if (inputValor) {
+                    const v = parseNumeroSeguro(found.valor);
+                    inputValor.value = (window.formatCurrencyARS ? window.formatCurrencyARS(v) : String(v));
+                }
                 if (inputNota) inputNota.value = found.nota || '';
                 if (selectPago) selectPago.value = found.forma_pago || 'Efectivo';
 
