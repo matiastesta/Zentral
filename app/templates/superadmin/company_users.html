@@ -57,6 +57,9 @@
                         <form method="post" action="{{ url_for('superadmin.company_users_reset_password', company_id=company.id, user_id=u.id) }}" class="inline" data-confirm="1" data-confirm-title="Resetear contraseña" data-confirm-message="Se va a generar una nueva contraseña para {{ u.username }}. ¿Confirmás?" data-confirm-ok="Resetear" data-confirm-cancel="Cancelar">
                             <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Reset pass</button>
                         </form>
+                        <form method="post" action="{{ url_for('superadmin.company_users_delete', company_id=company.id, user_id=u.id) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar usuario" data-confirm-message="Se va a eliminar el usuario {{ u.username }}. ¿Confirmás?" data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
+                            <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700">Eliminar</button>
+                        </form>
                         {% endif %}
                     </td>
                 </tr>

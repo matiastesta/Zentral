@@ -96,6 +96,14 @@
                     <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700" {% if user.is_master %}disabled{% endif %}>Guardar cambios</button>
                 </div>
             </form>
+
+            {% if not user.is_master %}
+            <div class="border-t border-gray-100 pt-4">
+                <form method="post" action="{{ url_for('superadmin.company_users_delete', company_id=company.id, user_id=user.id) }}" class="flex justify-end" data-confirm="1" data-confirm-title="Eliminar usuario" data-confirm-message="Se va a eliminar el usuario {{ user.username }}. ¿Confirmás?" data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
+                    <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-red-600 hover:bg-red-700">Eliminar usuario</button>
+                </form>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

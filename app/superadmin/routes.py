@@ -899,6 +899,35 @@ def company_users_reset_password(company_id: str, user_id: int):
     return redirect(url_for('superadmin.company_users', company_id=c.id))
 
 
+@bp.post('/companies/<company_id>/users/<int:user_id>/delete')
+@login_required
+def company_users_delete(company_id: str, user_id: int):
+    _require_zentral_admin()
+    c = db.session.get(Company, str(company_id))
+    if not c:
+        flash('Empresa inválida.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    u = db.session.get(User, int(user_id))
+    if not u:
+        flash('Usuario inválido.', 'error')
+        return redirect(url_for('superadmin.company_users', company_id=c.id))
+    if str(getattr(u, 'company_id', '') or '') != str(c.id):
+        flash('Usuario inválido.', 'error')
+        return redirect(url_for('superadmin.company_users', company_id=c.id))
+    if getattr(u, 'is_master', False):
+        flash('El usuario master no se puede eliminar.', 'error')
+        return redirect(url_for('superadmin.company_users', company_id=c.id))
+    if int(getattr(u, 'id', 0) or 0) == int(getattr(current_user, 'id', 0) or 0):
+        flash('No podés eliminar tu propio usuario.', 'error')
+        return redirect(url_for('superadmin.company_users', company_id=c.id))
+
+    db.session.delete(u)
+    db.session.commit()
+    flash('Usuario eliminado.', 'success')
+    return redirect(url_for('superadmin.company_users', company_id=c.id))
+
+
 @bp.get('/companies/<company_id>/roles')
 @login_required
 def company_roles(company_id: str):

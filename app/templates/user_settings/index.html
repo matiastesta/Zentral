@@ -61,7 +61,7 @@
                                         <a href="{{ url_for('user_settings.user_detail', user_id=user.id) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Editar</a>
                                         {% endif %}
                                         {% if can_manage_users and not user.is_master and current_user.id != user.id %}
-                                        <form method="post" class="block">
+                                        <form method="post" class="block" data-confirm="1" data-confirm-title="Eliminar usuario" data-confirm-message="Se va a eliminar el usuario {{ user.username }}. ¿Confirmás?" data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
                                             <input type="hidden" name="action" value="delete_user">
                                             <input type="hidden" name="user_id" value="{{ user.id }}">
                                             <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50">Eliminar</button>
