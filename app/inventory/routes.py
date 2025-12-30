@@ -264,7 +264,15 @@ def list_products():
     if limit <= 0 or limit > 5000:
         limit = 500
     active = (request.args.get('active') or '').strip()
-    q = db.session.query(Product)
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+
+    q = db.session.query(Product).filter(Product.company_id == cid)
     if active in ('1', 'true', 'True'):
         q = q.filter(Product.active == True)  # noqa: E712
     q = q.order_by(Product.name.asc()).limit(limit)
@@ -281,7 +289,15 @@ def search_products():
     if limit <= 0 or limit > 200:
         limit = 50
 
-    q = db.session.query(Product).filter(Product.active == True)  # noqa: E712
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+
+    q = db.session.query(Product).filter(Product.company_id == cid, Product.active == True)  # noqa: E712
     if qraw:
         term = f"%{qraw}%"
         q = q.filter(
@@ -301,6 +317,14 @@ def search_products():
 @module_required('inventory')
 def create_product():
     payload = request.get_json(silent=True) or {}
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     name = str(payload.get('name') or '').strip()
     if not name:
         return jsonify({'ok': False, 'error': 'name_required'}), 400
@@ -309,7 +333,7 @@ def create_product():
     category = None
     if cat_id is not None and cat_id != '':
         try:
-            category = db.session.get(Category, int(cat_id))
+            category = db.session.query(Category).filter(Category.company_id == cid, Category.id == int(cat_id)).first()
         except Exception:
             category = None
     if not category:
@@ -325,12 +349,13 @@ def create_product():
     supplier_name = str(payload.get('primary_supplier_name') or '').strip() or None
     supplier_row = None
     if supplier_id:
-        supplier_row = db.session.get(Supplier, supplier_id)
+        supplier_row = db.session.query(Supplier).filter(Supplier.company_id == cid, Supplier.id == supplier_id).first()
         if not supplier_row:
             return jsonify({'ok': False, 'error': 'supplier_not_found'}), 400
         supplier_name = str(supplier_row.name or '').strip() or supplier_name
 
     row = Product(
+        company_id=cid,
         name=name,
         description=str(payload.get('description') or '').strip() or None,
         category_id=(category.id if category else None),
@@ -427,7 +452,15 @@ def update_product(product_id: int):
 @login_required
 @module_required('inventory')
 def upload_product_image(product_id: int):
-    row = db.session.get(Product, int(product_id))
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    row = db.session.query(Product).filter(Product.company_id == cid, Product.id == int(product_id)).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     f = request.files.get('image')
@@ -438,7 +471,7 @@ def upload_product_image(product_id: int):
 
     try:
         asset = upload_to_r2_and_create_asset(
-            company_id=str(getattr(row, 'company_id', '') or '').strip(),
+            company_id=cid,
             file_storage=f,
             entity_type='product',
             entity_id=str(row.id),

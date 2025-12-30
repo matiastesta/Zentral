@@ -332,6 +332,7 @@ def create_app(config_class=Config):
 
     @app.after_request
     def _tenant_cookie_path_isolation(response):
+        return response
         try:
             prefix = str(request.script_root or '').strip()
         except Exception:

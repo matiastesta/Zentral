@@ -830,6 +830,16 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const __SCRIPT_ROOT__ = String('{{ request.script_root or "" }}' || '').trim();
+    function tenantUrl(u) {
+        const url = String(u || '').trim();
+        if (!url) return '';
+        if (__SCRIPT_ROOT__ && __SCRIPT_ROOT__.startsWith('/c/') && url.startsWith('/') && !url.startsWith(__SCRIPT_ROOT__ + '/')) {
+            return __SCRIPT_ROOT__ + url;
+        }
+        return url;
+    }
+
     const btnCreate = document.getElementById('btn-create-inv');
     const btnAddLot = document.getElementById('btn-add-lot');
     const btnPrecios = document.getElementById('btn-precios-inv');
@@ -1918,7 +1928,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function setFileImagePreviewUrl(url) {
-        const imgUrl = String(url || '').trim();
+        const imgUrl = tenantUrl(String(url || '').trim());
         const hasImg = !!imgUrl;
 
         if (fileImagePreview) {
@@ -2460,7 +2470,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (prodDesc) prodDesc.value = String(prod?.description || '');
         syncProductToggleLabels();
 
-        const imgUrl = String(prod?.image_url || '').trim();
+        const imgUrl = tenantUrl(String(prod?.image_url || '').trim());
         if (imgUrl && prodImagePreview) {
             prodImagePreview.src = imgUrl;
             prodImagePreview.classList.remove('hidden');
@@ -2701,7 +2711,7 @@ document.addEventListener('DOMContentLoaded', function () {
         filteredProducts.forEach(({ p, m }) => {
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-gray-50';
-            const imgUrl = String(p?.image_url || '').trim();
+            const imgUrl = tenantUrl(String(p?.image_url || '').trim());
             const imgCell = imgUrl
                 ? ('<img src="' + imgUrl + '" alt="" class="h-9 w-9 rounded-md object-cover border border-gray-200 bg-gray-50">')
                 : ('<div class="h-9 w-9 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400"><i class="fas fa-image"></i></div>');
@@ -2812,7 +2822,7 @@ document.addEventListener('DOMContentLoaded', function () {
         filteredLots.forEach(({ l, p }) => {
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-gray-50';
-            const imgUrl = String(p?.image_url || '').trim();
+            const imgUrl = tenantUrl(String(p?.image_url || '').trim());
             const imgCell = imgUrl
                 ? ('<img src="' + imgUrl + '" alt="" class="h-9 w-9 rounded-md object-cover border border-gray-200 bg-gray-50">')
                 : ('<div class="h-9 w-9 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400"><i class="fas fa-image"></i></div>');
