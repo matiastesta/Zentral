@@ -61,6 +61,22 @@ def _apply_rls_settings_on_connection(conn, *, is_login: bool, login_email: str 
     )
 
 
+def _apply_rls_settings_payload_on_connection(conn, *, settings: dict) -> None:
+    conn.execute(
+        text(
+            """
+            SELECT
+                set_config('app.company_slug', :slug, true),
+                set_config('app.current_company_id', :cid, true),
+                set_config('app.is_zentral_admin', :is_admin, true),
+                set_config('app.is_login', :is_login, true),
+                set_config('app.login_email', :login_email, true)
+            """
+        ),
+        settings,
+    )
+
+
 def apply_rls_context(*, is_login: bool, login_email: str | None = None) -> None:
     if not has_request_context():
         return
@@ -88,7 +104,36 @@ def apply_rls_context(*, is_login: bool, login_email: str | None = None) -> None
         g._login_email = (str(login_email or '').strip().lower() if is_login else '')
         return
 
-    ensure_request_context()
+    # Postgres: bootstrap RLS settings in two phases to avoid a circular dependency.
+    #
+    # - Resolving company_id may require querying Company by slug.
+    # - Company table RLS policy allows access by app.company_slug, which is set via set_config.
+    # - Therefore, we must set app.company_slug first (and session-derived company_id if present),
+    #   then resolve request context, then re-apply with the final resolved company_id.
+    slug = resolve_company_slug() or ''
+    try:
+        is_admin_v = '1' if (session.get('auth_is_zentral_admin') == '1') else '0'
+    except Exception:
+        is_admin_v = '0'
+    try:
+        cid_from_session = ''
+        if is_admin_v == '1':
+            cid_from_session = str(session.get('impersonate_company_id') or '').strip()
+        if not cid_from_session:
+            cid_from_session = str(session.get('auth_company_id') or '').strip()
+    except Exception:
+        cid_from_session = ''
+
+    is_login_v = '1' if is_login else '0'
+    login_email_v = (str(login_email or '').strip().lower() if is_login else '')
+
+    initial_settings = {
+        'slug': slug,
+        'cid': cid_from_session,
+        'is_admin': is_admin_v,
+        'is_login': is_login_v,
+        'login_email': login_email_v,
+    }
 
     try:
         g._is_login = bool(is_login)
@@ -97,7 +142,15 @@ def apply_rls_context(*, is_login: bool, login_email: str | None = None) -> None
         pass
 
     try:
-        _apply_rls_settings_on_connection(db.session.connection(), is_login=is_login, login_email=login_email)
+        conn = db.session.connection()
+        _apply_rls_settings_payload_on_connection(conn, settings=initial_settings)
+
+        ensure_request_context()
+        resolved_cid = str(getattr(g, 'company_id', None) or '').strip()
+        if resolved_cid and resolved_cid != str(cid_from_session or '').strip():
+            updated = dict(initial_settings)
+            updated['cid'] = resolved_cid
+            _apply_rls_settings_payload_on_connection(conn, settings=updated)
     except Exception as e:
         if isinstance(e, ProgrammingError) or _is_missing_company_table(e):
             try:
