@@ -326,9 +326,14 @@ def create_app(config_class=Config):
     def inject_support_mode():
         try:
             from flask import g
-            from app.tenancy import is_impersonating
+            from app.tenancy import ensure_request_context, is_impersonating
 
             support_mode = bool(is_impersonating())
+            if support_mode:
+                try:
+                    ensure_request_context()
+                except Exception:
+                    pass
             support_company = getattr(g, 'company', None) if support_mode else None
             return {
                 "is_support_mode": support_mode,

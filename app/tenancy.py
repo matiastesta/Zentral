@@ -49,7 +49,10 @@ def effective_company_id() -> str | None:
 
 
 def ensure_request_context() -> None:
-    if hasattr(g, 'company'):
+    # Only short-circuit if the company has already been resolved.
+    # Other code paths may set placeholder attributes (company=None) to prevent
+    # recursion while tenant context is being computed.
+    if hasattr(g, 'company') and getattr(g, 'company', None) is not None:
         return
 
     if getattr(g, '_ensuring_request_context', False):
