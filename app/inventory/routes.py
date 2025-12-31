@@ -11,7 +11,7 @@ from typing import Optional
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.models import Category, InventoryLot, InventoryMovement, Product, Supplier
+from app.models import Category, FileAsset, InventoryLot, InventoryMovement, Product, Supplier
 from app.files.storage import upload_to_r2_and_create_asset
 from app.permissions import module_required, module_required_any
 from app.tenancy import ensure_request_context
@@ -494,17 +494,70 @@ def upload_product_image(product_id: int):
 @login_required
 @module_required('inventory')
 def delete_product(product_id: int):
-    row = db.session.get(Product, int(product_id))
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    row = db.session.query(Product).filter(Product.company_id == cid, Product.id == int(product_id)).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
-    has_lots = db.session.query(InventoryLot.id).filter(InventoryLot.product_id == row.id).first() is not None
-    has_movements = db.session.query(InventoryMovement.id).filter(InventoryMovement.product_id == row.id).first() is not None
+    has_lots = db.session.query(InventoryLot.id).filter(InventoryLot.company_id == cid, InventoryLot.product_id == row.id).first() is not None
+    has_movements = db.session.query(InventoryMovement.id).filter(InventoryMovement.company_id == cid, InventoryMovement.product_id == row.id).first() is not None
 
     # Para mantener integridad y UX consistente, se desactiva (no se elimina) desde la UI.
     row.active = False
     db.session.commit()
     return jsonify({'ok': True, 'soft_deleted': True, 'had_history': bool(has_lots or has_movements)})
+
+
+@bp.delete('/api/products/<int:product_id>/hard')
+@login_required
+@module_required('inventory')
+def hard_delete_product(product_id: int):
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    row = db.session.query(Product).filter(Product.company_id == cid, Product.id == int(product_id)).first()
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    try:
+        img_asset_id = str(getattr(row, 'image_file_id', '') or '').strip()
+
+        db.session.query(InventoryMovement).filter(
+            InventoryMovement.company_id == cid,
+            InventoryMovement.product_id == row.id,
+        ).delete(synchronize_session=False)
+
+        db.session.query(InventoryLot).filter(
+            InventoryLot.company_id == cid,
+            InventoryLot.product_id == row.id,
+        ).delete(synchronize_session=False)
+
+        if img_asset_id:
+            db.session.query(FileAsset).filter(FileAsset.company_id == cid, FileAsset.id == img_asset_id).delete(synchronize_session=False)
+        db.session.query(FileAsset).filter(
+            FileAsset.company_id == cid,
+            FileAsset.entity_type == 'product',
+            FileAsset.entity_id == str(row.id),
+        ).delete(synchronize_session=False)
+
+        db.session.delete(row)
+        db.session.commit()
+        return jsonify({'ok': True})
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
 
 
 @bp.post('/api/products/prices')

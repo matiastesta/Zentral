@@ -125,11 +125,11 @@
                     </div>
                     <div class="md:col-span-4">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de ingreso</label>
-                        <input id="edit-lot-date" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="YYYY-MM-DD" autocomplete="off">
+                        <input id="edit-lot-date" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="dd/mm/aaaa" autocomplete="off">
                     </div>
                     <div class="md:col-span-4">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Vencimiento</label>
-                        <input id="edit-lot-exp" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="YYYY-MM-DD" autocomplete="off">
+                        <input id="edit-lot-exp" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="dd/mm/aaaa" autocomplete="off">
                     </div>
 
                     <div class="md:col-span-12">
@@ -610,18 +610,6 @@
             </div>
 
             <div id="create-inv-scroll" class="flex-1 min-h-0 overflow-y-auto">
-            <div id="create-choice" class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button id="btn-choice-product" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
-                    <div class="text-2xl">🆕</div>
-                    <div class="mt-2 font-semibold text-gray-900">Crear producto nuevo</div>
-                    <div class="text-xs text-gray-500">Definí el ítem consolidado y su configuración.</div>
-                </button>
-                <button id="btn-choice-lot" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
-                    <div class="text-2xl">➕</div>
-                    <div class="mt-2 font-semibold text-gray-900">Agregar lote a producto existente</div>
-                    <div class="text-xs text-gray-500">Ingresá stock real con costo y vencimiento.</div>
-                </button>
-            </div>
 
             <div id="form-product" class="hidden p-5">
                 <div class="space-y-4">
@@ -670,6 +658,48 @@
                             <div class="md:col-span-3">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Precio de Lista</label>
                                 <input id="prod-sale-price" type="text" inputmode="decimal" class="w-full h-10 px-3 py-2 text-sm border rounded-md" placeholder="$0" data-currency="ars">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="prod-first-lot" class="space-y-2">
+                        <div class="text-sm font-semibold text-gray-900">Agregar primer lote</div>
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                            <div class="md:col-span-3">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de ingreso</label>
+                                <input id="prod-lot-date" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" value="{{ now.strftime('%d/%m/%Y') }}" placeholder="dd/mm/aaaa" autocomplete="off">
+                            </div>
+                            <div class="md:col-span-5">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor</label>
+                                <div class="relative">
+                                    <input id="prod-lot-supplier" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="Buscar y seleccionar proveedor (opcional)" autocomplete="off">
+                                    <input id="prod-lot-supplier-id" type="hidden" value="">
+                                </div>
+                                <div class="mt-2 grid grid-cols-1 gap-2">
+                                    <button id="btn-select-supplier-prod-lot" type="button" class="w-full px-3 py-1.5 text-xs font-medium rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">Seleccionar</button>
+                                </div>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Costo unitario</label>
+                                <input id="prod-lot-cu" type="text" inputmode="decimal" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="$0" data-currency="ars">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
+                                <input id="prod-lot-qty" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
+                            </div>
+
+                            <div class="md:col-span-3">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Costo total</label>
+                                <input id="prod-lot-ct" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" value="$0" readonly>
+                            </div>
+                            <div class="md:col-span-3">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Vencimiento</label>
+                                <input id="prod-lot-exp" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" placeholder="dd/mm/aaaa" autocomplete="off" disabled>
+                                <label class="mt-2 inline-flex items-center text-xs text-gray-600"><input id="prod-lot-no-exp" type="checkbox" class="rounded border-gray-300 mr-2" checked> No corresponde</label>
+                            </div>
+                            <div class="md:col-span-6">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Nota del lote</label>
+                                <input id="prod-lot-note" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
                             </div>
                         </div>
                     </div>
@@ -747,7 +777,7 @@
                     </div>
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de ingreso</label>
-                        <input id="lot-date" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" value="{{ now.strftime('%Y-%m-%d') }}" placeholder="YYYY-MM-DD" autocomplete="off">
+                        <input id="lot-date" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" value="{{ now.strftime('%d/%m/%Y') }}" placeholder="dd/mm/aaaa" autocomplete="off">
                     </div>
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor</label>
@@ -775,8 +805,8 @@
                     </div>
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Vencimiento</label>
-                        <input id="lot-exp" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="YYYY-MM-DD" autocomplete="off">
-                        <label class="mt-2 inline-flex items-center text-xs text-gray-600"><input id="lot-no-exp" type="checkbox" class="rounded border-gray-300 mr-2"> No corresponde</label>
+                        <input id="lot-exp" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="dd/mm/aaaa" autocomplete="off" disabled>
+                        <label class="mt-2 inline-flex items-center text-xs text-gray-600"><input id="lot-no-exp" type="checkbox" class="rounded border-gray-300 mr-2" checked> No corresponde</label>
                     </div>
 
                     <div class="md:col-span-12">
@@ -901,15 +931,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 allowInput: true,
                 locale: (flatpickr && flatpickr.l10ns && flatpickr.l10ns.es) ? flatpickr.l10ns.es : undefined,
             };
+            const commonOptsDmY = {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                locale: (flatpickr && flatpickr.l10ns && flatpickr.l10ns.es) ? flatpickr.l10ns.es : undefined,
+            };
             if (typeof flatpickr.l10ns !== 'undefined' && flatpickr.l10ns.es) {
                 try { flatpickr.localize(flatpickr.l10ns.es); } catch (e) { }
             }
             const lotDate = document.getElementById('lot-date');
             const lotExp = document.getElementById('lot-exp');
-            if (lotDate) flatpickr(lotDate, commonOpts);
-            if (lotExp) flatpickr(lotExp, commonOpts);
-            if (editLotDate) flatpickr(editLotDate, commonOpts);
-            if (editLotExp) flatpickr(editLotExp, commonOpts);
+            if (lotDate) flatpickr(lotDate, commonOptsDmY);
+            if (lotExp) flatpickr(lotExp, commonOptsDmY);
+            if (editLotDate) flatpickr(editLotDate, commonOptsDmY);
+            if (editLotExp) flatpickr(editLotExp, commonOptsDmY);
+            if (prodLotDate) flatpickr(prodLotDate, commonOptsDmY);
+            if (prodLotExp) flatpickr(prodLotExp, commonOptsDmY);
         }
     } catch (e) {
     }
@@ -1046,6 +1083,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const iconToggleProdExtra = document.getElementById('icon-toggle-prod-extra');
     const prodExtra = document.getElementById('prod-extra');
 
+    const prodFirstLot = document.getElementById('prod-first-lot');
+    const prodLotDate = document.getElementById('prod-lot-date');
+    const prodLotSupplier = document.getElementById('prod-lot-supplier');
+    const prodLotSupplierId = document.getElementById('prod-lot-supplier-id');
+    const btnSelectSupplierProdLot = document.getElementById('btn-select-supplier-prod-lot');
+    const prodLotCu = document.getElementById('prod-lot-cu');
+    const prodLotQty = document.getElementById('prod-lot-qty');
+    const prodLotCt = document.getElementById('prod-lot-ct');
+    const prodLotExp = document.getElementById('prod-lot-exp');
+    const prodLotNoExp = document.getElementById('prod-lot-no-exp');
+    const prodLotNote = document.getElementById('prod-lot-note');
+
     const lotProduct = document.getElementById('lot-product');
     const lotDate = document.getElementById('lot-date');
     const lotSupplier = document.getElementById('lot-supplier');
@@ -1147,13 +1196,20 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!target) return;
             if (!supplierId && !supplierName) return;
 
-            if (target === 'lot') {
-                openAddLot();
-            } else if (target === 'product') {
-                openCreate();
-                restoreProductDraft();
-            } else {
-                openCreate();
+            // Si ya restauramos el borrador del modal, NO re-abrimos (eso resetea inputs).
+            const didRestoreDraft = !!window.__inv_draft_restored;
+            if (!didRestoreDraft) {
+                if (target === 'lot') {
+                    openAddLot();
+                } else if (target === 'prod_lot') {
+                    openCreate();
+                } else if (target === 'product') {
+                    openCreate();
+                    restoreProductDraft();
+                } else {
+                    // fallback: abrir el modal sin tocar formularios
+                    try { abrirModal(modalCreate, true); } catch (e) { }
+                }
             }
 
             currentSupplierTarget = target;
@@ -1200,6 +1256,24 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function esc(v) {
+        const s = String(v ?? '');
+        return s
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function fmtNumero(v) {
+        return parseNumeroSeguro(v).toLocaleString('es-AR', { maximumFractionDigits: 2 });
+    }
+
+    function fmtMoneda(v) {
+        return formatMonedaARS(parseNumeroSeguro(v));
+    }
+
     function openAddLot() {
         resetCreateModal();
         abrirModal(modalCreate, true);
@@ -1216,6 +1290,19 @@ document.addEventListener('DOMContentLoaded', function () {
             if (prefillLotProductId && lotProduct) {
                 lotProduct.value = String(prefillLotProductId);
                 prefillLotProductId = '';
+            }
+        } catch (e) {
+        }
+
+        try {
+            if (lotDate && window.formatFechaDisplay) lotDate.value = window.formatFechaDisplay(new Date());
+        } catch (e) {
+        }
+
+        try {
+            if (lotNoExp) {
+                lotNoExp.checked = true;
+                lotNoExp.dispatchEvent(new Event('change', { bubbles: true }));
             }
         } catch (e) {
         }
@@ -1612,6 +1699,13 @@ document.addEventListener('DOMContentLoaded', function () {
             suppressSupplierInputClear = false;
             return;
         }
+        if (currentSupplierTarget === 'prod_lot') {
+            suppressSupplierInputClear = true;
+            if (prodLotSupplierId) prodLotSupplierId.value = id;
+            if (prodLotSupplier) prodLotSupplier.value = name;
+            suppressSupplierInputClear = false;
+            return;
+        }
         if (currentSupplierTarget === 'lot') {
             suppressSupplierInputClear = true;
             if (lotSupplierId) lotSupplierId.value = id;
@@ -1703,8 +1797,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function apiListProducts() {
         return fetch('/inventory/api/products?limit=5000', { credentials: 'same-origin' })
-            .then(r => r.json())
-            .then(d => (d && d.ok && Array.isArray(d.items)) ? d.items : []);
+            .then(function (r) {
+                if (!r || !r.ok) return [];
+                return r.json().then(
+                    (d) => (d && d.ok && Array.isArray(d.items)) ? d.items : [],
+                    () => []
+                );
+            })
+            .catch(function () { return []; });
     }
 
     function apiListSuppliers(q) {
@@ -1757,8 +1857,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function apiListLots() {
         return fetch('/inventory/api/lots?limit=10000', { credentials: 'same-origin' })
-            .then(r => r.json())
-            .then(d => (d && d.ok && Array.isArray(d.items)) ? d.items : []);
+            .then(function (r) {
+                if (!r || !r.ok) return [];
+                return r.json().then(
+                    (d) => (d && d.ok && Array.isArray(d.items)) ? d.items : [],
+                    () => []
+                );
+            })
+            .catch(function () { return []; });
     }
 
     function apiListMovements(productId) {
@@ -1767,8 +1873,14 @@ document.addEventListener('DOMContentLoaded', function () {
         qs.push('limit=2000');
         const url = '/inventory/api/movements' + (qs.length ? ('?' + qs.join('&')) : '');
         return fetch(url, { credentials: 'same-origin' })
-            .then(r => r.json())
-            .then(d => (d && d.ok && Array.isArray(d.items)) ? d.items : []);
+            .then(function (r) {
+                if (!r || !r.ok) return [];
+                return r.json().then(
+                    (d) => (d && d.ok && Array.isArray(d.items)) ? d.items : [],
+                    () => []
+                );
+            })
+            .catch(function () { return []; });
     }
 
     function apiCreateProduct(payload) {
@@ -1791,6 +1903,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function apiDeleteProduct(productId) {
         return fetch('/inventory/api/products/' + encodeURIComponent(String(productId)), {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        }).then(r => r.json());
+    }
+
+    function apiHardDeleteProduct(productId) {
+        return fetch('/inventory/api/products/' + encodeURIComponent(String(productId)) + '/hard', {
             method: 'DELETE',
             credentials: 'same-origin'
         }).then(r => r.json());
@@ -1834,10 +1953,19 @@ document.addEventListener('DOMContentLoaded', function () {
         const pRes = apiListProducts();
         const lRes = apiListLots();
         const mRes = apiListMovements('');
-        return Promise.all([Promise.resolve(pRes), Promise.resolve(lRes), Promise.resolve(mRes)]).then(function (vals) {
-            const products = Array.isArray(vals[0]) ? vals[0] : [];
-            const lots = Array.isArray(vals[1]) ? vals[1] : [];
-            const movements = Array.isArray(vals[2]) ? vals[2] : [];
+        return Promise.allSettled([Promise.resolve(pRes), Promise.resolve(lRes), Promise.resolve(mRes)]).then(function (results) {
+            const getArr = function (idx) {
+                try {
+                    const r = results[idx];
+                    if (!r || r.status !== 'fulfilled') return [];
+                    return Array.isArray(r.value) ? r.value : [];
+                } catch (e) {
+                    return [];
+                }
+            };
+            const products = getArr(0);
+            const lots = getArr(1);
+            const movements = getArr(2);
             cacheProducts = products;
             cacheLots = lots;
             cacheMovements = movements;
@@ -1882,6 +2010,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (st === 'Crítico') return '<span class="px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">Crítico</span>';
         if (st === 'Reponer') return '<span class="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium">Reponer</span>';
         return '<span class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[11px] font-medium">OK</span>';
+    }
+
+    function statusBadgeHtml(st) {
+        return badgeStatus(st);
     }
 
     function getStatus(stock, reorderPoint, minStock) {
@@ -2423,12 +2555,56 @@ document.addEventListener('DOMContentLoaded', function () {
             iconToggleProdExtra.classList.remove('fa-chevron-up');
             iconToggleProdExtra.classList.add('fa-chevron-down');
         }
+
+        if (prodFirstLot) prodFirstLot.classList.remove('hidden');
+
+        try {
+            if (prodLotDate && window.formatFechaDisplay) prodLotDate.value = window.formatFechaDisplay(new Date());
+        } catch (e) {
+        }
+        if (prodLotSupplier) prodLotSupplier.value = '';
+        if (prodLotSupplierId) prodLotSupplierId.value = '';
+        if (prodLotCu) prodLotCu.value = '';
+        if (prodLotQty) prodLotQty.value = '';
+        if (prodLotCt) prodLotCt.value = '$0';
+        if (prodLotNoExp) prodLotNoExp.checked = true;
+        if (prodLotExp) {
+            prodLotExp.value = '';
+            prodLotExp.disabled = true;
+            prodLotExp.classList.add('bg-gray-50');
+        }
+        if (prodLotNote) prodLotNote.value = '';
+    }
+
+    function toIsoDate(raw) {
+        const v = String(raw || '').trim();
+        if (!v) return '';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+        const m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (m) return m[3] + '-' + m[2] + '-' + m[1];
+        return '';
+    }
+
+    function isoToDisplayDate(raw) {
+        const v = String(raw || '').trim();
+        if (!v) return '';
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(v)) return v;
+        const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (m) return m[3] + '/' + m[2] + '/' + m[1];
+        return '';
+    }
+
+    function updateProdLotCt() {
+        const cu = parseMonedaARS(prodLotCu?.value);
+        const qty = parseNumeroSeguro(prodLotQty?.value);
+        const ct = cu * qty;
+        if (prodLotCt) prodLotCt.value = formatMonedaARS(ct);
     }
 
     function resetCreateModal() {
         editingProductId = '';
         clearProductForm();
-        if (choiceWrap) choiceWrap.classList.remove('hidden');
+        if (choiceWrap) choiceWrap.classList.add('hidden');
         if (formProduct) formProduct.classList.add('hidden');
         if (formLot) formLot.classList.add('hidden');
         try { if (formProduct) formProduct.style.display = ''; } catch (e) { }
@@ -2450,6 +2626,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (choiceWrap) choiceWrap.classList.add('hidden');
         if (formProduct) formProduct.classList.remove('hidden');
         try { if (formLot) formLot.style.display = ''; } catch (e) { }
+
+        if (prodFirstLot) prodFirstLot.classList.add('hidden');
 
         if (prodName) prodName.value = String(prod?.name || '');
         if (prodCatId) prodCatId.value = String(prod?.category_id || prod?.category?.id || '');
@@ -2517,6 +2695,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (choiceWrap) choiceWrap.classList.add('hidden');
         if (formProduct) formProduct.classList.remove('hidden');
         try { if (formLot) formLot.style.display = ''; } catch (e) { }
+
+        if (prodFirstLot) prodFirstLot.classList.remove('hidden');
         if (!didLoadCategories) {
             didLoadCategories = true;
             loadCategories(function () {
@@ -2583,7 +2763,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (isInactive) metrics.status = 'Inactivo';
 
                 if (!stList.length) {
-                    return !isInactive;
+                    return false;
                 }
                 return stList.indexOf(metrics.status) >= 0;
             })
@@ -2722,25 +2902,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 : ('<div class="h-9 w-9 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400"><i class="fas fa-image"></i></div>');
             const desc = String(p?.description || '').trim();
 
+            const isInactive = (p && p.active === false);
+            const toggleText = isInactive ? 'Activar' : 'Inactivar';
+            const toggleCls = isInactive ? 'text-green-700' : 'text-gray-700';
+
             tr.innerHTML = ''
-                + '<td class="px-4 py-3">' + imgCell + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-900"><div class="font-medium">' + String(p.name || '') + '</div></td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(categoryLabel(p) || '') + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(m.stock.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500">' + String(p.unit_name || p.unit || '') + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(m.avg) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(m.total) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500"><div class="max-w-xs truncate">' + (desc || '—') + '</div></td>'
-                + '<td class="px-4 py-3 text-sm text-center">' + badgeStatus(m.status) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right">'
-                + '  <div class="relative inline-flex">'
-                + '    <button type="button" class="btn-actions-toggle h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-500" aria-label="Acciones" data-product-id="' + String(p.id) + '">' 
-                + '      <i class="fas fa-ellipsis-v"></i>'
-                + '    </button>'
-                + '    <div class="row-actions-menu hidden absolute right-0 mt-2 w-44 rounded-md border border-gray-200 bg-white shadow-lg z-20">'
-                + '      <button type="button" class="btn-view-file w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Ver legajo</button>'
-                + '      <button type="button" class="btn-add-lot-product w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Agregar lote</button>'
-                + '      <button type="button" class="btn-delete-product w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Eliminar</button>'
+                + '<td class="px-4 py-3 text-sm text-gray-700">' + imgCell + '</td>'
+                + '<td class="px-4 py-3 text-sm font-medium text-gray-900">' + esc(p.name) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(categoryLabel(p)) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600">' + fmtNumero(m.stock) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(p.unit_name || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600 text-right">' + fmtMoneda(m.avg) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600 text-right">' + fmtMoneda(m.total) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600">' + (p.description ? esc(p.description) : '—') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600">' + statusBadgeHtml(m.status) + '</td>'
+                + '<td class="px-4 py-3 text-right relative">'
+                + '  <button type="button" class="btn-actions-toggle h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-600">'
+                + '    <i class="fas fa-ellipsis-v"></i>'
+                + '  </button>'
+                + '  <div class="row-actions-menu hidden absolute right-2 mt-1 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[9999]">'
+                + '    <div class="py-1 text-[11px]">'
+                + '      <button type="button" class="btn-view-file w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Ver legajo</button>'
+                + '      <button type="button" class="btn-add-lot-product w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Agregar lote</button>'
+                + '      <button type="button" class="btn-toggle-active-product w-full text-left px-3 py-2 text-xs ' + toggleCls + ' hover:bg-gray-50" data-product-id="' + String(p.id) + '" data-active="' + (isInactive ? '0' : '1') + '">' + toggleText + '</button>'
+                + '      <button type="button" class="btn-hard-delete-product w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Eliminar</button>'
                 + '    </div>'
                 + '  </div>'
                 + '</td>';
@@ -2788,7 +2973,62 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
 
-        Array.from(tbodyCurrent.querySelectorAll('.btn-delete-product')).forEach(btn => {
+        Array.from(tbodyCurrent.querySelectorAll('.btn-toggle-active-product')).forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.getAttribute('data-product-id') || '';
+                if (!id) return;
+                closeAllMenus();
+
+                const prod = (Array.isArray(cacheProducts) ? cacheProducts : []).find(p => String(p?.id || '') === String(id));
+                const isInactive = (prod && prod.active === false);
+
+                const confirmFn = (window.confirmModal && typeof window.confirmModal === 'function')
+                    ? window.confirmModal
+                    : function (m) { return Promise.resolve(window.confirm(m)); };
+
+                if (isInactive) {
+                    confirmFn('¿Querés activar este producto?', 'Activar producto', 'Volverá a estar disponible en el inventario.', { okText: 'Activar', cancelText: 'Cancelar' })
+                        .then(function (ok) {
+                            if (!ok) return;
+                            const payload = {
+                                active: true,
+                                description: String(prod?.description || ''),
+                                barcode: String(prod?.barcode || ''),
+                            };
+                            apiUpdateProduct(id, payload).then(function (res) {
+                                if (!res || res.ok !== true) {
+                                    if (window.showAlertModal) window.showAlertModal('No se pudo activar el producto.', 'Error', 'Operación fallida');
+                                    else alert('No se pudo activar el producto.');
+                                    return;
+                                }
+                                renderAll();
+                            }).catch(function () {
+                                if (window.showAlertModal) window.showAlertModal('No se pudo activar el producto.', 'Error', 'Operación fallida');
+                                else alert('No se pudo activar el producto.');
+                            });
+                        });
+                    return;
+                }
+
+                confirmFn('¿Querés inactivar este producto?', 'Inactivar producto', 'Podés volver a activarlo más adelante.', { okText: 'Inactivar', cancelText: 'Cancelar' })
+                    .then(function (ok) {
+                        if (!ok) return;
+                        apiDeleteProduct(id).then(function (res) {
+                            if (!res || res.ok !== true) {
+                                if (window.showAlertModal) window.showAlertModal('No se pudo inactivar el producto.', 'Error', 'Operación fallida');
+                                else alert('No se pudo inactivar el producto.');
+                                return;
+                            }
+                            renderAll();
+                        }).catch(function () {
+                            if (window.showAlertModal) window.showAlertModal('No se pudo inactivar el producto.', 'Error', 'Operación fallida');
+                            else alert('No se pudo inactivar el producto.');
+                        });
+                    });
+            });
+        });
+
+        Array.from(tbodyCurrent.querySelectorAll('.btn-hard-delete-product')).forEach(btn => {
             btn.addEventListener('click', function () {
                 const id = this.getAttribute('data-product-id') || '';
                 if (!id) return;
@@ -2798,13 +3038,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     ? window.confirmModal
                     : function (m) { return Promise.resolve(window.confirm(m)); };
 
-                confirmFn('¿Seguro que querés eliminar este producto?', 'Eliminar producto', 'Este producto tiene historial. Será desactivado.', { okText: 'Eliminar', cancelText: 'Cancelar' })
+                confirmFn('¿Seguro que querés eliminar este producto?', 'Eliminar producto', 'Se borrará definitivamente y no quedará registro.', { okText: 'Eliminar', cancelText: 'Cancelar' })
                     .then(function (ok) {
                         if (!ok) return;
-                        apiDeleteProduct(id).then(function (res) {
+                        apiHardDeleteProduct(id).then(function (res) {
                             if (!res || res.ok !== true) {
-                                if (window.showAlertModal) window.showAlertModal('No se pudo eliminar el producto.', 'Error', 'Operación fallida');
-                                else alert('No se pudo eliminar el producto.');
+                                const err = String(res?.error || '').trim();
+                                const msg = (err === 'not_found') ? 'El producto ya no existe.' : 'No se pudo eliminar el producto.';
+                                if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Operación fallida');
+                                else alert(msg);
                                 return;
                             }
                             renderAll();
@@ -2943,8 +3185,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (editLotCu) editLotCu.value = formatMonedaARS(parseNumeroSeguro(lot?.unit_cost));
 
         if (editLotCode) editLotCode.value = String(lot?.lot_code || '');
-        if (editLotDate) editLotDate.value = String(lot?.received_at || '').slice(0, 10);
-        if (editLotExp) editLotExp.value = String(lot?.expiration_date || '').slice(0, 10);
+        if (editLotDate) editLotDate.value = isoToDisplayDate(String(lot?.received_at || '').slice(0, 10));
+        if (editLotExp) editLotExp.value = isoToDisplayDate(String(lot?.expiration_date || '').slice(0, 10));
 
         if (editLotSupplier) editLotSupplier.value = String(lot?.supplier_name || '');
         if (editLotSupplierId) editLotSupplierId.value = String(lot?.supplier_id || '');
@@ -2969,8 +3211,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const payload = {
             lot_code: String(editLotCode?.value || '').trim(),
-            date: String(editLotDate?.value || '').trim(),
-            expiration_date: String(editLotExp?.value || '').trim(),
+            date: toIsoDate(String(editLotDate?.value || '').trim()),
+            expiration_date: toIsoDate(String(editLotExp?.value || '').trim()),
             supplier_id: String(editLotSupplierId?.value || '').trim(),
             supplier_name: String(editLotSupplier?.value || '').trim(),
             note: String(editLotNote?.value || '').trim(),
@@ -3322,18 +3564,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (tabCurrent) tabCurrent.addEventListener('click', function () { switchTab('current'); });
     if (tabLots) tabLots.addEventListener('click', function () { switchTab('lots'); });
 
-    if (btnChoiceProduct) btnChoiceProduct.addEventListener('click', function () {
-        if (choiceWrap) choiceWrap.classList.add('hidden');
-        if (formProduct) formProduct.classList.remove('hidden');
-        try { if (createInvScroll) createInvScroll.scrollTop = 0; } catch (e) { }
-    });
-    if (btnChoiceLot) btnChoiceLot.addEventListener('click', function () {
-        if (choiceWrap) choiceWrap.classList.add('hidden');
-        if (formLot) formLot.classList.remove('hidden');
-        poblarProductosSelect();
-        try { if (createInvScroll) createInvScroll.scrollTop = 0; } catch (e) { }
-    });
-    if (btnBack1) btnBack1.addEventListener('click', resetCreateModal);
+    if (btnBack1) btnBack1.addEventListener('click', closeCreate);
     if (btnBack2) btnBack2.addEventListener('click', closeCreate);
 
     if (prodUnit) {
@@ -3402,8 +3633,22 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    if (prodLotNoExp) {
+        prodLotNoExp.addEventListener('change', function () {
+            const no = !!prodLotNoExp.checked;
+            if (prodLotExp) {
+                prodLotExp.value = '';
+                prodLotExp.disabled = no;
+                prodLotExp.classList.toggle('bg-gray-50', no);
+            }
+        });
+    }
+
     if (lotCu) lotCu.addEventListener('input', updateLotCt);
     if (lotQty) lotQty.addEventListener('input', updateLotCt);
+
+    if (prodLotCu) prodLotCu.addEventListener('input', updateProdLotCt);
+    if (prodLotQty) prodLotQty.addEventListener('input', updateProdLotCt);
 
     if (btnSaveProduct) {
         btnSaveProduct.addEventListener('click', function () {
@@ -3419,6 +3664,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const desc = String(prodDesc?.value || '').trim();
             const salePrice = parseMonedaARS(prodSalePrice?.value);
             const active = !!prodActive?.checked;
+
+            const firstLotQty = parseNumeroSeguro(prodLotQty?.value);
+            const wantsFirstLot = (!editingProductId) && (firstLotQty > 0);
 
             if (!name) { if (window.showAlertModal) window.showAlertModal('Completá el nombre del producto.', 'Atención', 'Validación requerida'); else alert('Completá el nombre del producto.'); return; }
             if (!categoryId) { if (window.showAlertModal) window.showAlertModal('Seleccioná la categoría del producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná la categoría del producto.'); return; }
@@ -3456,18 +3704,66 @@ document.addEventListener('DOMContentLoaded', function () {
                 const item = res.item;
                 const pid = String(item?.id || editingProductId || '').trim();
                 const file = (prodImage && prodImage.files && prodImage.files.length) ? prodImage.files[0] : null;
-                if (pid && file) {
-                    apiUploadProductImage(pid, file).then(function () {
-                        closeCreate();
-                        renderAll();
+
+                let lotFailed = false;
+                let lotInvalid = false;
+                const createFirstLot = function () {
+                    if (!wantsFirstLot) return Promise.resolve({ skipped: true });
+                    const entryIso = toIsoDate(String(prodLotDate?.value || '').trim());
+                    if (!entryIso) {
+                        lotInvalid = true;
+                        return Promise.resolve({ skipped: true });
+                    }
+                    const supplierName = String(prodLotSupplier?.value || '').trim();
+                    const supplierId = String(prodLotSupplierId?.value || '').trim();
+                    const unitCost = parseMonedaARS(prodLotCu?.value);
+                    const qty = parseNumeroSeguro(prodLotQty?.value);
+                    const expIso = (prodLotNoExp?.checked) ? '' : toIsoDate(String(prodLotExp?.value || '').trim());
+                    if (!prodLotNoExp?.checked && !expIso) {
+                        lotInvalid = true;
+                        return Promise.resolve({ skipped: true });
+                    }
+                    const note = String(prodLotNote?.value || '').trim();
+
+                    const lotPayload = {
+                        product_id: parseInt(pid, 10),
+                        qty: qty,
+                        unit_cost: unitCost,
+                        date: entryIso,
+                        supplier_id: supplierId,
+                        supplier_name: supplierName,
+                        expiration_date: expIso,
+                        note: note
+                    };
+                    return apiCreateLot(lotPayload).then(function (lr) {
+                        if (!lr || lr.ok !== true) {
+                            lotFailed = true;
+                        }
+                        return lr;
                     }).catch(function () {
-                        closeCreate();
-                        renderAll();
+                        lotFailed = true;
                     });
-                    return;
-                }
-                closeCreate();
-                renderAll();
+                };
+
+                const uploadImage = function () {
+                    if (!(pid && file)) return Promise.resolve({ skipped: true });
+                    return apiUploadProductImage(pid, file).catch(function () {
+                    });
+                };
+
+                createFirstLot().then(function () {
+                    return uploadImage();
+                }).then(function () {
+                    closeCreate();
+                    renderAll();
+                    if (wantsFirstLot && lotInvalid) {
+                        if (window.showAlertModal) window.showAlertModal('El ítem se guardó, pero el lote no se creó: revisá la fecha de ingreso y/o vencimiento.', 'Atención', 'Lote incompleto');
+                        else alert('El ítem se guardó, pero el lote no se creó: revisá la fecha de ingreso y/o vencimiento.');
+                    } else if (wantsFirstLot && lotFailed) {
+                        if (window.showAlertModal) window.showAlertModal('El ítem se guardó, pero no se pudo crear el lote.', 'Atención', 'Operación parcial');
+                        else alert('El ítem se guardó, pero no se pudo crear el lote.');
+                    }
+                });
             }).catch(function () {
                 const msg = editingProductId ? 'No se pudo editar el producto.' : 'No se pudo crear el producto.';
                 if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Operación fallida');
@@ -3638,6 +3934,13 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    if (prodLotSupplier) {
+        prodLotSupplier.addEventListener('input', function () {
+            if (suppressSupplierInputClear) return;
+            if (prodLotSupplierId) prodLotSupplierId.value = '';
+        });
+    }
+
     function safeReturnToWithTarget(target) {
         try {
             const url = new URL(window.location.href);
@@ -3652,6 +3955,51 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function goCreateSupplier(target) {
+        try {
+            const draft = {
+                wasOpen: !!(modalCreate && !modalCreate.classList.contains('hidden')),
+                choiceHidden: !!choiceWrap?.classList.contains('hidden'),
+                productHidden: !!formProduct?.classList.contains('hidden'),
+                lotHidden: !!formLot?.classList.contains('hidden'),
+                editingProductId: String(editingProductId || ''),
+                product: {
+                    name: String(prodName?.value || ''),
+                    categoryId: String(prodCatId?.value || ''),
+                    unit: String(prodUnit?.value || ''),
+                    unitOther: String(prodUnitOther?.value || ''),
+                    manageLots: !!prodLots?.checked,
+                    method: String(prodMethod?.value || ''),
+                    min: String(prodMin?.value || ''),
+                    reorder: String(prodReorder?.value || ''),
+                    desc: String(prodDesc?.value || ''),
+                    salePrice: String(prodSalePrice?.value || ''),
+                    active: !!prodActive?.checked,
+                    firstLot: {
+                        date: String(prodLotDate?.value || ''),
+                        supplier: String(prodLotSupplier?.value || ''),
+                        supplierId: String(prodLotSupplierId?.value || ''),
+                        cu: String(prodLotCu?.value || ''),
+                        qty: String(prodLotQty?.value || ''),
+                        exp: String(prodLotExp?.value || ''),
+                        noExp: !!prodLotNoExp?.checked,
+                        note: String(prodLotNote?.value || '')
+                    }
+                },
+                lot: {
+                    productId: String(lotProduct?.value || ''),
+                    date: String(lotDate?.value || ''),
+                    supplier: String(lotSupplier?.value || ''),
+                    supplierId: String(lotSupplierId?.value || ''),
+                    cu: String(lotCu?.value || ''),
+                    qty: String(lotQty?.value || ''),
+                    exp: String(lotExp?.value || ''),
+                    noExp: !!lotNoExp?.checked,
+                    note: String(lotNote?.value || '')
+                }
+            };
+            window.sessionStorage?.setItem('inv_draft', JSON.stringify(draft));
+        } catch (e) {
+        }
         const returnTo = safeReturnToWithTarget(target);
         const qs = [
             'return_to=' + encodeURIComponent(returnTo),
@@ -3659,9 +4007,96 @@ document.addEventListener('DOMContentLoaded', function () {
         ];
         window.location.href = '/suppliers/new?' + qs.join('&');
     }
+
+    function restoreInventoryDraft() {
+        let raw = '';
+        try { raw = window.sessionStorage?.getItem('inv_draft') || ''; } catch (e) { raw = ''; }
+        if (!raw) return;
+        let d = null;
+        try { d = JSON.parse(raw); } catch (e) { d = null; }
+        try { window.sessionStorage?.removeItem('inv_draft'); } catch (e) { }
+        if (!d || !d.wasOpen) return;
+
+        try { window.__inv_draft_restored = true; } catch (e) { }
+
+        try {
+            if (d.productHidden === false) {
+                openCreate();
+            } else if (d.lotHidden === false) {
+                openAddLot();
+            } else {
+                abrirModal(modalCreate, true);
+            }
+        } catch (e) {
+        }
+
+        try {
+            editingProductId = String(d.editingProductId || '');
+        } catch (e) {
+        }
+
+        try {
+            if (choiceWrap) choiceWrap.classList.toggle('hidden', !!d.choiceHidden);
+            if (formProduct) formProduct.classList.toggle('hidden', !!d.productHidden);
+            if (formLot) formLot.classList.toggle('hidden', !!d.lotHidden);
+        } catch (e) {
+        }
+
+        try {
+            if (prodName) prodName.value = String(d?.product?.name || '');
+            if (prodCatId) prodCatId.value = String(d?.product?.categoryId || '');
+            if (prodUnit) prodUnit.value = String(d?.product?.unit || '');
+            if (prodUnitOther) prodUnitOther.value = String(d?.product?.unitOther || '');
+            if (prodLots) prodLots.checked = !!d?.product?.manageLots;
+            if (prodMethod) prodMethod.value = String(d?.product?.method || '');
+            if (prodMin) prodMin.value = String(d?.product?.min || '');
+            if (prodReorder) prodReorder.value = String(d?.product?.reorder || '');
+            if (prodDesc) prodDesc.value = String(d?.product?.desc || '');
+            if (prodSalePrice) prodSalePrice.value = String(d?.product?.salePrice || '');
+            if (prodActive) prodActive.checked = !!d?.product?.active;
+        } catch (e) {
+        }
+
+        try {
+            const fl = d?.product?.firstLot || {};
+            if (prodLotDate) prodLotDate.value = String(fl?.date || '');
+            if (prodLotSupplier) prodLotSupplier.value = String(fl?.supplier || '');
+            if (prodLotSupplierId) prodLotSupplierId.value = String(fl?.supplierId || '');
+            if (prodLotCu) prodLotCu.value = String(fl?.cu || '');
+            if (prodLotQty) prodLotQty.value = String(fl?.qty || '');
+            if (prodLotExp) prodLotExp.value = String(fl?.exp || '');
+            if (prodLotNoExp) prodLotNoExp.checked = !!fl?.noExp;
+            if (prodLotNote) prodLotNote.value = String(fl?.note || '');
+            try { prodLotNoExp?.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) { }
+            try { updateProdLotCt(); } catch (e) { }
+        } catch (e) {
+        }
+
+        try {
+            const l = d?.lot || {};
+            if (lotProduct) lotProduct.value = String(l?.productId || '');
+            if (lotDate) lotDate.value = String(l?.date || '');
+            if (lotSupplier) lotSupplier.value = String(l?.supplier || '');
+            if (lotSupplierId) lotSupplierId.value = String(l?.supplierId || '');
+            if (lotCu) lotCu.value = String(l?.cu || '');
+            if (lotQty) lotQty.value = String(l?.qty || '');
+            if (lotExp) lotExp.value = String(l?.exp || '');
+            if (lotNoExp) lotNoExp.checked = !!l?.noExp;
+            if (lotNote) lotNote.value = String(l?.note || '');
+            try { lotNoExp?.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) { }
+            try { updateLotCt(); } catch (e) { }
+        } catch (e) {
+        }
+    }
     if (btnSelectSupplierLot) {
         btnSelectSupplierLot.addEventListener('click', function () {
             openSupplierModal('lot');
+        });
+    }
+
+    if (btnSelectSupplierProdLot) {
+        btnSelectSupplierProdLot.addEventListener('click', function () {
+            openSupplierModal('prod_lot');
         });
     }
 
@@ -3709,16 +4144,20 @@ document.addEventListener('DOMContentLoaded', function () {
             const entryDate = String(lotDate?.value || '').trim();
             const supplier = String(lotSupplier?.value || '').trim();
             const supplierId = String(lotSupplierId?.value || '').trim();
-            const cu = parseNumeroSeguro(lotCu?.value);
+            const cu = parseMonedaARS(lotCu?.value);
             const qty = parseNumeroSeguro(lotQty?.value);
             const expiration = (lotNoExp?.checked) ? '' : String(lotExp?.value || '').trim();
             const note = String(lotNote?.value || '').trim();
 
+            const entryIso = toIsoDate(entryDate);
+            const expIso = (lotNoExp?.checked) ? '' : toIsoDate(expiration);
+
             if (!productId) { if (window.showAlertModal) window.showAlertModal('Seleccioná un producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná un producto.'); return; }
-            if (!entryDate) { if (window.showAlertModal) window.showAlertModal('Completá la fecha de ingreso.', 'Atención', 'Validación requerida'); else alert('Completá la fecha de ingreso.'); return; }
+            if (!entryIso) { if (window.showAlertModal) window.showAlertModal('Completá la fecha de ingreso.', 'Atención', 'Validación requerida'); else alert('Completá la fecha de ingreso.'); return; }
             if (!supplier) { if (window.showAlertModal) window.showAlertModal('Completá el proveedor.', 'Atención', 'Validación requerida'); else alert('Completá el proveedor.'); return; }
-            if (!(cu > 0)) { if (window.showAlertModal) window.showAlertModal('El costo unitario debe ser mayor a 0.', 'Atención', 'Validación requerida'); else alert('El costo unitario debe ser mayor a 0.'); return; }
+            if (!(cu >= 0)) { if (window.showAlertModal) window.showAlertModal('El costo unitario no puede ser negativo.', 'Atención', 'Validación requerida'); else alert('El costo unitario no puede ser negativo.'); return; }
             if (!(qty > 0)) { if (window.showAlertModal) window.showAlertModal('La cantidad debe ser mayor a 0.', 'Atención', 'Validación requerida'); else alert('La cantidad debe ser mayor a 0.'); return; }
+            if (!lotNoExp?.checked && !expIso) { if (window.showAlertModal) window.showAlertModal('Completá la fecha de vencimiento o marcá “No corresponde”.', 'Atención', 'Validación requerida'); else alert('Completá la fecha de vencimiento o marcá “No corresponde”.'); return; }
 
             const prod = (Array.isArray(cacheProducts) ? cacheProducts : []).find(p => String(p.id) === String(productId));
             if (!prod) { if (window.showAlertModal) window.showAlertModal('Producto inválido.', 'Atención', 'Validación requerida'); else alert('Producto inválido.'); return; }
@@ -3745,13 +4184,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
             apiCreateLot({
                 product_id: parseInt(productId, 10),
-                date: entryDate,
+                date: entryIso,
                 unit_cost: cu,
                 qty: qty,
                 supplier_id: supplierId,
                 supplier_name: supplier,
                 lot_code: lotCode,
-                expiration_date: expiration,
+                expiration_date: expIso,
                 note: note
             }).then(function (res) {
                 if (!res || res.ok !== true) {
@@ -3769,7 +4208,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    [filterQ, filterCat, filterStatus].forEach(el => {
+    [filterQ, filterCat].forEach(el => {
         if (!el) return;
         el.addEventListener('input', renderAll);
         el.addEventListener('change', renderAll);
@@ -3805,8 +4244,10 @@ document.addEventListener('DOMContentLoaded', function () {
         try { filterStatus.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) { }
     }
 
-    // Estado filter: permitir multi-selección simple (sin Ctrl/Cmd) y que "Todos" seleccione OK+Reponer+Crítico.
+    // Estado filter: compatible con bootstrap-select.
+    // Regla: "Todos" (value="") es exclusivo. Default: solo "Todos".
     let suppressStatusSync = false;
+    let lastTodosSelected = false;
 
     function getStatusOptions() {
         if (!filterStatus) return { allOpt: null, statusOpts: [] };
@@ -3816,40 +4257,88 @@ document.addEventListener('DOMContentLoaded', function () {
         return { allOpt, statusOpts };
     }
 
-    function syncTodosOption() {
+    function refreshStatusPickerUI() {
+        try {
+            if (window.jQuery && window.jQuery.fn && typeof window.jQuery.fn.selectpicker === 'function') {
+                window.jQuery(filterStatus).selectpicker('refresh');
+            }
+        } catch (e) {
+        }
+    }
+
+    function setTodosOnlySelected() {
+        if (!filterStatus) return;
+        const { allOpt, statusOpts } = getStatusOptions();
+        // Default: "Todos" marcado y todos los estados seleccionados.
+        if (allOpt) allOpt.selected = true;
+        statusOpts.forEach(function (o) { o.selected = true; });
+        refreshStatusPickerUI();
+    }
+
+    function enforceStatusSelectionRules() {
         if (!filterStatus) return;
         const { allOpt, statusOpts } = getStatusOptions();
         if (!allOpt) return;
-        const allSelected = statusOpts.length > 0 && statusOpts.every(o => !!o.selected);
-        allOpt.selected = allSelected;
+
+        // Se permite selección vacía. Reglas automáticas mínimas:
+        // - Si el usuario seleccionó algún estado manualmente, no tocar.
+        // - Si el usuario deja "Todos" seleccionado, no forzamos nada acá (se maneja como toggle en el handler bs.select).
+        refreshStatusPickerUI();
     }
 
     if (filterStatus) {
-        filterStatus.addEventListener('change', function () {
+        const handleStatusChanged = function () {
             if (suppressStatusSync) return;
-            const { allOpt, statusOpts } = getStatusOptions();
-            if (!allOpt) {
+            suppressStatusSync = true;
+            setTimeout(function () {
+                try {
+                    const { allOpt, statusOpts } = getStatusOptions();
+                    const isTodosNow = !!allOpt?.selected;
+                    const anyStatusSelected = statusOpts.some(o => !!o.selected);
+
+                    // "Todos" es un toggle independiente:
+                    // - OFF -> ON: seleccionar todos los estados
+                    // - ON -> OFF: limpiar todos los estados
+                    if (isTodosNow && !lastTodosSelected) {
+                        statusOpts.forEach(function (o) { o.selected = true; });
+                    } else if (!isTodosNow && lastTodosSelected) {
+                        statusOpts.forEach(function (o) { o.selected = false; });
+                    } else if (isTodosNow && anyStatusSelected) {
+                        // Si el usuario toca estados individuales mientras "Todos" está ON,
+                        // apagamos "Todos" para permitir selección parcial.
+                        // ("Todos" solo sirve para seleccionar todo / deseleccionar todo).
+                        const allStatusesSelected = statusOpts.length > 0 && statusOpts.every(o => !!o.selected);
+                        if (!allStatusesSelected) {
+                            allOpt.selected = false;
+                        }
+                    }
+
+                    lastTodosSelected = !!allOpt?.selected;
+                    enforceStatusSelectionRules();
+                    refreshStatusPickerUI();
+                } catch (e) {
+                }
+                suppressStatusSync = false;
                 try { renderAll(); } catch (e) { }
-                return;
+            }, 0);
+        };
+
+        filterStatus.addEventListener('change', handleStatusChanged);
+        try {
+            if (window.jQuery && window.jQuery.fn && typeof window.jQuery.fn.selectpicker === 'function') {
+                window.jQuery(filterStatus).on('changed.bs.select', handleStatusChanged);
             }
+        } catch (e) {
+        }
 
-            const todosSelected = !!allOpt.selected;
-            if (todosSelected) {
-                suppressStatusSync = true;
-                statusOpts.forEach(function (o) { o.selected = true; });
-                suppressStatusSync = false;
-            } else {
-                // Si están las 3 seleccionadas, marcamos "Todos" para que el dropdown lo muestre.
-                suppressStatusSync = true;
-                syncTodosOption();
-                suppressStatusSync = false;
-            }
-
-            try { renderAll(); } catch (e) { }
-        });
-
-        // Inicial: si al cargar están todas seleccionadas, reflejar en "Todos".
-        try { syncTodosOption(); } catch (e) { }
+        try {
+            setTodosOnlySelected();
+            try {
+                const { allOpt } = getStatusOptions();
+                lastTodosSelected = !!allOpt?.selected;
+            } catch (e) { }
+            filterStatus.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (e) { }
     }
 
     function setStatusFilterButtonText(text) {
@@ -3894,7 +4383,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const { allOpt, statusOpts } = getStatusOptions();
         if (!allOpt) return;
         const selected = statusOpts.filter(o => !!o.selected);
-        if (!selected.length || selected.length === statusOpts.length) {
+        if (!selected.length) {
+            setStatusFilterButtonText('Ninguno');
+            return;
+        }
+        if (selected.length === statusOpts.length) {
             setStatusFilterButtonText('Todos');
             return;
         }
@@ -3924,6 +4417,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    try { restoreInventoryDraft(); } catch (e) { }
     applyReturnedSupplierSelection();
 
     switchTab('current');

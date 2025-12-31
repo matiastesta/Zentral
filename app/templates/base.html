@@ -755,34 +755,42 @@
                             const trimmed = raw.trim();
                             if (!trimmed) return;
                             if (/^\s*-?\$?\s*$/.test(raw)) return;
-                            const digitsBefore = countDigitsBeforeCaret(raw, el.selectionStart);
                             const rawNoSpace = raw.replace(/\s/g, '');
-                            const trailingComma = /,$/.test(rawNoSpace);
+                            const trailingComma = /,$/.test(rawNoSpace.replace(/\$/g, ''));
 
-                            const n = parseCurrencyARS(raw);
-                            let fracDigits = 0;
+                            let sign = '';
                             try {
-                                const m = trailingComma ? null : String(raw).match(/,([^,]*)$/);
-                                if (m && typeof m[1] === 'string') {
-                                    const dec = m[1].replace(/[^0-9]/g, '');
-                                    if (dec.length >= 2) fracDigits = 2;
-                                    else if (dec.length === 1) fracDigits = 1;
-                                }
+                                if (trimmed.startsWith('-')) sign = '-';
                             } catch (e) {
                             }
-                            let formatted = fracDigits ? _formatCurrencyARSFixed(n, fracDigits) : formatCurrencyARS(n);
-                            if (trailingComma) {
-                                if (formatted.indexOf(',') < 0) formatted = formatted + ',';
+
+                            let s = rawNoSpace.replace(/\$/g, '');
+                            if (s.startsWith('-')) s = s.slice(1);
+                            s = s.replace(/[^0-9,]/g, '');
+
+                            const commaIdx = s.indexOf(',');
+                            let intPart = s;
+                            let decPart = '';
+                            if (commaIdx >= 0) {
+                                intPart = s.slice(0, commaIdx);
+                                decPart = s.slice(commaIdx + 1);
                             }
-                            el.value = formatted;
-                            if (trailingComma) {
-                                try {
-                                    const pos = formatted.length;
-                                    el.setSelectionRange(pos, pos);
-                                } catch (e) {
-                                }
-                            } else {
-                                setCaretByDigits(el, formatted, digitsBefore);
+                            if (decPart.length > 2) decPart = decPart.slice(0, 2);
+
+                            if (!intPart && !decPart && !trailingComma) return;
+
+                            const intDigits = String(intPart || '').replace(/[^0-9]/g, '');
+                            const intFormatted = (intDigits ? intDigits : '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+                            let out = sign + '$' + intFormatted;
+                            if (commaIdx >= 0 || trailingComma) {
+                                out += ',' + (decPart || '');
+                            }
+                            el.value = out;
+                            try {
+                                const pos = out.length;
+                                el.setSelectionRange(pos, pos);
+                            } catch (e) {
                             }
                         });
 
