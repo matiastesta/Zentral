@@ -21,6 +21,16 @@ def _serialize_supplier(row: Supplier):
         cats = cats if isinstance(cats, list) else []
     except Exception:
         cats = []
+
+    try:
+        raw_meta = str(getattr(row, 'meta_json', '') or '').strip()
+        if raw_meta:
+            meta_obj = json.loads(raw_meta) if isinstance(raw_meta, str) else {}
+            if isinstance(meta_obj, dict) and meta_obj.get('inventory_supplier') is True:
+                if 'Inventario' not in [str(x or '').strip() for x in cats]:
+                    cats = ['Inventario'] + cats
+    except Exception:
+        pass
     return {
         'id': row.id,
         'name': row.name or '',

@@ -49,17 +49,14 @@
 
         <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Categorías (multiselección)</label>
+            <label class="flex items-center gap-2 p-2 border rounded-md text-sm mb-2 bg-gray-50">
+                <input id="supplier-category-inventory" type="checkbox" class="rounded">
+                <span>Inventario</span>
+            </label>
             <div id="supplier-categories" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Servicios públicos" class="rounded"> <span>Servicios públicos</span></label>
-                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Compra de productos e insumos" class="rounded"> <span>Compra de productos e insumos</span></label>
-                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Inventario" class="rounded"> <span>Inventario</span></label>
-                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Arriendo" class="rounded"> <span>Arriendo</span></label>
-                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Nómina" class="rounded"> <span>Nómina</span></label>
-                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Transportes" class="rounded"> <span>Transportes</span></label>
-                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Domicilios y logística" class="rounded"> <span>Domicilios y logística</span></label>
-                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Mantenimiento y reparaciones" class="rounded"> <span>Mantenimiento y reparaciones</span></label>
-                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Muebles, equipos o maquinarias" class="rounded"> <span>Muebles, equipos o maquinarias</span></label>
-                <label class="flex items-center gap-2 p-2 border rounded-md text-sm"><input type="checkbox" value="Otro" class="rounded"> <span>Otro</span></label>
+            </div>
+            <div class="mt-2 flex justify-end">
+                <button id="btn-manage-supplier-categories" type="button" class="text-[11px] text-blue-700 hover:text-blue-900">Administrar categorías</button>
             </div>
         </div>
 
@@ -159,6 +156,40 @@
         </div>
     </div>
 </div>
+
+<div id="modal-supplier-categories" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Categorías</h3>
+                    <p class="text-xs text-gray-500">Administrá categorías operativas (no inventario).</p>
+                </div>
+                <button id="btn-close-supplier-categories" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600" aria-label="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-3">
+                <div class="grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
+                    <div class="md:col-span-5">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Nueva categoría</label>
+                        <input id="supplier-new-category-name" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Publicidad">
+                    </div>
+                    <div class="md:col-span-1 flex justify-end">
+                        <button id="btn-supplier-add-category" type="button" class="w-full inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Agregar</button>
+                    </div>
+                </div>
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <div id="supplier-categories-admin-list" class="max-h-[320px] overflow-auto divide-y divide-gray-100"></div>
+                </div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-cancel-supplier-categories" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -176,6 +207,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const selectType = document.getElementById('supplier-type');
     const selectStatus = document.getElementById('supplier-status');
     const categoriesWrap = document.getElementById('supplier-categories');
+    const inventoryCheckbox = document.getElementById('supplier-category-inventory');
+    const btnManageCategories = document.getElementById('btn-manage-supplier-categories');
+    const modalCats = document.getElementById('modal-supplier-categories');
+    const btnCloseCats = document.getElementById('btn-close-supplier-categories');
+    const btnCancelCats = document.getElementById('btn-cancel-supplier-categories');
+    const inputNewCatName = document.getElementById('supplier-new-category-name');
+    const btnAddCat = document.getElementById('btn-supplier-add-category');
+    const catsAdminList = document.getElementById('supplier-categories-admin-list');
 
     const btnToggle = document.getElementById('btn-toggle-complementaria');
     const panelComp = document.getElementById('panel-complementaria');
@@ -196,9 +235,108 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnGuardar = document.getElementById('btn-guardar-proveedor');
 
     let lastLoadedMetaObj = {};
+    let inventorySupplierFlag = false;
 
     function isPromise(x) {
         return !!x && typeof x.then === 'function';
+    }
+
+    function parseMetaObj(raw) {
+        const s = String(raw || '').trim();
+        if (!s) return {};
+        try {
+            const parsed = JSON.parse(s);
+            return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function normalizeCategories(values) {
+        const arr = Array.isArray(values) ? values : [];
+        const out = [];
+        arr.forEach(function (x) {
+            const raw = String(x || '').trim();
+            if (!raw) return;
+            const low = raw.toLowerCase();
+            if (low === 'inventario') {
+                inventorySupplierFlag = true;
+                return;
+            }
+            if (low === 'compra de productos e insumos') {
+                out.push('Gastos operativos');
+                return;
+            }
+            if (low === 'domicilios y logística' || low === 'domicilios y logistica') {
+                out.push('Transportes');
+                return;
+            }
+            out.push(raw);
+        });
+        return out;
+    }
+
+    function readExpenseCategories() {
+        try {
+            if (window.StorageService && typeof window.StorageService.getAdapter === 'function') {
+                const a = window.StorageService.getAdapter();
+                if (a && typeof a.getExpenseCategories === 'function') {
+                    return a.getExpenseCategories();
+                }
+            }
+        } catch (e) {
+        }
+        return [];
+    }
+
+    function renderSupplierCategories() {
+        if (!categoriesWrap) return Promise.resolve();
+        const base = [
+            'Servicios públicos',
+            'Gastos operativos',
+            'Arriendo',
+            'Nómina',
+            'Transportes',
+            'Mantenimiento y reparaciones',
+            'Muebles, equipos o maquinarias',
+            'Otro'
+        ];
+
+        const res = readExpenseCategories();
+        const finish = function (items) {
+            const all = base.slice();
+            (Array.isArray(items) ? items : []).forEach(function (c) {
+                const name = (c && typeof c === 'object') ? String(c.name || '').trim() : String(c || '').trim();
+                if (!name) return;
+                if (name.toLowerCase() === 'inventario') return;
+                if (all.includes(name)) return;
+                all.splice(all.length - 1, 0, name);
+            });
+
+            categoriesWrap.innerHTML = '';
+            all.forEach(function (c) {
+                const label = document.createElement('label');
+                label.className = 'flex items-center gap-2 p-2 border rounded-md text-sm';
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.value = c;
+                input.className = 'rounded';
+                const span = document.createElement('span');
+                span.textContent = c;
+                label.appendChild(input);
+                label.appendChild(span);
+                categoriesWrap.appendChild(label);
+            });
+        };
+
+        if (isPromise(res)) return res.then(finish).catch(function () { finish([]); });
+        finish(res);
+        return Promise.resolve();
+    }
+
+    function syncInventoryCheckbox() {
+        if (!inventoryCheckbox) return;
+        inventoryCheckbox.checked = !!inventorySupplierFlag;
     }
 
     async function apiJson(url, options) {
@@ -215,6 +353,115 @@ document.addEventListener('DOMContentLoaded', function () {
             throw new Error(msg);
         }
         return data;
+    }
+
+    function openCategoriesModal() {
+        if (!modalCats) return;
+        modalCats.classList.remove('hidden');
+        if (inputNewCatName) inputNewCatName.value = '';
+        renderCategoriesAdminList();
+        if (inputNewCatName) inputNewCatName.focus();
+    }
+
+    function closeCategoriesModal() {
+        if (!modalCats) return;
+        modalCats.classList.add('hidden');
+    }
+
+    function renderCategoriesAdminList() {
+        if (!catsAdminList) return;
+        const res = readExpenseCategories();
+        const apply = function (items) {
+            const list = Array.isArray(items) ? items : [];
+            catsAdminList.innerHTML = '';
+            const filtered = list
+                .map(function (c) {
+                    if (c && typeof c === 'object') return { id: String(c.id || '').trim(), name: String(c.name || '').trim() };
+                    const name = String(c || '').trim();
+                    return { id: '', name };
+                })
+                .filter(function (x) { return x && x.name && x.name.toLowerCase() !== 'inventario'; })
+                .sort(function (a, b) { return a.name.localeCompare(b.name); });
+
+            if (!filtered.length) {
+                const empty = document.createElement('div');
+                empty.className = 'px-4 py-6 text-sm text-center text-gray-500';
+                empty.textContent = 'No hay categorías personalizadas.';
+                catsAdminList.appendChild(empty);
+                return;
+            }
+
+            filtered.forEach(function (c) {
+                const row = document.createElement('div');
+                row.className = 'px-4 py-3 flex items-center justify-between gap-3';
+                row.innerHTML = '<div class="text-sm text-gray-800">' + c.name + '</div>';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'text-xs text-red-700 hover:text-red-900';
+                btn.textContent = 'Eliminar';
+                btn.addEventListener('click', function () {
+                    if (!c.id) return;
+                    const go = function () {
+                        apiJson('/expenses/api/categories/' + encodeURIComponent(c.id), { method: 'DELETE' })
+                            .then(function () {
+                                const selected = getSelectedCategories();
+                                return renderSupplierCategories().then(function () {
+                                    setSelectedCategories(selected);
+                                    syncInventoryCheckbox();
+                                    return renderCategoriesAdminList();
+                                });
+                            })
+                            .catch(function (e) {
+                                const msg = String(e && e.message ? e.message : 'No se pudo eliminar la categoría.');
+                                if (window.showAlertModal) window.showAlertModal(msg, 'Atención', 'Error');
+                                else alert(msg);
+                            });
+                    };
+                    if (window.confirmModal) {
+                        window.confirmModal(
+                            '¿Eliminar la categoría “' + c.name + '”?',
+                            'Eliminar categoría',
+                            'Confirmación requerida',
+                            { okText: 'Eliminar', cancelText: 'Cancelar' }
+                        ).then(function (ok) { if (ok) go(); });
+                    } else {
+                        if (confirm('¿Eliminar la categoría “' + c.name + '”?')) go();
+                    }
+                });
+                row.appendChild(btn);
+                catsAdminList.appendChild(row);
+            });
+        };
+
+        if (isPromise(res)) return res.then(apply).catch(function () { apply([]); });
+        apply(res);
+    }
+
+    function addNewCategoryFromModal() {
+        const name = String(inputNewCatName?.value || '').trim();
+        if (!name) return;
+        if (name.toLowerCase() === 'inventario') {
+            if (window.showAlertModal) window.showAlertModal('La categoría “Inventario” es exclusiva del módulo de Inventario.', 'Atención', 'Categoría reservada');
+            else alert('La categoría “Inventario” es exclusiva del módulo de Inventario.');
+            return;
+        }
+        apiJson('/expenses/api/categories', {
+            method: 'POST',
+            body: JSON.stringify({ name: name })
+        }).then(function () {
+            const selected = getSelectedCategories();
+            selected.push(name);
+            renderSupplierCategories().then(function () {
+                setSelectedCategories(selected);
+                syncInventoryCheckbox();
+                renderCategoriesAdminList();
+                if (inputNewCatName) inputNewCatName.value = '';
+            });
+        }).catch(function (e) {
+            const msg = String(e && e.message ? e.message : 'No se pudo crear la categoría.');
+            if (window.showAlertModal) window.showAlertModal(msg, 'Atención', 'Error');
+            else alert(msg);
+        });
     }
 
     function getSelectedCategories() {
@@ -255,7 +502,11 @@ document.addEventListener('DOMContentLoaded', function () {
             if (inputName) inputName.value = found.name || '';
             if (selectType) selectType.value = found.supplier_type || 'Services';
             if (selectStatus) selectStatus.value = found.status || 'Active';
-            setSelectedCategories(found.categories || []);
+            const metaParsed = parseMetaObj(found.meta_json || '');
+            lastLoadedMetaObj = metaParsed;
+            if (metaParsed && metaParsed.inventory_supplier === true) inventorySupplierFlag = true;
+            setSelectedCategories(normalizeCategories(found.categories || []));
+            syncInventoryCheckbox();
 
             if (invoiceType) invoiceType.value = found.invoice_type || '';
             if (defaultPayment) defaultPayment.value = found.default_payment_method || '';
@@ -269,15 +520,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (notes) notes.value = found.notes || '';
 
-            lastLoadedMetaObj = {};
-            const rawMeta = String(found.meta_json || '').trim();
-            if (rawMeta) {
-                try {
-                    const parsed = JSON.parse(rawMeta);
-                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) lastLoadedMetaObj = parsed;
-                } catch (e) {
-                }
-            }
         }).catch(function () {
         });
     }
@@ -286,7 +528,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const name = (inputName?.value || '').trim();
         const cats = getSelectedCategories();
         if (!name) return false;
-        if (!cats.length) return false;
+        if (!inventorySupplierFlag && !cats.length) return false;
         return true;
     }
 
@@ -320,6 +562,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const metaObj = (lastLoadedMetaObj && typeof lastLoadedMetaObj === 'object' && !Array.isArray(lastLoadedMetaObj))
             ? { ...lastLoadedMetaObj }
             : {};
+        if (inventorySupplierFlag) metaObj.inventory_supplier = true;
+        else if (metaObj && metaObj.inventory_supplier) delete metaObj.inventory_supplier;
         if (filesMeta.length) metaObj.attachments = filesMeta;
         if (Object.keys(metaObj).length) {
             try {
@@ -365,15 +609,43 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    const id = params.get('id');
-    if (id) {
-        cargarDesdeId(id);
-    } else {
-        const cat = String(prefillCategory || '').trim();
-        if (cat) {
-            setSelectedCategories([cat]);
-        }
+    if (inventoryCheckbox) {
+        inventoryCheckbox.addEventListener('change', function () {
+            inventorySupplierFlag = !!inventoryCheckbox.checked;
+        });
     }
+
+    if (btnManageCategories) {
+        btnManageCategories.addEventListener('click', function () {
+            openCategoriesModal();
+        });
+    }
+    if (btnCloseCats) btnCloseCats.addEventListener('click', function () { closeCategoriesModal(); });
+    if (btnCancelCats) btnCancelCats.addEventListener('click', function () { closeCategoriesModal(); });
+    if (btnAddCat) btnAddCat.addEventListener('click', function () { addNewCategoryFromModal(); });
+    if (inputNewCatName) {
+        inputNewCatName.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addNewCategoryFromModal();
+            }
+        });
+    }
+
+    renderSupplierCategories().then(function () {
+        const id = params.get('id');
+        if (id) {
+            cargarDesdeId(id);
+        } else {
+            const cat = String(prefillCategory || '').trim();
+            if (cat && cat.toLowerCase() === 'inventario') {
+                inventorySupplierFlag = true;
+            } else if (cat) {
+                setSelectedCategories([cat]);
+            }
+            syncInventoryCheckbox();
+        }
+    });
 });
 </script>
 {% endblock %}

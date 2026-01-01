@@ -1664,6 +1664,24 @@ document.addEventListener('DOMContentLoaded', function () {
         return cats.map(x => String(x || '').trim()).filter(Boolean);
     }
 
+    function parseSupplierMeta(s) {
+        try {
+            const raw = String(s?.meta_json || '').trim();
+            if (!raw) return {};
+            const parsed = JSON.parse(raw);
+            return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function isInventorySupplier(s) {
+        const meta = parseSupplierMeta(s);
+        if (meta && meta.inventory_supplier === true) return true;
+        const cats = normalizeSupplierCats(s).map(x => String(x || '').trim().toLowerCase());
+        return cats.includes('inventario');
+    }
+
     function openSupplierModal(target) {
         currentSupplierTarget = String(target || '').trim();
         if (!modalSelectSupplier) return;
@@ -1723,8 +1741,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const filtered = list
             .filter(s => (s?.status || 'Active') !== 'Discontinued')
             .filter(s => {
-                const cats = normalizeSupplierCats(s).map(x => String(x || '').trim().toLowerCase());
-                return cats.includes('inventario');
+                return isInventorySupplier(s);
             })
             .filter(s => {
                 if (!query) return true;
