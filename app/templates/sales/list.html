@@ -4166,26 +4166,52 @@ document.addEventListener('DOMContentLoaded', function() {
         const startDay = new Date(ySel, mSel, dSel, 0, 0, 0, 0).getTime();
         const endDay = new Date(ySel, mSel, dSel, 23, 59, 59, 999).getTime();
 
-        // 1) Ventas en efectivo desde historial visible
-        if (historial) {
-            const tbody = historial.querySelector('tbody');
-            if (tbody) {
-                const filas = tbody.querySelectorAll('tr');
-                filas.forEach(tr => {
-                    const celdas = tr.querySelectorAll('td');
-                    if (!celdas || celdas.length < 5) return;
-                    const tipo = String(tr.getAttribute('data-type') || '').trim();
-                    const pago = (celdas[4]?.textContent || '').trim();
-                    const totalTexto = (celdas[3]?.textContent || '').trim();
-                    const fechaFila = (celdas[1]?.textContent || '').trim();
-                    const tsFila = parseDateToTs(fechaFila);
-                    if (!tsFila || tsFila < startDay || tsFila > endDay) return;
-                    if (pago === 'Efectivo' && (tipo === 'Venta' || tipo === 'Pago' || tipo === 'Devolucion' || tipo === 'Devolución' || tipo === 'Cambio' || tipo === 'Cobro CC')) {
-                        total += parseMoneda(totalTexto);
-                    }
-                });
+        // 1) Ingresos/egresos en efectivo del día desde salesCache (valores reales)
+        // Regla clave: si una venta queda en cuenta corriente, a caja entra SOLO lo efectivamente cobrado.
+        const sales = Array.isArray(salesCache) ? salesCache : [];
+        sales.forEach(function (s) {
+            const st = String(s?.status || '').trim();
+            if (st === 'Reemplazada') return;
+
+            const pm = String(s?.payment_method || '').trim();
+            if (pm !== 'Efectivo') return;
+
+            const iso = String(s?.fecha || s?.date || '').trim();
+            let tsFila = 0;
+            if (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+                try {
+                    tsFila = new Date(iso + 'T00:00:00').getTime();
+                } catch (e) {
+                    tsFila = 0;
+                }
             }
-        }
+            if (!tsFila) {
+                const raw = (typeof s?.created_at === 'number') ? s.created_at : 0;
+                tsFila = raw || 0;
+            }
+            if (!tsFila || tsFila < startDay || tsFila > endDay) return;
+
+            const tipo = String(s?.type || s?.sale_type || '').trim();
+            const totalVenta = parseFloat(s?.total || 0) || 0;
+            const paid = parseFloat(s?.paid_amount || 0) || 0;
+
+            if (tipo === 'Venta') {
+                total += Math.max(0, paid);
+                return;
+            }
+
+            // Cobro de cuenta corriente: es ingreso de caja real
+            if (tipo === 'CobroCC' || tipo === 'Cobro CC') {
+                total += Math.max(0, totalVenta);
+                return;
+            }
+
+            // Cambios/Devoluciones/Ajustes: impactan caja por su total (puede ser negativo)
+            if (tipo === 'Cambio' || tipo === 'Devolucion' || tipo === 'Devolución' || tipo === 'Pago') {
+                total += totalVenta;
+                return;
+            }
+        });
 
         // 2) Egresos en efectivo del día (resta) desde StorageService/getExpenses
         const fecha = String(document.getElementById('fecha-arqueo')?.value || '').trim();
