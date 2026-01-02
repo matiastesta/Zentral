@@ -40,13 +40,13 @@ MODULE_KEYS = [
     'sales',
     'expenses',
     'inventory',
+    'movements',
     'customers',
     'suppliers',
     'employees',
-    'movements',
     'reports',
-    'settings',
     'user_settings',
+    'settings',
 ]
 
 

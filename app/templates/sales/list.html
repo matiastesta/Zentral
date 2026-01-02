@@ -403,30 +403,10 @@
                     <table class="w-full text-xs">
                         <thead class="bg-gray-50 sticky top-0">
                             <tr>
-                                <th class="px-2 py-2 text-left text-gray-500 font-medium">
-                                    <button type="button" class="btn-sort-cambio inline-flex items-center gap-1 hover:text-gray-700" data-sort-key="name">
-                                        Producto
-                                        <i class="fas fa-sort text-[10px]" data-sort-icon></i>
-                                    </button>
-                                </th>
-                                <th class="px-2 py-2 text-left text-gray-500 font-medium">
-                                    <button type="button" class="btn-sort-cambio inline-flex items-center gap-1 hover:text-gray-700" data-sort-key="category">
-                                        Categoría
-                                        <i class="fas fa-sort text-[10px]" data-sort-icon></i>
-                                    </button>
-                                </th>
-                                <th class="px-2 py-2 text-right text-gray-500 font-medium">
-                                    <button type="button" class="btn-sort-cambio inline-flex items-center gap-1 hover:text-gray-700" data-sort-key="price">
-                                        Precio
-                                        <i class="fas fa-sort text-[10px]" data-sort-icon></i>
-                                    </button>
-                                </th>
-                                <th class="px-2 py-2 text-right text-gray-500 font-medium">
-                                    <button type="button" class="btn-sort-cambio inline-flex items-center gap-1 hover:text-gray-700" data-sort-key="stock">
-                                        Stock
-                                        <i class="fas fa-sort text-[10px]" data-sort-icon></i>
-                                    </button>
-                                </th>
+                                <th class="px-2 py-2 text-left text-gray-500 font-medium">Producto</th>
+                                <th class="px-2 py-2 text-left text-gray-500 font-medium">Categoría</th>
+                                <th class="px-2 py-2 text-right text-gray-500 font-medium">Precio</th>
+                                <th class="px-2 py-2 text-right text-gray-500 font-medium">Stock</th>
                                 <th class="px-2 py-2 text-center text-gray-500 font-medium">Acción</th>
                             </tr>
                         </thead>
@@ -440,12 +420,12 @@
             </div>
 
             <!-- Carrito de cambio -->
-            <div class="p-4 bg-white rounded-lg shadow flex flex-col md:sticky md:top-24 max-h-[calc(100vh-7rem)] text-xs">
+            <div class="p-4 bg-white rounded-lg shadow flex flex-col h-full text-xs">
                 <div class="flex items-center justify-between mb-2">
                     <h2 class="text-sm font-medium text-gray-800">Carrito de cambio</h2>
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-[10px] font-semibold uppercase tracking-wide">Cambio</span>
                 </div>
-                <div class="flex-1 overflow-y-auto overflow-x-auto border border-gray-100 rounded-md mb-3 text-xs">
+                <div class="flex-1 overflow-y-auto overflow-x-hidden border border-gray-100 rounded-md mb-3 text-xs">
                     <table id="tabla-carrito-cambio" class="w-full text-xs">
                         <thead class="bg-gray-50">
                             <tr>
@@ -500,30 +480,10 @@
                     <table class="w-full text-xs">
                         <thead class="bg-gray-50 sticky top-0">
                             <tr>
-                                <th class="px-2 py-2 text-left text-gray-500 font-medium">
-                                    <button type="button" class="btn-sort-cambio-venta inline-flex items-center gap-1 hover:text-gray-700" data-sort-key="name">
-                                        Producto
-                                        <i class="fas fa-sort text-[10px]" data-sort-icon></i>
-                                    </button>
-                                </th>
-                                <th class="px-2 py-2 text-left text-gray-500 font-medium">
-                                    <button type="button" class="btn-sort-cambio-venta inline-flex items-center gap-1 hover:text-gray-700" data-sort-key="category">
-                                        Categoría
-                                        <i class="fas fa-sort text-[10px]" data-sort-icon></i>
-                                    </button>
-                                </th>
-                                <th class="px-2 py-2 text-right text-gray-500 font-medium">
-                                    <button type="button" class="btn-sort-cambio-venta inline-flex items-center gap-1 hover:text-gray-700" data-sort-key="price">
-                                        Precio
-                                        <i class="fas fa-sort text-[10px]" data-sort-icon></i>
-                                    </button>
-                                </th>
-                                <th class="px-2 py-2 text-right text-gray-500 font-medium">
-                                    <button type="button" class="btn-sort-cambio-venta inline-flex items-center gap-1 hover:text-gray-700" data-sort-key="stock">
-                                        Stock
-                                        <i class="fas fa-sort text-[10px]" data-sort-icon></i>
-                                    </button>
-                                </th>
+                                <th class="px-2 py-2 text-left text-gray-500 font-medium">Producto</th>
+                                <th class="px-2 py-2 text-left text-gray-500 font-medium">Categoría</th>
+                                <th class="px-2 py-2 text-right text-gray-500 font-medium">Precio</th>
+                                <th class="px-2 py-2 text-right text-gray-500 font-medium">Stock</th>
                                 <th class="px-2 py-2 text-center text-gray-500 font-medium">Acción</th>
                             </tr>
                         </thead>
@@ -537,11 +497,11 @@
             </div>
 
             <!-- Carrito de nueva venta con saldo a favor -->
-            <div class="p-4 bg-white rounded-lg shadow flex flex-col md:sticky md:top-24 max-h-[calc(100vh-7rem)] text-xs">
+            <div class="p-4 bg-white rounded-lg shadow flex flex-col h-full text-xs">
                 <div class="flex items-center justify-center mb-2">
                     <h2 class="text-sm font-medium text-gray-800">Nueva venta (con saldo a favor)</h2>
                 </div>
-                <div class="flex-1 overflow-y-auto overflow-x-auto border border-gray-100 rounded-md mb-3 text-xs">
+                <div class="flex-1 overflow-y-auto overflow-x-hidden border border-gray-100 rounded-md mb-3 text-xs">
                     <table id="tabla-carrito-cambio-venta" class="w-full text-xs">
                         <thead class="bg-gray-50">
                             <tr>
@@ -762,7 +722,7 @@
                         <input id="venta-libre-nombre" type="text" class="w-full px-2 py-1 border rounded-md text-xs" placeholder="Nombre del producto (venta libre)">
                     </div>
                     <div>
-                        <input id="venta-libre-precio" type="text" inputmode="numeric" class="w-full px-2 py-1 border rounded-md text-xs" placeholder="$0">
+                        <input id="venta-libre-precio" type="number" min="0" step="0.01" class="w-full px-2 py-1 border rounded-md text-xs" placeholder="Precio">
                     </div>
                     <div class="md:col-span-3">
                         <button id="btn-agregar-venta-libre" type="button" class="inline-flex items-center justify-center w-full px-3 py-2 text-[11px] font-medium text-white rounded-md" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">
@@ -780,30 +740,10 @@
                 <table class="w-full text-xs">
                     <thead class="bg-gray-50 sticky top-0">
                         <tr>
-                            <th class="px-2 py-2 text-left text-gray-500 font-medium">
-                                <button type="button" class="btn-sort-venta inline-flex items-center gap-1 hover:text-gray-700" data-sort-key="name">
-                                    Producto
-                                    <i class="fas fa-sort text-[10px]" data-sort-icon></i>
-                                </button>
-                            </th>
-                            <th class="px-2 py-2 text-left text-gray-500 font-medium">
-                                <button type="button" class="btn-sort-venta inline-flex items-center gap-1 hover:text-gray-700" data-sort-key="category">
-                                    Categoría
-                                    <i class="fas fa-sort text-[10px]" data-sort-icon></i>
-                                </button>
-                            </th>
-                            <th class="px-2 py-2 text-right text-gray-500 font-medium">
-                                <button type="button" class="btn-sort-venta inline-flex items-center gap-1 hover:text-gray-700" data-sort-key="price">
-                                    Precio
-                                    <i class="fas fa-sort text-[10px]" data-sort-icon></i>
-                                </button>
-                            </th>
-                            <th class="px-2 py-2 text-right text-gray-500 font-medium">
-                                <button type="button" class="btn-sort-venta inline-flex items-center gap-1 hover:text-gray-700" data-sort-key="stock">
-                                    Stock
-                                    <i class="fas fa-sort text-[10px]" data-sort-icon></i>
-                                </button>
-                            </th>
+                            <th class="px-2 py-2 text-left text-gray-500 font-medium">Producto</th>
+                            <th class="px-2 py-2 text-left text-gray-500 font-medium">Categoría</th>
+                            <th class="px-2 py-2 text-right text-gray-500 font-medium">Precio</th>
+                            <th class="px-2 py-2 text-right text-gray-500 font-medium">Stock</th>
                             <th class="px-2 py-2 text-center text-gray-500 font-medium">Acción</th>
                         </tr>
                     </thead>
@@ -817,7 +757,7 @@
         </div>
 
         <!-- Carrito lateral -->
-        <div class="flex flex-col gap-2">
+        <div class="flex flex-col gap-2 h-full">
             <div id="venta-steps-slot-paso1" class="flex">
                 <div id="venta-steps-pills" class="flex gap-1.5 flex-wrap text-[10px]">
                     <span id="pill-venta-paso1" class="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white font-medium">1. {{ label_products }}</span>
@@ -825,11 +765,11 @@
                 </div>
             </div>
 
-            <div class="p-4 bg-white rounded-lg shadow flex flex-col md:sticky md:top-24 max-h-[calc(100vh-7rem)]">
+            <div class="p-4 bg-white rounded-lg shadow flex flex-col h-full">
                 <div class="flex items-center justify-center mb-2">
                     <h2 class="text-sm font-medium text-gray-800">Carrito</h2>
                 </div>
-                <div class="flex-1 overflow-y-auto overflow-x-auto border border-gray-100 rounded-md mb-3 text-xs">
+                <div class="flex-1 overflow-y-auto overflow-x-hidden border border-gray-100 rounded-md mb-3 text-xs">
                     <table id="tabla-carrito" class="w-full text-xs">
                     <thead class="bg-gray-50">
                         <tr>
@@ -1660,8 +1600,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const products = Array.isArray(data?.products) ? data.products : [];
         const lots = Array.isArray(data?.lots) ? data.lots : [];
 
-        const sortedProducts = sortProductsForListView(products, lots, cambioSortState);
-
         if (cambioViewMode === 'list') {
             if (tablaProductosCambioWrap) tablaProductosCambioWrap.classList.remove('hidden');
             if (gridProductosCambio) gridProductosCambio.classList.add('hidden');
@@ -1670,7 +1608,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (tablaProductosCambioBody) tablaProductosCambioBody.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-sm text-gray-500">No hay productos en inventario.</td></tr>';
                 return;
             }
-            sortedProducts.slice(0, 200).forEach(p => {
+            products.slice(0, 200).forEach(p => {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const cat = String(p?.category?.name || p?.category_name || '').trim();
@@ -1723,8 +1661,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const products = Array.isArray(data?.products) ? data.products : [];
         const lots = Array.isArray(data?.lots) ? data.lots : [];
 
-        const sortedProducts = sortProductsForListView(products, lots, cambioVentaSortState);
-
         if (cambioVentaViewMode === 'list') {
             if (tablaProductosCambioVentaWrap) tablaProductosCambioVentaWrap.classList.remove('hidden');
             if (gridProductosCambioVenta) gridProductosCambioVenta.classList.add('hidden');
@@ -1733,7 +1669,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (tablaProductosCambioVentaBody) tablaProductosCambioVentaBody.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-sm text-gray-500">No hay productos en inventario.</td></tr>';
                 return;
             }
-            sortedProducts.slice(0, 200).forEach(p => {
+            products.slice(0, 200).forEach(p => {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const cat = String(p?.category?.name || p?.category_name || '').trim();
@@ -2316,20 +2252,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const n = parseFloat(s);
         return isNaN(n) ? 0 : n;
-    }
-
-    function formatVentaLibreMoneyInput(raw) {
-        const digits = String(raw ?? '').replace(/[^0-9]/g, '');
-        if (!digits) return '';
-        const n = parseInt(digits, 10);
-        if (!isFinite(n)) return '';
-        return '$' + n.toLocaleString('es-AR', { maximumFractionDigits: 0 });
-    }
-
-    function parseVentaLibreMoney(raw) {
-        const digits = String(raw ?? '').replace(/[^0-9]/g, '');
-        const n = parseInt(digits || '0', 10);
-        return isFinite(n) ? n : 0;
     }
 
     function parseMonedaARSInput(value) {
@@ -3672,108 +3594,14 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedCategoriaCambio = 'Todos';
     let selectedCategoriaCambioVenta = 'Todos';
     let ventaViewMode = 'list';
-    let ventaSortState = { key: '', dir: '' };
     let ventaSearchQuery = '';
     let ventaInvData = null;
     let cambioViewMode = 'list';
-    let cambioSortState = { key: '', dir: '' };
     let cambioSearchQuery = '';
     let cambioInvData = null;
     let cambioVentaViewMode = 'list';
-    let cambioVentaSortState = { key: '', dir: '' };
     let cambioVentaSearchQuery = '';
     let cambioVentaInvData = null;
-
-    function ensureSortState(state) {
-        const s = (state && typeof state === 'object') ? state : { key: '', dir: '' };
-        const key = String(s.key || '').trim();
-        const dir = String(s.dir || '').trim();
-        return { key, dir: (dir === 'asc' || dir === 'desc') ? dir : '' };
-    }
-
-    function sortProductsForListView(products, lots, sortState) {
-        const s = ensureSortState(sortState);
-        if (!s.key || !s.dir) return Array.isArray(products) ? products.slice() : [];
-
-        const list = Array.isArray(products) ? products.slice() : [];
-        const key = s.key;
-        const dirMul = (s.dir === 'desc') ? -1 : 1;
-
-        const getName = (p) => String(p?.name || '').trim().toLowerCase();
-        const getCategory = (p) => String(p?.category?.name || p?.category_name || '').trim().toLowerCase();
-        const getPrice = (p) => {
-            const v = parseFloat(p?.sale_price || p?.price || 0) || 0;
-            return isFinite(v) ? v : 0;
-        };
-        const getStock = (p) => {
-            const v = stockDisponiblePorProducto(lots, p?.id);
-            return isFinite(v) ? v : 0;
-        };
-
-        list.sort(function (a, b) {
-            if (key === 'price') return (getPrice(a) - getPrice(b)) * dirMul;
-            if (key === 'stock') return (getStock(a) - getStock(b)) * dirMul;
-            if (key === 'category') return getCategory(a).localeCompare(getCategory(b), 'es') * dirMul;
-            return getName(a).localeCompare(getName(b), 'es') * dirMul;
-        });
-        return list;
-    }
-
-    function setSortState(stateObj, key) {
-        const nextKey = String(key || '').trim();
-        if (!nextKey) return;
-        const curr = ensureSortState(stateObj);
-        if (curr.key !== nextKey) {
-            stateObj.key = nextKey;
-            stateObj.dir = 'asc';
-            return;
-        }
-        if (curr.dir === 'asc') stateObj.dir = 'desc';
-        else if (curr.dir === 'desc') stateObj.dir = 'asc';
-        else stateObj.dir = 'asc';
-    }
-
-    function updateSortIcons(selector, stateObj) {
-        const state = ensureSortState(stateObj);
-        document.querySelectorAll(selector).forEach(function (btn) {
-            const key = String(btn.getAttribute('data-sort-key') || '').trim();
-            const icon = btn.querySelector('[data-sort-icon]');
-            if (!icon) return;
-            icon.classList.remove('fa-sort', 'fa-sort-up', 'fa-sort-down');
-            if (state.key === key && state.dir) {
-                icon.classList.add(state.dir === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
-            } else {
-                icon.classList.add('fa-sort');
-            }
-        });
-    }
-
-    function bindSortButtons() {
-        document.querySelectorAll('.btn-sort-venta').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                setSortState(ventaSortState, btn.getAttribute('data-sort-key'));
-                updateSortIcons('.btn-sort-venta', ventaSortState);
-                if (ventaInvData) renderVentaProductsView(ventaInvData);
-            });
-        });
-        document.querySelectorAll('.btn-sort-cambio').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                setSortState(cambioSortState, btn.getAttribute('data-sort-key'));
-                updateSortIcons('.btn-sort-cambio', cambioSortState);
-                if (cambioInvData) renderCambioProductsView(cambioInvData);
-            });
-        });
-        document.querySelectorAll('.btn-sort-cambio-venta').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                setSortState(cambioVentaSortState, btn.getAttribute('data-sort-key'));
-                updateSortIcons('.btn-sort-cambio-venta', cambioVentaSortState);
-                if (cambioVentaInvData) renderCambioVentaProductsView(cambioVentaInvData);
-            });
-        });
-        updateSortIcons('.btn-sort-venta', ventaSortState);
-        updateSortIcons('.btn-sort-cambio', cambioSortState);
-        updateSortIcons('.btn-sort-cambio-venta', cambioVentaSortState);
-    }
 
     function uniqueCategoriesFromProducts(products) {
         const out = [];
@@ -3961,8 +3789,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const products = Array.isArray(data?.products) ? data.products : [];
         const lots = Array.isArray(data?.lots) ? data.lots : [];
 
-        const sortedProducts = sortProductsForListView(products, lots, ventaSortState);
-
         if (ventaViewMode === 'list') {
             if (tablaProductosWrap) tablaProductosWrap.classList.remove('hidden');
             gridProductos.classList.add('hidden');
@@ -3973,7 +3799,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (tablaProductosBody) tablaProductosBody.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-sm text-gray-500">No hay productos en inventario.</td></tr>';
                 return;
             }
-            sortedProducts.slice(0, 200).forEach(p => {
+            products.slice(0, 200).forEach(p => {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const displayPrice = price > 0 ? price : 0;
@@ -4829,7 +4655,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const tr = document.createElement('tr');
         if (productId) tr.setAttribute('data-product-id', productId);
         tr.innerHTML = `
-            <td class="px-1 py-1 text-gray-700 whitespace-nowrap">${nombre}</td>
+            <td class="px-1 py-1 text-gray-700 truncate">${nombre}</td>
             <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" step="0.01" class="input-precio w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
             <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" step="1" class="input-cantidad w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${cantidad}"></td>
             <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" max="100" step="0.01" class="input-descuento w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${descuentoValue}"></td>
@@ -4926,7 +4752,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const tr = document.createElement('tr');
         if (meta && meta.productId) tr.setAttribute('data-product-id', String(meta.productId));
         tr.innerHTML = `
-            <td class="px-1 py-1 text-gray-700 whitespace-nowrap">${nombre}</td>
+            <td class="px-1 py-1 text-gray-700 truncate">${nombre}</td>
             <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" step="0.01" class="input-precio-cambio w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
             <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" step="1" class="input-cantidad-cambio w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${cantidad}"></td>
             <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" max="100" step="0.01" class="input-descuento-cambio w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearPct(descuento)}"></td>
@@ -5021,7 +4847,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const tr = document.createElement('tr');
         if (meta && meta.productId) tr.setAttribute('data-product-id', String(meta.productId));
         tr.innerHTML = `
-            <td class="px-1 py-1 text-gray-700 whitespace-nowrap">${nombre}</td>
+            <td class="px-1 py-1 text-gray-700 truncate">${nombre}</td>
             <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" step="0.01" class="input-precio-cambio-venta w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
             <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" step="1" class="input-cantidad-cambio-venta w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${cantidad}"></td>
             <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" max="100" step="0.01" class="input-descuento-cambio-venta w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearPct(descuento)}"></td>
@@ -5401,9 +5227,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function agregarVentaLibreDesdeFormulario() {
         if (!inputVentaLibreNombre || !inputVentaLibrePrecio) return;
         const nombre = (inputVentaLibreNombre.value || '').trim();
-        const precio = parseVentaLibreMoney(inputVentaLibrePrecio.value || '0');
+        const precio = parseFloat(inputVentaLibrePrecio.value || '0');
         if (!nombre) return;
-        agregarProductoAlCarrito(nombre, isNaN(precio) ? '0' : String((precio || 0).toFixed(2)));
+        agregarProductoAlCarrito(nombre, isNaN(precio) ? '0' : String(precio.toFixed(2)));
         inputVentaLibreNombre.value = '';
         inputVentaLibrePrecio.value = '';
         inputVentaLibreNombre.focus();
@@ -5430,14 +5256,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
                 agregarVentaLibreDesdeFormulario();
             }
-        });
-        inputVentaLibrePrecio.addEventListener('input', function () {
-            const next = formatVentaLibreMoneyInput(inputVentaLibrePrecio.value || '');
-            inputVentaLibrePrecio.value = next;
-        });
-        inputVentaLibrePrecio.addEventListener('blur', function () {
-            const next = formatVentaLibreMoneyInput(inputVentaLibrePrecio.value || '');
-            inputVentaLibrePrecio.value = next;
         });
     }
 
@@ -6324,8 +6142,6 @@ td.num,th.num{text-align:right}
     if (btnViewListCambio) btnViewListCambio.addEventListener('click', function () { setCambioViewMode('list', true); });
     if (btnViewGridCambioVenta) btnViewGridCambioVenta.addEventListener('click', function () { setCambioVentaViewMode('grid', true); });
     if (btnViewListCambioVenta) btnViewListCambioVenta.addEventListener('click', function () { setCambioVentaViewMode('list', true); });
-
-    bindSortButtons();
     renderProductosDesdeInventario();
     renderProductosCambioDesdeInventario();
     renderProductosCambioVentaDesdeInventario();

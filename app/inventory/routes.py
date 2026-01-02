@@ -258,7 +258,7 @@ def _serialize_movement(m: InventoryMovement):
 
 @bp.get('/api/products')
 @login_required
-@module_required_any('inventory', 'dashboard')
+@module_required('inventory')
 def list_products():
     limit = int(request.args.get('limit') or 500)
     if limit <= 0 or limit > 5000:
@@ -607,7 +607,7 @@ def bulk_update_product_prices():
 
 @bp.get('/api/lots')
 @login_required
-@module_required_any('inventory', 'dashboard')
+@module_required('inventory')
 def list_lots():
     limit = int(request.args.get('limit') or 5000)
     if limit <= 0 or limit > 20000:
@@ -830,7 +830,7 @@ def delete_lot(lot_id: int):
 
 @bp.get('/api/movements')
 @login_required
-@module_required_any('inventory', 'dashboard')
+@module_required('inventory')
 def list_inventory_movements():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()

@@ -120,7 +120,10 @@
                     <div class="text-xs font-semibold text-gray-700">Permisos</div>
                     <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
                         {% for key in module_keys %}
-                            <label class="inline-flex items-center gap-2"><input name="perm_{{ key }}" type="checkbox">{{ key }}</label>
+                            <label class="inline-flex items-center gap-2">
+                                <input name="perm_{{ key }}" type="checkbox">
+                                {% if key == 'dashboard' %}Dashboard{% elif key == 'calendar' %}Calendario{% elif key == 'sales' %}Ventas{% elif key == 'expenses' %}Gastos{% elif key == 'inventory' %}Inventario{% elif key == 'movements' %}Movimientos{% elif key == 'customers' %}Clientes{% elif key == 'suppliers' %}Proveedores{% elif key == 'employees' %}Empleados{% elif key == 'reports' %}Informes{% elif key == 'user_settings' %}Config. de usuario{% elif key == 'settings' %}Config. del negocio{% else %}{{ key }}{% endif %}
+                            </label>
                         {% endfor %}
                     </div>
                 </div>

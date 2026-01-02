@@ -65,7 +65,7 @@ def index():
 
 @bp.get('/api/customers')
 @login_required
-@module_required_any('customers', 'dashboard')
+@module_required('customers')
 def list_customers_api():
     qraw = (request.args.get('q') or '').strip()
     limit = int(request.args.get('limit') or 500)

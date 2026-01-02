@@ -88,6 +88,20 @@ def login():
         remember_flag = bool(is_zentral_admin)
         login_user(user, remember=remember_flag)
 
+        try:
+            if not is_zentral_admin and not getattr(user, 'is_master', False):
+                role_name = str(getattr(user, 'role', '') or '').strip()
+                if role_name in {'admin', 'company_admin'}:
+                    perms = user.get_permissions() if getattr(user, 'get_permissions', None) else {}
+                    if isinstance(perms, dict) and not perms:
+                        user.set_permissions_all(True)
+                        db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+
         session.pop('impersonate_company_id', None)
         if is_zentral_admin:
             session['auth_is_zentral_admin'] = '1'

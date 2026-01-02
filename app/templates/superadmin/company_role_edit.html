@@ -24,7 +24,7 @@
                 {% for k in module_keys %}
                 <label class="inline-flex items-center gap-2">
                     <input name="perm_{{ k }}" type="checkbox" {% if perms.get(k) %}checked{% endif %}>
-                    {{ k }}
+                    {% if k == 'dashboard' %}Dashboard{% elif k == 'calendar' %}Calendario{% elif k == 'sales' %}Ventas{% elif k == 'expenses' %}Gastos{% elif k == 'inventory' %}Inventario{% elif k == 'movements' %}Movimientos{% elif k == 'customers' %}Clientes{% elif k == 'suppliers' %}Proveedores{% elif k == 'employees' %}Empleados{% elif k == 'reports' %}Informes{% elif k == 'user_settings' %}Config. de usuario{% elif k == 'settings' %}Config. del negocio{% else %}{{ k }}{% endif %}
                 </label>
                 {% endfor %}
             </div>

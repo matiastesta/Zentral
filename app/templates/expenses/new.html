@@ -32,12 +32,16 @@
             <div class="lg:col-span-2">
                 <label class="block text-xs font-medium text-gray-600 mb-1">Categoría</label>
                 <select id="egreso-categoria" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                    <option value="">Seleccionar categoría</option>
+                    <option value="Servicios públicos">Servicios públicos</option>
+                    <option value="Gastos operativos">Gastos operativos</option>
+                    <option value="Arriendo">Arriendo</option>
+                    <option value="Nómina">Nómina</option>
+                    <option value="Transportes">Transportes</option>
+                    <option value="Mantenimiento y reparaciones">Mantenimiento y reparaciones</option>
+                    <option value="Muebles, equipos o maquinarias">Muebles, equipos o maquinarias</option>
+                    <option value="Otro">Otro</option>
                 </select>
                 <p id="categoria-desc" class="mt-1 text-xs text-gray-500"></p>
-                <div class="mt-1 flex justify-end">
-                    <button id="btn-egreso-manage-categories" type="button" class="text-[11px] text-blue-700 hover:text-blue-900">Administrar categorías</button>
-                </div>
 
                 <div id="wrap-egreso-categoria-otro" class="mt-2 hidden">
                     <label class="block text-xs font-medium text-gray-600 mb-1">Especificar categoría</label>
@@ -240,40 +244,6 @@
         </div>
     </div>
 </div>
-
-<div id="modal-egreso-categories" class="hidden fixed inset-0 z-50">
-    <div class="absolute inset-0 bg-black/40"></div>
-    <div class="relative h-full w-full flex items-center justify-center p-4">
-        <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Categorías de gastos</h3>
-                    <p class="text-xs text-gray-500">Administrá categorías operativas (no inventario).</p>
-                </div>
-                <button id="btn-close-egreso-categories" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600" aria-label="Cerrar">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="p-5 space-y-3">
-                <div class="grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
-                    <div class="md:col-span-5">
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Nueva categoría</label>
-                        <input id="egreso-new-category-name" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: Publicidad">
-                    </div>
-                    <div class="md:col-span-1 flex justify-end">
-                        <button id="btn-egreso-add-category" type="button" class="w-full inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Agregar</button>
-                    </div>
-                </div>
-                <div class="border border-gray-200 rounded-xl overflow-hidden">
-                    <div id="egreso-categories-admin-list" class="max-h-[320px] overflow-auto divide-y divide-gray-100"></div>
-                </div>
-            </div>
-            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
-                <button id="btn-cancel-egreso-categories" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cerrar</button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
@@ -288,7 +258,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const inputFecha = document.getElementById('egreso-fecha');
     const selectCategoria = document.getElementById('egreso-categoria');
     const categoriaDesc = document.getElementById('categoria-desc');
-    const btnManageCats = document.getElementById('btn-egreso-manage-categories');
     const wrapOtro = document.getElementById('wrap-egreso-categoria-otro');
     const inputOtro = document.getElementById('egreso-categoria-otro');
     const checkGuardarCategoria = document.getElementById('egreso-categoria-guardar');
@@ -315,13 +284,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const proveedorModalCancel = document.getElementById('proveedor-modal-cancel');
     const proveedorModalSearch = document.getElementById('proveedor-modal-search');
     const proveedorModalList = document.getElementById('proveedor-modal-list');
-
-    const modalCats = document.getElementById('modal-egreso-categories');
-    const btnCloseCats = document.getElementById('btn-close-egreso-categories');
-    const btnCancelCats = document.getElementById('btn-cancel-egreso-categories');
-    const inputNewCatName = document.getElementById('egreso-new-category-name');
-    const btnAddCat = document.getElementById('btn-egreso-add-category');
-    const catsAdminList = document.getElementById('egreso-categories-admin-list');
 
     const selectTipo = document.getElementById('egreso-tipo');
     const selectFrecuencia = document.getElementById('egreso-frecuencia');
@@ -490,41 +452,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function normalizeSupplierCats(s) {
         const cats = s && Array.isArray(s.categories) ? s.categories : [];
-        const out = [];
-        cats.forEach(function (x) {
-            const raw = String(x || '').trim();
-            if (!raw) return;
-            const low = raw.toLowerCase();
-            if (low === 'compra de productos e insumos') {
-                out.push('Gastos operativos');
-                return;
-            }
-            if (low === 'domicilios y logística' || low === 'domicilios y logistica') {
-                out.push('Transportes');
-                return;
-            }
-            out.push(raw);
-        });
-        return out.filter(Boolean);
+        return cats.map(x => String(x || '').trim()).filter(Boolean);
     }
 
-    function parseMetaObj(raw) {
-        const s = String(raw || '').trim();
-        if (!s) return {};
-        try {
-            const parsed = JSON.parse(s);
-            return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
-        } catch (e) {
-            return {};
-        }
-    }
-
-    function isInventoryOnlySupplier(s) {
-        const meta = parseMetaObj(s?.meta_json || '');
+    function isInventorySupplier(s) {
         const cats = normalizeSupplierCats(s).map(x => x.toLowerCase());
-        const hasInv = (meta && meta.inventory_supplier === true) || cats.includes('inventario');
-        const nonInv = cats.filter(x => x !== 'inventario');
-        return !!(hasInv && nonInv.length === 0);
+        return cats.includes('inventario');
     }
 
     function getSelectedCategoriaForSupplierFilter() {
@@ -555,6 +488,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const found = (Array.isArray(list) ? list : []).find(x => String(x?.id || '').trim() === sid);
             if (!found) return;
             if (supplierMatchesSelectedCategory(found)) return;
+
+            setProveedorSeleccionado('', '');
+            try { hideProveedorDd(); } catch (e) {}
+            try { closeProveedorModal(); } catch (e) {}
             if (window.showAlertModal) {
                 window.showAlertModal(
                     'El proveedor seleccionado no pertenece a la categoría “' + cat + '”. Seleccioná un proveedor dentro de esa categoría.',
@@ -572,7 +509,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const cat = getSelectedCategoriaForSupplierFilter();
         const filtered = list
             .filter(s => (s?.status || 'Active') !== 'Discontinued')
-            .filter(s => !isInventoryOnlySupplier(s))
+            .filter(s => !isInventorySupplier(s))
             .filter(supplierMatchesSelectedCategory)
             .filter(s => {
                 if (!query) return true;
@@ -696,107 +633,6 @@ document.addEventListener('DOMContentLoaded', function () {
             throw new Error(msg);
         }
         return data;
-    }
-
-    function openCategoriesModal() {
-        if (!modalCats) return;
-        modalCats.classList.remove('hidden');
-        if (inputNewCatName) inputNewCatName.value = '';
-        renderCategoriesAdminList();
-        if (inputNewCatName) inputNewCatName.focus();
-    }
-
-    function closeCategoriesModal() {
-        if (!modalCats) return;
-        modalCats.classList.add('hidden');
-    }
-
-    function renderCategoriesAdminList() {
-        if (!catsAdminList) return;
-        const res = leerCategoriasPersonalizadas();
-        const apply = function (items) {
-            const list = Array.isArray(items) ? items : [];
-            catsAdminList.innerHTML = '';
-            const filtered = list
-                .map(function (c) {
-                    if (c && typeof c === 'object') return { id: String(c.id || '').trim(), name: String(c.name || '').trim() };
-                    const name = String(c || '').trim();
-                    return { id: '', name };
-                })
-                .filter(function (x) { return x && x.id && x.name && x.name.toLowerCase() !== 'inventario'; })
-                .sort(function (a, b) { return a.name.localeCompare(b.name); });
-
-            if (!filtered.length) {
-                const empty = document.createElement('div');
-                empty.className = 'px-4 py-6 text-sm text-center text-gray-500';
-                empty.textContent = 'No hay categorías personalizadas.';
-                catsAdminList.appendChild(empty);
-                return;
-            }
-
-            filtered.forEach(function (c) {
-                const row = document.createElement('div');
-                row.className = 'px-4 py-3 flex items-center justify-between gap-3';
-                row.innerHTML = '<div class="text-sm text-gray-800">' + c.name + '</div>';
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'text-xs text-red-700 hover:text-red-900';
-                btn.textContent = 'Eliminar';
-                btn.addEventListener('click', function () {
-                    if (!c.id) return;
-                    const go = function () {
-                        apiJson('/expenses/api/categories/' + encodeURIComponent(c.id), { method: 'DELETE' })
-                            .then(function () {
-                                poblarCategorias();
-                                validateSelectedSupplierAgainstCategory();
-                                renderCategoriesAdminList();
-                            })
-                            .catch(function (e) {
-                                const msg = String(e && e.message ? e.message : 'No se pudo eliminar la categoría.');
-                                if (window.showAlertModal) window.showAlertModal(msg, 'Atención', 'Error');
-                                else alert(msg);
-                            });
-                    };
-                    if (window.confirmModal) {
-                        window.confirmModal(
-                            '¿Eliminar la categoría “' + c.name + '”?',
-                            'Eliminar categoría',
-                            'Confirmación requerida',
-                            { okText: 'Eliminar', cancelText: 'Cancelar' }
-                        ).then(function (ok) { if (ok) go(); });
-                    } else {
-                        if (confirm('¿Eliminar la categoría “' + c.name + '”?')) go();
-                    }
-                });
-                row.appendChild(btn);
-                catsAdminList.appendChild(row);
-            });
-        };
-
-        if (isPromise(res)) return res.then(apply).catch(function () { apply([]); });
-        apply(res);
-    }
-
-    function addNewCategoryFromModal() {
-        const name = String(inputNewCatName?.value || '').trim();
-        if (!name) return;
-        if (name.toLowerCase() === 'inventario') {
-            if (window.showAlertModal) window.showAlertModal('La categoría “Inventario” es exclusiva del módulo de Inventario.', 'Atención', 'Categoría reservada');
-            else alert('La categoría “Inventario” es exclusiva del módulo de Inventario.');
-            return;
-        }
-        apiJson('/expenses/api/categories', {
-            method: 'POST',
-            body: JSON.stringify({ name: name })
-        }).then(function () {
-            poblarCategorias();
-            renderCategoriesAdminList();
-            if (inputNewCatName) inputNewCatName.value = '';
-        }).catch(function (e) {
-            const msg = String(e && e.message ? e.message : 'No se pudo crear la categoría.');
-            if (window.showAlertModal) window.showAlertModal(msg, 'Atención', 'Error');
-            else alert(msg);
-        });
     }
 
     function triggerDownload(url) {
@@ -966,7 +802,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!ddProveedor) return;
         const items = (Array.isArray(list) ? list : [])
             .filter(s => (s?.status || 'Active') !== 'Discontinued')
-            .filter(s => !isInventoryOnlySupplier(s))
+            .filter(s => !isInventorySupplier(s))
             .filter(supplierMatchesSelectedCategory)
             .slice(0, 12);
         ddProveedor.innerHTML = '';
@@ -997,7 +833,7 @@ document.addEventListener('DOMContentLoaded', function () {
         ddProveedor.innerHTML = '';
         const q = String(query || '').trim();
         items
-            .filter(s => !isInventoryOnlySupplier(s))
+            .filter(s => !isInventorySupplier(s))
             .filter(supplierMatchesSelectedCategory)
             .forEach(s => {
             const btn = document.createElement('button');
@@ -1112,18 +948,11 @@ document.addEventListener('DOMContentLoaded', function () {
             (Array.isArray(custom) ? custom : []).forEach(c => {
                 const name = (c && typeof c === 'object') ? String(c.name || '').trim() : String(c || '').trim();
                 if (!name) return;
-                if (name.toLowerCase() === 'inventario') return;
                 if (all.includes(name)) return;
                 all.splice(all.length - 1, 0, name);
             });
 
             selectCategoria.innerHTML = '';
-
-            const ph = document.createElement('option');
-            ph.textContent = 'Seleccionar categoría';
-            ph.value = '';
-            selectCategoria.appendChild(ph);
-
             all.forEach(c => {
                 const opt = document.createElement('option');
                 opt.textContent = c;
@@ -1131,134 +960,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 selectCategoria.appendChild(opt);
             });
             if (current && all.includes(current)) selectCategoria.value = current;
-            else selectCategoria.value = '';
         };
 
-        if (isPromise(customRes)) return customRes.then(finish);
-        finish(customRes);
-        return Promise.resolve();
-    }
-
-    const EXPENSE_DRAFT_KEY = 'zentral_expense_draft_v1';
-
-    function readExpenseDraft() {
-        try {
-            const raw = window.sessionStorage ? window.sessionStorage.getItem(EXPENSE_DRAFT_KEY) : '';
-            if (!raw) return null;
-            const parsed = JSON.parse(raw);
-            return (parsed && typeof parsed === 'object') ? parsed : null;
-        } catch (e) {
-            return null;
-        }
-    }
-
-    function saveExpenseDraft(returnTo) {
-        try {
-            if (!window.sessionStorage) return;
-            const draft = {
-                return_to: String(returnTo || '').trim(),
-                ts: Date.now(),
-                data: {
-                    fecha: String(inputFecha?.value || ''),
-                    categoria: String(selectCategoria?.value || ''),
-                    categoria_otro: String(inputOtro?.value || ''),
-                    guardar_categoria: !!checkGuardarCategoria?.checked,
-                    valor: String(inputValor?.value || ''),
-                    nota: String(inputNota?.value || ''),
-                    forma_pago: String(selectPago?.value || ''),
-                    paymode: isCcMode() ? 'cc' : 'full',
-                    cc_days: String(inputCcDays?.value || ''),
-                    cc_installments: String(inputCcInstallments?.value || ''),
-                    supplier_id: String(inputProveedorId?.value || ''),
-                    supplier_name: String(inputProveedor?.value || ''),
-                    tipo: String(selectTipo?.value || ''),
-                    frecuencia: String(selectFrecuencia?.value || ''),
-                    employee_id: String(selectEmpleado?.value || ''),
-                    period_from: String(inputPeriodoDesde?.value || ''),
-                    period_to: String(inputPeriodoHasta?.value || ''),
-                    payroll_payment_type: String(selectTipoPagoNomina?.value || ''),
-                    custom_fields: leerCamposPersonalizadosDesdeUI()
-                }
-            };
-            window.sessionStorage.setItem(EXPENSE_DRAFT_KEY, JSON.stringify(draft));
-        } catch (e) {
-        }
-    }
-
-    function clearExpenseDraft() {
-        try {
-            if (!window.sessionStorage) return;
-            window.sessionStorage.removeItem(EXPENSE_DRAFT_KEY);
-        } catch (e) {
-        }
-    }
-
-    function stripSupplierReturnParams(search) {
-        try {
-            const s = String(search || '').trim();
-            const p = new URLSearchParams(s.startsWith('?') ? s.slice(1) : s);
-            p.delete('supplier_id');
-            p.delete('supplier_name');
-            const out = p.toString();
-            return out ? ('?' + out) : '';
-        } catch (e) {
-            return String(search || '');
-        }
-    }
-
-    function restoreExpenseDraftIfMatch() {
-        const d = readExpenseDraft();
-        if (!d) return false;
-        const expected = String(d.return_to || '').trim();
-        if (!expected) return false;
-
-        const current = window.location.pathname + stripSupplierReturnParams(window.location.search);
-        if (current !== expected) return false;
-
-        const data = (d.data && typeof d.data === 'object') ? d.data : {};
-
-        if (inputFecha) inputFecha.value = String(data.fecha || inputFecha.value || '');
-        if (selectCategoria) selectCategoria.value = String(data.categoria || '');
-        if (inputOtro) inputOtro.value = String(data.categoria_otro || '');
-        if (checkGuardarCategoria) checkGuardarCategoria.checked = !!data.guardar_categoria;
-        if (inputValor) inputValor.value = String(data.valor || '');
-        if (inputNota) inputNota.value = String(data.nota || '');
-        if (selectPago) selectPago.value = String(data.forma_pago || selectPago.value || 'Efectivo');
-        if (inputCcDays) inputCcDays.value = String(data.cc_days || inputCcDays.value || '30');
-        if (inputCcInstallments) inputCcInstallments.value = String(data.cc_installments || inputCcInstallments.value || '1');
-        if (selectTipo) selectTipo.value = String(data.tipo || selectTipo.value || 'Variable');
-        if (selectFrecuencia) selectFrecuencia.value = String(data.frecuencia || selectFrecuencia.value || 'Único');
-        if (selectEmpleado) selectEmpleado.value = String(data.employee_id || '');
-        if (inputPeriodoDesde) inputPeriodoDesde.value = String(data.period_from || '');
-        if (inputPeriodoHasta) inputPeriodoHasta.value = String(data.period_to || '');
-        syncPeriodoRangoFromHidden();
-        if (selectTipoPagoNomina) selectTipoPagoNomina.value = String(data.payroll_payment_type || selectTipoPagoNomina.value || 'Sueldo');
-
-        if (panelCampos && camposWrap) {
-            camposWrap.innerHTML = '';
-            const cf = Array.isArray(data.custom_fields) ? data.custom_fields : [];
-            cf.forEach(x => {
-                camposWrap.appendChild(crearCampoRow(x?.key || '', x?.value || ''));
-            });
-        }
-
-        if (radioPayFull && radioPayCc) {
-            const cc = String(data.paymode || '').trim() === 'cc';
-            radioPayCc.checked = cc;
-            radioPayFull.checked = !cc;
-        }
-        syncPayModeUi();
-
-        aplicarVisibilidadPorCategoria();
-        setCategoriaDescripcion();
-
-        if (!String(new URLSearchParams(window.location.search).get('supplier_id') || '').trim()) {
-            setProveedorSeleccionado(String(data.supplier_id || ''), String(data.supplier_name || ''));
-        }
-
-        isDirty = false;
-        clearExpenseDraft();
-        return true;
+        if (isPromise(customRes)) customRes.then(finish);
+        else finish(customRes);
     }
 
     function crearCampoRow(key, value) {
@@ -1661,7 +1366,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const cat = getSelectedCategoriaForSupplierFilter();
             const qs = ['return_to=' + encodeURIComponent(returnTo)];
             if (cat) qs.push('prefill_category=' + encodeURIComponent(cat));
-            saveExpenseDraft(returnTo);
             window.location.href = suppliersNewUrl + '?' + qs.join('&');
         });
     }
@@ -1669,19 +1373,6 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btnSeleccionarProveedor) {
         btnSeleccionarProveedor.addEventListener('click', function () {
             openProveedorModal();
-        });
-    }
-
-    if (btnManageCats) btnManageCats.addEventListener('click', function () { openCategoriesModal(); });
-    if (btnCloseCats) btnCloseCats.addEventListener('click', function () { closeCategoriesModal(); });
-    if (btnCancelCats) btnCancelCats.addEventListener('click', function () { closeCategoriesModal(); });
-    if (btnAddCat) btnAddCat.addEventListener('click', function () { addNewCategoryFromModal(); });
-    if (inputNewCatName) {
-        inputNewCatName.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                addNewCategoryFromModal();
-            }
         });
     }
 
@@ -1841,19 +1532,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const id = params.get('id');
     const duplicateId = params.get('duplicate_id');
 
-    const categoriasRes = poblarCategorias();
+    poblarCategorias();
     poblarEmpleados();
     aplicarVisibilidadPorCategoria();
     setCategoriaDescripcion();
     syncPayModeUi();
-
-    if (categoriasRes && typeof categoriasRes.then === 'function') {
-        categoriasRes.then(function () {
-            try { restoreExpenseDraftIfMatch(); } catch (e) {}
-        });
-    } else {
-        try { restoreExpenseDraftIfMatch(); } catch (e) {}
-    }
 
     applyReturnedEmployee();
 

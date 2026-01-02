@@ -208,7 +208,7 @@ def _serialize_lot_for_sales(l: InventoryLot):
 
 @bp.get('/api/sales')
 @login_required
-@module_required_any('sales', 'dashboard')
+@module_required('sales')
 def list_sales():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
@@ -350,7 +350,7 @@ def debt_summary():
 
 @bp.get('/api/sales/overdue-customers')
 @login_required
-@module_required_any('sales', 'dashboard')
+@module_required('sales')
 def overdue_customers_count():
     days = int(request.args.get('days') or 30)
     if days <= 0 or days > 3650:

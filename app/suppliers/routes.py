@@ -21,16 +21,6 @@ def _serialize_supplier(row: Supplier):
         cats = cats if isinstance(cats, list) else []
     except Exception:
         cats = []
-
-    try:
-        raw_meta = str(getattr(row, 'meta_json', '') or '').strip()
-        if raw_meta:
-            meta_obj = json.loads(raw_meta) if isinstance(raw_meta, str) else {}
-            if isinstance(meta_obj, dict) and meta_obj.get('inventory_supplier') is True:
-                if 'Inventario' not in [str(x or '').strip() for x in cats]:
-                    cats = ['Inventario'] + cats
-    except Exception:
-        pass
     return {
         'id': row.id,
         'name': row.name or '',
@@ -56,36 +46,6 @@ def _get_company_id() -> str | None:
         return cid or None
     except Exception:
         return None
-
-
-def _module_required_any(*module_names: str):
-    def decorator(fn):
-        @wraps(fn)
-        def wrapped(*args, **kwargs):
-            if not current_user.is_authenticated:
-                abort(401)
-            if getattr(current_user, 'role', '') == 'zentral_admin':
-                if is_impersonating():
-                    return fn(*args, **kwargs)
-                return redirect(url_for('superadmin.index'))
-            if not getattr(current_user, 'can', None):
-                abort(403)
-
-            allowed = False
-            for mn in module_names:
-                try:
-                    if bool(current_user.can(mn)):
-                        allowed = True
-                        break
-                except Exception:
-                    continue
-            if not allowed:
-                abort(403)
-            return fn(*args, **kwargs)
-
-        return wrapped
-
-    return decorator
 
 
 def _apply_supplier_payload(row: Supplier, payload: dict):
@@ -476,14 +436,14 @@ def index():
 
 @bp.route('/new')
 @login_required
-@_module_required_any('suppliers', 'inventory')
+@module_required('suppliers')
 def new():
     return render_template('suppliers/new.html', title='Nuevo proveedor')
 
 
 @bp.get('/api/suppliers')
 @login_required
-@_module_required_any('suppliers', 'inventory')
+@module_required('suppliers')
 def list_suppliers_api():
     q = (request.args.get('q') or '').strip().lower()
     limit = int(request.args.get('limit') or 5000)
@@ -504,7 +464,7 @@ def list_suppliers_api():
 
 @bp.get('/api/suppliers/<supplier_id>')
 @login_required
-@_module_required_any('suppliers', 'inventory')
+@module_required('suppliers')
 def get_supplier_api(supplier_id):
     company_id = _get_company_id()
     if not company_id:
@@ -519,7 +479,7 @@ def get_supplier_api(supplier_id):
 
 @bp.post('/api/suppliers')
 @login_required
-@_module_required_any('suppliers', 'inventory')
+@module_required('suppliers')
 def create_supplier_api():
     company_id = _get_company_id()
     if not company_id:
@@ -543,7 +503,7 @@ def create_supplier_api():
 
 @bp.put('/api/suppliers/<supplier_id>')
 @login_required
-@_module_required_any('suppliers', 'inventory')
+@module_required('suppliers')
 def update_supplier_api(supplier_id):
     company_id = _get_company_id()
     if not company_id:

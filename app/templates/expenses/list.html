@@ -5,7 +5,7 @@
     <div class="flex items-center justify-between">
         <div>
             <div class="flex items-center gap-2">
-                <h1 class="text-2xl font-bold text-gray-900">Gastos y Egresos</h1>
+                <h1 class="text-2xl font-bold text-gray-900">Gastos</h1>
                 <button type="button" class="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-gray-100 text-gray-600" data-kpi-toggle="expenses" data-kpi-key="expenses" data-kpi-target="#kpi-section-expenses" aria-expanded="true" aria-label="Mostrar/ocultar KPIs">
                     <i data-kpi-toggle-icon class="fas fa-chevron-down"></i>
                 </button>
@@ -65,14 +65,14 @@
     </div>
 
 <!-- Historial de gastos -->
-<div id="historial-egresos" class="bg-white rounded-xl shadow overflow-visible">
+<div id="historial-gastos" class="bg-white rounded-xl shadow overflow-visible">
     <div class="px-4 py-3 border-b border-gray-100 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
             <h2 class="text-sm font-semibold text-gray-900">Historial de movimientos</h2>
             <p class="text-xs text-gray-500">Gastos recientes.</p>
         </div>
         <div class="flex flex-wrap gap-2 text-[11px]">
-            <button id="btn-export-egresos" type="button" class="px-3 py-1 rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 inline-flex items-center gap-2">
+            <button id="btn-export-gastos" type="button" class="px-3 py-1 rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 inline-flex items-center gap-2">
                 <span>Exportar</span>
                 <i class="fas fa-file-export text-[10px]"></i>
             </button>
@@ -107,11 +107,11 @@
             <tr class="text-[11px] bg-white align-middle">
                 <th class="px-3 py-1">
                     <div class="inline-block min-w-[110px] max-w-[140px] w-full">
-                        <input id="filtro-rango-egresos" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="dd/mm/aaaa - dd/mm/aaaa" readonly>
+                        <input id="filtro-rango-gastos" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="dd/mm/aaaa - dd/mm/aaaa" readonly>
                     </div>
                 </th>
                 <th class="px-3 py-1">
-                    <select id="filtro-categoria-egresos" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
+                    <select id="filtro-categoria-gastos" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
                         <option value="">Todas</option>
                         <option value="Servicios públicos">Servicios públicos</option>
                         <option value="Gastos operativos">Gastos operativos</option>
@@ -125,10 +125,10 @@
                 </th>
                 <th class="px-3 py-1"></th>
                 <th class="px-3 py-1">
-                    <div class="relative" id="wrap-filtro-proveedor-egresos">
-                        <input id="filtro-proveedor-egresos" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="Buscar proveedor" autocomplete="off">
-                        <input id="filtro-proveedor-egresos-id" type="hidden" value="">
-                        <div id="filtro-proveedor-egresos-dd" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden"></div>
+                    <div class="relative" id="wrap-filtro-proveedor-gastos">
+                        <input id="filtro-proveedor-gastos" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="Buscar proveedor" autocomplete="off">
+                        <input id="filtro-proveedor-gastos-id" type="hidden" value="">
+                        <div id="filtro-proveedor-gastos-dd" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg overflow-hidden"></div>
                     </div>
                 </th>
                 <th class="px-3 py-1"></th>
@@ -136,7 +136,7 @@
                 <th class="px-3 py-1"></th>
             </tr>
         </thead>
-        <tbody id="egresos-tbody" class="bg-white divide-y divide-gray-200">
+        <tbody id="gastos-tbody" class="bg-white divide-y divide-gray-200">
             <tr>
                 <td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay gastos registrados. Usa el botón "Nuevo gasto" para cargarlos.</td>
             </tr>
@@ -144,13 +144,13 @@
     </table>
 
     <div class="hidden">
-        <span id="egresos-total-periodo">$0,00</span>
+        <span id="gastos-total-periodo">$0,00</span>
     </div>
 </div>
 
 </div>
 
-<div id="modal-export-egresos" class="hidden fixed inset-0 z-50">
+<div id="modal-export-gastos" class="hidden fixed inset-0 z-50">
     <div class="absolute inset-0 bg-black/40"></div>
     <div class="relative h-full w-full flex items-center justify-center p-4">
         <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
@@ -159,24 +159,24 @@
                     <h3 class="text-base font-semibold text-gray-900">Exportar historial</h3>
                     <p class="text-xs text-gray-500">Se exporta exactamente lo que estás viendo (con filtros aplicados).</p>
                 </div>
-                <button id="btn-close-export-egresos" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                <button id="btn-close-export-gastos" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button id="btn-export-egresos-pdf" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                <button id="btn-export-gastos-pdf" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
                     <div class="text-3xl leading-none select-none">📄</div>
                     <div class="mt-2 font-semibold text-gray-900">Exportar a PDF</div>
                     <div class="text-xs text-gray-500">Ideal para imprimir o enviar.</div>
                 </button>
-                <button id="btn-export-egresos-xls" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                <button id="btn-export-gastos-xls" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
                     <div class="text-3xl leading-none select-none">📊</div>
                     <div class="mt-2 font-semibold text-gray-900">Exportar a Excel</div>
                     <div class="text-xs text-gray-500">Descarga un CSV compatible.</div>
                 </button>
             </div>
             <div class="px-5 py-4 border-t border-gray-100 flex justify-end">
-                <button id="btn-cancel-export-egresos" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-cancel-export-gastos" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
             </div>
         </div>
     </div>
@@ -208,8 +208,8 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const tbody = document.getElementById('egresos-tbody');
-    const elTotalPeriodo = document.getElementById('egresos-total-periodo');
+    const tbody = document.getElementById('gastos-tbody');
+    const elTotalPeriodo = document.getElementById('gastos-total-periodo');
 
     const kpiGastosHoy = document.getElementById('kpi-gastos-hoy');
     const kpiCantGastosHoy = document.getElementById('kpi-cant-gastos-hoy');
@@ -218,23 +218,23 @@ document.addEventListener('DOMContentLoaded', function () {
     const kpiTopCatsTooltip = document.getElementById('kpi-top-cats-tooltip');
     const kpiTopCatsLegend = document.getElementById('kpi-top-cats-legend');
 
-    const btnExport = document.getElementById('btn-export-egresos');
-    const modalExport = document.getElementById('modal-export-egresos');
-    const btnCloseExport = document.getElementById('btn-close-export-egresos');
-    const btnCancelExport = document.getElementById('btn-cancel-export-egresos');
-    const btnExportPdf = document.getElementById('btn-export-egresos-pdf');
-    const btnExportXls = document.getElementById('btn-export-egresos-xls');
+    const btnExport = document.getElementById('btn-export-gastos');
+    const modalExport = document.getElementById('modal-export-gastos');
+    const btnCloseExport = document.getElementById('btn-close-export-gastos');
+    const btnCancelExport = document.getElementById('btn-cancel-export-gastos');
+    const btnExportPdf = document.getElementById('btn-export-gastos-pdf');
+    const btnExportXls = document.getElementById('btn-export-gastos-xls');
 
     const modalPreview = document.getElementById('modal-preview-egreso');
     const previewBody = document.getElementById('preview-egreso-body');
     const btnClosePreview = document.getElementById('btn-close-preview-egreso');
     const btnCancelPreview = document.getElementById('btn-cancel-preview-egreso');
 
-    const filtroRango = document.getElementById('filtro-rango-egresos');
-    const filtroCategoria = document.getElementById('filtro-categoria-egresos');
-    const filtroProveedor = document.getElementById('filtro-proveedor-egresos');
-    const filtroProveedorId = document.getElementById('filtro-proveedor-egresos-id');
-    const filtroProveedorDd = document.getElementById('filtro-proveedor-egresos-dd');
+    const filtroRango = document.getElementById('filtro-rango-gastos');
+    const filtroCategoria = document.getElementById('filtro-categoria-gastos');
+    const filtroProveedor = document.getElementById('filtro-proveedor-gastos');
+    const filtroProveedorId = document.getElementById('filtro-proveedor-gastos-id');
+    const filtroProveedorDd = document.getElementById('filtro-proveedor-gastos-dd');
 
     const newUrl = "{{ url_for('expenses.new') }}";
     const suppliersNewUrl = "{{ url_for('suppliers.new') }}";
@@ -981,7 +981,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.addEventListener('click', function (ev) {
-        const wrap = document.getElementById('wrap-filtro-proveedor-egresos');
+        const wrap = document.getElementById('wrap-filtro-proveedor-gastos');
         if (!wrap) return;
         if (!wrap.contains(ev.target)) hideProveedorDd();
     });
@@ -1050,7 +1050,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const a = document.createElement('a');
         const period = getPeriodLabelSafe().replace(/\s+/g, '_').replace(/\//g, '-');
         a.href = URL.createObjectURL(blob);
-        a.download = 'egresos_' + period + '.csv';
+        a.download = 'gastos_' + period + '.csv';
         document.body.appendChild(a);
         a.click();
         a.remove();

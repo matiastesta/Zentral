@@ -28,7 +28,7 @@ def index():
 
 @bp.get('/api/cash-counts')
 @login_required
-@module_required_any('movements', 'dashboard')
+@module_required('movements')
 def list_cash_counts():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()

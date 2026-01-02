@@ -146,21 +146,6 @@ class User(UserMixin, db.Model):
             return True
         if self.role in {'zentral_admin'}:
             return True
-
-        try:
-            cid = str(getattr(self, 'company_id', '') or '').strip()
-            if cid:
-                role_row = (
-                    db.session.query(CompanyRole)
-                    .filter(CompanyRole.company_id == cid, CompanyRole.name == str(self.role or '').strip())
-                    .first()
-                )
-                if role_row:
-                    perms = role_row.get_permissions()
-                    if bool(perms.get(str(module_name), False)):
-                        return True
-        except Exception:
-            pass
         perms = self.get_permissions()
         return bool(perms.get(str(module_name), False))
 

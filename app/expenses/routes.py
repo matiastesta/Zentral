@@ -106,7 +106,7 @@ def _format_currency_ars(amount):
 @bp.route("/")
 @bp.route("/index")
 @login_required
-@module_required_any('expenses', 'dashboard')
+@module_required('expenses')
 def index():
     """Listado básico de gastos."""
     return render_template("expenses/list.html", title="Gastos")
@@ -141,29 +141,15 @@ def _supplier_is_inventory_supplier(supplier_id: str) -> bool:
             return False
     except Exception:
         return False
-    has_inventory_flag = False
-    try:
-        raw_meta = str(getattr(row, 'meta_json', '') or '').strip()
-        if raw_meta:
-            meta_obj = json.loads(raw_meta) if isinstance(raw_meta, str) else {}
-            if isinstance(meta_obj, dict) and meta_obj.get('inventory_supplier') is True:
-                has_inventory_flag = True
-    except Exception:
-        pass
-
     raw = str(getattr(row, 'categories_json', '') or '').strip()
+    if not raw:
+        return False
     try:
-        cats = json.loads(raw) if raw else []
+        cats = json.loads(raw)
         cats = cats if isinstance(cats, list) else []
     except Exception:
         cats = []
-
-    norm = [str(x or '').strip().lower() for x in cats if str(x or '').strip()]
-    has_inventory_legacy = 'inventario' in norm
-    non_inventory = [x for x in norm if x != 'inventario']
-
-    has_inventory = has_inventory_flag or has_inventory_legacy
-    return bool(has_inventory and (len(non_inventory) == 0))
+    return 'inventario' in [str(x or '').strip().lower() for x in cats]
 
 
 def _payload_uses_inventory_supplier(payload: dict) -> bool:
@@ -243,7 +229,7 @@ def _apply_expense_category_payload(row: ExpenseCategory, payload: dict):
 
 @bp.get('/api/expenses')
 @login_required
-@module_required_any('expenses', 'dashboard')
+@module_required('expenses')
 def list_expenses_api():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
@@ -755,7 +741,7 @@ def upsert_expenses_bulk():
 
 @bp.get('/api/categories')
 @login_required
-@module_required_any('expenses', 'suppliers')
+@module_required('expenses')
 def list_expense_categories_api():
     q = (request.args.get('q') or '').strip().lower()
     limit = int(request.args.get('limit') or 5000)
@@ -766,12 +752,7 @@ def list_expense_categories_api():
         like = f"%{q}%"
         query = query.filter(ExpenseCategory.name.ilike(like))
     rows = query.order_by(ExpenseCategory.name.asc()).limit(limit).all()
-    items = []
-    for r in rows:
-        if str(getattr(r, 'name', '') or '').strip().lower() == 'inventario':
-            continue
-        items.append(_serialize_expense_category(r))
-    return jsonify({'ok': True, 'items': items})
+    return jsonify({'ok': True, 'items': [_serialize_expense_category(r) for r in rows]})
 
 
 @bp.get('/api/categories/<category_id>')
@@ -787,7 +768,7 @@ def get_expense_category_api(category_id):
 
 @bp.post('/api/categories')
 @login_required
-@module_required_any('expenses', 'suppliers')
+@module_required('expenses')
 def create_expense_category_api():
     payload = request.get_json(silent=True) or {}
     cid = str(payload.get('id') or '').strip() or uuid4().hex
@@ -795,8 +776,6 @@ def create_expense_category_api():
     if row:
         return jsonify({'ok': False, 'error': 'already_exists'}), 400
     name = str(payload.get('name') or payload.get('categoria') or '').strip() or 'Categoría'
-    if name.strip().lower() == 'inventario':
-        return jsonify({'ok': False, 'error': 'reserved_category', 'message': 'La categoría “Inventario” está reservada para el módulo de Inventario.'}), 400
     row = ExpenseCategory(id=cid, name=name)
     _apply_expense_category_payload(row, payload)
     db.session.add(row)
@@ -810,16 +789,13 @@ def create_expense_category_api():
 
 @bp.put('/api/categories/<category_id>')
 @login_required
-@module_required_any('expenses', 'suppliers')
+@module_required('expenses')
 def update_expense_category_api(category_id):
     cid = str(category_id or '').strip()
     row = db.session.get(ExpenseCategory, cid)
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     payload = request.get_json(silent=True) or {}
-    next_name = str(payload.get('name') or payload.get('categoria') or payload.get('category') or row.name or '').strip()
-    if next_name.strip().lower() == 'inventario':
-        return jsonify({'ok': False, 'error': 'reserved_category', 'message': 'La categoría “Inventario” está reservada para el módulo de Inventario.'}), 400
     _apply_expense_category_payload(row, payload)
     try:
         db.session.commit()
@@ -831,46 +807,12 @@ def update_expense_category_api(category_id):
 
 @bp.delete('/api/categories/<category_id>')
 @login_required
-@module_required_any('expenses', 'suppliers')
+@module_required('expenses')
 def delete_expense_category_api(category_id):
     cid = str(category_id or '').strip()
     row = db.session.get(ExpenseCategory, cid)
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
-    name = str(getattr(row, 'name', '') or '').strip()
-    if name.lower() == 'inventario':
-        return jsonify({'ok': False, 'error': 'reserved_category', 'message': 'La categoría “Inventario” está reservada para el módulo de Inventario.'}), 400
-
-    company_id = str(getattr(g, 'company_id', '') or '').strip()
-    used_count = 0
-    if company_id and name:
-        try:
-            sup_rows = (
-                db.session.query(Supplier)
-                .filter(Supplier.company_id == company_id, Supplier.status == 'Active')
-                .limit(5000)
-                .all()
-            )
-        except Exception:
-            sup_rows = []
-        target = name.lower()
-        for s in sup_rows:
-            raw_cats = str(getattr(s, 'categories_json', '') or '').strip()
-            try:
-                cats = json.loads(raw_cats) if raw_cats else []
-                cats = cats if isinstance(cats, list) else []
-            except Exception:
-                cats = []
-            norm = [str(x or '').strip().lower() for x in cats if str(x or '').strip()]
-            if target in norm:
-                used_count += 1
-    if used_count > 0:
-        return jsonify({
-            'ok': False,
-            'error': 'category_in_use',
-            'count': used_count,
-            'message': f'Esta categoría está siendo utilizada por {used_count} proveedor(es) activo(s).'
-        }), 400
     try:
         db.session.delete(row)
         db.session.commit()
@@ -882,7 +824,7 @@ def delete_expense_category_api(category_id):
 
 @bp.post('/api/categories/bulk')
 @login_required
-@module_required_any('expenses', 'suppliers')
+@module_required('expenses')
 def upsert_expense_categories_bulk():
     payload = request.get_json(silent=True) or {}
     items = payload.get('items')
@@ -890,13 +832,10 @@ def upsert_expense_categories_bulk():
     out = []
     for it in items_list:
         d = it if isinstance(it, dict) else {}
-        name = str(d.get('name') or d.get('categoria') or 'Categoría').strip() or 'Categoría'
-        if name.strip().lower() == 'inventario':
-            return jsonify({'ok': False, 'error': 'reserved_category', 'message': 'La categoría “Inventario” está reservada para el módulo de Inventario.'}), 400
         cid = str(d.get('id') or '').strip() or uuid4().hex
         row = db.session.get(ExpenseCategory, cid)
         if not row:
-            row = ExpenseCategory(id=cid, name=name)
+            row = ExpenseCategory(id=cid, name=str(d.get('name') or d.get('categoria') or 'Categoría').strip() or 'Categoría')
             db.session.add(row)
         _apply_expense_category_payload(row, d)
         out.append(row)
