@@ -1,5 +1,6 @@
 from datetime import date as dt_date, datetime, timedelta
 from typing import Any, Dict, List
+import re
 import uuid
 
 from flask import current_app, g, jsonify, render_template, request, url_for
@@ -67,6 +68,96 @@ def _exchange_ticket_from_sale_id(sale_id: int) -> str:
         return '#C0000'
 
 
+def _parse_related_from_notes(notes: str):
+    try:
+        note_rel = str(notes or '').strip()
+        if not note_rel:
+            return None, ''
+        m = re.search(r"Relacionado\s+a\s+(venta|cambio)\s+([^\n\r]+)", note_rel, re.IGNORECASE)
+        if not m:
+            return None, ''
+        kind = str(m.group(1) or '').strip().lower() or None
+        tok = str(m.group(2) or '').strip()
+        return kind, tok
+    except Exception:
+        current_app.logger.exception('Failed to parse related reference from notes')
+        return None, ''
+
+
+def _is_tmp_related_ticket(tok: str) -> bool:
+    try:
+        t = str(tok or '').strip().lower()
+        if not t:
+            return False
+        return ('__tmp__' in t) or ('_tmp_' in t)
+    except Exception:
+        return False
+
+
+def _related_type_slug(sale_type: str) -> str:
+    t = str(sale_type or '').strip()
+    if t == 'Venta':
+        return 'sale'
+    if t == 'Cambio':
+        return 'change'
+    return ''
+
+
+def _build_related_label(this_type: str, related_type: str, related_ticket: str) -> str:
+    tt = str(this_type or '').strip()
+    rt = str(related_type or '').strip()
+    tk = str(related_ticket or '').strip()
+    if not tk:
+        return ''
+    if tt == 'Venta' and rt == 'Cambio':
+        return f"Venta → Cambio {tk}"
+    if tt == 'Cambio' and rt == 'Venta':
+        return f"Cambio → Venta {tk}"
+    if rt:
+        return f"Relacionado a {rt} {tk}"
+    return f"Relacionado {tk}"
+
+
+def _format_date_dmy(d) -> str:
+    try:
+        if not d:
+            return ''
+        return d.strftime('%d/%m/%Y')
+    except Exception:
+        return ''
+
+
+def _format_money_ar(amount: float) -> str:
+    try:
+        n = float(amount or 0.0)
+        s = f"{abs(n):,.0f}"
+        s = s.replace(',', '.')
+        return f"-${s}" if n < 0 else f"${s}"
+    except Exception:
+        return '$0'
+
+
+def _fallback_related_summary(related_row: Sale) -> str:
+    try:
+        if not related_row:
+            return ''
+        d = _format_date_dmy(getattr(related_row, 'sale_date', None))
+        cust = str(getattr(related_row, 'customer_name', '') or '').strip()
+        total = _format_money_ar(float(getattr(related_row, 'total', 0.0) or 0.0))
+        base = ' – '.join([x for x in [d, cust, total] if x])
+        if not base:
+            return 'Relacionado'
+        rt = str(getattr(related_row, 'sale_type', '') or '').strip()
+        if rt == 'Venta':
+            return f"Venta relacionada: {base}"
+        if rt == 'Cambio':
+            return f"Cambio relacionado: {base}"
+        return f"Relacionado: {base}"
+    except Exception:
+        current_app.logger.exception('Failed to build related fallback summary')
+        return 'Relacionado'
+
+
 @bp.route('/')
 @bp.route('/index')
 @login_required
@@ -75,7 +166,7 @@ def index():
     return render_template('sales/list.html', title='Ventas')
 
 
-def _serialize_sale(row: Sale):
+def _serialize_sale(row: Sale, related: dict = None):
     has_venta_libre = False
     venta_libre_count = 0
     try:
@@ -90,6 +181,8 @@ def _serialize_sale(row: Sale):
         has_venta_libre = False
         venta_libre_count = 0
 
+    rel = related if isinstance(related, dict) else {}
+
     return {
         'id': row.id,
         'ticket': row.ticket,
@@ -98,6 +191,11 @@ def _serialize_sale(row: Sale):
         'status': row.status,
         'payment_method': row.payment_method,
         'notes': row.notes or '',
+
+        'related_label': str(rel.get('label') or ''),
+        'related_ticket': str(rel.get('ticket') or ''),
+        'related_type': str(rel.get('type') or ''),
+        'related_url': str(rel.get('url') or ''),
 
         'is_gift': bool(getattr(row, 'is_gift', False)),
         'gift_code': (getattr(row, 'gift_code', None) or ''),
@@ -239,7 +337,119 @@ def list_sales():
         q = q.filter(Sale.sale_type != 'CobroCC')
     q = q.order_by(Sale.sale_date.desc(), Sale.id.desc()).limit(limit)
     rows = q.all()
-    return jsonify({'ok': True, 'items': [_serialize_sale(r) for r in rows]})
+
+    by_ticket = {}
+    for r in rows:
+        try:
+            tk = str(getattr(r, 'ticket', '') or '').strip()
+            if tk:
+                by_ticket[tk] = r
+        except Exception:
+            continue
+
+    referenced = set()
+    for r in rows:
+        kind, tok = _parse_related_from_notes(getattr(r, 'notes', '') or '')
+        if tok and (not _is_tmp_related_ticket(tok)):
+            referenced.add(tok)
+
+    missing = [t for t in referenced if t not in by_ticket]
+    if missing:
+        try:
+            extra = (
+                db.session.query(Sale)
+                .filter(Sale.company_id == cid)
+                .filter(Sale.ticket.in_(missing))
+                .all()
+            )
+            for r in (extra or []):
+                tk = str(getattr(r, 'ticket', '') or '').strip()
+                if tk:
+                    by_ticket[tk] = r
+        except Exception:
+            current_app.logger.exception('Failed to load referenced related tickets')
+
+    exchange_groups = {}
+    for r in rows:
+        try:
+            rt = getattr(r, 'exchange_return_total', None)
+            nt = getattr(r, 'exchange_new_total', None)
+            if rt is None or nt is None:
+                continue
+            key = (
+                (r.sale_date.isoformat() if r.sale_date else ''),
+                round(float(rt or 0.0), 4),
+                round(float(nt or 0.0), 4),
+                str(getattr(r, 'customer_id', '') or '').strip(),
+                str(getattr(r, 'customer_name', '') or '').strip(),
+                int(getattr(r, 'created_by_user_id', 0) or 0),
+            )
+            exchange_groups.setdefault(key, []).append(r)
+        except Exception:
+            continue
+
+    def _pick_exchange_pair(row: Sale):
+        try:
+            rt = getattr(row, 'exchange_return_total', None)
+            nt = getattr(row, 'exchange_new_total', None)
+            if rt is None or nt is None:
+                return None
+            key = (
+                (row.sale_date.isoformat() if row.sale_date else ''),
+                round(float(rt or 0.0), 4),
+                round(float(nt or 0.0), 4),
+                str(getattr(row, 'customer_id', '') or '').strip(),
+                str(getattr(row, 'customer_name', '') or '').strip(),
+                int(getattr(row, 'created_by_user_id', 0) or 0),
+            )
+            group = exchange_groups.get(key) or []
+            cands = [x for x in group if int(getattr(x, 'id', 0) or 0) != int(getattr(row, 'id', 0) or 0)]
+            if not cands:
+                return None
+            pref = [x for x in cands if str(getattr(x, 'sale_type', '') or '').strip() != str(getattr(row, 'sale_type', '') or '').strip()]
+            cands = pref or cands
+            if getattr(row, 'created_at', None):
+                cands.sort(key=lambda x: abs((x.created_at - row.created_at).total_seconds()) if getattr(x, 'created_at', None) else 999999)
+            return cands[0] if cands else None
+        except Exception:
+            return None
+
+    related_map = {}
+    for r in rows:
+        kind, tok = _parse_related_from_notes(getattr(r, 'notes', '') or '')
+        rel_row = None
+        if tok and (not _is_tmp_related_ticket(tok)):
+            rel_row = by_ticket.get(tok)
+        if not rel_row:
+            rel_row = _pick_exchange_pair(r)
+
+        if rel_row:
+            rel_ticket = str(getattr(rel_row, 'ticket', '') or '').strip()
+            rel_type = str(getattr(rel_row, 'sale_type', '') or '').strip()
+            if _is_tmp_related_ticket(rel_ticket):
+                related_map[int(r.id)] = {
+                    'ticket': '',
+                    'type': _related_type_slug(rel_type),
+                    'label': _fallback_related_summary(rel_row),
+                    'url': '',
+                }
+                continue
+            related_map[int(r.id)] = {
+                'ticket': rel_ticket,
+                'type': _related_type_slug(rel_type),
+                'label': _build_related_label(getattr(r, 'sale_type', ''), rel_type, rel_ticket),
+                'url': '',
+            }
+        else:
+            has_rel_hint = bool(tok) or (getattr(r, 'exchange_return_total', None) is not None and getattr(r, 'exchange_new_total', None) is not None)
+            related_map[int(r.id)] = {
+                'ticket': '',
+                'type': ('sale' if kind == 'venta' else 'change' if kind == 'cambio' else ''),
+                'label': 'Relacionado (no disponible)' if has_rel_hint else '',
+                'url': '',
+            }
+
+    return jsonify({'ok': True, 'items': [_serialize_sale(r, related=related_map.get(int(r.id))) for r in rows]})
 
 
 @bp.get('/api/sales/<ticket>')
@@ -251,7 +461,79 @@ def get_sale(ticket):
     row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == t).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
-    return jsonify({'ok': True, 'item': _serialize_sale(row)})
+
+    kind, tok = _parse_related_from_notes(getattr(row, 'notes', '') or '')
+    rel_row = None
+    if tok and (not _is_tmp_related_ticket(tok)):
+        try:
+            rel_row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == tok).first()
+        except Exception:
+            current_app.logger.exception('Failed to load related sale by ticket')
+            rel_row = None
+    if not rel_row:
+        try:
+            rt = getattr(row, 'exchange_return_total', None)
+            nt = getattr(row, 'exchange_new_total', None)
+            if rt is not None and nt is not None:
+                qrel = (
+                    db.session.query(Sale)
+                    .filter(Sale.company_id == cid)
+                    .filter(Sale.id != row.id)
+                    .filter(Sale.sale_date == row.sale_date)
+                    .filter(Sale.exchange_return_total == rt)
+                    .filter(Sale.exchange_new_total == nt)
+                )
+                try:
+                    if row.created_by_user_id:
+                        qrel = qrel.filter(Sale.created_by_user_id == row.created_by_user_id)
+                except Exception:
+                    pass
+                try:
+                    if row.customer_id:
+                        qrel = qrel.filter(Sale.customer_id == row.customer_id)
+                    elif row.customer_name:
+                        qrel = qrel.filter(Sale.customer_name == row.customer_name)
+                except Exception:
+                    pass
+                if row.created_at:
+                    try:
+                        lo = row.created_at - timedelta(minutes=5)
+                        hi = row.created_at + timedelta(minutes=5)
+                        qrel = qrel.filter(Sale.created_at >= lo, Sale.created_at <= hi)
+                    except Exception:
+                        pass
+                rel_row = qrel.order_by(Sale.created_at.desc(), Sale.id.desc()).first()
+        except Exception:
+            current_app.logger.exception('Failed to load related sale by exchange fields')
+            rel_row = None
+
+    if rel_row:
+        rel_ticket = str(getattr(rel_row, 'ticket', '') or '').strip()
+        rel_type = str(getattr(rel_row, 'sale_type', '') or '').strip()
+        if _is_tmp_related_ticket(rel_ticket):
+            related = {
+                'ticket': '',
+                'type': _related_type_slug(rel_type),
+                'label': _fallback_related_summary(rel_row),
+                'url': '',
+            }
+        else:
+            related = {
+                'ticket': rel_ticket,
+                'type': _related_type_slug(rel_type),
+                'label': _build_related_label(getattr(row, 'sale_type', ''), rel_type, rel_ticket),
+                'url': '',
+            }
+    else:
+        has_rel_hint = bool(tok) or (getattr(row, 'exchange_return_total', None) is not None and getattr(row, 'exchange_new_total', None) is not None)
+        related = {
+            'ticket': '',
+            'type': ('sale' if kind == 'venta' else 'change' if kind == 'cambio' else ''),
+            'label': 'Relacionado (no disponible)' if has_rel_hint else '',
+            'url': '',
+        }
+
+    return jsonify({'ok': True, 'item': _serialize_sale(row, related=related)})
 
 
 @bp.get('/api/products')
@@ -642,6 +924,22 @@ def create_exchange():
             sale_row.ticket = _ticket_from_sale_id(int(getattr(sale_row, 'id', 0) or 0))
         except Exception:
             sale_row.ticket = _ticket_from_sale_id(0)
+
+        try:
+            rn = str(getattr(return_row, 'notes', '') or '')
+            sn = str(getattr(sale_row, 'notes', '') or '')
+            if rn and sale_ticket:
+                rn2 = rn.replace(f"Relacionado a venta {sale_ticket}", f"Relacionado a venta {sale_row.ticket}")
+                if rn2 == rn:
+                    rn2 = re.sub(r"(Relacionado\s+a\s+venta\s+)[^\n\r]+", r"\1" + str(sale_row.ticket), rn, flags=re.IGNORECASE)
+                return_row.notes = rn2
+            if sn and return_ticket:
+                sn2 = sn.replace(f"Relacionado a cambio {return_ticket}", f"Relacionado a cambio {return_row.ticket}")
+                if sn2 == sn:
+                    sn2 = re.sub(r"(Relacionado\s+a\s+cambio\s+)[^\n\r]+", r"\1" + str(return_row.ticket), sn, flags=re.IGNORECASE)
+                sale_row.notes = sn2
+        except Exception:
+            current_app.logger.exception('Failed to rewrite exchange notes with final tickets')
 
         for it in return_items_list:
             d = it if isinstance(it, dict) else {}

@@ -1938,18 +1938,35 @@ document.addEventListener('DOMContentLoaded', function() {
             tr.setAttribute('data-type', tipoLabel);
 
             let relatedText = '';
+            let relatedTicket = '';
             try {
-                const notes = String(s?.notes || '').trim();
-                const m = notes.match(/Relacionado\s+a\s+[^\n\r]+/i);
-                if (m && m[0]) relatedText = String(m[0]).trim();
+                relatedText = String(s?.related_label || '').trim();
+                relatedTicket = String(s?.related_ticket || '').trim();
+                if (relatedText && /(_tmp_|__tmp__)/i.test(relatedText)) relatedText = '';
+                if (relatedTicket && /(_tmp_|__tmp__)/i.test(relatedTicket)) relatedTicket = '';
             } catch (e) {
             }
             tr.setAttribute('data-related', relatedText);
 
+            let relatedHtml = '';
+            try {
+                const relLabel = escapeHtml(relatedText);
+                const relTicket = escapeHtml(relatedTicket);
+                if (relLabel) {
+                    if (relatedTicket) {
+                        relatedHtml = '<a href="#" class="mt-0.5 text-[10px] text-indigo-700 hover:underline" onclick="openEditTicket(\'' + relTicket + '\'); return false;">' + relLabel + '</a>';
+                    } else {
+                        relatedHtml = '<div class="mt-0.5 text-[10px] text-gray-500">' + relLabel + '</div>';
+                    }
+                }
+            } catch (e) {
+                relatedHtml = '';
+            }
+
             const statusHtml = ''
                 + '<div class="flex flex-col items-center">'
                 +   statusBadgeHtml(s?.status, s?.type)
-                +   (relatedText ? ('<div class="mt-0.5 text-[10px] text-gray-500">' + relatedText + '</div>') : '')
+                +   (relatedHtml || '')
                 + '</div>';
 
             let ticketCellHtml = '';
@@ -2681,6 +2698,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 const t = String(ticket || '').trim();
                 const sale = sales.find(s => String(s?.ticket || '').trim() === t) || null;
                 if (!sale) return;
+
+                try {
+                    const relType = String(sale?.related_type || '').trim().toLowerCase();
+                    const relTicket = String(sale?.related_ticket || '').trim();
+                    if (relType === 'change' && relTicket && relTicket.startsWith('#C')) {
+                        openEditCambioVentaTicket(t, sale, relTicket);
+                        return;
+                    }
+                } catch (e) {
+                }
 
                 const notes = String(sale?.notes || '').trim();
                 const m = notes.match(/Relacionado\s+a\s+cambio\s+(#C\d+)/i);
