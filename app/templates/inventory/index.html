@@ -3275,7 +3275,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const msg = (err === 'supplier_not_found')
                     ? 'Proveedor inválido.'
                     : (err === 'lot_has_sales')
-                        ? 'No se puede cambiar cantidad/costo porque el lote ya tiene consumos registrados.'
+                        ? 'No se puede cambiar la cantidad/fecha porque el lote ya tiene consumos registrados.'
                         : (err === 'qty_required')
                             ? 'La cantidad debe ser mayor a 0.'
                             : (err === 'unit_cost_invalid')

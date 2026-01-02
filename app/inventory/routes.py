@@ -703,11 +703,33 @@ def update_lot(lot_id: int):
 
     qty_initial_raw = payload.get('qty_initial')
     unit_cost_raw = payload.get('unit_cost')
-    wants_qty_change = qty_initial_raw is not None
+    wants_qty_change = False
+    wants_unit_cost_change = False
+
+    qty_initial = None
+    unit_cost = None
 
     movement_date = _parse_date_iso(payload.get('date'), None)
     if not movement_date:
         return jsonify({'ok': False, 'error': 'date_required'}), 400
+
+    if qty_initial_raw is not None:
+        qty_initial = _num(qty_initial_raw)
+        if qty_initial <= 0:
+            return jsonify({'ok': False, 'error': 'qty_required'}), 400
+        try:
+            wants_qty_change = bool(abs(float(qty_initial) - float(lot.qty_initial or 0)) > 1e-9)
+        except Exception:
+            wants_qty_change = True
+
+    if unit_cost_raw is not None:
+        unit_cost = _num(unit_cost_raw)
+        if unit_cost < 0:
+            return jsonify({'ok': False, 'error': 'unit_cost_invalid'}), 400
+        try:
+            wants_unit_cost_change = bool(abs(float(unit_cost) - float(lot.unit_cost or 0)) > 1e-9)
+        except Exception:
+            wants_unit_cost_change = True
 
     wants_date_change = False
     try:
@@ -730,17 +752,6 @@ def update_lot(lot_id: int):
         )
         if blocked:
             return jsonify({'ok': False, 'error': 'lot_has_sales'}), 400
-
-    qty_initial = None
-    unit_cost = None
-    if qty_initial_raw is not None:
-        qty_initial = _num(qty_initial_raw)
-        if qty_initial <= 0:
-            return jsonify({'ok': False, 'error': 'qty_required'}), 400
-    if unit_cost_raw is not None:
-        unit_cost = _num(unit_cost_raw)
-        if unit_cost < 0:
-            return jsonify({'ok': False, 'error': 'unit_cost_invalid'}), 400
 
     supplier_id = str(payload.get('supplier_id') or '').strip() or None
     supplier_name = str(payload.get('supplier_name') or '').strip() or None
@@ -768,22 +779,22 @@ def update_lot(lot_id: int):
     lot.expiration_date = exp_dt
     lot.received_at = received_at
 
-    if qty_initial is not None:
+    if qty_initial is not None and wants_qty_change:
         lot.qty_initial = qty_initial
         lot.qty_available = qty_initial
-    if unit_cost is not None:
+    if unit_cost is not None and wants_unit_cost_change:
         lot.unit_cost = unit_cost
 
     # Mantener consistencia: el movimiento de ingreso del lote define la fecha del ingreso.
     try:
         mv_update = {InventoryMovement.movement_date: movement_date}
-        if qty_initial is not None:
+        if qty_initial is not None and wants_qty_change:
             mv_update[InventoryMovement.qty_delta] = qty_initial
-        if unit_cost is not None:
+        if unit_cost is not None and wants_unit_cost_change:
             mv_update[InventoryMovement.unit_cost] = unit_cost
-        if qty_initial is not None or unit_cost is not None:
-            q = qty_initial if qty_initial is not None else float(lot.qty_initial or 0)
-            c = unit_cost if unit_cost is not None else float(lot.unit_cost or 0)
+        if (qty_initial is not None and wants_qty_change) or (unit_cost is not None and wants_unit_cost_change):
+            q = qty_initial if (qty_initial is not None and wants_qty_change) else float(lot.qty_initial or 0)
+            c = unit_cost if (unit_cost is not None and wants_unit_cost_change) else float(lot.unit_cost or 0)
             mv_update[InventoryMovement.total_cost] = q * c
 
         # Un lote puede venir de compra (purchase) o de devolución (return).
@@ -799,7 +810,7 @@ def update_lot(lot_id: int):
 
     # Si cambia el costo, recalcular "para atrás" el costo de todos los movimientos del lote.
     # Esto afecta el histórico de costo de ventas (COGS) y reportes.
-    if unit_cost is not None:
+    if unit_cost is not None and wants_unit_cost_change:
         try:
             (
                 db.session.query(InventoryMovement)
