@@ -584,7 +584,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             let list = Array.isArray(sales) ? sales.slice() : [];
             list = list.filter(s => {
-                const txt = (String(s?.ticket || '') + ' ' + String(s?.notes || '')).toLowerCase();
+                const txt = (String(s?.ticket || '') + ' ' + String(s?.notes_display || s?.notes || '')).toLowerCase();
                 if (q && !txt.includes(q)) return false;
                 const pm = String(s?.payment_method || '').trim();
                 if (pagos.length && pagos.indexOf(pm) < 0) return false;
@@ -599,7 +599,7 @@ document.addEventListener('DOMContentLoaded', function () {
             list.sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
 
             const buildNotes = function (s) {
-                const base = String(s?.notes || '').trim();
+                const base = String(s?.notes_display || s?.notes || '').trim();
                 const detail = buildTicketDetail(s);
                 if (!detail) return base;
                 if (!base) return detail;
@@ -630,7 +630,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + labelTipo(s) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(s?.payment_method || '') + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(buildNotes(s) || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(buildNotes(s) || '').replace(/__tmp__|_tmp_/gi, '') + '</td>'
                     + '<td class="px-4 py-3 text-center">'
                     +   '<button type="button" class="btn-del-sale h-8 w-8 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-ticket="' + String(ticket).replace(/"/g, '&quot;') + '" title="Eliminar">'
                     +       '<i class="fas fa-trash text-[12px]"></i>'

@@ -158,6 +158,47 @@ def _fallback_related_summary(related_row: Sale) -> str:
         return 'Relacionado'
 
 
+def _sanitize_notes_for_display(notes: str) -> str:
+    try:
+        txt = str(notes or '').strip()
+        if not txt:
+            return ''
+
+        out_lines = []
+        for raw_line in txt.splitlines():
+            line = str(raw_line or '').strip()
+            if not line:
+                continue
+
+            mrel = re.search(r"^Relacionado\s+a\s+(venta|cambio)\s+([^\n\r]+)$", line, re.IGNORECASE)
+            if mrel:
+                tok = str(mrel.group(2) or '').strip()
+                if _is_tmp_related_ticket(tok):
+                    out_lines.append('Relacionado (no disponible)')
+                    continue
+
+            mcc = re.search(r"^(CC\s+(?:cobrada\s+parcialmente|saldada)\s+por)\s+([^\s]+)\s*(\(.*\))$", line, re.IGNORECASE)
+            if mcc:
+                tok = str(mcc.group(2) or '').strip()
+                suffix = str(mcc.group(3) or '').strip()
+                if _is_tmp_related_ticket(tok):
+                    out_lines.append(f"{mcc.group(1)} {suffix}".replace('  ', ' ').strip())
+                    continue
+
+            if _is_tmp_related_ticket(line):
+                continue
+            line = re.sub(r"\b[A-Z]?__tmp__[a-f0-9]{6,}\b", "", line, flags=re.IGNORECASE)
+            line = re.sub(r"\b[A-Z]?_tmp_[a-f0-9]{6,}\b", "", line, flags=re.IGNORECASE)
+            line = re.sub(r"\s{2,}", " ", line).strip()
+            if line:
+                out_lines.append(line)
+
+        return '\n'.join(out_lines).strip()
+    except Exception:
+        current_app.logger.exception('Failed to sanitize notes')
+        return ''
+
+
 @bp.route('/')
 @bp.route('/index')
 @login_required
@@ -191,6 +232,8 @@ def _serialize_sale(row: Sale, related: dict = None):
         'status': row.status,
         'payment_method': row.payment_method,
         'notes': row.notes or '',
+
+        'notes_display': _sanitize_notes_for_display(row.notes or ''),
 
         'related_label': str(rel.get('label') or ''),
         'related_ticket': str(rel.get('ticket') or ''),
@@ -746,14 +789,6 @@ def settle_sale_due_amount():
     remaining = abs(due) - abs(pay_amount)
     row.due_amount = float(remaining if remaining > 0.00001 else 0.0)
     row.on_account = bool(row.due_amount > 0)
-    extra = (
-        f"CC cobrada parcialmente por {payment_ticket} ({payment_method})"
-        if row.on_account
-        else f"CC saldada por {payment_ticket} ({payment_method})"
-    )
-    prev = str(row.notes or '').strip()
-    row.notes = (prev + ('\n' if prev else '') + extra) if extra else (prev or None)
-
     db.session.add(payment_sale)
     try:
         db.session.flush()
@@ -761,6 +796,16 @@ def settle_sale_due_amount():
             payment_sale.ticket = _ticket_from_sale_id(int(getattr(payment_sale, 'id', 0) or 0))
         except Exception:
             payment_sale.ticket = _ticket_from_sale_id(0)
+
+        final_payment_ticket = str(getattr(payment_sale, 'ticket', '') or '').strip() or payment_ticket
+        extra = (
+            f"CC cobrada parcialmente por {final_payment_ticket} ({payment_method})"
+            if row.on_account
+            else f"CC saldada por {final_payment_ticket} ({payment_method})"
+        )
+        prev = str(row.notes or '').strip()
+        row.notes = (prev + ('\n' if prev else '') + extra) if extra else (prev or None)
+
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
