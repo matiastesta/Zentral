@@ -2444,84 +2444,114 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function saveProductFile() {
-        const pid = String(fileProductId || '').trim();
-        if (!pid) return;
-
-        const name = String(fileName?.value || '').trim();
-        const categoryId = String(fileCat?.value || '').trim();
-        const unitBase = String(fileUnit?.value || '').trim();
-        const unitOther = String(fileUnitOther?.value || '').trim();
-        const unit = (unitBase === 'Otro') ? unitOther : unitBase;
-        const desc = String(fileDesc?.value || '').trim();
-        const primarySupplierName = String(filePrimarySupplier?.value || '').trim();
-        const primarySupplierId = String(filePrimarySupplierId?.value || '').trim();
-        const active = !!fileActive?.checked;
-
-        const min = parseNumeroSeguro(fileMin?.value);
-        const reorderPoint = parseNumeroSeguro(fileReorder?.value);
-
-        if (!name) { if (window.showAlertModal) window.showAlertModal('Completá el nombre del producto.', 'Atención', 'Validación requerida'); else alert('Completá el nombre del producto.'); return; }
-        if (!categoryId) { if (window.showAlertModal) window.showAlertModal('Seleccioná la categoría del producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná la categoría del producto.'); return; }
-        if (!unit) { if (window.showAlertModal) window.showAlertModal('Completá la unidad.', 'Atención', 'Validación requerida'); else alert('Completá la unidad.'); return; }
-
-        const payload = {
-            name,
-            category_id: parseInt(categoryId, 10),
-            unit_name: unit,
-            description: desc,
-            primary_supplier_id: primarySupplierId,
-            primary_supplier_name: primarySupplierName,
-            active: active,
-            min_stock: min,
-            reorder_point: reorderPoint,
+        const oldBtnLabel = btnSaveFile ? String(btnSaveFile.textContent || 'Guardar') : 'Guardar';
+        const setSavingState = function (saving) {
+            if (!btnSaveFile) return;
+            btnSaveFile.disabled = !!saving;
+            btnSaveFile.classList.toggle('opacity-70', !!saving);
+            btnSaveFile.classList.toggle('cursor-not-allowed', !!saving);
+            btnSaveFile.textContent = saving ? 'Guardando…' : oldBtnLabel;
         };
 
-        if (fileMethod && !fileMethod.disabled) {
-            payload.method = String(fileMethod.value || '').trim() || 'FIFO';
-        }
-
-        apiUpdateProduct(pid, payload).then(function (res) {
-            if (!res || res.ok !== true) {
-                const err = String(res?.error || '').trim();
-                const msg = (err === 'method_locked')
-                    ? 'La metodología no puede modificarse una vez que el producto tiene movimientos.'
-                    : 'No se pudo guardar el legajo.';
-                if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Operación fallida');
-                else alert(msg);
+        try {
+            const pid = String(fileProductId || '').trim();
+            if (!pid) {
+                if (window.showAlertModal) window.showAlertModal('No se pudo determinar el producto a guardar. Cerrá y volvé a abrir el legajo.', 'Error', 'Legajo');
+                else alert('No se pudo determinar el producto a guardar.');
                 return;
             }
 
-            const item = res.item;
-            if (item && item.id) {
-                cacheProducts = (Array.isArray(cacheProducts) ? cacheProducts : []).map(p => (String(p?.id) === String(item.id)) ? item : p);
+            const name = String(fileName?.value || '').trim();
+            const categoryId = String(fileCat?.value || '').trim();
+            const unitBase = String(fileUnit?.value || '').trim();
+            const unitOther = String(fileUnitOther?.value || '').trim();
+            const unit = (unitBase === 'Otro') ? unitOther : unitBase;
+            const desc = String(fileDesc?.value || '').trim();
+            const primarySupplierName = String(filePrimarySupplier?.value || '').trim();
+            const primarySupplierId = String(filePrimarySupplierId?.value || '').trim();
+            const active = !!fileActive?.checked;
+
+            const min = parseNumeroSeguro(fileMin?.value);
+            const reorderPoint = parseNumeroSeguro(fileReorder?.value);
+
+            if (!name) { if (window.showAlertModal) window.showAlertModal('Completá el nombre del producto.', 'Atención', 'Validación requerida'); else alert('Completá el nombre del producto.'); return; }
+            if (!categoryId) { if (window.showAlertModal) window.showAlertModal('Seleccioná la categoría del producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná la categoría del producto.'); return; }
+            if (!unit) { if (window.showAlertModal) window.showAlertModal('Completá la unidad.', 'Atención', 'Validación requerida'); else alert('Completá la unidad.'); return; }
+
+            const payload = {
+                name,
+                category_id: parseInt(categoryId, 10),
+                unit_name: unit,
+                description: desc,
+                primary_supplier_id: primarySupplierId,
+                primary_supplier_name: primarySupplierName,
+                active: active,
+                min_stock: min,
+                reorder_point: reorderPoint,
+            };
+
+            if (fileMethod && !fileMethod.disabled) {
+                payload.method = String(fileMethod.value || '').trim() || 'FIFO';
             }
 
-            const file = (fileImage && fileImage.files && fileImage.files.length) ? fileImage.files[0] : null;
-            if (fileImageWasChanged && file) {
-                apiUploadProductImage(pid, file).then(function (res2) {
-                    const item2 = res2?.item;
-                    if (item2 && item2.id) {
-                        cacheProducts = (Array.isArray(cacheProducts) ? cacheProducts : []).map(p => (String(p?.id) === String(item2.id)) ? item2 : p);
+            setSavingState(true);
+            apiUpdateProduct(pid, payload)
+                .then(function (res) {
+                    if (!res || res.ok !== true) {
+                        const err = String(res?.error || '').trim();
+                        const msg = (err === 'method_locked')
+                            ? 'La metodología no puede modificarse una vez que el producto tiene movimientos.'
+                            : 'No se pudo guardar el legajo.';
+                        if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Operación fallida');
+                        else alert(msg);
+                        return;
                     }
-                    fileImageWasChanged = false;
-                    if (fileImage) fileImage.value = '';
-                    renderAll();
-                    openProductFile(pid);
-                }).catch(function () {
-                    fileImageWasChanged = false;
-                    if (fileImage) fileImage.value = '';
-                    renderAll();
-                    openProductFile(pid);
-                });
-                return;
-            }
 
-            renderAll();
-            openProductFile(pid);
-        }).catch(function () {
-            if (window.showAlertModal) window.showAlertModal('No se pudo guardar el legajo.', 'Error', 'Operación fallida');
+                    const item = res.item;
+                    if (item && item.id) {
+                        cacheProducts = (Array.isArray(cacheProducts) ? cacheProducts : []).map(p => (String(p?.id) === String(item.id)) ? item : p);
+                    }
+
+                    const file = (fileImage && fileImage.files && fileImage.files.length) ? fileImage.files[0] : null;
+                    if (fileImageWasChanged && file) {
+                        return apiUploadProductImage(pid, file).then(function (res2) {
+                            const item2 = res2?.item;
+                            if (item2 && item2.id) {
+                                cacheProducts = (Array.isArray(cacheProducts) ? cacheProducts : []).map(p => (String(p?.id) === String(item2.id)) ? item2 : p);
+                            }
+                            fileImageWasChanged = false;
+                            if (fileImage) fileImage.value = '';
+                        }).catch(function () {
+                            fileImageWasChanged = false;
+                            if (fileImage) fileImage.value = '';
+                        });
+                    }
+                })
+                .then(function () {
+                    renderAll();
+                    openProductFile(pid);
+                })
+                .catch(function () {
+                    if (window.showAlertModal) window.showAlertModal('No se pudo guardar el legajo.', 'Error', 'Operación fallida');
+                    else alert('No se pudo guardar el legajo.');
+                })
+                .finally(function () {
+                    setSavingState(false);
+                });
+        } catch (e) {
+            try { console.error('saveProductFile failed', e); } catch (err) { }
+            if (window.showAlertModal) window.showAlertModal('No se pudo guardar el legajo. Revisá la consola para más detalles.', 'Error', 'Legajo');
             else alert('No se pudo guardar el legajo.');
-        });
+            try {
+                if (btnSaveFile) {
+                    btnSaveFile.disabled = false;
+                    btnSaveFile.classList.remove('opacity-70');
+                    btnSaveFile.classList.remove('cursor-not-allowed');
+                    btnSaveFile.textContent = oldBtnLabel;
+                }
+            } catch (err) {
+            }
+        }
     }
 
     function clearProductForm() {
