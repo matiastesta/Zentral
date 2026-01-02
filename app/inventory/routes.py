@@ -703,15 +703,25 @@ def update_lot(lot_id: int):
 
     qty_initial_raw = payload.get('qty_initial')
     unit_cost_raw = payload.get('unit_cost')
-    wants_qty_cost_change = (qty_initial_raw is not None) or (unit_cost_raw is not None)
+    wants_qty_change = qty_initial_raw is not None
 
-    date_raw = payload.get('date')
-    wants_date_change = date_raw is not None
+    movement_date = _parse_date_iso(payload.get('date'), None)
+    if not movement_date:
+        return jsonify({'ok': False, 'error': 'date_required'}), 400
+
+    wants_date_change = False
+    try:
+        if getattr(lot, 'received_at', None) is None:
+            wants_date_change = True
+        else:
+            wants_date_change = bool(lot.received_at.date() != movement_date)
+    except Exception:
+        wants_date_change = True
 
     # Proteger consistencia: si el lote ya tuvo consumos, no permitimos cambiar cantidad/costo.
     # FIFO/PEPS depende de received_at: si ya hay consumos u otros movimientos aplicados al lote,
     # no se deben permitir cambios que alteren el orden o la magnitud del ingreso.
-    if wants_qty_cost_change or wants_date_change:
+    if wants_qty_change or wants_date_change:
         blocked = (
             db.session.query(InventoryMovement.id)
             .filter(InventoryMovement.lot_id == lot.id)
@@ -719,15 +729,6 @@ def update_lot(lot_id: int):
             .first()
         )
         if blocked:
-            return jsonify({'ok': False, 'error': 'lot_has_sales'}), 400
-
-        used_sale = (
-            db.session.query(InventoryMovement.id)
-            .filter(InventoryMovement.lot_id == lot.id)
-            .filter(InventoryMovement.type == 'sale')
-            .first()
-        )
-        if used_sale:
             return jsonify({'ok': False, 'error': 'lot_has_sales'}), 400
 
     qty_initial = None
@@ -754,10 +755,6 @@ def update_lot(lot_id: int):
 
     exp_raw = str(payload.get('expiration_date') or '').strip()
     exp_dt = _parse_date_iso(exp_raw, None) if exp_raw else None
-
-    movement_date = _parse_date_iso(payload.get('date'), None)
-    if not movement_date:
-        return jsonify({'ok': False, 'error': 'date_required'}), 400
 
     try:
         received_at = datetime.combine(movement_date, datetime.min.time())
@@ -799,6 +796,62 @@ def update_lot(lot_id: int):
         inbound.update(mv_update, synchronize_session=False)
     except Exception:
         current_app.logger.exception('Failed to update inbound movement for inventory lot')
+
+    # Si cambia el costo, recalcular "para atrás" el costo de todos los movimientos del lote.
+    # Esto afecta el histórico de costo de ventas (COGS) y reportes.
+    if unit_cost is not None:
+        try:
+            (
+                db.session.query(InventoryMovement)
+                .filter(InventoryMovement.lot_id == lot.id)
+                .update(
+                    {
+                        InventoryMovement.unit_cost: unit_cost,
+                        InventoryMovement.total_cost: func.abs(InventoryMovement.qty_delta) * float(unit_cost or 0),
+                    },
+                    synchronize_session=False,
+                )
+            )
+        except Exception:
+            current_app.logger.exception('Failed to recompute movement costs for inventory lot')
+
+        try:
+            cid = str(getattr(lot, 'company_id', '') or '').strip()
+            patterns = [
+                f'%"lot_id":{lot.id}%',
+                f'%"lot_id": {lot.id}%',
+                f'%"lot_id":"{lot.id}"%',
+                f'%"lot_id": "{lot.id}"%',
+            ]
+            conds = [Expense.meta_json.ilike(p) for p in patterns]
+            if cid and conds:
+                rows = (
+                    db.session.query(Expense)
+                    .filter(Expense.company_id == cid)
+                    .filter(Expense.origin == 'inventory')
+                    .filter(or_(*conds))
+                    .all()
+                )
+                for r in rows:
+                    try:
+                        meta_obj = json.loads(r.meta_json) if isinstance(r.meta_json, str) and r.meta_json else {}
+                    except Exception:
+                        meta_obj = {}
+                    if not isinstance(meta_obj, dict):
+                        continue
+                    origin_ref = meta_obj.get('origin_ref')
+                    if not isinstance(origin_ref, dict):
+                        continue
+                    ref_lot_id = origin_ref.get('lot_id')
+                    try:
+                        ref_lot_id_int = int(ref_lot_id) if ref_lot_id is not None else None
+                    except Exception:
+                        ref_lot_id_int = None
+                    if ref_lot_id_int != int(lot.id):
+                        continue
+                    r.amount = float(lot.qty_initial or 0) * float(unit_cost or 0)
+        except Exception:
+            current_app.logger.exception('Failed to update inventory-origin expense amount for lot')
 
     try:
         db.session.commit()
