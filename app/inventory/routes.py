@@ -1,5 +1,6 @@
 from datetime import date as dt_date, datetime
 
+import json
 import os
 from uuid import uuid4
 
@@ -11,7 +12,7 @@ from typing import Optional
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.models import Category, FileAsset, InventoryLot, InventoryMovement, Product, Supplier
+from app.models import Category, Expense, FileAsset, InventoryLot, InventoryMovement, Product, Supplier
 from app.files.storage import upload_to_r2_and_create_asset
 from app.permissions import module_required, module_required_any
 from app.tenancy import ensure_request_context
@@ -821,10 +822,43 @@ def delete_lot(lot_id: int):
     if used:
         return jsonify({'ok': False, 'error': 'lot_has_sales'}), 400
 
-    # borrar movimientos asociados (compras/ajustes/return) y el lote
-    db.session.query(InventoryMovement).filter(InventoryMovement.lot_id == lot.id).delete(synchronize_session=False)
-    db.session.delete(lot)
-    db.session.commit()
+    # Borrado consistente:
+    # - movimientos de inventario asociados (purchase/return/etc)
+    # - egresos creados desde inventario que referencien este lote (meta_json.origin_ref.lot_id)
+    try:
+        cid = str(getattr(lot, 'company_id', '') or '').strip()
+
+        # borrar egresos vinculados al lote
+        # Nota: Expense.meta_json guarda origin_ref (dict) y puede tener lot_id como número o string.
+        patterns = [
+            f'%"lot_id":{lot.id}%',
+            f'%"lot_id": {lot.id}%',
+            f'%"lot_id":"{lot.id}"%',
+            f'%"lot_id": "{lot.id}"%',
+        ]
+        try:
+            conds = []
+            for p in patterns:
+                conds.append(Expense.meta_json.ilike(p))
+            if cid and conds:
+                (
+                    db.session.query(Expense)
+                    .filter(Expense.company_id == cid)
+                    .filter(Expense.origin == 'inventory')
+                    .filter(or_(*conds))
+                    .delete(synchronize_session=False)
+                )
+        except Exception:
+            current_app.logger.exception('Failed to delete inventory-origin expenses for lot')
+
+        # borrar movimientos asociados (compras/ajustes/return) y el lote
+        db.session.query(InventoryMovement).filter(InventoryMovement.lot_id == lot.id).delete(synchronize_session=False)
+        db.session.delete(lot)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Failed to delete inventory lot')
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
     return jsonify({'ok': True})
 
 
