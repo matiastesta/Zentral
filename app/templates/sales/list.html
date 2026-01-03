@@ -2255,6 +2255,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const hasComma = s.indexOf(',') >= 0;
         const hasDot = s.indexOf('.') >= 0;
+        const commaCount = (s.match(/,/g) || []).length;
+        const dotCount = (s.match(/\./g) || []).length;
         if (hasComma && hasDot) {
             const lastComma = s.lastIndexOf(',');
             const lastDot = s.lastIndexOf('.');
@@ -2263,9 +2265,19 @@ document.addEventListener('DOMContentLoaded', function() {
             s = s.split(thouSep).join('');
             if (decSep === ',') s = s.replace(',', '.');
         } else if (hasComma) {
-            s = s.replace(/\./g, '').replace(',', '.');
+            // Si hay comas y no hay puntos: por defecto es decimal (es-AR),
+            // pero si termina en ,XXX (3 dígitos) lo interpretamos como separador de miles.
+            if (commaCount > 1 || /,\d{3}$/.test(s)) {
+                s = s.split(',').join('');
+            } else {
+                s = s.replace(',', '.');
+            }
         } else if (hasDot) {
-            s = s.replace(/,/g, '');
+            // Si hay puntos y no hay comas: puede ser decimal o separador de miles.
+            // Si termina en .XXX (3 dígitos) o hay múltiples puntos, lo tratamos como miles.
+            if (dotCount > 1 || /\.\d{3}$/.test(s)) {
+                s = s.split('.').join('');
+            }
         }
         const n = parseFloat(s);
         return isNaN(n) ? 0 : n;

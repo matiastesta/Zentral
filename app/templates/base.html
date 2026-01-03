@@ -678,6 +678,9 @@
                 }
                 if (!s) return 0;
 
+                // Mantener solo dígitos y separadores comunes
+                s = s.replace(/[^0-9.,]/g, '');
+
                 if (s.indexOf(',') >= 0) {
                     const parts = s.split(',');
                     const intPart = String(parts[0] || '').replace(/\./g, '').replace(/[^0-9]/g, '');
@@ -686,13 +689,33 @@
                     return isNaN(num) ? 0 : (sign * num);
                 }
 
-                const isThousandsOnly = /^\d{1,3}(\.\d{3})+$/.test(s);
-                if (isThousandsOnly) {
-                    const num = parseFloat(s.replace(/\./g, ''));
+                const dotCount = (s.match(/\./g) || []).length;
+                const hasDot = s.indexOf('.') >= 0;
+
+                if (hasDot) {
+                    const isThousandsOnly = /^\d{1,3}(\.\d{3})+$/.test(s);
+                    if (isThousandsOnly) {
+                        const num = parseFloat(s.replace(/\./g, ''));
+                        return isNaN(num) ? 0 : (sign * num);
+                    }
+
+                    const lastDot = s.lastIndexOf('.');
+                    const fracLen = lastDot >= 0 ? (s.length - lastDot - 1) : 0;
+
+                    // Si hay múltiples puntos o el sufijo es de 3+ dígitos, asumimos miles.
+                    if (dotCount > 1 || fracLen > 2) {
+                        const num = parseFloat(s.replace(/\./g, ''));
+                        return isNaN(num) ? 0 : (sign * num);
+                    }
+
+                    // Caso decimal: mantener solo el último punto como separador decimal
+                    const intPart = String(s.slice(0, lastDot)).replace(/\./g, '').replace(/[^0-9]/g, '');
+                    const decPart = String(s.slice(lastDot + 1)).replace(/[^0-9]/g, '');
+                    const num = parseFloat((intPart || '0') + '.' + (decPart || '0'));
                     return isNaN(num) ? 0 : (sign * num);
                 }
 
-                const cleaned = s.replace(/[^0-9.]/g, '');
+                const cleaned = s.replace(/[^0-9]/g, '');
                 const num = parseFloat(cleaned);
                 return isNaN(num) ? 0 : (sign * num);
             }
