@@ -71,7 +71,7 @@
 
         <div id="panel-mov-egresos" class="space-y-3 hidden">
             <div class="bg-white rounded-lg shadow border border-gray-200">
-                <div class="overflow-auto" style="max-height: 65vh;">
+                <div id="mov-egresos-scroll" class="overflow-auto" style="max-height: 65vh;">
                 <table class="min-w-full table-fixed divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
@@ -253,21 +253,47 @@ document.addEventListener('DOMContentLoaded', function () {
     function parseFecha(raw) {
         const v = String(raw || '').trim();
         if (!v) return null;
+        const m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (m) {
+            const dd = parseInt(m[1], 10);
+            const mm = parseInt(m[2], 10);
+            const yy = parseInt(m[3], 10);
+            const dt = new Date(yy, mm - 1, dd);
+            return isNaN(dt.getTime()) ? null : dt;
+        }
         const dt = new Date(v);
         return isNaN(dt.getTime()) ? null : dt;
     }
 
+    function endOfPeriod(d) {
+        if (!d) return null;
+        const x = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        x.setHours(23, 59, 59, 999);
+        return x;
+    }
+
     function parseRangoFechas(raw) {
         const txt = String(raw || '').trim();
+        if (!txt) return null;
         const normalized = txt.replace(/\s+a\s+/i, ' - ').replace(/\s+to\s+/i, ' - ');
         const parts = normalized.split(' - ').map(p => p.trim()).filter(Boolean);
+        if (!parts.length) return null;
+        if (parts.length === 1) {
+            const a = parseFecha(parts[0]);
+            if (!a) return null;
+            a.setHours(0, 0, 0, 0);
+            const b = endOfPeriod(a);
+            return b ? { from: a, to: b } : null;
+        }
         if (parts.length !== 2) return null;
         const a = parseFecha(parts[0]);
         const b = parseFecha(parts[1]);
         if (!a || !b) return null;
-        a.setHours(0,0,0,0);
-        b.setHours(23,59,59,999);
-        return { from: a, to: b };
+        a.setHours(0, 0, 0, 0);
+        b.setHours(23, 59, 59, 999);
+        const from = (a <= b) ? a : b;
+        const to = (a <= b) ? b : a;
+        return { from, to };
     }
 
     function normKey(v) {
@@ -286,6 +312,29 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         const v = String(selectEl.value || '').trim();
         return v ? [v] : [];
+    }
+
+    function getSelectFilterState(selectEl) {
+        const emptyValue = '';
+        if (!selectEl) return { mode: 'all', values: [] };
+        let selectedVals = [];
+        try {
+            selectedVals = Array.from(selectEl.selectedOptions || []).map(o => String(o.value || ''));
+        } catch (e) {
+            const v = String(selectEl.value || '').trim();
+            selectedVals = v ? [v] : [];
+        }
+
+        const realSelected = selectedVals.filter(v => v !== emptyValue && String(v).trim());
+        const allVals = Array.from(selectEl.options || [])
+            .map(o => String(o.value || ''))
+            .filter(v => v !== emptyValue && String(v).trim());
+
+        if (selectedVals.includes(emptyValue)) return { mode: 'all', values: [] };
+        if (!allVals.length) return { mode: 'all', values: [] };
+        if (!realSelected.length) return { mode: 'none', values: [] };
+        if (realSelected.length >= allVals.length) return { mode: 'all', values: [] };
+        return { mode: 'some', values: realSelected };
     }
 
     function saleKind(s) {
@@ -333,6 +382,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let egresosSupsAll = [];
     let egresosCatsSelected = new Set();
     let egresosSupsSelected = new Set();
+    let egresosCatsAllSelected = true;
+    let egresosSupsAllSelected = true;
 
     function buildUniqueSorted(arr) {
         const seen = new Map();
@@ -357,8 +408,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!fEgresosCatBtn) return;
         const total = egresosCatsAll.length;
         const selCount = egresosCatsSelected.size;
-        if (!selCount || selCount >= total) {
+        if (egresosCatsAllSelected) {
             fEgresosCatBtn.textContent = 'Categoría (todas)';
+            return;
+        }
+        if (!selCount) {
+            fEgresosCatBtn.textContent = 'Categoría (ninguna)';
             return;
         }
         if (selCount === 1) {
@@ -374,8 +429,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!fEgresosSupBtn) return;
         const total = egresosSupsAll.length;
         const selCount = egresosSupsSelected.size;
-        if (!selCount || selCount >= total) {
+        if (egresosSupsAllSelected) {
             fEgresosSupBtn.textContent = 'Proveedor (todos)';
+            return;
+        }
+        if (!selCount) {
+            fEgresosSupBtn.textContent = 'Proveedor (ninguno)';
             return;
         }
         if (selCount === 1) {
@@ -393,7 +452,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const items = egresosCatsAll.filter(it => !q || it.k.includes(q) || normKey(it.label).includes(q));
         const total = egresosCatsAll.length;
         const selCount = egresosCatsSelected.size;
-        const allOn = (!selCount || selCount >= total);
+        const allOn = egresosCatsAllSelected;
         const html = [];
         html.push('<label class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">'
             + '<input type="checkbox" class="eg-cat-all" ' + (allOn ? 'checked' : '') + ' />'
@@ -419,7 +478,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const items = egresosSupsAll.filter(it => !q || it.k.includes(q) || normKey(it.label).includes(q));
         const total = egresosSupsAll.length;
         const selCount = egresosSupsSelected.size;
-        const allOn = (!selCount || selCount >= total);
+        const allOn = egresosSupsAllSelected;
         const html = [];
         html.push('<label class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">'
             + '<input type="checkbox" class="eg-sup-all" ' + (allOn ? 'checked' : '') + ' />'
@@ -451,6 +510,22 @@ document.addEventListener('DOMContentLoaded', function () {
         egresosCatsSelected = new Set(Array.from(egresosCatsSelected).filter(k => catsKeys.has(k)));
         const supsKeys = new Set(sups.map(x => x.k));
         egresosSupsSelected = new Set(Array.from(egresosSupsSelected).filter(k => supsKeys.has(k)));
+
+        if (!cats.length) {
+            egresosCatsAllSelected = true;
+            egresosCatsSelected = new Set();
+        } else if (!egresosCatsAllSelected && egresosCatsSelected.size >= cats.length) {
+            egresosCatsAllSelected = true;
+            egresosCatsSelected = new Set();
+        }
+
+        if (!sups.length) {
+            egresosSupsAllSelected = true;
+            egresosSupsSelected = new Set();
+        } else if (!egresosSupsAllSelected && egresosSupsSelected.size >= sups.length) {
+            egresosSupsAllSelected = true;
+            egresosSupsSelected = new Set();
+        }
 
         updateCatsButtonLabel();
         updateSupsButtonLabel();
@@ -576,8 +651,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!tbodyVentas) return;
         const q = String(fVentasQ?.value || '').trim().toLowerCase();
         const rango = parseRangoFechas(fVentasRange?.value);
-        const pagos = getSelectedValues(fVentasPago);
-        const tipos = getSelectedValues(fVentasTipo);
+        const pagosState = getSelectFilterState(fVentasPago);
+        const tiposState = getSelectFilterState(fVentasTipo);
 
         tbodyVentas.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
         getSalesFromApi(rango, function (sales) {
@@ -587,10 +662,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 const txt = (String(s?.ticket || '') + ' ' + String(s?.notes_display || s?.notes || '')).toLowerCase();
                 if (q && !txt.includes(q)) return false;
                 const pm = String(s?.payment_method || '').trim();
-                if (pagos.length && pagos.indexOf(pm) < 0) return false;
+                if (pagosState.mode === 'none') return false;
+                if (pagosState.mode === 'some' && pagosState.values.indexOf(pm) < 0) return false;
 
                 const kind = saleKind(s);
-                if (tipos.length && tipos.indexOf(kind) < 0) return false;
+                if (tiposState.mode === 'none') return false;
+                if (tiposState.mode === 'some' && tiposState.values.indexOf(kind) < 0) return false;
 
                 const dt = parseFecha(s?.fecha || s?.date || '');
                 if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
@@ -669,24 +746,27 @@ document.addEventListener('DOMContentLoaded', function () {
             updateEgresosFilterOptions(egresos);
 
             const rango = parseRangoFechas(fEgresosRange?.value);
-            const pagos = getSelectedValues(fEgresosPago);
+            const pagosState = getSelectFilterState(fEgresosPago);
 
             let list = Array.isArray(egresos) ? egresos.slice() : [];
             list = list.filter(e => {
                 const catKey = normKey(e?.categoria || '');
-                if (egresosCatsSelected.size && egresosCatsSelected.size < egresosCatsAll.length) {
+                if (!egresosCatsAllSelected) {
+                    if (!egresosCatsSelected.size) return false;
                     if (!egresosCatsSelected.has(catKey)) return false;
                 }
 
                 const supKey = normKey(e?.supplier_name || e?.proveedor || '');
-                if (egresosSupsSelected.size && egresosSupsSelected.size < egresosSupsAll.length) {
+                if (!egresosSupsAllSelected) {
+                    if (!egresosSupsSelected.size) return false;
                     if (!egresosSupsSelected.has(supKey)) return false;
                 }
                 const dt = parseFecha(e?.fecha || '');
                 if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
 
                 const pay = String(e?.forma_pago || e?.payment_method || e?.pago || '').trim();
-                if (pagos.length && pagos.indexOf(pay) < 0) return false;
+                if (pagosState.mode === 'none') return false;
+                if (pagosState.mode === 'some' && pagosState.values.indexOf(pay) < 0) return false;
 
                 return true;
             });
@@ -813,6 +893,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (tabEgresos) tabEgresos.addEventListener('click', function () { setTab('egresos'); });
     if (tabArqueo) tabArqueo.addEventListener('click', function () { setTab('arqueo'); });
 
+    initTodosMultiSelect(fVentasPago);
+    initTodosMultiSelect(fVentasTipo);
+    initTodosMultiSelect(fEgresosPago);
+
     [fVentasQ, fVentasPago, fVentasTipo].forEach(el => { if (el) el.addEventListener('input', renderVentas); if (el) el.addEventListener('change', renderVentas); });
     if (fEgresosPago) fEgresosPago.addEventListener('change', function () { try { renderEgresos(); } catch (e) { } });
 
@@ -821,8 +905,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const open = fEgresosCatMenu.classList.contains('hidden');
             setDropdownOpen(fEgresosCatMenu, open);
             if (open) {
+                try { const sc = document.getElementById('mov-egresos-scroll'); if (sc) sc.style.overflow = 'visible'; } catch (e) {}
                 try { setDropdownOpen(fEgresosSupMenu, false); } catch (e) { }
                 try { fEgresosCatSearch?.focus?.(); } catch (e) { }
+            } else {
+                try {
+                    const sc = document.getElementById('mov-egresos-scroll');
+                    if (sc && (!fEgresosSupMenu || fEgresosSupMenu.classList.contains('hidden'))) sc.style.overflow = 'auto';
+                } catch (e) {}
             }
         });
     }
@@ -832,8 +922,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const open = fEgresosSupMenu.classList.contains('hidden');
             setDropdownOpen(fEgresosSupMenu, open);
             if (open) {
+                try { const sc = document.getElementById('mov-egresos-scroll'); if (sc) sc.style.overflow = 'visible'; } catch (e) {}
                 try { setDropdownOpen(fEgresosCatMenu, false); } catch (e) { }
                 try { fEgresosSupSearch?.focus?.(); } catch (e) { }
+            } else {
+                try {
+                    const sc = document.getElementById('mov-egresos-scroll');
+                    if (sc && (!fEgresosCatMenu || fEgresosCatMenu.classList.contains('hidden'))) sc.style.overflow = 'auto';
+                } catch (e) {}
             }
         });
     }
@@ -850,18 +946,27 @@ document.addEventListener('DOMContentLoaded', function () {
             const t = ev && ev.target ? ev.target : null;
             if (!t) return;
             if (t.classList.contains('eg-cat-all')) {
-                egresosCatsSelected = new Set();
+                if (egresosCatsAllSelected) {
+                    egresosCatsAllSelected = false;
+                    egresosCatsSelected = new Set();
+                } else {
+                    egresosCatsAllSelected = true;
+                    egresosCatsSelected = new Set();
+                }
             }
             if (t.classList.contains('eg-cat-opt')) {
                 const k = String(t.getAttribute('data-k') || '').trim();
                 if (!k) return;
-                if (!egresosCatsSelected.size || egresosCatsSelected.size >= egresosCatsAll.length) {
+                if (egresosCatsAllSelected) {
+                    egresosCatsAllSelected = false;
                     egresosCatsSelected = new Set(egresosCatsAll.map(x => x.k));
                 }
-                if (t.checked) {
-                    egresosCatsSelected.add(k);
-                } else {
-                    egresosCatsSelected.delete(k);
+                if (t.checked) egresosCatsSelected.add(k);
+                else egresosCatsSelected.delete(k);
+
+                if (egresosCatsSelected.size >= egresosCatsAll.length) {
+                    egresosCatsAllSelected = true;
+                    egresosCatsSelected = new Set();
                 }
             }
             updateCatsButtonLabel();
@@ -875,24 +980,90 @@ document.addEventListener('DOMContentLoaded', function () {
             const t = ev && ev.target ? ev.target : null;
             if (!t) return;
             if (t.classList.contains('eg-sup-all')) {
-                egresosSupsSelected = new Set();
+                if (egresosSupsAllSelected) {
+                    egresosSupsAllSelected = false;
+                    egresosSupsSelected = new Set();
+                } else {
+                    egresosSupsAllSelected = true;
+                    egresosSupsSelected = new Set();
+                }
             }
             if (t.classList.contains('eg-sup-opt')) {
                 const k = String(t.getAttribute('data-k') || '').trim();
                 if (!k) return;
-                if (!egresosSupsSelected.size || egresosSupsSelected.size >= egresosSupsAll.length) {
+                if (egresosSupsAllSelected) {
+                    egresosSupsAllSelected = false;
                     egresosSupsSelected = new Set(egresosSupsAll.map(x => x.k));
                 }
-                if (t.checked) {
-                    egresosSupsSelected.add(k);
-                } else {
-                    egresosSupsSelected.delete(k);
+                if (t.checked) egresosSupsSelected.add(k);
+                else egresosSupsSelected.delete(k);
+
+                if (egresosSupsSelected.size >= egresosSupsAll.length) {
+                    egresosSupsAllSelected = true;
+                    egresosSupsSelected = new Set();
                 }
             }
             updateSupsButtonLabel();
             renderSupsItems();
             try { renderEgresos(); } catch (e) { }
         });
+    }
+
+    function initTodosMultiSelect(selectEl) {
+        if (!selectEl) return;
+        let internal = false;
+        const allValue = '';
+        const getAllOptionValues = function () {
+            try {
+                return Array.from(selectEl.options || [])
+                    .map(o => String(o.value || ''))
+                    .filter(v => v !== allValue);
+            } catch (e) {
+                return [];
+            }
+        };
+
+        const apply = function (mode) {
+            internal = true;
+            try {
+                const allVals = getAllOptionValues();
+                const opts = Array.from(selectEl.options || []);
+                if (mode === 'all') {
+                    opts.forEach(o => { if (String(o.value || '') === allValue) o.selected = true; else o.selected = true; });
+                } else if (mode === 'none') {
+                    opts.forEach(o => { o.selected = false; });
+                } else if (mode === 'sync') {
+                    const selectedVals = Array.from(selectEl.selectedOptions || []).map(o => String(o.value || ''));
+                    const selectedReal = selectedVals.filter(v => v !== allValue);
+                    const allOpt = opts.find(o => String(o.value || '') === allValue);
+                    if (allOpt) {
+                        allOpt.selected = (allVals.length > 0 && selectedReal.length >= allVals.length);
+                    }
+                }
+            } catch (e) {
+            }
+            internal = false;
+        };
+
+        selectEl.addEventListener('change', function () {
+            if (internal) return;
+            const selectedVals = Array.from(selectEl.selectedOptions || []).map(o => String(o.value || ''));
+            const hasAll = selectedVals.includes(allValue);
+            const allVals = getAllOptionValues();
+            const realSelected = selectedVals.filter(v => v !== allValue);
+
+            if (hasAll) {
+                if (realSelected.length >= allVals.length) {
+                    apply('none');
+                } else {
+                    apply('all');
+                }
+            } else {
+                apply('sync');
+            }
+        });
+
+        apply('sync');
     }
 
     document.addEventListener('click', function (ev) {
@@ -902,6 +1073,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (fEgresosCatMenu && !fEgresosCatMenu.classList.contains('hidden')) {
                 if (!fEgresosCatMenu.contains(t) && !fEgresosCatBtn.contains(t)) {
                     setDropdownOpen(fEgresosCatMenu, false);
+                    try {
+                        const sc = document.getElementById('mov-egresos-scroll');
+                        if (sc && (!fEgresosSupMenu || fEgresosSupMenu.classList.contains('hidden'))) sc.style.overflow = 'auto';
+                    } catch (e) {}
                 }
             }
         } catch (e) {
@@ -910,6 +1085,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (fEgresosSupMenu && !fEgresosSupMenu.classList.contains('hidden')) {
                 if (!fEgresosSupMenu.contains(t) && !fEgresosSupBtn.contains(t)) {
                     setDropdownOpen(fEgresosSupMenu, false);
+                    try {
+                        const sc = document.getElementById('mov-egresos-scroll');
+                        if (sc && (!fEgresosCatMenu || fEgresosCatMenu.classList.contains('hidden'))) sc.style.overflow = 'auto';
+                    } catch (e) {}
                 }
             }
         } catch (e) {
@@ -918,20 +1097,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (fVentasRange && window.flatpickr) {
         flatpickr(fVentasRange, { mode: 'range', dateFormat: 'd/m/Y', locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es', allowInput: false,
-            onChange: function (d) { if (Array.isArray(d) && d.length === 2) renderVentas(); },
-            onClose: function (d) { if (Array.isArray(d) && d.length === 2) renderVentas(); }
+            onChange: function (d) { if (Array.isArray(d) && d.length >= 1) renderVentas(); },
+            onClose: function (d) { if (Array.isArray(d) && d.length >= 1) renderVentas(); }
         });
     }
     if (fEgresosRange && window.flatpickr) {
         flatpickr(fEgresosRange, { mode: 'range', dateFormat: 'd/m/Y', locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es', allowInput: false,
-            onChange: function (d) { if (Array.isArray(d) && d.length === 2) renderEgresos(); },
-            onClose: function (d) { if (Array.isArray(d) && d.length === 2) renderEgresos(); }
+            onChange: function (d) { if (Array.isArray(d) && d.length >= 1) renderEgresos(); },
+            onClose: function (d) { if (Array.isArray(d) && d.length >= 1) renderEgresos(); }
         });
     }
     if (fArqueoRange && window.flatpickr) {
         flatpickr(fArqueoRange, { mode: 'range', dateFormat: 'd/m/Y', locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es', allowInput: false,
-            onChange: function (d) { if (Array.isArray(d) && d.length === 2) renderArqueo(); },
-            onClose: function (d) { if (Array.isArray(d) && d.length === 2) renderArqueo(); }
+            onChange: function (d) { if (Array.isArray(d) && d.length >= 1) renderArqueo(); },
+            onClose: function (d) { if (Array.isArray(d) && d.length >= 1) renderArqueo(); }
         });
     }
 
