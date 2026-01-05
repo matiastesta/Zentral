@@ -7,7 +7,7 @@ from sqlalchemy import and_, func, or_
 
 from app import db
 from app.models import Employee, Expense
-from app.permissions import module_required
+from app.permissions import module_required, module_required_any
 from app.employees import bp
 
 
@@ -125,7 +125,7 @@ def _apply_employee_payload(row: Employee, payload: dict):
 
 @bp.get('/api/employees')
 @login_required
-@module_required('employees')
+@module_required_any('employees', 'sales')
 def list_employees_api():
     q = (request.args.get('q') or '').strip().lower()
     limit = int(request.args.get('limit') or 2000)
