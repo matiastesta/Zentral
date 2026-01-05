@@ -311,6 +311,18 @@ def update_expense_api(expense_id):
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
+    try:
+        if str(getattr(row, 'origin', '') or '').strip().lower() == 'inventory':
+            meta_obj = _load_meta_obj(row)
+            origin_ref = meta_obj.get('origin_ref') if isinstance(meta_obj, dict) else None
+            if isinstance(origin_ref, dict):
+                kind = str(origin_ref.get('kind') or '').strip().lower()
+                adj = str(origin_ref.get('adjustment_id') or '').strip()
+                if kind == 'lot_adjustment' or adj:
+                    return jsonify({'ok': False, 'error': 'locked'}), 400
+    except Exception:
+        pass
+
     payload = request.get_json(silent=True) or {}
     if _payload_uses_inventory_supplier(payload):
         return jsonify({'ok': False, 'error': 'inventory_supplier_forbidden'}), 400
@@ -335,6 +347,18 @@ def delete_expense_api(expense_id):
     row = db.session.query(Expense).filter(Expense.company_id == cid, Expense.id == eid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    try:
+        if str(getattr(row, 'origin', '') or '').strip().lower() == 'inventory':
+            meta_obj = _load_meta_obj(row)
+            origin_ref = meta_obj.get('origin_ref') if isinstance(meta_obj, dict) else None
+            if isinstance(origin_ref, dict):
+                kind = str(origin_ref.get('kind') or '').strip().lower()
+                adj = str(origin_ref.get('adjustment_id') or '').strip()
+                if kind == 'lot_adjustment' or adj:
+                    return jsonify({'ok': False, 'error': 'locked'}), 400
+    except Exception:
+        pass
     try:
         db.session.delete(row)
         db.session.commit()

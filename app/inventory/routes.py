@@ -12,11 +12,18 @@ from typing import Optional
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.models import Category, Expense, FileAsset, InventoryLot, InventoryMovement, Product, Supplier
+from app.models import Category, Expense, FileAsset, InventoryLot, InventoryMovement, Product, Sale, Supplier
 from app.files.storage import upload_to_r2_and_create_asset
 from app.permissions import module_required, module_required_any
 from app.tenancy import ensure_request_context
 from app.inventory import bp
+
+
+def _company_id() -> str:
+    try:
+        return str(getattr(g, 'company_id', '') or '').strip()
+    except Exception:
+        return ''
 
 
 @bp.route('/')
@@ -807,6 +814,263 @@ def update_lot(lot_id: int):
         return jsonify({'ok': False, 'error': 'db_error'}), 400
 
     return jsonify({'ok': True, 'item': _serialize_lot(lot)})
+
+
+@bp.post('/api/lots/<int:lot_id>/adjust')
+@login_required
+@module_required('inventory')
+def adjust_lot(lot_id: int):
+    from flask_login import current_user
+
+    try:
+        if getattr(current_user, 'can', None):
+            allowed = True
+            try:
+                allowed = bool(current_user.can('inventario.ajuste_lote'))
+            except Exception:
+                allowed = True
+            if not allowed:
+                return jsonify({'ok': False, 'error': 'forbidden'}), 403
+    except Exception:
+        pass
+
+    lot = db.session.get(InventoryLot, int(lot_id))
+    if not lot:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    cid = _company_id()
+    if cid and str(getattr(lot, 'company_id', '') or '') != cid:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    payload = request.get_json(silent=True) or {}
+    date_adj = _parse_date_iso(payload.get('date') or payload.get('fecha'), dt_date.today())
+    note_user = str(payload.get('note') or payload.get('nota') or '').strip()
+
+    qty_initial_raw = payload.get('qty_initial')
+    unit_cost_raw = payload.get('unit_cost')
+    if qty_initial_raw is None and unit_cost_raw is None:
+        return jsonify({'ok': False, 'error': 'qty_or_cost_required'}), 400
+
+    old_qty_initial = float(getattr(lot, 'qty_initial', 0.0) or 0.0)
+    old_unit_cost = float(getattr(lot, 'unit_cost', 0.0) or 0.0)
+
+    new_qty_initial = old_qty_initial
+    if qty_initial_raw is not None:
+        new_qty_initial = _num(qty_initial_raw)
+        if new_qty_initial <= 0:
+            return jsonify({'ok': False, 'error': 'qty_required'}), 400
+
+    new_unit_cost = old_unit_cost
+    if unit_cost_raw is not None:
+        new_unit_cost = _num(unit_cost_raw)
+        if new_unit_cost < 0:
+            return jsonify({'ok': False, 'error': 'unit_cost_invalid'}), 400
+
+    sold_rows = (
+        db.session.query(
+            InventoryMovement.sale_ticket,
+            InventoryMovement.movement_date,
+            func.coalesce(func.sum(-InventoryMovement.qty_delta), 0.0),
+        )
+        .filter(InventoryMovement.company_id == cid)
+        .filter(InventoryMovement.lot_id == lot.id)
+        .filter(InventoryMovement.type == 'sale')
+        .group_by(InventoryMovement.sale_ticket, InventoryMovement.movement_date)
+        .all()
+    )
+    qty_sold_total = sum(float(qty or 0.0) for (_, __, qty) in (sold_rows or []))
+
+    if float(new_qty_initial or 0.0) + 1e-9 < float(qty_sold_total or 0.0):
+        return jsonify({'ok': False, 'error': 'qty_below_consumed', 'consumed_qty': round(qty_sold_total, 6)}), 400
+
+    adjustment_id = uuid4().hex
+
+    value_old = float(old_qty_initial or 0.0) * float(old_unit_cost or 0.0)
+    value_new = float(new_qty_initial or 0.0) * float(new_unit_cost or 0.0)
+    difference_valor = float(value_new or 0.0) - float(value_old or 0.0)
+    amount_abs = abs(float(difference_valor or 0.0))
+
+    product_name = str(getattr(getattr(lot, 'product', None), 'name', '') or '').strip() or 'Producto'
+    lot_label = str(getattr(lot, 'lot_code', '') or '').strip() or str(lot.id)
+
+    base_note_lines = [
+        f"Ajuste de inventario del producto {product_name} – Lote {lot_label}.",
+        f"AdjustmentId: {adjustment_id}",
+        f"Diferencia_valor: {round(difference_valor, 4)} (nuevo {round(value_new, 4)} - anterior {round(value_old, 4)})",
+        "Este registro NO corresponde a una operación comercial, sino a una corrección interna.",
+    ]
+    if note_user:
+        base_note_lines.append(f"Nota: {note_user}")
+
+    try:
+        lot.qty_initial = float(new_qty_initial or 0.0)
+        lot.unit_cost = float(new_unit_cost or 0.0)
+        lot.qty_available = max(0.0, float(new_qty_initial or 0.0) - float(qty_sold_total or 0.0))
+
+        qty_delta_adj = float(new_qty_initial or 0.0) - float(old_qty_initial or 0.0)
+        db.session.add(InventoryMovement(
+            company_id=cid,
+            movement_date=date_adj,
+            type='lot_adjust',
+            sale_ticket=None,
+            product_id=lot.product_id,
+            lot_id=lot.id,
+            qty_delta=qty_delta_adj,
+            unit_cost=float(new_unit_cost or 0.0),
+            total_cost=qty_delta_adj * float(new_unit_cost or 0.0),
+        ))
+
+        delta_unit_cost = float(new_unit_cost or 0.0) - float(old_unit_cost or 0.0)
+        if abs(delta_unit_cost) > 1e-9 and sold_rows:
+            for t, d, qty in (sold_rows or []):
+                ticket = str(t or '').strip()
+                if not ticket:
+                    continue
+                sold_qty = float(qty or 0.0)
+                if abs(sold_qty) <= 1e-9:
+                    continue
+                db.session.add(InventoryMovement(
+                    company_id=cid,
+                    movement_date=d or date_adj,
+                    type='sale_adjust',
+                    sale_ticket=ticket,
+                    product_id=lot.product_id,
+                    lot_id=lot.id,
+                    qty_delta=0.0,
+                    unit_cost=delta_unit_cost,
+                    total_cost=sold_qty * delta_unit_cost,
+                ))
+
+        created = {
+            'adjustment_id': adjustment_id,
+            'sales': [],
+            'expenses': [],
+            'difference_valor': round(difference_valor, 4),
+        }
+
+        if amount_abs > 1e-9:
+            if difference_valor > 0:
+                op_ticket = f"AJOP-{adjustment_id[:10]}"
+                mv_ticket = f"AJMV-{adjustment_id[:10]}"
+                op_notes = '\n'.join(base_note_lines + [
+                    'Layer: operativa',
+                    'Tipo: Venta por ajuste de costo de mercadería',
+                ])
+                mv_notes = '\n'.join(base_note_lines + [
+                    'Layer: contable',
+                    'Tipo: Ingreso por ajuste de inventario',
+                    'Categoría: Inventario',
+                ])
+
+                db.session.add(Sale(
+                    company_id=cid,
+                    ticket=op_ticket,
+                    sale_date=date_adj,
+                    sale_type='AjusteInvCosto',
+                    status='Completada',
+                    payment_method='Ajuste interno',
+                    notes=op_notes,
+                    total=amount_abs,
+                    discount_general_pct=0.0,
+                    discount_general_amount=0.0,
+                    on_account=False,
+                    paid_amount=amount_abs,
+                    due_amount=0.0,
+                    customer_id=None,
+                    customer_name='Sistema / Ajuste interno',
+                ))
+                db.session.add(Sale(
+                    company_id=cid,
+                    ticket=mv_ticket,
+                    sale_date=date_adj,
+                    sale_type='IngresoAjusteInv',
+                    status='Completada',
+                    payment_method='Ajuste interno',
+                    notes=mv_notes,
+                    total=amount_abs,
+                    discount_general_pct=0.0,
+                    discount_general_amount=0.0,
+                    on_account=False,
+                    paid_amount=amount_abs,
+                    due_amount=0.0,
+                    customer_id=None,
+                    customer_name='Sistema / Ajuste interno',
+                ))
+                created['sales'] = [op_ticket, mv_ticket]
+            elif difference_valor < 0:
+                supplier_id = str(getattr(lot, 'supplier_id', '') or '').strip() or None
+                supplier_name = str(getattr(lot, 'supplier_name', '') or '').strip() or None
+                base_meta = {
+                    'origin_ref': {
+                        'kind': 'lot_adjustment',
+                        'adjustment_id': adjustment_id,
+                        'product_id': lot.product_id,
+                        'lot_id': lot.id,
+                    }
+                }
+
+                op_eid = uuid4().hex
+                mv_eid = uuid4().hex
+
+                op_meta = json.loads(json.dumps(base_meta, ensure_ascii=False))
+                op_meta['origin_ref']['layer'] = 'operational'
+                op_meta['origin_ref']['linked_expense_id'] = mv_eid
+
+                mv_meta = json.loads(json.dumps(base_meta, ensure_ascii=False))
+                mv_meta['origin_ref']['layer'] = 'movement'
+                mv_meta['origin_ref']['linked_expense_id'] = op_eid
+
+                op_notes = '\n'.join(base_note_lines + [
+                    'Layer: operativa',
+                    'Tipo: Gasto por ajuste de inventario',
+                    'Categoría: Inventario',
+                ])
+                mv_notes = '\n'.join(base_note_lines + [
+                    'Layer: contable',
+                    'Tipo: Gasto por ajuste de inventario',
+                    'Categoría: Inventario',
+                ])
+
+                db.session.add(Expense(
+                    id=op_eid,
+                    company_id=cid,
+                    expense_date=date_adj,
+                    payment_method='Ajuste interno',
+                    amount=amount_abs,
+                    category='Inventario',
+                    supplier_id=supplier_id,
+                    supplier_name=supplier_name,
+                    note=op_notes,
+                    expense_type='AjusteInventario',
+                    origin='inventory',
+                    meta_json=json.dumps(op_meta, ensure_ascii=False),
+                ))
+                db.session.add(Expense(
+                    id=mv_eid,
+                    company_id=cid,
+                    expense_date=date_adj,
+                    payment_method='Ajuste interno',
+                    amount=amount_abs,
+                    category='Inventario',
+                    supplier_id=supplier_id,
+                    supplier_name=supplier_name,
+                    note=mv_notes,
+                    expense_type='AjusteInventario',
+                    origin='inventory',
+                    meta_json=json.dumps(mv_meta, ensure_ascii=False),
+                ))
+                created['expenses'] = [op_eid, mv_eid]
+
+        db.session.commit()
+        return jsonify({
+            'ok': True,
+            'item': _serialize_lot(lot),
+            'created': created,
+        })
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Failed to adjust inventory lot')
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
 
 
 @bp.delete('/api/lots/<int:lot_id>')

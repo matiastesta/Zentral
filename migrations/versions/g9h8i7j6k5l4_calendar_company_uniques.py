@@ -36,8 +36,28 @@ def upgrade() -> None:
         except Exception:
             pass
 
+    with op.batch_alter_table('sale', schema=None) as batch_op:
+        try:
+            batch_op.add_column(sa.Column('employee_id', sa.String(length=64), nullable=True))
+        except Exception:
+            pass
+        try:
+            batch_op.add_column(sa.Column('employee_name', sa.String(length=255), nullable=True))
+        except Exception:
+            pass
+
 
 def downgrade() -> None:
+    with op.batch_alter_table('sale', schema=None) as batch_op:
+        try:
+            batch_op.drop_column('employee_name')
+        except Exception:
+            pass
+        try:
+            batch_op.drop_column('employee_id')
+        except Exception:
+            pass
+
     with op.batch_alter_table('cash_count', schema=None) as batch_op:
         try:
             batch_op.drop_constraint('uq_cash_count_company_date', type_='unique')

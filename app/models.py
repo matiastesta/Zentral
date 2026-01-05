@@ -331,6 +331,9 @@ class Sale(db.Model):
     customer_id = db.Column(db.String(64), nullable=True)
     customer_name = db.Column(db.String(255), nullable=True)
 
+    employee_id = db.Column(db.String(64), nullable=True)
+    employee_name = db.Column(db.String(255), nullable=True)
+
     exchange_return_total = db.Column(db.Float, nullable=True)
     exchange_new_total = db.Column(db.Float, nullable=True)
 

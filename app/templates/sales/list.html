@@ -102,7 +102,7 @@
                 <i class="fas fa-cash-register"></i>
             </div>
             <div>
-                <p class="text-xs uppercase tracking-wide text-gray-500">Ventas del día</p>
+                <p id="kpi-label-ventas" class="text-xs uppercase tracking-wide text-gray-500">Ventas del día</p>
                 <p id="kpi-ventas-dia" class="text-lg font-semibold text-gray-900">$0,00</p>
             </div>
         </div>
@@ -111,7 +111,7 @@
                 <i class="fas fa-receipt"></i>
             </div>
             <div>
-                <p class="text-xs uppercase tracking-wide text-gray-500">Cantidad de ventas</p>
+                <p id="kpi-label-tickets" class="text-xs uppercase tracking-wide text-gray-500">Cantidad de ventas</p>
                 <p id="kpi-tickets-dia" class="text-lg font-semibold text-gray-900">0</p>
             </div>
         </div>
@@ -120,7 +120,7 @@
                 <i class="fas fa-box-open"></i>
             </div>
             <div>
-                <p class="text-xs uppercase tracking-wide text-gray-500">Cantidad de artículos vendidos</p>
+                <p id="kpi-label-items" class="text-xs uppercase tracking-wide text-gray-500">Cantidad de artículos vendidos</p>
                 <p id="kpi-items-dia" class="text-lg font-semibold text-gray-900">0</p>
             </div>
         </div>
@@ -130,7 +130,7 @@
                 <i class="fas fa-ticket-alt"></i>
             </div>
             <div>
-                <p class="text-xs uppercase tracking-wide text-gray-500">Ticket promedio</p>
+                <p id="kpi-label-promedio" class="text-xs uppercase tracking-wide text-gray-500">Ticket promedio</p>
                 <p id="kpi-ticket-promedio" class="text-lg font-semibold text-gray-900">$0,00</p>
             </div>
         </div>
@@ -231,6 +231,7 @@
                     <th id="ventas-col-ticket-label" class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Ticket</th>
                     <th class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Fecha <i class="fas fa-chevron-down ml-1 text-gray-400"></i></th>
                     <th class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Cliente</th>
+                    <th class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Empleado responsable</th>
                     <th class="px-3 py-2 text-right text-gray-600 font-semibold align-bottom">Total</th>
                     <th class="px-3 py-2 text-center text-gray-600 font-semibold align-bottom">Pago <i class="fas fa-chevron-down ml-1 text-gray-400"></i></th>
                     <th class="px-3 py-2 text-center text-gray-600 font-semibold align-bottom">Tipo <i class="fas fa-chevron-down ml-1 text-gray-400"></i></th>
@@ -247,6 +248,11 @@
                     </th>
                     <th class="px-3 py-1">
                         <input id="ventas-search-cliente" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="Buscar por cliente">
+                    </th>
+                    <th class="px-3 py-1">
+                        <select id="ventas-filter-employee" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600">
+                            <option value="">Todos</option>
+                        </select>
                     </th>
                     <th class="px-3 py-1"></th>
                     <th class="px-3 py-1 text-center text-gray-400">
@@ -270,7 +276,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-100">
                 <tr>
-                    <td colspan="7" class="px-4 py-6 text-center text-sm text-gray-500">Cargando movimientos…</td>
+                    <td colspan="8" class="px-4 py-6 text-center text-sm text-gray-500">Cargando movimientos…</td>
                 </tr>
             </tbody>
         </table>
@@ -575,9 +581,19 @@
                             </div>
                         </div>
 
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Notas del ticket</label>
-                            <textarea id="cambio-notas" rows="5" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Observaciones internas, aclaraciones de la operación, etc."></textarea>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Notas del ticket</label>
+                                <textarea id="cambio-notas" rows="5" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Observaciones internas, aclaraciones de la operación, etc."></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Empleado responsable</label>
+                                <select id="cambio-employee" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                                    <option value="">— Seleccionar —</option>
+                                </select>
+                                <p id="msg-cambio-no-employees" class="mt-1 text-[11px] text-gray-500 hidden">No hay empleados cargados. <a href="{{ url_for('employees.new') }}" class="text-indigo-700 hover:underline">Crear empleado</a></p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -859,9 +875,18 @@
                             </label>
                         </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Notas del ticket</label>
-                        <textarea id="ticket-notas" rows="5" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Observaciones internas, aclaraciones de la operación, etc."></textarea>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Notas del ticket</label>
+                            <textarea id="ticket-notas" rows="5" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Observaciones internas, aclaraciones de la operación, etc."></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Empleado responsable</label>
+                            <select id="ticket-employee" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                                <option value="">— Seleccionar —</option>
+                            </select>
+                            <p id="msg-venta-no-employees" class="mt-1 text-[11px] text-gray-500 hidden">No hay empleados cargados. <a href="{{ url_for('employees.new') }}" class="text-indigo-700 hover:underline">Crear empleado</a></p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1171,10 +1196,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const ventasColTicketLabel = document.getElementById('ventas-col-ticket-label');
     const selectVentasPago = document.getElementById('ventas-filter-pago');
     const selectVentasEstado = document.getElementById('ventas-filter-estado');
+    const selectVentasEmployee = document.getElementById('ventas-filter-employee');
     const kpiVentasDiaEl = document.getElementById('kpi-ventas-dia');
     const kpiTicketsDiaEl = document.getElementById('kpi-tickets-dia');
     const kpiItemsDiaEl = document.getElementById('kpi-items-dia');
     const kpiTicketPromedioEl = document.getElementById('kpi-ticket-promedio');
+    const kpiLabelVentasEl = document.getElementById('kpi-label-ventas');
+    const kpiLabelTicketsEl = document.getElementById('kpi-label-tickets');
+    const kpiLabelItemsEl = document.getElementById('kpi-label-items');
+    const kpiLabelPromedioEl = document.getElementById('kpi-label-promedio');
     // Elementos específicos del flujo de cambio
     let botonesProductoCambio = [];
     const tablaCarritoCambio = document.getElementById('tabla-carrito-cambio');
@@ -1204,6 +1234,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputClienteCambio = document.getElementById('cambio-cliente');
     const ddClienteCambio = document.getElementById('cambio-cliente-dd');
     const inputNotasCambio = document.getElementById('cambio-notas');
+    const selectTicketEmployee = document.getElementById('ticket-employee');
+    const selectCambioEmployee = document.getElementById('cambio-employee');
+    const msgVentaNoEmployees = document.getElementById('msg-venta-no-employees');
+    const msgCambioNoEmployees = document.getElementById('msg-cambio-no-employees');
     const btnConfirmarCambioFinal = document.getElementById('btn-confirmar-cambio-final');
     const panelPagoClienteCambio = document.getElementById('panel-pago-cliente-cambio');
     const btnPagoCompletoCambio = document.getElementById('btn-pago-completo-cambio');
@@ -1910,7 +1944,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const list = Array.isArray(salesCache) ? salesCache.slice() : [];
         list.sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
         if (!list.length) {
-            historialTbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-sm text-gray-500">Todavía no hay movimientos.</td></tr>';
+            historialTbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-sm text-gray-500">Todavía no hay movimientos.</td></tr>';
             return;
         }
         list.forEach(s => {
@@ -1921,6 +1955,8 @@ document.addEventListener('DOMContentLoaded', function() {
             tr.setAttribute('data-ticket', ticket);
             tr.setAttribute('data-is-gift', isGift ? '1' : '0');
             tr.setAttribute('data-gift-code', giftCode);
+            tr.setAttribute('data-employee-id', String(s?.employee_id || '').trim());
+            tr.setAttribute('data-employee-name', String(s?.employee_name || '').trim());
 
             let hasVentaLibre = false;
             try {
@@ -1988,6 +2024,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 + '<td class="' + ticketCellClass + '">' + ticketCellHtml + '</td>'
                 + '<td class="px-3 py-2 text-gray-500">' + formatFechaDisplay(s?.fecha || '—') + '</td>'
                 + '<td class="px-3 py-2 text-gray-500">' + String(s?.customer_name || '—') + '</td>'
+                + '<td class="px-3 py-2 text-gray-500">' + String(s?.employee_name || '—') + '</td>'
                 + '<td class="px-3 py-2 text-right text-gray-500">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>'
                 + '<td class="px-3 py-2 text-center text-gray-500">' + String(s?.payment_method || 'Efectivo') + '</td>'
                 + '<td class="px-3 py-2 text-center">' + statusHtml + '</td>'
@@ -2363,6 +2400,104 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             if (current) selectArqueoEmployee.value = current;
         };
+        if (isPromise(res)) return res.then(apply);
+        apply(res);
+        return null;
+    }
+
+    function getSelectedEmployeePayload(selectEl) {
+        try {
+            const id = String(selectEl?.value || '').trim();
+            if (!id) return { employee_id: '', employee_name: '' };
+            const label = String(selectEl?.selectedOptions?.[0]?.textContent || '').trim();
+            return { employee_id: id, employee_name: label };
+        } catch (e) {
+            return { employee_id: '', employee_name: '' };
+        }
+    }
+
+    function _employeeDisplayName(e) {
+        try {
+            const full = (String(e?.first_name || '') + ' ' + String(e?.last_name || '')).trim();
+            return String(e?.name || full || '').trim() || 'Empleado';
+        } catch (err) {
+            return 'Empleado';
+        }
+    }
+
+    function initSalesEmployeesSelectors() {
+        const res = leerEmpleados();
+        const apply = function (arr) {
+            const empleadosRaw = Array.isArray(arr) ? arr : [];
+            const empleados = empleadosRaw.filter(e => {
+                try {
+                    return (e && typeof e === 'object') ? (e.active !== false) : false;
+                } catch (err) {
+                    return false;
+                }
+            });
+
+            const currentVenta = String(selectTicketEmployee?.value || '');
+            const currentCambio = String(selectCambioEmployee?.value || '');
+            const currentFiltro = String(selectVentasEmployee?.value || '');
+
+            if (selectTicketEmployee) {
+                selectTicketEmployee.innerHTML = '<option value="">— Seleccionar —</option>';
+                selectTicketEmployee.disabled = !empleados.length;
+                if (msgVentaNoEmployees) msgVentaNoEmployees.classList.toggle('hidden', !!empleados.length);
+            }
+            if (selectCambioEmployee) {
+                selectCambioEmployee.innerHTML = '<option value="">— Seleccionar —</option>';
+                selectCambioEmployee.disabled = !empleados.length;
+                if (msgCambioNoEmployees) msgCambioNoEmployees.classList.toggle('hidden', !!empleados.length);
+            }
+            if (selectVentasEmployee) {
+                selectVentasEmployee.innerHTML = '<option value="">Todos</option>';
+                selectVentasEmployee.disabled = !empleados.length;
+            }
+
+            empleados
+                .slice()
+                .sort((a, b) => _employeeDisplayName(a).localeCompare(_employeeDisplayName(b), 'es'))
+                .forEach(e => {
+                    const id = String(e?.id || '').trim();
+                    if (!id) return;
+                    const name = _employeeDisplayName(e);
+
+                    if (selectTicketEmployee) {
+                        const opt = document.createElement('option');
+                        opt.value = id;
+                        opt.textContent = name;
+                        selectTicketEmployee.appendChild(opt);
+                    }
+                    if (selectCambioEmployee) {
+                        const opt2 = document.createElement('option');
+                        opt2.value = id;
+                        opt2.textContent = name;
+                        selectCambioEmployee.appendChild(opt2);
+                    }
+                    if (selectVentasEmployee) {
+                        const opt3 = document.createElement('option');
+                        opt3.value = id;
+                        opt3.textContent = name;
+                        selectVentasEmployee.appendChild(opt3);
+                    }
+                });
+
+            if (selectTicketEmployee && currentVenta) selectTicketEmployee.value = currentVenta;
+            if (selectCambioEmployee && currentCambio) selectCambioEmployee.value = currentCambio;
+            if (selectVentasEmployee && currentFiltro) selectVentasEmployee.value = currentFiltro;
+
+            try {
+                const last = String(window.localStorage.getItem('sales_last_employee_id') || '').trim();
+                if (last) {
+                    if (selectTicketEmployee && !selectTicketEmployee.value) selectTicketEmployee.value = last;
+                    if (selectCambioEmployee && !selectCambioEmployee.value) selectCambioEmployee.value = last;
+                }
+            } catch (err) {
+            }
+        };
+
         if (isPromise(res)) return res.then(apply);
         apply(res);
         return null;
@@ -2745,6 +2880,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (ticketFecha) ticketFecha.value = String(sale?.fecha || '').trim() || defaultFecha;
                 if (ticketNotas) ticketNotas.value = String(sale?.notes || '').trim();
 
+                if (selectTicketEmployee) selectTicketEmployee.value = String(sale?.employee_id || '').trim();
+
                 const cid = String(sale?.customer_id || '').trim();
                 const cname = String(sale?.customer_name || '').trim();
                 selectedCustomer = (cid || cname) ? { id: cid, name: cname } : null;
@@ -2875,6 +3012,7 @@ document.addEventListener('DOMContentLoaded', function() {
         selectedCustomer = (cid || cname) ? { id: cid, name: cname } : null;
         if (inputClienteCambio) inputClienteCambio.value = cname;
         if (inputNotasCambio) inputNotasCambio.value = String(sale?.notes || '').trim();
+        if (selectCambioEmployee) selectCambioEmployee.value = String(sale?.employee_id || '').trim();
         currentCustomerContext = 'cambio';
         updateClientePagoCambioVisibility();
 
@@ -3514,6 +3652,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const qCli = String(inputSearchVentasCliente?.value || '').trim().toLowerCase();
         const pago = String(selectVentasPago?.value || '').trim();
         const estado = String(selectVentasEstado?.value || '').trim();
+        const emp = String(selectVentasEmployee?.value || '').trim();
 
         let fromTs = 0;
         let toTs = 0;
@@ -3548,16 +3687,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
         rows.forEach(tr => {
             const tds = tr.querySelectorAll('td');
-            if (!tds || tds.length < 6) return;
+            if (!tds || tds.length < 7) return;
             const isGiftRow = String(tr.getAttribute('data-is-gift') || '') === '1';
             const vTicketNorm = String(tr.getAttribute('data-ticket') || tds[0]?.textContent || '').trim();
             const vGift = String(tr.getAttribute('data-gift-code') || '').trim();
             const vTicketPrimary = ventasGiftOnly ? (vGift || vTicketNorm) : vTicketNorm;
             const vFecha = String(tds[1]?.textContent || '').trim();
             const vCliente = String(tds[2]?.textContent || '').trim();
-            const vPago = String(tds[4]?.textContent || '').trim();
-            const vEstado = String(tds[5]?.textContent || '').trim();
+            const vPago = String(tds[5]?.textContent || '').trim();
+            const vEstado = String(tds[6]?.textContent || '').trim();
             const vTipoNorm = String(tr.getAttribute('data-type') || '').trim();
+            const vEmpId = String(tr.getAttribute('data-employee-id') || '').trim();
 
             let ok = true;
             if (ventasGiftOnly && !isGiftRow) ok = false;
@@ -3571,6 +3711,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (estado) {
                 if (vTipoNorm !== estado) ok = false;
             }
+            if (emp) {
+                if (vEmpId !== emp) ok = false;
+            }
 
             if (ok && fromTs && toTs) {
                 const ts = parseDateToTs(vFecha);
@@ -3579,46 +3722,176 @@ document.addEventListener('DOMContentLoaded', function() {
 
             tr.classList.toggle('hidden', !ok);
         });
+
+        initKpisFromSales();
+    }
+
+    function parseVentasRangeInputToDates() {
+        const r = String(inputFechaRango?.value || '').trim();
+        if (!r) return null;
+        const matches = r.match(/\b\d{2}\/\d{2}\/\d{4}\b/g) || [];
+        if (!matches.length) return null;
+        const a = parseDateToTs(matches[0]);
+        const b = parseDateToTs(matches.length >= 2 ? matches[1] : matches[0]);
+        if (!a || !b) return null;
+        return { from: new Date(Math.min(a, b)), to: new Date(Math.max(a, b)) };
+    }
+
+    function refreshVentasFromServerForRange() {
+        const range = parseVentasRangeInputToDates();
+        if (!range) {
+            salesLoaded = false;
+            salesLoadPromise = null;
+            const res = loadSalesFromServer();
+            const apply = function () {
+                renderHistorialFromCache();
+                applyVentasFilters();
+                initKpisFromSales();
+                recalcularArqueoAutomatico();
+            };
+            if (isPromise(res)) return res.then(apply);
+            apply();
+            return null;
+        }
+
+        salesLoadPromise = null;
+        return apiListSales(range).then(function (items) {
+            salesCache = Array.isArray(items) ? items : [];
+            salesLoaded = true;
+            renderHistorialFromCache();
+            applyVentasFilters();
+            initKpisFromSales();
+            recalcularArqueoAutomatico();
+        }).catch(function () {
+            // Si falla, no romper UI: mantener cache actual
+            renderHistorialFromCache();
+            applyVentasFilters();
+            initKpisFromSales();
+        });
     }
 
     function initKpisFromSales() {
         const res = leerSales();
         const apply = function (arr) {
             const sales = Array.isArray(arr) ? arr : [];
-            const today = new Date();
-            const y = today.getFullYear();
-            const m = today.getMonth();
-            const d = today.getDate();
-            const start = new Date(y, m, d, 0, 0, 0, 0).getTime();
-            const end = new Date(y, m, d, 23, 59, 59, 999).getTime();
 
-            let totalDia = 0;
-            let itemsDia = 0;
-            let ticketsDia = 0;
+            const qTic = String(inputSearchVentasTicket?.value || '').trim().toLowerCase();
+            const qCli = String(inputSearchVentasCliente?.value || '').trim().toLowerCase();
+            const pago = String(selectVentasPago?.value || '').trim();
+            const estado = String(selectVentasEstado?.value || '').trim();
+            const emp = String(selectVentasEmployee?.value || '').trim();
+
+            let fromTs = 0;
+            let toTs = 0;
+            const r = String(inputFechaRango?.value || '').trim();
+            if (r) {
+                const matches = r.match(/\b\d{2}\/\d{2}\/\d{4}\b/g) || [];
+                if (matches.length >= 2) {
+                    const a = parseDateToTs(matches[0]);
+                    const b = parseDateToTs(matches[1]);
+                    if (a && b) {
+                        fromTs = Math.min(a, b);
+                        toTs = Math.max(a, b) + (24 * 60 * 60 * 1000 - 1);
+                    }
+                } else if (matches.length === 1) {
+                    const a = parseDateToTs(matches[0]);
+                    if (a) {
+                        fromTs = a;
+                        toTs = a + (24 * 60 * 60 * 1000 - 1);
+                    }
+                } else if (r.includes('-')) {
+                    const parts = r.split('-').map(x => x.trim());
+                    if (parts.length >= 2) {
+                        const a = parseDateToTs(parts[0]);
+                        const b = parseDateToTs(parts[1]);
+                        if (a && b) {
+                            fromTs = Math.min(a, b);
+                            toTs = Math.max(a, b) + (24 * 60 * 60 * 1000 - 1);
+                        }
+                    }
+                }
+            }
+
+            let total = 0;
+            let itemsVendidos = 0;
+            let tickets = 0;
+
             sales.forEach(s => {
-                const ts = (typeof s?.created_at === 'number') ? s.created_at : 0;
-                if (!ts || ts < start || ts > end) return;
-                const tp = String(s?.type || s?.sale_type || '').trim();
                 const st = String(s?.status || '').trim();
                 if (st === 'Reemplazada') return;
-                // KPIs de "Ventas del día" deben contar SOLO ventas reales.
-                // Cobro CC (pagos de deuda) y Cambios se ven en historial/arqueo, pero no se consideran "venta".
-                if (tp !== 'Venta') return;
 
-                totalDia += Math.max(0, parseFloat(s?.total || '0') || 0);
-                ticketsDia += 1;
+                const isGiftRow = !!(s && s.is_gift);
+                if (ventasGiftOnly && !isGiftRow) return;
+
+                const tp = String(s?.type || s?.sale_type || '').trim();
+
+                const ticketNorm = String(s?.ticket || '').trim();
+                const gift = String(s?.gift_code || '').trim();
+                const ticketPrimary = ventasGiftOnly ? (gift || ticketNorm) : ticketNorm;
+                if (qTic) {
+                    const primary = ticketPrimary.toLowerCase();
+                    const alt = (ventasGiftOnly ? ticketNorm : gift).toLowerCase();
+                    if (!primary.includes(qTic) && !alt.includes(qTic)) return;
+                }
+
+                const cust = String(s?.customer_name || '').trim();
+                if (qCli && !cust.toLowerCase().includes(qCli)) return;
+
+                const pay = String(s?.payment_method || 'Efectivo').trim();
+                if (pago && pay !== pago) return;
+
+                if (estado && tp !== estado) return;
+
+                const empId = String(s?.employee_id || '').trim();
+                if (emp && empId !== emp) return;
+
+                if (fromTs && toTs) {
+                    const fechaTxt = String(s?.fecha || '').trim();
+                    let ts = 0;
+                    try {
+                        if (fechaTxt) {
+                            const d0 = new Date(fechaTxt);
+                            if (!isNaN(d0.getTime())) ts = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate(), 0, 0, 0, 0).getTime();
+                        }
+                    } catch (e) {
+                        ts = 0;
+                    }
+                    if (!ts || ts < fromTs || ts > toTs) return;
+                }
+
+                total += (parseFloat(s?.total || '0') || 0);
+                tickets += 1;
                 const its = Array.isArray(s?.items) ? s.items : [];
                 its.forEach(it => {
-                    itemsDia += parseFloat(it?.cantidad || '0') || 0;
+                    const qty = parseFloat(it?.cantidad || '0') || 0;
+                    const dir = String(it?.direction || 'out').toLowerCase();
+                    itemsVendidos += (dir === 'in') ? (-qty) : qty;
                 });
             });
 
-            const ticketProm = ticketsDia > 0 ? (totalDia / ticketsDia) : 0;
+            const ticketProm = tickets > 0 ? (total / tickets) : 0;
 
-            if (kpiVentasDiaEl) kpiVentasDiaEl.textContent = formatearMoneda(totalDia);
-            if (kpiTicketsDiaEl) kpiTicketsDiaEl.textContent = String(ticketsDia);
-            if (kpiItemsDiaEl) kpiItemsDiaEl.textContent = String(itemsDia);
+            if (kpiVentasDiaEl) kpiVentasDiaEl.textContent = formatearMoneda(total);
+            if (kpiTicketsDiaEl) kpiTicketsDiaEl.textContent = String(tickets);
+            if (kpiItemsDiaEl) kpiItemsDiaEl.textContent = String(itemsVendidos);
             if (kpiTicketPromedioEl) kpiTicketPromedioEl.textContent = formatearMoneda(ticketProm);
+
+            if (emp) {
+                if (kpiLabelVentasEl) kpiLabelVentasEl.textContent = 'Ventas del empleado';
+                if (kpiLabelTicketsEl) kpiLabelTicketsEl.textContent = 'Ventas realizadas por el empleado';
+                if (kpiLabelItemsEl) kpiLabelItemsEl.textContent = 'Artículos vendidos por el empleado';
+                if (kpiLabelPromedioEl) kpiLabelPromedioEl.textContent = 'Ticket promedio del empleado';
+            } else if (r) {
+                if (kpiLabelVentasEl) kpiLabelVentasEl.textContent = 'Ventas del período';
+                if (kpiLabelTicketsEl) kpiLabelTicketsEl.textContent = 'Cantidad de ventas';
+                if (kpiLabelItemsEl) kpiLabelItemsEl.textContent = 'Cantidad de artículos vendidos';
+                if (kpiLabelPromedioEl) kpiLabelPromedioEl.textContent = 'Ticket promedio';
+            } else {
+                if (kpiLabelVentasEl) kpiLabelVentasEl.textContent = 'Ventas';
+                if (kpiLabelTicketsEl) kpiLabelTicketsEl.textContent = 'Cantidad de movimientos';
+                if (kpiLabelItemsEl) kpiLabelItemsEl.textContent = 'Cantidad de artículos (neta)';
+                if (kpiLabelPromedioEl) kpiLabelPromedioEl.textContent = 'Ticket promedio';
+            }
         };
         if (isPromise(res)) return res.then(apply);
         apply(res);
@@ -5787,6 +6060,9 @@ document.addEventListener('DOMContentLoaded', function() {
             allowInput: false,
             onChange: function () {
                 applyVentasFilters();
+            },
+            onClose: function () {
+                refreshVentasFromServerForRange();
             }
         });
     }
@@ -5824,22 +6100,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     ticket: ticketExport,
                     fecha: tds[1] || '',
                     cliente: tds[2] || '',
-                    total: tds[3] || '',
-                    pago: tds[4] || '',
-                    estado: (tr.querySelector('td:nth-child(6)')?.textContent || '').trim()
+                    empleado: tds[3] || '',
+                    total: tds[4] || '',
+                    pago: tds[5] || '',
+                    estado: tds[6] || ''
                 };
             });
     }
 
     function exportVentasCsv() {
         const rows = getVentasVisibleRows();
-        const header = ['Ticket','Fecha','Cliente','Total','Pago','Tipo'];
+        const header = ['Ticket','Fecha','Cliente','Empleado responsable','Total','Pago','Tipo'];
         const lines = [header.map(escapeCsvCell).join(';')];
         rows.forEach(r => {
             lines.push([
                 r.ticket,
                 r.fecha,
                 r.cliente,
+                r.empleado,
                 r.total,
                 r.pago,
                 r.estado
@@ -5866,6 +6144,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 + '<td>' + r.ticket + '</td>'
                 + '<td>' + r.fecha + '</td>'
                 + '<td>' + r.cliente + '</td>'
+                + '<td>' + r.empleado + '</td>'
                 + '<td class="num">' + r.total + '</td>'
                 + '<td>' + r.pago + '</td>'
                 + '<td>' + r.estado + '</td>'
@@ -5897,7 +6176,7 @@ td.num,th.num{text-align:right}
 </div>
 <table>
   <thead><tr>
-    <th>Ticket</th><th>Fecha</th><th>Cliente</th><th class="num">Total</th><th>Pago</th><th>Tipo</th>
+    <th>Ticket</th><th>Fecha</th><th>Cliente</th><th>Empleado responsable</th><th class="num">Total</th><th>Pago</th><th>Tipo</th>
   </tr></thead>
   <tbody>
     ` + htmlRows + `
@@ -5905,9 +6184,9 @@ td.num,th.num{text-align:right}
 </table>
 <script>window.onload=function(){window.print();}<\/script>
 </body></html>`;
-        w.document.open();
-        w.document.write(html);
-        w.document.close();
+                w.document.open();
+                w.document.write(html);
+                w.document.close();
     }
 
     if (btnExportVentas) btnExportVentas.addEventListener('click', function () { openExportVentas(); });
@@ -5928,6 +6207,26 @@ td.num,th.num{text-align:right}
             updateVentasGiftModeUi();
             renderHistorialFromCache();
             applyVentasFilters();
+        });
+    }
+
+    function persistLastEmployeeIdFromSelect(select) {
+        try {
+            const id = String(select?.value || '').trim();
+            if (!id) return;
+            window.localStorage.setItem('sales_last_employee_id', id);
+        } catch (e) {
+        }
+    }
+
+    if (selectTicketEmployee) {
+        selectTicketEmployee.addEventListener('change', function () {
+            persistLastEmployeeIdFromSelect(selectTicketEmployee);
+        });
+    }
+    if (selectCambioEmployee) {
+        selectCambioEmployee.addEventListener('change', function () {
+            persistLastEmployeeIdFromSelect(selectCambioEmployee);
         });
     }
 
@@ -6128,6 +6427,7 @@ td.num,th.num{text-align:right}
                 items,
                 customer_id: selectedCustomer ? (selectedCustomer.id || '') : '',
                 customer_name: selectedCustomer ? (selectedCustomer.name || '') : '',
+                ...getSelectedEmployeePayload(selectTicketEmployee),
                 on_account: ventaOnAccount,
                 paid_amount: paidAmount,
                 due_amount: dueAmount,
@@ -6405,7 +6705,9 @@ td.num,th.num{text-align:right}
     if (inputSearchVentasTicket) inputSearchVentasTicket.addEventListener('input', function () { applyVentasFilters(); });
     if (selectVentasPago) selectVentasPago.addEventListener('change', function () { applyVentasFilters(); });
     if (selectVentasEstado) selectVentasEstado.addEventListener('change', function () { applyVentasFilters(); });
+    if (selectVentasEmployee) selectVentasEmployee.addEventListener('change', function () { applyVentasFilters(); });
 
+    initSalesEmployeesSelectors();
     initHistorialVentas();
 
     // Confirmar productos del cambio (pasar a Paso 2 con saldo a favor)
@@ -6443,6 +6745,7 @@ td.num,th.num{text-align:right}
                     due_amount: 0,
                     customer_id: custId,
                     customer_name: custName,
+                    ...getSelectedEmployeePayload(selectCambioEmployee),
                     exchange_return_total: returnTotal,
                     exchange_new_total: exNew,
                     is_gift: false,
@@ -6572,10 +6875,11 @@ td.num,th.num{text-align:right}
                     due_amount: dueForSale,
                     customer_id: custId,
                     customer_name: custName,
+                    ...getSelectedEmployeePayload(selectCambioEmployee),
                     exchange_return_total: returnTotal,
                     exchange_new_total: newTotal,
                     is_gift: !!cambioIsGift,
-                    gift_code: (cambioIsGift ? (cambioGiftCode || '') : ''),
+                    gift_code: (cambioIsGift ? (String(giftCodeElCambio?.textContent || '').trim() || '') : ''),
                     items: itemsOut,
                 }).then(function (res) {
                     if (!res || res.ok !== true) {
@@ -6654,15 +6958,15 @@ td.num,th.num{text-align:right}
                 notes: notas,
                 customer_id: custId,
                 customer_name: custName,
+                ...getSelectedEmployeePayload(selectCambioEmployee),
                 return_items: itemsIn,
                 new_items: itemsOut,
                 return_total: returnTotal,
                 new_total: newTotal,
-                on_account: onAccount,
                 paid_amount: paidAmount,
                 due_amount: dueAmount,
                 is_gift: !!cambioIsGift,
-                gift_code: (cambioIsGift ? (cambioGiftCode || '') : ''),
+                gift_code: (cambioIsGift ? (String(giftCodeElCambio?.textContent || '').trim() || '') : ''),
             }).then(function (res) {
                 if (!res || res.ok !== true) {
                     const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo registrar el cambio.';

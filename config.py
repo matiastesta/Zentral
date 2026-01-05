@@ -76,8 +76,8 @@ class Config:
         R2_PRESIGNED_EXPIRES_SECONDS = 120
 
 class DevelopmentConfig(Config):
-    DEBUG = True
-    SQLALCHEMY_ECHO = True
+    DEBUG = (not Config._is_railway)
+    SQLALCHEMY_ECHO = (not Config._is_railway)
 
 class TestingConfig(Config):
     TESTING = True

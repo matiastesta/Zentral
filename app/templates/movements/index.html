@@ -6,7 +6,7 @@
     <p class="mt-1 text-sm text-gray-600">Consulta el historial de ingresos y gastos con filtros avanzados.</p>
 </div>
 
-<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+<div class="bg-white rounded-lg shadow border border-gray-200 overflow-visible">
     <div class="border-b border-gray-200">
         <nav class="flex -mb-px" aria-label="Tabs">
             <button id="tab-mov-ventas" type="button" class="px-4 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-600">Ingresos</button>
@@ -47,6 +47,7 @@
                                     <option value="Cobro">Cobro</option>
                                     <option value="CuentaCorriente">Cuenta corriente</option>
                                     <option value="Cambio">Cambio</option>
+                                    <option value="IngresoAjusteInv">Ingreso por ajuste</option>
                                 </select>
                             </th>
                             <th class="px-4 py-1"></th>
@@ -90,7 +91,7 @@
                             <th class="px-4 py-1">
                                 <div class="relative">
                                     <button id="mov-egresos-cat-btn" type="button" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white text-left">Categoría (todas)</button>
-                                    <div id="mov-egresos-cat-menu" class="hidden absolute left-0 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-lg z-20">
+                                    <div id="mov-egresos-cat-menu" class="hidden absolute left-0 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-lg z-50">
                                         <div class="p-2 border-b border-gray-100">
                                             <input id="mov-egresos-cat-search" type="text" class="w-full px-2 py-1 border rounded-md text-xs text-gray-600" placeholder="Buscar categoría">
                                         </div>
@@ -101,7 +102,7 @@
                             <th class="px-4 py-1">
                                 <div class="relative">
                                     <button id="mov-egresos-sup-btn" type="button" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white text-left">Proveedor (todos)</button>
-                                    <div id="mov-egresos-sup-menu" class="hidden absolute left-0 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-lg z-20">
+                                    <div id="mov-egresos-sup-menu" class="hidden absolute left-0 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-lg z-50">
                                         <div class="p-2 border-b border-gray-100">
                                             <input id="mov-egresos-sup-search" type="text" class="w-full px-2 py-1 border rounded-md text-xs text-gray-600" placeholder="Buscar proveedor">
                                         </div>
@@ -337,6 +338,17 @@ document.addEventListener('DOMContentLoaded', function () {
         return { mode: 'some', values: realSelected };
     }
 
+    function isLockedSale(s) {
+        try {
+            const st = String(s?.type || s?.sale_type || '').trim();
+            const notes = String(s?.notes || s?.notes_display || '');
+            if (st === 'AjusteInvCosto' || st === 'IngresoAjusteInv') return true;
+            if (notes && notes.indexOf('AdjustmentId:') >= 0) return true;
+        } catch (e) {
+        }
+        return false;
+    }
+
     function saleKind(s) {
         const st = String(s?.type || s?.sale_type || '').trim();
         const pm = normKey(s?.payment_method || '');
@@ -344,6 +356,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (st === 'CobroCC') return 'Cobro';
         if (st === 'Cambio') return 'Cambio';
+        if (st === 'IngresoAjusteInv') return 'IngresoAjusteInv';
         if (onAcc || pm.includes('cuenta corriente') || pm === 'cuenta corriente') return 'CuentaCorriente';
         return 'Venta';
     }
@@ -353,6 +366,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (k === 'Cobro') return 'Cobro';
         if (k === 'CuentaCorriente') return 'Cuenta corriente';
         if (k === 'Cambio') return 'Cambio';
+        if (k === 'IngresoAjusteInv') return 'Ingreso por ajuste';
         return 'Venta';
     }
 
@@ -399,9 +413,47 @@ document.addEventListener('DOMContentLoaded', function () {
             .sort((a, b) => String(a.label).localeCompare(String(b.label), 'es'));
     }
 
-    function setDropdownOpen(menu, open) {
+    function setDropdownOpen(menu, open, anchorBtn) {
         if (!menu) return;
         menu.classList.toggle('hidden', !open);
+        if (!open) {
+            try {
+                menu.style.position = '';
+                menu.style.left = '';
+                menu.style.top = '';
+                menu.style.maxHeight = '';
+                menu.style.zIndex = '';
+            } catch (e) {}
+            return;
+        }
+
+        try {
+            const btn = anchorBtn || null;
+            if (!btn || !btn.getBoundingClientRect) return;
+            const r = btn.getBoundingClientRect();
+            const pad = 10;
+            const spaceBelow = Math.max(0, window.innerHeight - r.bottom - pad);
+            const spaceAbove = Math.max(0, r.top - pad);
+
+            const wantUp = (spaceBelow < 220) && (spaceAbove > spaceBelow);
+            const maxH = Math.max(140, Math.min(340, (wantUp ? (spaceAbove - 12) : (spaceBelow - 12))));
+
+            menu.style.position = 'fixed';
+            menu.style.left = Math.max(pad, Math.min(r.left, window.innerWidth - pad - 300)) + 'px';
+            menu.style.top = (wantUp ? Math.max(pad, r.top - maxH - 6) : (r.bottom + 6)) + 'px';
+            menu.style.maxHeight = maxH + 'px';
+            menu.style.overflow = 'auto';
+            menu.style.zIndex = '1050';
+        } catch (e) {
+        }
+    }
+
+    function selectAllMultiSelect(selectEl) {
+        if (!selectEl) return;
+        try {
+            Array.from(selectEl.options || []).forEach(function (o) { o.selected = true; });
+        } catch (e) {
+        }
     }
 
     function updateCatsButtonLabel() {
@@ -510,6 +562,13 @@ document.addEventListener('DOMContentLoaded', function () {
         egresosCatsSelected = new Set(Array.from(egresosCatsSelected).filter(k => catsKeys.has(k)));
         const supsKeys = new Set(sups.map(x => x.k));
         egresosSupsSelected = new Set(Array.from(egresosSupsSelected).filter(k => supsKeys.has(k)));
+
+        if (egresosCatsAllSelected) {
+            egresosCatsSelected = new Set();
+        }
+        if (egresosSupsAllSelected) {
+            egresosSupsSelected = new Set();
+        }
 
         if (!cats.length) {
             egresosCatsAllSelected = true;
@@ -701,6 +760,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
                 const ticket = String(s?.ticket || '').trim();
+                const locked = isLockedSale(s);
                 tr.innerHTML = ''
                     + '<td class="px-4 py-3 text-sm text-gray-900">' + String(s?.ticket || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(s?.fecha || s?.date || '') + '</td>'
@@ -709,9 +769,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(s?.payment_method || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + String(buildNotes(s) || '').replace(/__tmp__|_tmp_/gi, '') + '</td>'
                     + '<td class="px-4 py-3 text-center">'
-                    +   '<button type="button" class="btn-del-sale h-8 w-8 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-ticket="' + String(ticket).replace(/"/g, '&quot;') + '" title="Eliminar">'
+                    +   (locked ? '' : ('<button type="button" class="btn-del-sale h-8 w-8 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-ticket="' + String(ticket).replace(/"/g, '&quot;') + '" title="Eliminar">'
                     +       '<i class="fas fa-trash text-[12px]"></i>'
-                    +   '</button>'
+                    +   '</button>'))
                     + '</td>';
                 tbodyVentas.appendChild(tr);
             });
@@ -893,6 +953,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (tabEgresos) tabEgresos.addEventListener('click', function () { setTab('egresos'); });
     if (tabArqueo) tabArqueo.addEventListener('click', function () { setTab('arqueo'); });
 
+    egresosCatsAllSelected = true;
+    egresosSupsAllSelected = true;
+    egresosCatsSelected = new Set();
+    egresosSupsSelected = new Set();
+
+    selectAllMultiSelect(fVentasPago);
+    selectAllMultiSelect(fVentasTipo);
+    selectAllMultiSelect(fEgresosPago);
+
     initTodosMultiSelect(fVentasPago);
     initTodosMultiSelect(fVentasTipo);
     initTodosMultiSelect(fEgresosPago);
@@ -903,10 +972,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (fEgresosCatBtn && fEgresosCatMenu) {
         fEgresosCatBtn.addEventListener('click', function () {
             const open = fEgresosCatMenu.classList.contains('hidden');
-            setDropdownOpen(fEgresosCatMenu, open);
+            setDropdownOpen(fEgresosCatMenu, open, fEgresosCatBtn);
             if (open) {
                 try { const sc = document.getElementById('mov-egresos-scroll'); if (sc) sc.style.overflow = 'visible'; } catch (e) {}
-                try { setDropdownOpen(fEgresosSupMenu, false); } catch (e) { }
+                try { setDropdownOpen(fEgresosSupMenu, false, fEgresosSupBtn); } catch (e) { }
                 try { fEgresosCatSearch?.focus?.(); } catch (e) { }
             } else {
                 try {
@@ -920,10 +989,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (fEgresosSupBtn && fEgresosSupMenu) {
         fEgresosSupBtn.addEventListener('click', function () {
             const open = fEgresosSupMenu.classList.contains('hidden');
-            setDropdownOpen(fEgresosSupMenu, open);
+            setDropdownOpen(fEgresosSupMenu, open, fEgresosSupBtn);
             if (open) {
                 try { const sc = document.getElementById('mov-egresos-scroll'); if (sc) sc.style.overflow = 'visible'; } catch (e) {}
-                try { setDropdownOpen(fEgresosCatMenu, false); } catch (e) { }
+                try { setDropdownOpen(fEgresosCatMenu, false, fEgresosCatBtn); } catch (e) { }
                 try { fEgresosSupSearch?.focus?.(); } catch (e) { }
             } else {
                 try {
@@ -1035,9 +1104,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else if (mode === 'sync') {
                     const selectedVals = Array.from(selectEl.selectedOptions || []).map(o => String(o.value || ''));
                     const selectedReal = selectedVals.filter(v => v !== allValue);
+                    const hasAll = selectedVals.includes(allValue);
                     const allOpt = opts.find(o => String(o.value || '') === allValue);
                     if (allOpt) {
-                        allOpt.selected = (allVals.length > 0 && selectedReal.length >= allVals.length);
+                        allOpt.selected = hasAll || (allVals.length > 0 && selectedReal.length >= allVals.length);
                     }
                 }
             } catch (e) {
@@ -1066,13 +1136,24 @@ document.addEventListener('DOMContentLoaded', function () {
         apply('sync');
     }
 
+    function resetTodosMultiSelect(selectEl) {
+        if (!selectEl) return;
+        try {
+            const opts = Array.from(selectEl.options || []);
+            const allOpt = opts.find(o => String(o.value || '') === '');
+            opts.forEach(o => { o.selected = false; });
+            if (allOpt) allOpt.selected = true;
+        } catch (e) {
+        }
+    }
+
     document.addEventListener('click', function (ev) {
         const t = ev && ev.target ? ev.target : null;
         if (!t) return;
         try {
             if (fEgresosCatMenu && !fEgresosCatMenu.classList.contains('hidden')) {
                 if (!fEgresosCatMenu.contains(t) && !fEgresosCatBtn.contains(t)) {
-                    setDropdownOpen(fEgresosCatMenu, false);
+                    setDropdownOpen(fEgresosCatMenu, false, fEgresosCatBtn);
                     try {
                         const sc = document.getElementById('mov-egresos-scroll');
                         if (sc && (!fEgresosSupMenu || fEgresosSupMenu.classList.contains('hidden'))) sc.style.overflow = 'auto';
@@ -1084,7 +1165,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             if (fEgresosSupMenu && !fEgresosSupMenu.classList.contains('hidden')) {
                 if (!fEgresosSupMenu.contains(t) && !fEgresosSupBtn.contains(t)) {
-                    setDropdownOpen(fEgresosSupMenu, false);
+                    setDropdownOpen(fEgresosSupMenu, false, fEgresosSupBtn);
                     try {
                         const sc = document.getElementById('mov-egresos-scroll');
                         if (sc && (!fEgresosCatMenu || fEgresosCatMenu.classList.contains('hidden'))) sc.style.overflow = 'auto';

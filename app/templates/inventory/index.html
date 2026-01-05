@@ -152,9 +152,80 @@
                 </div>
             </div>
 
+            <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-between gap-2">
+                <button id="btn-open-adjust-lot" type="button" class="hidden inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100">Ajustar lote</button>
+                <div class="flex items-center justify-end gap-2">
+                    <button id="btn-cancel-edit-lot" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                    <button id="btn-save-edit-lot" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-adjust-lot" class="hidden fixed inset-0 z-50" style="z-index: 67;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Ajustar lote</h3>
+                    <p id="adjust-lot-subtitle" class="text-xs text-gray-500"></p>
+                </div>
+                <button id="btn-close-adjust-lot" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="p-5">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div class="md:col-span-6">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Producto</label>
+                        <div id="adjust-lot-product" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Consumido</label>
+                        <div id="adjust-lot-consumed" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Fecha</label>
+                        <div id="adjust-lot-date" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
+                    </div>
+
+                    <div class="md:col-span-6">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Cantidad actual</label>
+                        <div id="adjust-lot-qty-old" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
+                    </div>
+                    <div class="md:col-span-6">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Costo unitario actual</label>
+                        <div id="adjust-lot-cu-old" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
+                    </div>
+
+                    <div class="md:col-span-6">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Nueva cantidad <span class="text-red-600">*</span></label>
+                        <input id="adjust-lot-qty-new" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
+                    </div>
+                    <div class="md:col-span-6">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Nuevo costo unitario <span class="text-red-600">*</span></label>
+                        <input id="adjust-lot-cu-new" type="text" inputmode="decimal" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="$0" data-currency="ars">
+                    </div>
+
+                    <div class="md:col-span-12">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Nota</label>
+                        <input id="adjust-lot-note" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
+                    </div>
+
+                    <div class="md:col-span-12">
+                        <label class="inline-flex items-start gap-2 text-sm text-gray-700 select-none">
+                            <input id="adjust-lot-confirm" type="checkbox" class="mt-1 rounded border-gray-300">
+                            <span>Entiendo que este ajuste es irreversible y afecta CMV, márgenes e informes.</span>
+                        </label>
+                        <div id="adjust-lot-msg" class="mt-2 text-[11px] text-gray-600"></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
-                <button id="btn-cancel-edit-lot" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
-                <button id="btn-save-edit-lot" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">Guardar</button>
+                <button id="btn-cancel-adjust-lot" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-save-adjust-lot" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">Confirmar ajuste</button>
             </div>
         </div>
     </div>
@@ -860,6 +931,9 @@
     </div>
 </div>
 
+<script id="inv-permissions" type="application/json">{{ {
+    'lot_adjust': (current_user.is_authenticated and current_user.can('inventario.ajuste_lote')),
+} | tojson }}</script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const btnCreate = document.getElementById('btn-create-inv');
@@ -928,6 +1002,23 @@ document.addEventListener('DOMContentLoaded', function () {
     const linkCreateSupplierLotEdit = document.getElementById('link-create-supplier-lot-edit');
     const editLotNote = document.getElementById('edit-lot-note');
     const editLotMsg = document.getElementById('edit-lot-msg');
+    const btnOpenAdjustLot = document.getElementById('btn-open-adjust-lot');
+
+    const modalAdjustLot = document.getElementById('modal-adjust-lot');
+    const btnCloseAdjustLot = document.getElementById('btn-close-adjust-lot');
+    const btnCancelAdjustLot = document.getElementById('btn-cancel-adjust-lot');
+    const btnSaveAdjustLot = document.getElementById('btn-save-adjust-lot');
+    const adjustLotSubtitle = document.getElementById('adjust-lot-subtitle');
+    const adjustLotProduct = document.getElementById('adjust-lot-product');
+    const adjustLotConsumed = document.getElementById('adjust-lot-consumed');
+    const adjustLotDate = document.getElementById('adjust-lot-date');
+    const adjustLotQtyOld = document.getElementById('adjust-lot-qty-old');
+    const adjustLotCuOld = document.getElementById('adjust-lot-cu-old');
+    const adjustLotQtyNew = document.getElementById('adjust-lot-qty-new');
+    const adjustLotCuNew = document.getElementById('adjust-lot-cu-new');
+    const adjustLotNote = document.getElementById('adjust-lot-note');
+    const adjustLotConfirm = document.getElementById('adjust-lot-confirm');
+    const adjustLotMsg = document.getElementById('adjust-lot-msg');
 
     try {
         if (typeof flatpickr === 'function') {
@@ -957,6 +1048,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     let editingLotId = '';
+    let editingLotConsumedQty = 0;
+    let canAdjustLot = false;
+
+    try {
+        const el = document.getElementById('inv-permissions');
+        const parsed = el ? JSON.parse(String(el.textContent || '{}')) : {};
+        canAdjustLot = !!parsed?.lot_adjust;
+    } catch (e) {
+        canAdjustLot = false;
+    }
 
     function categoryLabel(p) {
         try {
@@ -2014,6 +2115,15 @@ document.addEventListener('DOMContentLoaded', function () {
     function apiUpdateLot(lotId, payload) {
         return fetch('/inventory/api/lots/' + encodeURIComponent(String(lotId)), {
             method: 'PUT',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {})
+        }).then(r => r.json());
+    }
+
+    function apiAdjustLot(lotId, payload) {
+        return fetch('/inventory/api/lots/' + encodeURIComponent(String(lotId)) + '/adjust', {
+            method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload || {})
@@ -3264,11 +3374,139 @@ document.addEventListener('DOMContentLoaded', function () {
         if (editLotNote) editLotNote.value = String(lot?.note || '');
         if (editLotMsg) editLotMsg.textContent = '';
 
+        try {
+            const movs = Array.isArray(cacheMovements) ? cacheMovements : [];
+            const consumed = movs
+                .filter(m => String(m?.type || '').trim() === 'sale')
+                .filter(m => String(m?.lot_id || '') === String(id))
+                .reduce((acc, m) => acc + Math.max(0, -parseNumeroSeguro(m?.qty_delta)), 0);
+            editingLotConsumedQty = consumed;
+        } catch (e) {
+            editingLotConsumedQty = 0;
+        }
+
+        const hasSales = (editingLotConsumedQty > 1e-9);
+        if (editLotQty) editLotQty.disabled = hasSales;
+        if (editLotCu) editLotCu.disabled = hasSales;
+        if (hasSales) {
+            if (editLotMsg) editLotMsg.textContent = 'Este lote ya tiene consumos. Para corregir cantidad/costo, usá “Ajustar lote”.';
+        }
+        if (btnOpenAdjustLot) {
+            const show = !!canAdjustLot;
+            btnOpenAdjustLot.classList.toggle('hidden', !show);
+            btnOpenAdjustLot.disabled = !show;
+            btnOpenAdjustLot.classList.toggle('opacity-50', !show);
+            btnOpenAdjustLot.classList.toggle('cursor-not-allowed', !show);
+        }
+
         abrirModal(modalEditLot, true);
+    }
+
+    function closeAdjustLot() {
+        if (adjustLotMsg) adjustLotMsg.textContent = '';
+        if (adjustLotConfirm) adjustLotConfirm.checked = false;
+        abrirModal(modalAdjustLot, false);
+    }
+
+    function openAdjustLot() {
+        const id = String(editingLotId || '').trim();
+        if (!id || !modalAdjustLot) return;
+        const lot = (Array.isArray(cacheLots) ? cacheLots : []).find(l => String(l?.id || '') === id);
+        if (!lot) return;
+        const prod = (Array.isArray(cacheProducts) ? cacheProducts : []).find(p => String(p?.id || '') === String(lot?.product_id || ''));
+
+        const today = new Date();
+        const isoToday = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+        if (adjustLotSubtitle) adjustLotSubtitle.textContent = String(prod?.name || lot?.product_name || '');
+        if (adjustLotProduct) adjustLotProduct.textContent = String(prod?.name || lot?.product_name || '');
+        if (adjustLotConsumed) adjustLotConsumed.textContent = String(parseNumeroSeguro(editingLotConsumedQty).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+        if (adjustLotDate) adjustLotDate.textContent = fmtFecha(isoToday);
+        if (adjustLotQtyOld) adjustLotQtyOld.textContent = String(parseNumeroSeguro(lot?.qty_initial).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+        if (adjustLotCuOld) adjustLotCuOld.textContent = formatMonedaARS(parseNumeroSeguro(lot?.unit_cost));
+
+        if (adjustLotQtyNew) adjustLotQtyNew.value = String(parseNumeroSeguro(lot?.qty_initial) || '');
+        if (adjustLotCuNew) adjustLotCuNew.value = formatMonedaARS(parseNumeroSeguro(lot?.unit_cost));
+        if (adjustLotNote) adjustLotNote.value = '';
+        if (adjustLotMsg) adjustLotMsg.textContent = '';
+        if (adjustLotConfirm) adjustLotConfirm.checked = false;
+
+        abrirModal(modalAdjustLot, true);
+    }
+
+    function saveAdjustLot() {
+        const id = String(editingLotId || '').trim();
+        if (!id) return;
+
+        const qtyInitial = parseNumeroSeguro(adjustLotQtyNew?.value);
+        const unitCost = parseMonedaARS(adjustLotCuNew?.value);
+        const note = String(adjustLotNote?.value || '').trim();
+
+        if (!(qtyInitial > 0)) {
+            if (adjustLotMsg) adjustLotMsg.textContent = 'La cantidad debe ser mayor a 0.';
+            return;
+        }
+        if (qtyInitial + 1e-9 < parseNumeroSeguro(editingLotConsumedQty)) {
+            if (adjustLotMsg) adjustLotMsg.textContent = 'La cantidad nueva no puede ser menor a la cantidad ya consumida.';
+            return;
+        }
+        if (!(unitCost >= 0)) {
+            if (adjustLotMsg) adjustLotMsg.textContent = 'El costo unitario no puede ser negativo.';
+            return;
+        }
+        if (!(adjustLotConfirm && adjustLotConfirm.checked)) {
+            if (adjustLotMsg) adjustLotMsg.textContent = 'Confirmá el ajuste para continuar.';
+            return;
+        }
+
+        const today = new Date();
+        const isoToday = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+        if (adjustLotMsg) adjustLotMsg.textContent = 'Aplicando ajuste…';
+        apiAdjustLot(id, {
+            qty_initial: qtyInitial,
+            unit_cost: unitCost,
+            note: note,
+            date: isoToday,
+        }).then(function (res) {
+            if (!res || res.ok !== true) {
+                const err = String(res?.error || '').trim();
+                const msg = (err === 'qty_below_consumed')
+                    ? 'La cantidad nueva no puede ser menor a lo consumido.'
+                    : (err === 'forbidden')
+                        ? 'No tenés permisos para ajustar lotes.'
+                        : 'No se pudo aplicar el ajuste.';
+                if (adjustLotMsg) adjustLotMsg.textContent = msg;
+                return;
+            }
+
+            try {
+                const item = res.item;
+                if (item && item.id) {
+                    cacheLots = (Array.isArray(cacheLots) ? cacheLots : []).map(l => (String(l?.id) === String(item.id)) ? item : l);
+                }
+            } catch (e) {
+            }
+
+            try {
+                const adjId = String(res?.created?.adjustment_id || '').trim();
+                if (adjId && window.showAlertModal) {
+                    window.showAlertModal('Ajuste aplicado. ID: ' + adjId, 'Listo', 'Ajustar lote');
+                }
+            } catch (e) {
+            }
+
+            closeAdjustLot();
+            closeEditLot();
+            renderAll();
+        }).catch(function () {
+            if (adjustLotMsg) adjustLotMsg.textContent = 'No se pudo aplicar el ajuste.';
+        });
     }
 
     function closeEditLot() {
         editingLotId = '';
+        editingLotConsumedQty = 0;
         if (editLotMsg) editLotMsg.textContent = '';
         abrirModal(modalEditLot, false);
     }
@@ -4305,6 +4543,14 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btnSaveEditLot) btnSaveEditLot.addEventListener('click', saveEditLot);
     if (btnCancelEditLot) btnCancelEditLot.addEventListener('click', closeEditLot);
     if (btnCloseEditLot) btnCloseEditLot.addEventListener('click', closeEditLot);
+
+    if (btnOpenAdjustLot) btnOpenAdjustLot.addEventListener('click', function () {
+        if (!canAdjustLot) return;
+        openAdjustLot();
+    });
+    if (btnCloseAdjustLot) btnCloseAdjustLot.addEventListener('click', closeAdjustLot);
+    if (btnCancelAdjustLot) btnCancelAdjustLot.addEventListener('click', closeAdjustLot);
+    if (btnSaveAdjustLot) btnSaveAdjustLot.addEventListener('click', saveAdjustLot);
 
     if (btnAddLot) btnAddLot.addEventListener('click', openAddLot);
 

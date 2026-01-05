@@ -107,6 +107,31 @@ def bootstrap_schema(reset: bool) -> None:
     engine = db.engine
     is_sqlite = str(engine.url.drivername).startswith('sqlite')
 
+    def _postgres_ensure_sale_employee_columns() -> None:
+        if is_sqlite:
+            return
+        try:
+            insp = inspect(engine)
+        except Exception:
+            return
+        try:
+            if 'sale' not in set(insp.get_table_names() or []):
+                return
+        except Exception:
+            return
+
+        try:
+            existing = {str(c.get('name') or '') for c in (insp.get_columns('sale') or [])}
+        except Exception:
+            existing = set()
+
+        if 'employee_id' not in existing:
+            db.session.execute(text('ALTER TABLE sale ADD COLUMN IF NOT EXISTS employee_id VARCHAR(64)'))
+            existing.add('employee_id')
+        if 'employee_name' not in existing:
+            db.session.execute(text('ALTER TABLE sale ADD COLUMN IF NOT EXISTS employee_name VARCHAR(255)'))
+            existing.add('employee_name')
+
     def _upgrade_db_to_head() -> None:
         try:
             from alembic import command
@@ -260,7 +285,15 @@ def bootstrap_schema(reset: bool) -> None:
     if is_sqlite:
         db.create_all()
     else:
-        _upgrade_db_to_head()
+        try:
+            _upgrade_db_to_head()
+        except Exception:
+            db.session.rollback()
+        try:
+            _postgres_ensure_sale_employee_columns()
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
     # SQLite: si la DB existe desde antes (sin migraciones), aseguramos columnas faltantes
     if is_sqlite:

@@ -6,11 +6,12 @@ import uuid
 from flask import current_app, g, jsonify, render_template, request, url_for
 from flask_login import login_required
 
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app import db
-from app.models import CashCount, Category, InventoryLot, InventoryMovement, Product, Sale, SaleItem
+from app.models import CashCount, Category, Employee, InventoryLot, InventoryMovement, Product, Sale, SaleItem
 from app.permissions import module_required, module_required_any
 from app.sales import bp
 
@@ -38,6 +39,62 @@ def _company_id() -> str:
         return str(getattr(g, 'company_id', '') or '').strip()
     except Exception:
         return ''
+
+
+def _ensure_sale_employee_columns() -> None:
+    """Failsafe para Postgres: asegura columnas employee_id/employee_name en sale.
+
+    Motivo: si Railway no aplicó migraciones, los endpoints de ventas rompen con
+    UndefinedColumn. Esto es idempotente y seguro.
+    """
+    try:
+        engine = db.engine
+        if str(engine.url.drivername).startswith('sqlite'):
+            return
+
+        insp = inspect(engine)
+        if 'sale' not in set(insp.get_table_names() or []):
+            return
+
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('sale') or [])}
+        stmts = []
+        if 'employee_id' not in cols:
+            stmts.append('ALTER TABLE sale ADD COLUMN IF NOT EXISTS employee_id VARCHAR(64)')
+        if 'employee_name' not in cols:
+            stmts.append('ALTER TABLE sale ADD COLUMN IF NOT EXISTS employee_name VARCHAR(255)')
+        if not stmts:
+            return
+
+        # Ejecutar DDL fuera de la sesión para evitar interferir con transacciones del request.
+        with engine.begin() as conn:
+            for sql in stmts:
+                conn.execute(text(sql))
+    except Exception:
+        current_app.logger.exception('Failed to ensure sale employee columns')
+
+
+def _resolve_employee_fields(*, cid: str, employee_id: str | None, employee_name: str | None):
+    eid = str(employee_id or '').strip() or None
+    ename = str(employee_name or '').strip() or None
+
+    if not cid:
+        return None, ename
+
+    if eid:
+        try:
+            row = db.session.query(Employee).filter(Employee.company_id == cid, Employee.id == eid).first()
+        except Exception:
+            row = None
+        if row:
+            try:
+                if hasattr(row, 'active') and not bool(getattr(row, 'active', True)):
+                    return None, ename
+            except Exception:
+                pass
+            full_name = (str(getattr(row, 'first_name', '') or '').strip() + ' ' + str(getattr(row, 'last_name', '') or '').strip()).strip()
+            name = str(getattr(row, 'name', '') or '').strip() or full_name or 'Empleado'
+            return eid, name
+    return None, ename
 
 
 def _tmp_ticket(prefix: str = '') -> str:
@@ -248,6 +305,8 @@ def _serialize_sale(row: Sale, related: dict = None):
         'discount_general_amount': row.discount_general_amount,
         'customer_id': row.customer_id or '',
         'customer_name': row.customer_name or '',
+        'employee_id': getattr(row, 'employee_id', None) or '',
+        'employee_name': getattr(row, 'employee_name', None) or '',
         'on_account': bool(row.on_account),
         'paid_amount': row.paid_amount,
         'due_amount': row.due_amount,
@@ -351,6 +410,7 @@ def _serialize_lot_for_sales(l: InventoryLot):
 @login_required
 @module_required('sales')
 def list_sales():
+    _ensure_sale_employee_columns()
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
     include_replaced = str(request.args.get('include_replaced') or '').strip() in ('1', 'true', 'True')
@@ -704,12 +764,6 @@ def overdue_customers_count():
             uniq.add(key)
 
     return jsonify({'ok': True, 'count': len(uniq)}), 200
-
-
-@bp.post('/api/sales/settle')
-@login_required
-@module_required('sales')
-def settle_sale_due_amount():
     payload = request.get_json(silent=True) or {}
     sale_id = payload.get('sale_id')
     ticket = str(payload.get('ticket') or '').strip()
@@ -719,6 +773,10 @@ def settle_sale_due_amount():
     cid = _company_id()
     if not cid:
         return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    raw_emp_id = str(payload.get('employee_id') or '').strip() or None
+    raw_emp_name = str(payload.get('employee_name') or '').strip() or None
+    emp_id, emp_name = _resolve_employee_fields(cid=cid, employee_id=raw_emp_id, employee_name=raw_emp_name)
 
     row = None
     if sale_id is not None and str(sale_id).strip() != '':
@@ -774,6 +832,8 @@ def settle_sale_due_amount():
         due_amount=0.0,
         customer_id=row.customer_id,
         customer_name=row.customer_name,
+        employee_id=getattr(row, 'employee_id', None),
+        employee_name=getattr(row, 'employee_name', None),
         exchange_return_total=None,
         exchange_new_total=None,
     )
@@ -822,10 +882,19 @@ def settle_sale_due_amount():
 @login_required
 @module_required('sales')
 def create_exchange():
+    _ensure_sale_employee_columns()
     payload = request.get_json(silent=True) or {}
     sale_date = _parse_date_iso(payload.get('fecha') or payload.get('date'), dt_date.today())
     payment_method = str(payload.get('payment_method') or 'Efectivo').strip() or 'Efectivo'
     notes = str(payload.get('notes') or '').strip() or None
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    raw_emp_id = str(payload.get('employee_id') or '').strip() or None
+    raw_emp_name = str(payload.get('employee_name') or '').strip() or None
+    emp_id, emp_name = _resolve_employee_fields(cid=cid, employee_id=raw_emp_id, employee_name=raw_emp_name)
 
     customer_id = str(payload.get('customer_id') or '').strip() or None
     customer_name = str(payload.get('customer_name') or '').strip() or None
@@ -877,10 +946,6 @@ def create_exchange():
     is_gift = bool(payload.get('is_gift'))
     gift_code = str(payload.get('gift_code') or '').strip() or None
 
-    cid = _company_id()
-    if not cid:
-        return jsonify({'ok': False, 'error': 'no_company'}), 400
-
     # En una transacción: registrar 2 movimientos (Devolución + Venta)
     try:
         return_ticket = _tmp_ticket('C')
@@ -908,6 +973,8 @@ def create_exchange():
             due_amount=0.0,
             customer_id=customer_id,
             customer_name=customer_name,
+            employee_id=emp_id,
+            employee_name=emp_name,
             exchange_return_total=return_total,
             exchange_new_total=new_total,
         )
@@ -934,6 +1001,8 @@ def create_exchange():
             due_amount=due_for_sale,
             customer_id=customer_id,
             customer_name=customer_name,
+            employee_id=emp_id,
+            employee_name=emp_name,
             exchange_return_total=return_total,
             exchange_new_total=new_total,
         )
@@ -1254,6 +1323,7 @@ def _next_exchange_ticket() -> str:
 @login_required
 @module_required('sales')
 def create_sale():
+    _ensure_sale_employee_columns()
     payload = request.get_json(silent=True) or {}
     sale_date = _parse_date_iso(payload.get('fecha') or payload.get('date'), dt_date.today())
     sale_type = str(payload.get('type') or 'Venta').strip() or 'Venta'
@@ -1263,6 +1333,10 @@ def create_sale():
     cid = _company_id()
     if not cid:
         return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    raw_emp_id = str(payload.get('employee_id') or '').strip() or None
+    raw_emp_name = str(payload.get('employee_name') or '').strip() or None
+    emp_id, emp_name = _resolve_employee_fields(cid=cid, employee_id=raw_emp_id, employee_name=raw_emp_name)
 
     row = Sale(
         ticket=_tmp_ticket('V'),
@@ -1280,6 +1354,8 @@ def create_sale():
         due_amount=_num(payload.get('due_amount')),
         customer_id=str(payload.get('customer_id') or '').strip() or None,
         customer_name=str(payload.get('customer_name') or '').strip() or None,
+        employee_id=emp_id,
+        employee_name=emp_name,
         exchange_return_total=(None if payload.get('exchange_return_total') is None else _num(payload.get('exchange_return_total'))),
         exchange_new_total=(None if payload.get('exchange_new_total') is None else _num(payload.get('exchange_new_total'))),
     )
@@ -1339,9 +1415,10 @@ def create_sale():
             'error': 'ticket_duplicate',
             'message': 'No se pudo registrar la venta: ticket duplicado.',
         }), 400
-    except Exception:
+    except Exception as e:
+        current_app.logger.exception('Failed to create sale')
         db.session.rollback()
-        return jsonify({'ok': False, 'error': 'db_error'}), 400
+        return jsonify({'ok': False, 'error': 'db_error', 'message': str(e)}), 400
 
     return jsonify({'ok': True, 'item': _serialize_sale(row)})
 
@@ -1350,11 +1427,20 @@ def create_sale():
 @login_required
 @module_required('sales')
 def update_sale(ticket):
+    _ensure_sale_employee_columns()
     t = str(ticket or '').strip()
     cid = _company_id()
     row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == t).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    try:
+        st = str(getattr(row, 'sale_type', '') or '').strip()
+        notes = str(getattr(row, 'notes', '') or '')
+        if st in ('AjusteInvCosto', 'IngresoAjusteInv') or ('AdjustmentId:' in notes):
+            return jsonify({'ok': False, 'error': 'locked'}), 400
+    except Exception:
+        pass
 
     payload = request.get_json(silent=True) or {}
     sale_date = _parse_date_iso(payload.get('fecha') or payload.get('date'), row.sale_date)
@@ -1382,6 +1468,13 @@ def update_sale(ticket):
     row.due_amount = _num(payload.get('due_amount'))
     row.customer_id = str(payload.get('customer_id') or '').strip() or None
     row.customer_name = str(payload.get('customer_name') or '').strip() or None
+
+    raw_emp_id = str(payload.get('employee_id') or '').strip() or None
+    raw_emp_name = str(payload.get('employee_name') or '').strip() or None
+    emp_id, emp_name = _resolve_employee_fields(cid=cid, employee_id=raw_emp_id, employee_name=raw_emp_name)
+    row.employee_id = emp_id
+    row.employee_name = emp_name
+
     row.exchange_return_total = (None if payload.get('exchange_return_total') is None else _num(payload.get('exchange_return_total')))
     row.exchange_new_total = (None if payload.get('exchange_new_total') is None else _num(payload.get('exchange_new_total')))
 
@@ -1416,13 +1509,19 @@ def update_sale(ticket):
         db.session.flush()
         try:
             _apply_inventory_for_sale(sale_ticket=t, sale_date=sale_date, items=items_list)
-        except ValueError as e:
+        except IntegrityError:
             db.session.rollback()
-            return jsonify({'ok': False, 'error': 'stock_insufficient', 'message': str(e)}), 400
-        db.session.commit()
-    except Exception:
+            return jsonify({'ok': False, 'error': 'ticket_duplicate', 'message': 'Ticket duplicado.'}), 400
+    except Exception as e:
+        current_app.logger.exception('Failed to update sale')
         db.session.rollback()
-        return jsonify({'ok': False, 'error': 'db_error'}), 400
+        return jsonify({'ok': False, 'error': 'db_error', 'message': str(e)}), 400
+    try:
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.exception('Failed to commit sale update')
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error', 'message': str(e)}), 400
     return jsonify({'ok': True, 'item': _serialize_sale(row)})
 
 
@@ -1435,6 +1534,14 @@ def delete_sale(ticket):
     row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == t).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    try:
+        st = str(getattr(row, 'sale_type', '') or '').strip()
+        notes = str(getattr(row, 'notes', '') or '')
+        if st in ('AjusteInvCosto', 'IngresoAjusteInv') or ('AdjustmentId:' in notes):
+            return jsonify({'ok': False, 'error': 'locked'}), 400
+    except Exception:
+        pass
     try:
         related_ticket = ''
         try:
