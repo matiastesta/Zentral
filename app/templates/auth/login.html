@@ -6,68 +6,244 @@
     <title>Iniciar sesión - Zentral</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+
+        :root {
+            --login-bg-scale: 1;
+            --login-bg-rotate: 0deg;
+            --login-bg-fit: cover;
+            --login-bg-position: center;
+        }
+
+        html, body { background: #000; }
+
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            color: #fff;
+            background: transparent;
+        }
+
+        video {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: var(--login-bg-fit);
+            object-position: var(--login-bg-position);
+            transform: scale(var(--login-bg-scale)) rotate(var(--login-bg-rotate));
+            transform-origin: center;
+            z-index: 0;
+            display: block;
+            filter: brightness(0.75) blur(1px);
+            pointer-events: none;
+        }
+
+        #bg-video { filter: brightness(0.75) blur(1px); }
+
+        .login-container {
+            background: rgba(10, 18, 44, 0.55);
+            backdrop-filter: blur(16px) saturate(180%);
+            position: relative;
+            z-index: 1;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            padding: 2.5rem 2.25rem;
+            width: min(420px, calc(100vw - 2rem));
+            box-shadow: 0 0 40px rgba(0,0,0,0.4);
+            animation: fadeIn 0.8s ease;
+        }
+
+        .input-group { margin-bottom: 1rem; }
+
+        .input-group label {
+            display: block;
+            font-size: 0.9rem;
+            margin-bottom: 0.4rem;
+            opacity: 0.9;
+        }
+
+        .glass-input {
+            width: 100%;
+            padding: 0.7rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            outline: none;
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            transition: background 0.3s, box-shadow 0.3s, border-color 0.3s;
+        }
+
+        .password-wrap { position: relative; }
+
+        .password-wrap .glass-input { padding-right: 2.75rem; }
+
+        .toggle-password {
+            position: absolute;
+            right: 0.55rem;
+            top: 50%;
+            transform: translateY(-50%);
+            height: 2.05rem;
+            width: 2.05rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(0,0,0,0.18);
+            color: rgba(255,255,255,0.9);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .toggle-password:hover {
+            background: rgba(0,0,0,0.28);
+        }
+
+        .glass-input::placeholder { color: rgba(255,255,255,0.75); }
+
+        .glass-input:focus {
+            background: rgba(255, 255, 255, 0.22);
+            border-color: rgba(255,255,255,0.35);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 0.85rem;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #00b4d8, #0077b6);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 180, 216, 0.35);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(14px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </head>
-<body class="min-h-screen flex items-center justify-center" style="background-color:#000000;">
-    <div class="max-w-4xl w-full mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden">
-        <div class="grid grid-cols-1 md:grid-cols-2">
-            <!-- Lado izquierdo: branding -->
-            <div class="flex flex-col items-center justify-center px-8 py-10" style="background-color:#fbf9f5;">
-                <div class="h-24 w-24 rounded-full border border-gray-200 flex items-center justify-center overflow-hidden mb-4 bg-white">
-                    {% if business and business.logo_filename %}
-                        <img src="{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}" alt="Logo" class="h-16 w-16 object-contain">
-                    {% else %}
-                        <span class="text-2xl font-semibold" style="color:#0d1067;">{{ (business.name[0] if business and business.name else 'Z')|upper }}</span>
-                    {% endif %}
-                </div>
-                <h1 class="text-xl font-semibold" style="color:#0d1067;">Zentral</h1>
-                <p class="mt-1 text-sm text-gray-600">Plataforma de gestión integral por Zentra Consultora.</p>
-                <div class="mt-6">
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium" style="background-color:#9a9eff; color:#0d1067;">
-                        Acceso exclusivo
-                    </span>
-                </div>
+<body>
+    <video id="bg-video" autoplay muted loop playsinline preload="auto">
+        <source src="{{ url_for('static', filename='media/login/LoginZentral_16x9.mp4') }}" type="video/mp4; codecs=avc1.42E01E, mp4a.40.2">
+        <source src="{{ url_for('static', filename='media/login/LoginZentral.mp4') }}" type="video/mp4; codecs=avc1.42E01E, mp4a.40.2">
+        Tu navegador no puede reproducir el video de fondo.
+    </video>
+
+    <div class="login-container">
+        <div class="flex flex-col items-center mb-6">
+            <div class="h-20 w-20 rounded-full border border-white border-opacity-30 flex items-center justify-center overflow-hidden mb-3" style="background: rgba(255,255,255,0.18);">
+                {% if business and business.logo_filename %}
+                    <img src="{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}" alt="Logo" class="h-14 w-14 object-contain">
+                {% else %}
+                    <img src="{{ url_for('static', filename='media/login/zentral-logo.png') }}" alt="Zentral" class="h-14 w-14 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+                    <span class="text-2xl font-semibold" style="display:none;">{{ (business.name[0] if business and business.name else 'Z')|upper }}</span>
+                {% endif %}
             </div>
-
-            <!-- Lado derecho: formulario de login -->
-            <div class="px-8 py-10">
-                <h2 class="text-2xl font-semibold mb-2" style="color:#0d1067;">Iniciar sesión</h2>
-                <p class="text-sm text-gray-600 mb-6">Ingresa tus credenciales para acceder a tu instancia de Zentral.</p>
-
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        <div class="space-y-2 mb-4">
-                            {% for category, message in messages %}
-                                <div class="text-sm px-3 py-2 rounded-md border {% if category == 'error' %}bg-red-50 text-red-700 border-red-200{% elif category == 'success' %}bg-green-50 text-green-700 border-green-200{% else %}bg-blue-50 text-blue-700 border-blue-200{% endif %}">
-                                    {{ message }}
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                {% endwith %}
-
-                <form method="post" class="space-y-5">
-                    {{ form.hidden_tag() }}
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Email o usuario</label>
-                        {{ form.login(class_='mt-1 block w-full px-3 py-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50') }}
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-                        {{ form.password(class_='mt-1 block w-full px-3 py-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50') }}
-                    </div>
-
-                    <div class="flex items-center justify-between text-xs text-gray-500">
-                        <span>Las credenciales son definidas por el administrador de tu negocio.</span>
-                    </div>
-
-                    <button type="submit" class="w-full py-2.5 text-sm font-medium rounded-md text-white" style="background-color:#0d1067;">
-                        Ingresar
-                    </button>
-                </form>
-            </div>
+            <h1 class="text-xl font-semibold">Zentral</h1>
+            <p class="mt-1 text-sm" style="opacity: 0.85;">Ingresá con tus credenciales para acceder.</p>
         </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="space-y-2 mb-4">
+                    {% for category, message in messages %}
+                        <div class="text-sm px-3 py-2 rounded-md border" style="background: rgba(0,0,0,0.25); border-color: rgba(255,255,255,0.18);">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="post">
+            {{ form.hidden_tag() }}
+
+            <div class="input-group">
+                <label for="login">Email o usuario</label>
+                {{ form.login(id='login', class_='glass-input', placeholder='nombre@empresa.com', autocomplete='username') }}
+            </div>
+
+            <div class="input-group">
+                <label for="password">Contraseña</label>
+                <div class="password-wrap">
+                    {{ form.password(id='password', class_='glass-input', placeholder='••••••••', autocomplete='current-password') }}
+                    <button type="button" class="toggle-password" id="toggle-password" aria-label="Mostrar contraseña" aria-pressed="false">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="login-btn">Ingresar</button>
+        </form>
     </div>
+
+    <script>
+        (function () {
+            var v = document.getElementById('bg-video');
+            if (!v) return;
+
+            function log() {
+                try { console.log.apply(console, arguments); } catch (e) {}
+            }
+
+            var srcEl = v.querySelector('source');
+            var src = srcEl ? srcEl.getAttribute('src') : null;
+            log('[login-bg] video source:', src);
+
+            v.addEventListener('error', function () {
+                log('[login-bg] video error', v.error);
+            });
+            v.addEventListener('loadeddata', function () {
+                log('[login-bg] loadeddata');
+            });
+            v.addEventListener('canplay', function () {
+                log('[login-bg] canplay');
+            });
+
+            try {
+                v.load();
+            } catch (e) {
+                log('[login-bg] load() threw', e);
+            }
+
+            var p;
+            try { p = v.play(); } catch (e) { p = null; }
+            if (p && typeof p.catch === 'function') {
+                p.catch(function (err) {
+                    log('[login-bg] play() blocked/failed', err);
+                });
+            }
+
+        })();
+
+        (function () {
+            var btn = document.getElementById('toggle-password');
+            var input = document.getElementById('password');
+            if (!btn || !input) return;
+
+            btn.addEventListener('click', function () {
+                var isPassword = (input.getAttribute('type') || '').toLowerCase() === 'password';
+                input.setAttribute('type', isPassword ? 'text' : 'password');
+                btn.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
+                btn.setAttribute('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+                var icon = btn.querySelector('i');
+                if (icon) {
+                    icon.className = isPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+                }
+            });
+        })();
+    </script>
 </body>
 </html>
