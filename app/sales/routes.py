@@ -27,8 +27,11 @@ def _dt_to_ms(dt):
 
 
 def _parse_date_iso(raw, fallback=None):
+    s = str(raw or '').strip()
+    if not s:
+        return fallback
     try:
-        return dt_date.fromisoformat(str(raw).strip())
+        return dt_date.fromisoformat(s)
     except Exception:
         current_app.logger.exception('Failed to parse date from iso format')
         return fallback
@@ -556,7 +559,7 @@ def _serialize_lot_for_sales(l: InventoryLot):
 
 @bp.get('/api/sales')
 @login_required
-@module_required('sales')
+@module_required_any('sales', 'customers')
 def list_sales():
     _ensure_sale_employee_columns()
     raw_from = (request.args.get('from') or '').strip()
@@ -916,7 +919,7 @@ def overdue_customers_count():
 
 @bp.post('/api/sales/settle')
 @login_required
-@module_required('sales')
+@module_required_any('sales', 'customers')
 def settle_cc_sale():
     payload = request.get_json(silent=True) or {}
     sale_id = payload.get('sale_id')

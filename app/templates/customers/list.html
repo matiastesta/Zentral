@@ -1230,11 +1230,41 @@ document.addEventListener('DOMContentLoaded', function () {
         const freqMin = Math.max(1, parseInt(crm?.freq_min_purchases || 1, 10) || 1);
         const bestMin = Math.max(1, parseInt(crm?.best_min_purchases || 2, 10) || 2);
         const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
+        const criticalDays = Math.max(overdueDays, parseInt(crm?.debt_critical_days || 60, 10) || 60);
+
+        const normName = function (v) {
+            let s = safeStr(v)
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, ' ');
+            try {
+                s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            } catch (e) {
+            }
+            return s;
+        };
 
         const mapped = customers.map(c => {
             const cid = safeStr(c.id);
+            const cidNorm = safeStr(c.id).trim().toLowerCase();
             const fullName = (safeStr(c.first_name) + ' ' + safeStr(c.last_name)).trim();
-            const salesFor = salesArr.filter(s => safeStr(s?.customer_id) === cid || (!safeStr(s?.customer_id) && fullName && safeStr(s?.customer_name).toLowerCase() === fullName.toLowerCase()));
+
+            const names = new Set();
+            const n1 = normName(fullName);
+            const n2 = normName(c?.name);
+            const n3 = normName(c?.full_name);
+            if (n1) names.add(n1);
+            if (n2) names.add(n2);
+            if (n3) names.add(n3);
+
+            const salesFor = sales.filter(s => {
+                const sid = safeStr(s?.customer_id).trim();
+                const sidNorm = sid.toLowerCase();
+                const sname = normName(s?.customer_name);
+                if (sid && sidNorm === cidNorm) return true;
+                if (sname && names.has(sname)) return true;
+                return false;
+            });
 
             const purchaseSales = salesFor.filter(s => {
                 const t = safeStr(s?.type || s?.sale_type).trim();
