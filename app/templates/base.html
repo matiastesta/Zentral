@@ -4,15 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %} - Zentral</title>
-    {% if business and business.logo_file_id %}
-        <link rel="icon" type="image/png" href="{{ url_for('files.download_file_api', file_id=business.logo_file_id) }}">
-        <link rel="apple-touch-icon" href="{{ url_for('files.download_file_api', file_id=business.logo_file_id) }}">
-    {% elif business and business.logo_filename %}
-        <link rel="icon" type="image/png" href="{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}">
-        <link rel="apple-touch-icon" href="{{ url_for('static', filename='uploads/' ~ business.logo_filename) }}">
-    {% else %}
-        <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230d1067'/%3E%3Ctext x='32' y='42' font-size='34' text-anchor='middle' fill='white' font-family='Arial'%3EZ%3C/text%3E%3C/svg%3E">
-    {% endif %}
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
     <!-- Tailwind CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <!-- Font Awesome -->
