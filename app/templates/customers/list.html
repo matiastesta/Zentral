@@ -8,6 +8,16 @@
             <i data-kpi-toggle-icon class="fas fa-chevron-down"></i>
         </button>
     </div>
+    <script>
+        const TENANT_PREFIX = ((window.location && window.location.pathname || '').match(/^\/c\/[^\/]+/) || [''])[0];
+        function apiPath(p) {
+            const s = String(p || '');
+            if (!s.startsWith('/')) return s;
+            if (s.startsWith('/c/')) return s;
+            if (!TENANT_PREFIX) return s;
+            return TENANT_PREFIX + s;
+        }
+    </script>
     <p class="mt-1 text-sm text-gray-600">Centraliza la información de tus {{ label_customers|lower }} para mejorar el seguimiento y la fidelización.</p>
 </div>
 
@@ -757,7 +767,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function apiGetCrmConfig() {
-        return fetch('/customers/api/crm-config', { method: 'GET', credentials: 'same-origin' })
+        return fetch(apiPath('/customers/api/crm-config'), { method: 'GET', credentials: 'same-origin' })
             .then(r => r.json())
             .then(function (res) {
                 if (res && res.ok === true && res.item && typeof res.item === 'object') return res.item;
@@ -768,7 +778,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function apiSaveCrmConfig(cfg) {
         const payload = cfg && typeof cfg === 'object' ? cfg : readCrmFormValues();
-        return fetch('/customers/api/crm-config', {
+        return fetch(apiPath('/customers/api/crm-config'), {
             method: 'PUT',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
@@ -814,7 +824,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function apiSettleDebt(opts) {
         const payload = opts && typeof opts === 'object' ? opts : {};
-        return fetch('/sales/api/sales/settle', {
+        return fetch(apiPath('/sales/api/sales/settle'), {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
@@ -1142,7 +1152,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         try {
-            return fetch('/customers/api/customers?limit=5000', { credentials: 'same-origin' })
+            return fetch(apiPath('/customers/api/customers?limit=5000'), { credentials: 'same-origin' })
                 .then(function (r) {
                     if (!r || !r.ok) throw new Error('http_' + String(r ? r.status : '0'));
                     return r.json();
@@ -1188,7 +1198,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         try {
-            return fetch('/sales/api/sales?limit=2000&include_replaced=1', { credentials: 'same-origin' })
+            return fetch(apiPath('/sales/api/sales?limit=2000&include_replaced=1'), { credentials: 'same-origin' })
                 .then(function (r) {
                     if (!r || !r.ok) throw new Error('http_' + String(r ? r.status : '0'));
                     return r.json();
@@ -1400,7 +1410,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         doConfirm().then(function (ok) {
             if (!ok) return;
-            fetch('/customers/api/customers/' + encodeURIComponent(cid), {
+            fetch(apiPath('/customers/api/customers/' + encodeURIComponent(cid)), {
                 method: 'DELETE',
                 credentials: 'same-origin'
             }).then(r => r.json()).then(function (res) {
@@ -1508,37 +1518,33 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         } catch (e) {
         }
-        const cRes = readCustomers();
-        const sRes = readSales();
-
-        const apply = function (customers, sales) {
-            cacheCustomers = dedupeCustomers(customers);
-            cacheSales = ensureArray(sales);
-            render();
-        };
-
-        if (isPromise(cRes) || isPromise(sRes)) {
-            Promise.all([Promise.resolve(cRes), Promise.resolve(sRes)])
-                .then(function (arr) {
-                    apply(arr[0], arr[1]);
-                })
-                .catch(function () {
-                    try {
-                        cacheCustomers = [];
-                        cacheSales = [];
+        Promise.resolve(readCustomers())
+            .then(function (customers) {
+                cacheCustomers = dedupeCustomers(customers);
+                cacheSales = [];
+                render();
+                return Promise.resolve(readSales())
+                    .then(function (sales) {
+                        cacheSales = ensureArray(sales);
                         render();
-                    } catch (e) {
+                    })
+                    .catch(function () {
+                    });
+            })
+            .catch(function () {
+                try {
+                    cacheCustomers = [];
+                    cacheSales = [];
+                    render();
+                } catch (e) {
+                }
+                try {
+                    if (tbody) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">No se pudieron cargar los datos.</td></tr>';
                     }
-                    try {
-                        if (tbody) {
-                            tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">No se pudieron cargar los datos.</td></tr>';
-                        }
-                    } catch (e) {
-                    }
-                });
-        } else {
-            apply(cRes, sRes);
-        }
+                } catch (e) {
+                }
+            });
     }
 
     function clearForm() {
@@ -1597,7 +1603,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         const isEditing = !!editingCustomerId;
-        const url = isEditing ? ('/customers/api/customers/' + encodeURIComponent(editingCustomerId)) : '/customers/api/customers';
+        const url = isEditing ? apiPath('/customers/api/customers/' + encodeURIComponent(editingCustomerId)) : apiPath('/customers/api/customers');
         const method = isEditing ? 'PUT' : 'POST';
 
         fetch(url, {
