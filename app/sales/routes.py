@@ -6,7 +6,7 @@ import uuid
 from flask import current_app, g, jsonify, render_template, request, url_for
 from flask_login import login_required
 
-from sqlalchemy import inspect, text
+from sqlalchemy import func, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
@@ -71,6 +71,153 @@ def _ensure_sale_employee_columns() -> None:
                 conn.execute(text(sql))
     except Exception:
         current_app.logger.exception('Failed to ensure sale employee columns')
+
+
+def _ensure_sale_ticket_numbering() -> None:
+    try:
+        engine = db.engine
+        insp = inspect(engine)
+        if 'sale' not in set(insp.get_table_names() or []):
+            return
+
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('sale') or [])}
+        stmts = []
+        if 'ticket_number' not in cols:
+            if str(engine.url.drivername).startswith('sqlite'):
+                stmts.append('ALTER TABLE sale ADD COLUMN ticket_number INTEGER')
+            else:
+                stmts.append('ALTER TABLE sale ADD COLUMN IF NOT EXISTS ticket_number INTEGER')
+
+        idx_sql = 'CREATE UNIQUE INDEX IF NOT EXISTS uq_sale_company_ticket_number ON sale (company_id, ticket_number)'
+
+        with engine.begin() as conn:
+            for sql in stmts:
+                try:
+                    conn.execute(text(sql))
+                except Exception:
+                    continue
+            try:
+                conn.execute(text(idx_sql))
+            except Exception:
+                pass
+
+        try:
+            # Limpiar tickets no numéricos (ej: AJMV-..., AJOP-...) para que no contaminen la secuencia.
+            invalid = (
+                db.session.query(Sale)
+                .filter(Sale.ticket_number.isnot(None))
+                .filter(~Sale.ticket.like('#%'))
+                .limit(5000)
+                .all()
+            )
+            touched = False
+            for r in (invalid or []):
+                r.ticket_number = None
+                touched = True
+
+            # Backfill SOLO para tickets de venta/cobro con formato '#0001' (no '#C0001').
+            missing = (
+                db.session.query(Sale)
+                .filter(Sale.ticket_number.is_(None))
+                .filter(Sale.ticket.like('#%'))
+                .limit(5000)
+                .all()
+            )
+            for r in (missing or []):
+                tk = str(getattr(r, 'ticket', '') or '').strip()
+                if not tk.startswith('#') or tk.startswith('#C'):
+                    continue
+                digits = ''.join([ch for ch in tk[1:] if ch.isdigit()])
+                if not digits:
+                    continue
+                try:
+                    r.ticket_number = int(digits)
+                    touched = True
+                except Exception:
+                    continue
+
+            if touched:
+                db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+    except Exception:
+        current_app.logger.exception('Failed to ensure sale ticket numbering')
+
+
+def _next_ticket_number(cid: str) -> int:
+    company_id = str(cid or '').strip()
+    if not company_id:
+        return 1
+    try:
+        mx = (
+            db.session.query(func.max(Sale.ticket_number))
+            .filter(Sale.company_id == company_id)
+            .scalar()
+        )
+        n = int(mx or 0)
+        if n > 0:
+            return n + 1
+    except Exception:
+        pass
+
+    try:
+        rows = db.session.query(Sale.ticket).filter(Sale.company_id == company_id).filter(Sale.ticket.like('#%')).all()
+        max_n = 0
+        for (t,) in (rows or []):
+            s = str(t or '').strip()
+            if not s.startswith('#') or s.startswith('#C'):
+                continue
+            digits = ''.join([ch for ch in s[1:] if ch.isdigit()])
+            if not digits:
+                continue
+            try:
+                max_n = max(max_n, int(digits))
+            except Exception:
+                continue
+        return max_n + 1 if max_n > 0 else 1
+    except Exception:
+        return 1
+
+
+def _format_ticket_number(n: int, prefix: str = '') -> str:
+    try:
+        num = int(n or 0)
+    except Exception:
+        num = 0
+    if num < 0:
+        num = 0
+    return '#' + str(prefix or '') + str(num).zfill(4)
+
+
+def _next_change_number(cid: str) -> int:
+    company_id = str(cid or '').strip()
+    if not company_id:
+        return 1
+    try:
+        rows = (
+            db.session.query(Sale.ticket)
+            .filter(Sale.company_id == company_id)
+            .filter(Sale.ticket.like('#C%'))
+            .all()
+        )
+        max_n = 0
+        for (t,) in (rows or []):
+            s = str(t or '').strip()
+            if not s.startswith('#C'):
+                continue
+            digits = ''.join([ch for ch in s[2:] if ch.isdigit()])
+            if not digits:
+                continue
+            try:
+                max_n = max(max_n, int(digits))
+            except Exception:
+                continue
+        return max_n + 1 if max_n > 0 else 1
+    except Exception:
+        return 1
 
 
 def _resolve_employee_fields(*, cid: str, employee_id: str | None, employee_name: str | None):
@@ -284,6 +431,7 @@ def _serialize_sale(row: Sale, related: dict = None):
     return {
         'id': row.id,
         'ticket': row.ticket,
+        'ticket_number': getattr(row, 'ticket_number', None) or None,
         'fecha': row.sale_date.isoformat() if row.sale_date else '',
         'type': row.sale_type,
         'status': row.status,
@@ -764,6 +912,12 @@ def overdue_customers_count():
             uniq.add(key)
 
     return jsonify({'ok': True, 'count': len(uniq)}), 200
+
+
+@bp.post('/api/sales/settle')
+@login_required
+@module_required('sales')
+def settle_cc_sale():
     payload = request.get_json(silent=True) or {}
     sale_id = payload.get('sale_id')
     ticket = str(payload.get('ticket') or '').strip()
@@ -773,6 +927,9 @@ def overdue_customers_count():
     cid = _company_id()
     if not cid:
         return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    _ensure_sale_employee_columns()
+    _ensure_sale_ticket_numbering()
 
     raw_emp_id = str(payload.get('employee_id') or '').strip() or None
     raw_emp_name = str(payload.get('employee_name') or '').strip() or None
@@ -812,70 +969,62 @@ def overdue_customers_count():
         return jsonify({'ok': False, 'error': 'amount_exceeds_due'}), 400
 
     settle_date = dt_date.today()
-    payment_ticket = _tmp_ticket('P')
+    base_n = _next_ticket_number(cid)
     ref = str(row.ticket or '').strip()
     note = f"Cobro cuenta corriente (Ticket {ref})"
 
-    payment_sale = Sale(
-        ticket=payment_ticket,
-        company_id=cid,
-        sale_date=settle_date,
-        sale_type='CobroCC',
-        status='Completada',
-        payment_method=payment_method,
-        notes=note,
-        total=abs(pay_amount),
-        discount_general_pct=0.0,
-        discount_general_amount=0.0,
-        on_account=False,
-        paid_amount=abs(pay_amount),
-        due_amount=0.0,
-        customer_id=row.customer_id,
-        customer_name=row.customer_name,
-        employee_id=getattr(row, 'employee_id', None),
-        employee_name=getattr(row, 'employee_name', None),
-        exchange_return_total=None,
-        exchange_new_total=None,
-    )
-    try:
-        from flask_login import current_user
-        uid = int(getattr(current_user, 'id', 0) or 0) or None
-        payment_sale.created_by_user_id = uid
-    except Exception:
-        current_app.logger.exception('Failed to set created_by_user_id for payment sale')
-        payment_sale.created_by_user_id = None
-
-    row.paid_amount = float(row.paid_amount or 0.0) + abs(pay_amount)
-    remaining = abs(due) - abs(pay_amount)
-    row.due_amount = float(remaining if remaining > 0.00001 else 0.0)
-    row.on_account = bool(row.due_amount > 0)
-    db.session.add(payment_sale)
-    try:
-        db.session.flush()
-        try:
-            payment_sale.ticket = _ticket_from_sale_id(int(getattr(payment_sale, 'id', 0) or 0))
-        except Exception:
-            payment_sale.ticket = _ticket_from_sale_id(0)
-
-        final_payment_ticket = str(getattr(payment_sale, 'ticket', '') or '').strip() or payment_ticket
-        extra = (
-            f"CC cobrada parcialmente por {final_payment_ticket} ({payment_method})"
-            if row.on_account
-            else f"CC saldada por {final_payment_ticket} ({payment_method})"
+    attempts = 0
+    while attempts < 10:
+        n = base_n + attempts
+        attempts += 1
+        payment_ticket = _format_ticket_number(n)
+        payment_sale = Sale(
+            ticket=payment_ticket,
+            ticket_number=n,
+            company_id=cid,
+            sale_date=settle_date,
+            sale_type='CobroCC',
+            status='Completada',
+            payment_method=payment_method,
+            notes=note,
+            total=abs(pay_amount),
+            discount_general_pct=0.0,
+            discount_general_amount=0.0,
+            on_account=False,
+            paid_amount=abs(pay_amount),
+            due_amount=0.0,
+            customer_id=row.customer_id,
+            customer_name=row.customer_name,
+            employee_id=emp_id,
+            employee_name=emp_name,
+            exchange_return_total=None,
+            exchange_new_total=None,
         )
-        prev = str(row.notes or '').strip()
-        row.notes = (prev + ('\n' if prev else '') + extra) if extra else (prev or None)
+        try:
+            from flask_login import current_user
+            uid = int(getattr(current_user, 'id', 0) or 0) or None
+            payment_sale.created_by_user_id = uid
+        except Exception:
+            current_app.logger.exception('Failed to set created_by_user_id for payment sale')
+            payment_sale.created_by_user_id = None
 
-        db.session.commit()
-    except IntegrityError:
-        db.session.rollback()
-        return jsonify({'ok': False, 'error': 'ticket_duplicate', 'message': 'No se pudo registrar el cobro: ticket duplicado.'}), 400
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception('Failed to commit payment sale')
-        return jsonify({'ok': False, 'error': 'db_error'}), 400
+        row.paid_amount = float(row.paid_amount or 0.0) + abs(pay_amount)
+        remaining = abs(due) - abs(pay_amount)
+        row.due_amount = float(remaining if remaining > 0.00001 else 0.0)
+        row.on_account = bool(row.due_amount > 0)
+        db.session.add(payment_sale)
+        try:
+            db.session.commit()
+            return jsonify({'ok': True, 'item': _serialize_sale(row), 'payment': _serialize_sale(payment_sale)})
+        except IntegrityError:
+            db.session.rollback()
+            continue
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception('Failed to commit payment sale')
+            return jsonify({'ok': False, 'error': 'db_error'}), 400
 
-    return jsonify({'ok': True, 'item': _serialize_sale(row), 'payment': _serialize_sale(payment_sale)})
+    return jsonify({'ok': False, 'error': 'ticket_duplicate', 'message': 'No se pudo registrar el cobro: ticket duplicado.'}), 400
 
 
 @bp.post('/api/exchanges')
@@ -891,6 +1040,8 @@ def create_exchange():
     cid = _company_id()
     if not cid:
         return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    _ensure_sale_ticket_numbering()
 
     raw_emp_id = str(payload.get('employee_id') or '').strip() or None
     raw_emp_name = str(payload.get('employee_name') or '').strip() or None
@@ -946,10 +1097,18 @@ def create_exchange():
     is_gift = bool(payload.get('is_gift'))
     gift_code = str(payload.get('gift_code') or '').strip() or None
 
+    base_change_n = _next_change_number(cid)
+    base_sale_n = _next_ticket_number(cid)
+
     # En una transacción: registrar 2 movimientos (Devolución + Venta)
-    try:
-        return_ticket = _tmp_ticket('C')
-        sale_ticket = _tmp_ticket('V')
+    attempts = 0
+    while attempts < 10:
+        change_n = base_change_n + attempts
+        sale_n = base_sale_n + attempts
+        attempts += 1
+
+        return_ticket = _format_ticket_number(change_n, 'C')
+        sale_ticket = _format_ticket_number(sale_n)
 
         base_notes = notes
         rel_return = f"Relacionado a venta {sale_ticket}"
@@ -959,6 +1118,7 @@ def create_exchange():
 
         return_row = Sale(
             ticket=return_ticket,
+            ticket_number=None,
             company_id=cid,
             sale_date=sale_date,
             sale_type='Cambio',
@@ -979,7 +1139,6 @@ def create_exchange():
             exchange_new_total=new_total,
         )
 
-        # Para la venta: el cliente "paga" con el crédito de la devolución + el pago real.
         paid_cash = paid_amount
         credit = min(float(return_total or 0.0), float(new_total or 0.0))
         paid_for_sale = max(0.0, min(float(new_total or 0.0), float(credit) + float(paid_cash)))
@@ -987,6 +1146,7 @@ def create_exchange():
 
         sale_row = Sale(
             ticket=sale_ticket,
+            ticket_number=sale_n,
             company_id=cid,
             sale_date=sale_date,
             sale_type='Venta',
@@ -1025,36 +1185,6 @@ def create_exchange():
         except Exception:
             current_app.logger.exception('Failed to apply gift_code for sale (exchange flow)')
 
-        db.session.add(return_row)
-        db.session.add(sale_row)
-        db.session.flush()
-
-        # Reemplazar tickets por formato final basado en IDs (único global)
-        try:
-            return_row.ticket = _exchange_ticket_from_sale_id(int(getattr(return_row, 'id', 0) or 0))
-        except Exception:
-            return_row.ticket = _exchange_ticket_from_sale_id(0)
-        try:
-            sale_row.ticket = _ticket_from_sale_id(int(getattr(sale_row, 'id', 0) or 0))
-        except Exception:
-            sale_row.ticket = _ticket_from_sale_id(0)
-
-        try:
-            rn = str(getattr(return_row, 'notes', '') or '')
-            sn = str(getattr(sale_row, 'notes', '') or '')
-            if rn and sale_ticket:
-                rn2 = rn.replace(f"Relacionado a venta {sale_ticket}", f"Relacionado a venta {sale_row.ticket}")
-                if rn2 == rn:
-                    rn2 = re.sub(r"(Relacionado\s+a\s+venta\s+)[^\n\r]+", r"\1" + str(sale_row.ticket), rn, flags=re.IGNORECASE)
-                return_row.notes = rn2
-            if sn and return_ticket:
-                sn2 = sn.replace(f"Relacionado a cambio {return_ticket}", f"Relacionado a cambio {return_row.ticket}")
-                if sn2 == sn:
-                    sn2 = re.sub(r"(Relacionado\s+a\s+cambio\s+)[^\n\r]+", r"\1" + str(return_row.ticket), sn, flags=re.IGNORECASE)
-                sale_row.notes = sn2
-        except Exception:
-            current_app.logger.exception('Failed to rewrite exchange notes with final tickets')
-
         for it in return_items_list:
             d = it if isinstance(it, dict) else {}
             return_row.items.append(SaleItem(
@@ -1079,31 +1209,36 @@ def create_exchange():
                 subtotal=_num(d.get('subtotal')),
             ))
 
-        _apply_inventory_for_sale(sale_ticket=return_row.ticket, sale_date=sale_date, items=return_items_inv)
-        _apply_inventory_for_sale(sale_ticket=sale_row.ticket, sale_date=sale_date, items=new_items_inv)
+        db.session.add(return_row)
+        db.session.add(sale_row)
+        try:
+            db.session.flush()
+            _apply_inventory_for_sale(sale_ticket=return_row.ticket, sale_date=sale_date, items=return_items_inv)
+            _apply_inventory_for_sale(sale_ticket=sale_row.ticket, sale_date=sale_date, items=new_items_inv)
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            continue
+        except ValueError as e:
+            db.session.rollback()
+            current_app.logger.exception('Failed to create exchange: stock insufficient')
+            return jsonify({'ok': False, 'error': 'stock_insufficient', 'message': str(e)}), 400
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception('Failed to create exchange: db error')
+            return jsonify({'ok': False, 'error': 'db_error'}), 400
 
-        db.session.commit()
-    except IntegrityError:
-        db.session.rollback()
-        return jsonify({'ok': False, 'error': 'ticket_duplicate', 'message': 'No se pudo registrar el cambio: ticket duplicado.'}), 400
-    except ValueError as e:
-        db.session.rollback()
-        current_app.logger.exception('Failed to create exchange: stock insufficient')
-        return jsonify({'ok': False, 'error': 'stock_insufficient', 'message': str(e)}), 400
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception('Failed to create exchange: db error')
-        return jsonify({'ok': False, 'error': 'db_error'}), 400
+        return jsonify({
+            'ok': True,
+            'return_ticket': return_row.ticket,
+            'new_ticket': sale_row.ticket,
+            'items': {
+                'return': _serialize_sale(return_row),
+                'sale': _serialize_sale(sale_row),
+            }
+        })
 
-    return jsonify({
-        'ok': True,
-        'return_ticket': return_row.ticket,
-        'new_ticket': sale_row.ticket,
-        'items': {
-            'return': _serialize_sale(return_row),
-            'sale': _serialize_sale(sale_row),
-        }
-    })
+    return jsonify({'ok': False, 'error': 'ticket_duplicate', 'message': 'No se pudo registrar el cambio: ticket duplicado.'}), 400
 
 
 def _next_ticket():
@@ -1334,93 +1469,92 @@ def create_sale():
     if not cid:
         return jsonify({'ok': False, 'error': 'no_company'}), 400
 
+    _ensure_sale_ticket_numbering()
+
     raw_emp_id = str(payload.get('employee_id') or '').strip() or None
     raw_emp_name = str(payload.get('employee_name') or '').strip() or None
     emp_id, emp_name = _resolve_employee_fields(cid=cid, employee_id=raw_emp_id, employee_name=raw_emp_name)
 
-    row = Sale(
-        ticket=_tmp_ticket('V'),
-        company_id=cid,
-        sale_date=sale_date,
-        sale_type=sale_type,
-        status=status,
-        payment_method=payment_method,
-        notes=str(payload.get('notes') or '').strip() or None,
-        total=_num(payload.get('total')),
-        discount_general_pct=_num(payload.get('discount_general_pct')),
-        discount_general_amount=_num(payload.get('discount_general_amount')),
-        on_account=bool(payload.get('on_account')),
-        paid_amount=_num(payload.get('paid_amount')),
-        due_amount=_num(payload.get('due_amount')),
-        customer_id=str(payload.get('customer_id') or '').strip() or None,
-        customer_name=str(payload.get('customer_name') or '').strip() or None,
-        employee_id=emp_id,
-        employee_name=emp_name,
-        exchange_return_total=(None if payload.get('exchange_return_total') is None else _num(payload.get('exchange_return_total'))),
-        exchange_new_total=(None if payload.get('exchange_new_total') is None else _num(payload.get('exchange_new_total'))),
-    )
-    try:
-        from flask_login import current_user
-        row.created_by_user_id = int(getattr(current_user, 'id', 0) or 0) or None
-    except Exception:
-        current_app.logger.exception('Failed to set created_by_user_id for sale')
-        row.created_by_user_id = None
-
-    items = payload.get('items')
-    items_list = items if isinstance(items, list) else []
-
-    is_gift = bool(payload.get('is_gift'))
-    gift_code = str(payload.get('gift_code') or '').strip() or None
-    try:
-        row.is_gift = is_gift
-        if is_gift and not gift_code:
-            gift_code = _make_gift_code(row.ticket, items_list)
-        row.gift_code = gift_code
-    except Exception:
-        current_app.logger.exception('Failed to apply gift_code for sale')
-
-    for it in items_list:
-        d = it if isinstance(it, dict) else {}
-        row.items.append(SaleItem(
-            direction=str(d.get('direction') or 'out').strip() or 'out',
-            product_id=str(d.get('product_id') or '').strip() or None,
-            product_name=str(d.get('nombre') or d.get('product_name') or 'Producto').strip() or 'Producto',
-            qty=_num(d.get('cantidad') if d.get('cantidad') is not None else d.get('qty')),
-            unit_price=_num(d.get('precio') if d.get('precio') is not None else d.get('unit_price')),
-            discount_pct=_num(d.get('descuento') if d.get('descuento') is not None else d.get('discount_pct')),
-            subtotal=_num(d.get('subtotal')),
-        ))
-
-    db.session.add(row)
-    try:
-        db.session.flush()
-
-        # Ticket final (único global por id de Sale)
+    attempts = 0
+    row = None
+    base_n = _next_ticket_number(cid)
+    while attempts < 5:
+        n = base_n + attempts
+        attempts += 1
+        tk = _format_ticket_number(n)
+        row = Sale(
+            ticket=tk,
+            ticket_number=n,
+            company_id=cid,
+            sale_date=sale_date,
+            sale_type=sale_type,
+            status=status,
+            payment_method=payment_method,
+            notes=str(payload.get('notes') or '').strip() or None,
+            total=_num(payload.get('total')),
+            discount_general_pct=_num(payload.get('discount_general_pct')),
+            discount_general_amount=_num(payload.get('discount_general_amount')),
+            on_account=bool(payload.get('on_account')),
+            paid_amount=_num(payload.get('paid_amount')),
+            due_amount=_num(payload.get('due_amount')),
+            customer_id=str(payload.get('customer_id') or '').strip() or None,
+            customer_name=str(payload.get('customer_name') or '').strip() or None,
+            employee_id=emp_id,
+            employee_name=emp_name,
+            exchange_return_total=(None if payload.get('exchange_return_total') is None else _num(payload.get('exchange_return_total'))),
+            exchange_new_total=(None if payload.get('exchange_new_total') is None else _num(payload.get('exchange_new_total'))),
+        )
         try:
-            row.ticket = _ticket_from_sale_id(int(getattr(row, 'id', 0) or 0))
+            from flask_login import current_user
+            row.created_by_user_id = int(getattr(current_user, 'id', 0) or 0) or None
         except Exception:
-            row.ticket = _ticket_from_sale_id(0)
+            current_app.logger.exception('Failed to set created_by_user_id for sale')
+            row.created_by_user_id = None
 
+        items = payload.get('items')
+        items_list = items if isinstance(items, list) else []
+
+        is_gift = bool(payload.get('is_gift'))
+        gift_code = str(payload.get('gift_code') or '').strip() or None
         try:
-            _apply_inventory_for_sale(sale_ticket=row.ticket, sale_date=sale_date, items=items_list)
-        except ValueError as e:
+            row.is_gift = is_gift
+            if is_gift and not gift_code:
+                gift_code = _make_gift_code(row.ticket, items_list)
+            row.gift_code = gift_code
+        except Exception:
+            current_app.logger.exception('Failed to apply gift_code for sale')
+
+        for it in items_list:
+            d = it if isinstance(it, dict) else {}
+            row.items.append(SaleItem(
+                direction=str(d.get('direction') or 'out').strip() or 'out',
+                product_id=str(d.get('product_id') or '').strip() or None,
+                product_name=str(d.get('nombre') or d.get('product_name') or 'Producto').strip() or 'Producto',
+                qty=_num(d.get('cantidad') if d.get('cantidad') is not None else d.get('qty')),
+                unit_price=_num(d.get('precio') if d.get('precio') is not None else d.get('unit_price')),
+                discount_pct=_num(d.get('descuento') if d.get('descuento') is not None else d.get('discount_pct')),
+                subtotal=_num(d.get('subtotal')),
+            ))
+
+        db.session.add(row)
+        try:
+            db.session.flush()
+            try:
+                _apply_inventory_for_sale(sale_ticket=row.ticket, sale_date=sale_date, items=items_list)
+            except ValueError as e:
+                db.session.rollback()
+                return jsonify({'ok': False, 'error': 'stock_insufficient', 'message': str(e)}), 400
+            db.session.commit()
+            return jsonify({'ok': True, 'item': _serialize_sale(row)})
+        except IntegrityError:
             db.session.rollback()
-            return jsonify({'ok': False, 'error': 'stock_insufficient', 'message': str(e)}), 400
+            continue
 
-        db.session.commit()
-    except IntegrityError:
-        db.session.rollback()
-        return jsonify({
-            'ok': False,
-            'error': 'ticket_duplicate',
-            'message': 'No se pudo registrar la venta: ticket duplicado.',
-        }), 400
-    except Exception as e:
-        current_app.logger.exception('Failed to create sale')
-        db.session.rollback()
-        return jsonify({'ok': False, 'error': 'db_error', 'message': str(e)}), 400
-
-    return jsonify({'ok': True, 'item': _serialize_sale(row)})
+    return jsonify({
+        'ok': False,
+        'error': 'ticket_duplicate',
+        'message': 'No se pudo registrar la venta: ticket duplicado.',
+    }), 400
 
 
 @bp.put('/api/sales/<ticket>')
@@ -1630,18 +1764,6 @@ def get_cash_count():
             'updated_at': row.updated_at.isoformat() if row.updated_at else None,
         }
     })
-
-
-@bp.post('/api/cash-count')
-@login_required
-@module_required('sales')
-def upsert_cash_count():
-    payload = request.get_json(silent=True) or {}
-    raw = str(payload.get('date') or '').strip()
-    try:
-        d = dt_date.fromisoformat(raw) if raw else dt_date.today()
-    except Exception:
-        d = dt_date.today()
 
     cid = _company_id()
     if not cid:

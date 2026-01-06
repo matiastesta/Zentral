@@ -182,6 +182,9 @@
                 <div class="p-3 border border-gray-200 rounded-xl bg-gray-50">
                     <div class="text-sm font-semibold text-gray-900">Clasificación de clientes</div>
                     <div class="mt-1 text-[11px] text-gray-500">Reglas basadas en compras recientes. El cliente “Mejor” siempre exige más compras que “Frecuente”.</div>
+                    <div class="mt-2 p-3 rounded-lg border border-amber-200 bg-amber-50 text-[11px] text-amber-900">
+                        La condición de Deudor / Deudor crítico tiene prioridad absoluta sobre las clasificaciones comerciales. Mientras exista deuda, el cliente será considerado deudor independientemente de sus compras.
+                    </div>
                     <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Ventana de compra (días)</label>
@@ -537,10 +540,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let clasTitle = 'Clasificación';
     let clasOpts = [
+        { k: 'deudor_critico', label: 'Deudor crítico' },
+        { k: 'deudor', label: 'Deudor' },
         { k: 'mejor_cliente', label: 'Mejor cliente' },
         { k: 'frecuente', label: 'Frecuente' },
         { k: 'inactivo', label: 'Inactivo' },
-        { k: 'deudor', label: 'Deudor' },
     ];
     const ccOpts = [
         { k: 'al_dia', label: 'Cuenta corriente al día' },
@@ -656,10 +660,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const debtor = safeStr(c.labels?.debtor || 'Deudor') || 'Deudor';
 
         const rows = [
-            { k: best, c1: '>= ' + safeStr(c.best_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'Sin CC vencida' },
-            { k: freq, c1: '>= ' + safeStr(c.freq_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'O con deuda sin vencer' },
-            { k: inactive, c1: 'No cumple Mejor/Frecuente', c2: 'Sin actividad reciente' },
-            { k: debtor, c1: 'CC vencida > ' + safeStr(c.debt_overdue_days) + ' días', c2: 'Crítica > ' + safeStr(c.debt_critical_days) + ' días' },
+            { k: debtor, c1: 'Con deuda (saldo > 0)', c2: 'Crítica si >= ' + safeStr(c.debt_critical_days) + ' días' },
+            { k: best, c1: '>= ' + safeStr(c.best_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'Sin deuda' },
+            { k: freq, c1: '>= ' + safeStr(c.freq_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'Sin deuda' },
+            { k: inactive, c1: 'No cumple Mejor/Frecuente', c2: 'Sin deuda y sin actividad reciente' },
         ];
 
         const html = [];
@@ -741,7 +745,7 @@ document.addEventListener('DOMContentLoaded', function () {
             debt_critical_days: 60,
             freq_min_purchases: 1,
             best_min_purchases: 2,
-            labels: { clas_title: 'Clasificación', best: 'Mejor cliente', freq: 'Frecuente', inactive: 'Inactivo', debtor: 'Deudor' }
+            labels: { clas_title: 'Clasificación', best: 'Mejor cliente', freq: 'Frecuente', inactive: 'Inactivo', debtor: 'Deudor', debtor_critical: 'Deudor crítico' }
         };
     }
 
@@ -752,6 +756,29 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function apiGetCrmConfig() {
+        return fetch('/customers/api/crm-config', { method: 'GET', credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(function (res) {
+                if (res && res.ok === true && res.item && typeof res.item === 'object') return res.item;
+                return null;
+            })
+            .catch(function () { return null; });
+    }
+
+    function apiSaveCrmConfig(cfg) {
+        const payload = cfg && typeof cfg === 'object' ? cfg : readCrmFormValues();
+        return fetch('/customers/api/crm-config', {
+            method: 'PUT',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(r => r.json()).then(function (res) {
+            if (res && res.ok === true && res.item && typeof res.item === 'object') return res.item;
+            return null;
+        }).catch(function () { return null; });
+    }
+
     let crmCfgCache = null;
     function getCrmCfg() {
         if (!crmCfgCache) crmCfgCache = readCrmConfig();
@@ -759,6 +786,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     function setCrmCfg(cfg) {
         crmCfgCache = cfg && typeof cfg === 'object' ? cfg : null;
+    }
+
+    function refreshCrmCfgFromApi() {
+        return apiGetCrmConfig().then(function (cfg) {
+            if (!cfg) return null;
+            try {
+                writeCrmConfig(cfg);
+            } catch (e) {
+            }
+            setCrmCfg(cfg);
+            applyCrmLabelsToUi(cfg);
+            return cfg;
+        });
     }
 
     function saveSales(list) {
@@ -977,10 +1017,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const title = safeStr(c.labels?.clas_title || 'Clasificación') || 'Clasificación';
         clasTitle = title;
         clasOpts = [
+            { k: 'deudor_critico', label: safeStr(c.labels?.debtor_critical || 'Deudor crítico') || 'Deudor crítico' },
+            { k: 'deudor', label: safeStr(c.labels?.debtor || 'Deudor') || 'Deudor' },
             { k: 'mejor_cliente', label: safeStr(c.labels?.best || 'Mejor cliente') || 'Mejor cliente' },
             { k: 'frecuente', label: safeStr(c.labels?.freq || 'Frecuente') || 'Frecuente' },
             { k: 'inactivo', label: safeStr(c.labels?.inactive || 'Inactivo') || 'Inactivo' },
-            { k: 'deudor', label: safeStr(c.labels?.debtor || 'Deudor') || 'Deudor' },
         ];
         try {
             const allowed = new Set(clasOpts.map(x => x.k));
@@ -1203,13 +1244,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const saldo = salesFor.reduce((acc, s) => acc + (parseFloat(s?.due_amount || 0) || 0), 0);
             const tieneCc = saldo > 0 || salesFor.some(s => !!s?.on_account);
-            const lastImpagoTs = salesFor.reduce((acc, s) => {
+            const oldestImpagoTs = salesFor.reduce((acc, s) => {
                 const due = parseFloat(s?.due_amount || 0) || 0;
                 if (due <= 0) return acc;
                 const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
-                return Math.max(acc, ts || 0);
+                if (!ts) return acc;
+                if (!acc) return ts;
+                return Math.min(acc, ts);
             }, 0);
-            const diasDeuda = saldo > 0 ? (daysSince(lastImpagoTs) ?? 0) : 0;
+            const diasDeuda = saldo > 0 ? (daysSince(oldestImpagoTs) ?? 0) : 0;
 
             const diasUltCompra = ultimaTs ? (daysSince(ultimaTs) ?? 0) : null;
             const recentPurchases = purchaseSales.filter(s => {
@@ -1218,14 +1261,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 return (nowTs - ts) <= winMs;
             }).length;
 
-            const isOverdue = (saldo > 0) && (diasDeuda > overdueDays);
-
             let clas = 'inactivo';
-            if (isOverdue) {
-                clas = 'deudor';
-            } else if (saldo > 0) {
-                // Tiene deuda pero no está vencida: se considera frecuente
-                clas = 'frecuente';
+            if (saldo > 0) {
+                clas = (diasDeuda >= criticalDays) ? 'deudor_critico' : 'deudor';
             } else if (recentPurchases >= bestMin) {
                 clas = 'mejor_cliente';
             } else if (recentPurchases >= freqMin) {
@@ -1234,7 +1272,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 clas = 'inactivo';
             }
 
-            const alert = isOverdue ? 'vencida' : '';
+            const alert = (saldo > 0 && diasDeuda >= criticalDays) ? 'vencida_critica' : ((saldo > 0 && diasDeuda >= overdueDays) ? 'vencida' : '');
 
             const ultimaCompraRaw = ultimaTs ? new Date(ultimaTs).toISOString().slice(0, 10) : '';
             const ultimaCompra = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function')
@@ -1332,6 +1370,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const lblFreq = safeStr(crm?.labels?.freq || 'Frecuente') || 'Frecuente';
         const lblInactive = safeStr(crm?.labels?.inactive || 'Inactivo') || 'Inactivo';
         const lblDebtor = safeStr(crm?.labels?.debtor || 'Deudor') || 'Deudor';
+        const lblDebtorCrit = safeStr(crm?.labels?.debtor_critical || 'Deudor crítico') || 'Deudor crítico';
+        if (cls === 'deudor_critico') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-600 text-white text-[11px] font-medium">' + lblDebtorCrit + '</span>';
         if (cls === 'deudor') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">' + lblDebtor + '</span>';
         if (cls === 'inactivo') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">' + lblInactive + '</span>';
         if (cls === 'mejor_cliente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium">' + lblBest + '</span>';
@@ -1380,8 +1420,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
         const criticalDays = Math.max(overdueDays, parseInt(crm?.debt_critical_days || 60, 10) || 60);
         const dias = (parseInt(c.dias_deuda || 0, 10) || 0);
-        if (dias > criticalDays) return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[11px] font-medium">Vencida crítica · ' + safeStr(dias) + 'd</span>';
-        if (dias > overdueDays) return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-medium">Vencida · ' + safeStr(dias) + 'd</span>';
+        if (dias >= criticalDays) return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[11px] font-medium">Vencida crítica · ' + safeStr(dias) + 'd</span>';
+        if (dias >= overdueDays) return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-medium">Vencida · ' + safeStr(dias) + 'd</span>';
         return '';
     }
 
@@ -1610,21 +1650,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (btnConfigAlertas) {
             btnConfigAlertas.addEventListener('click', function () {
-                const cfg = readCrmConfig();
-                setCrmCfg(cfg);
-                setCrmError('');
-                if (inputCrmRecentDays) inputCrmRecentDays.value = safeStr(cfg.recent_days);
-                if (inputCrmDebtOverdueDays) inputCrmDebtOverdueDays.value = safeStr(cfg.debt_overdue_days);
-                if (inputCrmDebtCriticalDays) inputCrmDebtCriticalDays.value = safeStr(cfg.debt_critical_days || Math.max(cfg.debt_overdue_days || 30, 60));
-                if (inputCrmFreqMin) inputCrmFreqMin.value = safeStr(cfg.freq_min_purchases);
-                if (inputCrmBestMin) inputCrmBestMin.value = safeStr(cfg.best_min_purchases);
-                if (inputCrmLabelClasTitle) inputCrmLabelClasTitle.value = safeStr(cfg.labels?.clas_title || 'Clasificación');
-                if (inputCrmLabelBest) inputCrmLabelBest.value = safeStr(cfg.labels?.best || 'Mejor cliente');
-                if (inputCrmLabelFreq) inputCrmLabelFreq.value = safeStr(cfg.labels?.freq || 'Frecuente');
-                if (inputCrmLabelInactive) inputCrmLabelInactive.value = safeStr(cfg.labels?.inactive || 'Inactivo');
-                if (inputCrmLabelDebtor) inputCrmLabelDebtor.value = safeStr(cfg.labels?.debtor || 'Deudor');
-                try { renderCrmPreview(readCrmFormValues()); } catch (e) { }
-                openModal(modalAlerts);
+                Promise.resolve(refreshCrmCfgFromApi()).then(function () {
+                    const cfg = getCrmCfg();
+                    setCrmError('');
+                    if (inputCrmRecentDays) inputCrmRecentDays.value = safeStr(cfg.recent_days);
+                    if (inputCrmDebtOverdueDays) inputCrmDebtOverdueDays.value = safeStr(cfg.debt_overdue_days);
+                    if (inputCrmDebtCriticalDays) inputCrmDebtCriticalDays.value = safeStr(cfg.debt_critical_days || Math.max(cfg.debt_overdue_days || 30, 60));
+                    if (inputCrmFreqMin) inputCrmFreqMin.value = safeStr(cfg.freq_min_purchases);
+                    if (inputCrmBestMin) inputCrmBestMin.value = safeStr(cfg.best_min_purchases);
+                    if (inputCrmLabelClasTitle) inputCrmLabelClasTitle.value = safeStr(cfg.labels?.clas_title || 'Clasificación');
+                    if (inputCrmLabelBest) inputCrmLabelBest.value = safeStr(cfg.labels?.best || 'Mejor cliente');
+                    if (inputCrmLabelFreq) inputCrmLabelFreq.value = safeStr(cfg.labels?.freq || 'Frecuente');
+                    if (inputCrmLabelInactive) inputCrmLabelInactive.value = safeStr(cfg.labels?.inactive || 'Inactivo');
+                    if (inputCrmLabelDebtor) inputCrmLabelDebtor.value = safeStr(cfg.labels?.debtor || 'Deudor');
+                    try { renderCrmPreview(readCrmFormValues()); } catch (e) { }
+                    openModal(modalAlerts);
+                });
             });
         }
         if (btnCloseAlerts) btnCloseAlerts.addEventListener('click', function () { closeModal(modalAlerts); });
@@ -1638,10 +1679,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
                 setCrmError('');
-                writeCrmConfig(cfg);
-                applyCrmLabelsToUi(cfg);
-                closeModal(modalAlerts);
-                render();
+                Promise.resolve(apiSaveCrmConfig(cfg)).then(function (saved) {
+                    const applied = saved && typeof saved === 'object' ? saved : cfg;
+                    writeCrmConfig(applied);
+                    applyCrmLabelsToUi(applied);
+                    closeModal(modalAlerts);
+                    render();
+                }).catch(function () {
+                    setCrmError('No se pudo guardar la configuración.');
+                });
             });
         }
 
@@ -1824,6 +1870,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     applyCrmLabelsToUi(readCrmConfig());
+    Promise.resolve(refreshCrmCfgFromApi()).then(function () {
+        render();
+    });
     initSorting();
     initActions();
     loadAll();

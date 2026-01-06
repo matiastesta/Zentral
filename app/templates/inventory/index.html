@@ -13,11 +13,8 @@
             <p class="mt-1 text-sm text-gray-600">Inventario es el único punto de entrada de stock. Cada alta de lote genera un egreso automático.</p>
         </div>
         <div class="flex gap-2 justify-end">
-            <button id="btn-create-inv" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">
-                <i class="fas fa-plus mr-2"></i> Crear ítem
-            </button>
-            <button id="btn-add-lot" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md border border-gray-200 bg-white hover:bg-gray-50">
-                <i class="fas fa-plus mr-2 text-gray-500"></i> Agregar lote
+            <button id="btn-register-inv" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">
+                <i class="fas fa-plus mr-2"></i> Registrar Inventario
             </button>
         </div>
     </div>
@@ -645,6 +642,7 @@
                             <tr>
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Producto</th>
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
+                                <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Costo unitario</th>
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Precio actual</th>
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Nuevo precio</th>
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
@@ -656,7 +654,7 @@
                             </tr>
                         </thead>
                         <tbody id="precios-tbody" class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>
+                            <tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -676,7 +674,7 @@
 <div id="modal-create-inv" class="hidden fixed inset-0 z-50">
     <div class="absolute inset-0 bg-black/40"></div>
     <div class="relative h-full w-full flex items-center justify-center p-4">
-        <div class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: calc(100vh - 2rem);">
+        <div id="create-inv-panel" class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: calc(100vh - 2rem);">
             <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
                 <div>
                     <h3 id="create-inv-title" class="text-base font-semibold text-gray-900">Crear ítem</h3>
@@ -686,6 +684,23 @@
             </div>
 
             <div id="create-inv-scroll" class="flex-1 min-h-0 overflow-y-auto">
+
+            <div id="create-choice" class="p-5">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <button id="btn-choice-product" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                        <div class="text-sm font-semibold text-gray-900">Crear ítem</div>
+                        <div class="mt-1 text-xs text-gray-500">Registrar un producto nuevo.</div>
+                    </button>
+                    <button id="btn-choice-lot" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                        <div class="text-sm font-semibold text-gray-900">Agregar lote</div>
+                        <div class="mt-1 text-xs text-gray-500">Ingresar stock a un producto existente.</div>
+                    </button>
+                    <button id="btn-choice-import" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
+                        <div class="text-sm font-semibold text-gray-900">Importar masivamente</div>
+                        <div class="mt-1 text-xs text-gray-500">Por Excel</div>
+                    </button>
+                </div>
+            </div>
 
             <div id="form-product" class="hidden p-5">
                 <div class="space-y-4">
@@ -720,13 +735,6 @@
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Unidad (otro)</label>
                                 <input id="prod-unit-other" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: caja">
                             </div>
-                            <div class="md:col-span-3">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>
-                                <label class="w-full h-10 inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-md bg-white cursor-pointer select-none">
-                                    <input id="prod-active" type="checkbox" class="rounded border-gray-300" checked>
-                                    <span id="prod-active-label" class="text-sm text-gray-700">Activo</span>
-                                </label>
-                            </div>
                             <div class="md:col-span-5">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Descripción</label>
                                 <textarea id="prod-desc" rows="1" class="w-full h-10 px-3 py-2 text-sm border rounded-md resize-none" placeholder="Opcional"></textarea>
@@ -741,10 +749,6 @@
                     <div id="prod-first-lot" class="space-y-2">
                         <div class="text-sm font-semibold text-gray-900">Agregar primer lote</div>
                         <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-                            <div class="md:col-span-3">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de ingreso</label>
-                                <input id="prod-lot-date" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" value="{{ now.strftime('%d/%m/%Y') }}" placeholder="dd/mm/aaaa" autocomplete="off">
-                            </div>
                             <div class="md:col-span-5">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor</label>
                                 <div class="relative">
@@ -755,7 +759,7 @@
                                     <button id="btn-select-supplier-prod-lot" type="button" class="w-full px-3 py-1.5 text-xs font-medium rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">Seleccionar</button>
                                 </div>
                             </div>
-                            <div class="md:col-span-2">
+                            <div class="md:col-span-3">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Costo unitario</label>
                                 <input id="prod-lot-cu" type="text" inputmode="decimal" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="$0" data-currency="ars">
                             </div>
@@ -809,21 +813,6 @@
                             <div class="text-sm font-semibold text-gray-900">Configuración de stock</div>
                             <div class="mt-2 grid grid-cols-1 md:grid-cols-12 gap-3">
                                 <div class="md:col-span-3">
-                                    <label class="block text-xs font-medium text-gray-600 mb-1">Maneja lotes</label>
-                                    <label class="w-full inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-md bg-white cursor-pointer select-none">
-                                        <input id="prod-lots" type="checkbox" class="rounded border-gray-300" checked>
-                                        <span id="prod-lots-label" class="text-sm text-gray-700">Sí</span>
-                                    </label>
-                                </div>
-                                <div class="md:col-span-3">
-                                    <label class="block text-xs font-medium text-gray-600 mb-1">Metodología</label>
-                                    <select id="prod-method" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                                        <option value="FIFO">PEPS</option>
-                                        <option value="Average">Costo promedio</option>
-                                    </select>
-                                    <div id="prod-method-lock-msg" class="hidden mt-1 text-[9px] leading-tight text-amber-700">La metodología no puede modificarse una vez que el producto tiene movimientos.</div>
-                                </div>
-                                <div class="md:col-span-3">
                                     <label class="block text-xs font-medium text-gray-600 mb-1">Stock mínimo</label>
                                     <input id="prod-min" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
                                     <div class="mt-1 text-[5px] leading-none text-gray-500" style="font-size:11px;line-height:1;">Alerta crítica.</div>
@@ -850,10 +839,6 @@
                         <select id="lot-product" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
                             <option value="">— Seleccionar —</option>
                         </select>
-                    </div>
-                    <div class="md:col-span-3">
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de ingreso</label>
-                        <input id="lot-date" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" value="{{ now.strftime('%d/%m/%Y') }}" placeholder="dd/mm/aaaa" autocomplete="off">
                     </div>
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor</label>
@@ -896,6 +881,205 @@
                 </div>
             </div>
 
+            <div id="form-import" class="hidden p-5">
+                <div class="space-y-4">
+                    <div class="rounded-xl border border-gray-200 bg-white p-4">
+                        <div class="text-sm font-semibold text-gray-900">Formato del Excel</div>
+                        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <div class="text-xs font-semibold text-gray-700">Columnas obligatorias</div>
+                                <div class="mt-2 text-xs text-gray-600 space-y-1">
+                                    <div>nombre</div>
+                                    <div>categoria</div>
+                                    <div>precio_lista</div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="text-xs font-semibold text-gray-700">Columnas opcionales</div>
+                                <div class="mt-2 text-xs text-gray-600 grid grid-cols-2 gap-x-6 gap-y-1">
+                                    <div>unidad</div>
+                                    <div>descripcion</div>
+                                    <div>costo_unitario</div>
+                                    <div>cantidad</div>
+                                    <div>proveedor</div>
+                                    <div>vencimiento</div>
+                                    <div>nota_lote</div>
+                                    <div>stock_minimo</div>
+                                    <div>punto_pedido</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-[11px] text-gray-500">Cada fila representa un ítem. Si hay cantidad, se crea un lote inicial.</div>
+                    </div>
+
+                    <div class="flex flex-col md:flex-row md:items-end gap-3">
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Archivo Excel (.xlsx)</label>
+                            <input id="import-file" type="file" accept=".xlsx" class="w-full text-sm" />
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="btn-download-import-template" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md border border-gray-200 bg-white hover:bg-gray-50">
+                                <i class="fas fa-download mr-2 text-gray-500"></i> Descargar plantilla
+                            </button>
+                            <button id="btn-run-import" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">
+                                <i class="fas fa-search mr-2"></i> Previsualizar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="import-result" class="hidden rounded-xl border border-gray-200 bg-white p-4"></div>
+                </div>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button id="btn-back-3" type="button" class="px-4 py-2 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50">Volver</button>
+                </div>
+            </div>
+
+            <div id="form-preview" class="hidden p-5">
+                <div class="space-y-4">
+                    <div class="rounded-xl border border-gray-200 bg-white p-4">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <div>
+                                <div class="text-sm font-semibold text-gray-900">Previsualizar importación</div>
+                                <div class="mt-1 text-[11px] text-gray-500">Editá y corregí antes de impactar datos.</div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button id="btn-preview-back" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md border border-gray-200 bg-white hover:bg-gray-50">Volver</button>
+                                <button id="btn-import-valid" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md border border-gray-200 bg-white hover:bg-gray-50">Importar solo válidas</button>
+                                <button id="btn-confirm-import" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">Confirmar importación</button>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 grid grid-cols-2 md:grid-cols-6 gap-2">
+                            <div class="rounded-lg border border-gray-200 p-3">
+                                <div class="text-xs text-gray-500">Filas detectadas</div>
+                                <div id="preview-count-total" class="text-lg font-semibold text-gray-900">0</div>
+                            </div>
+                            <div class="rounded-lg border border-gray-200 p-3">
+                                <div class="text-xs text-gray-500">Filas válidas</div>
+                                <div id="preview-count-valid" class="text-lg font-semibold text-gray-900">0</div>
+                            </div>
+                            <div class="rounded-lg border border-gray-200 p-3">
+                                <div class="text-xs text-gray-500">Filas con error</div>
+                                <div id="preview-count-errors" class="text-lg font-semibold text-gray-900">0</div>
+                            </div>
+                            <button id="preview-card-new-cats" type="button" class="rounded-lg border border-gray-200 p-3 text-left hover:bg-gray-50">
+                                <div class="text-xs text-gray-500">Categorías nuevas <span class="text-[11px] text-gray-400">· Click para desplegar</span></div>
+                                <div id="preview-count-new-cats" class="text-lg font-semibold text-gray-900">0</div>
+                            </button>
+                            <button id="preview-card-new-sups" type="button" class="rounded-lg border border-gray-200 p-3 text-left hover:bg-gray-50">
+                                <div class="text-xs text-gray-500">Proveedores nuevos <span class="text-[11px] text-gray-400">· Click para desplegar</span></div>
+                                <div id="preview-count-new-sups" class="text-lg font-semibold text-gray-900">0</div>
+                            </button>
+                            <div class="rounded-lg border border-gray-200 p-3">
+                                <div class="text-xs text-gray-500">Ítems ya existen</div>
+                                <div id="preview-count-exists" class="text-lg font-semibold text-gray-900">0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="preview-drilldown" class="hidden rounded-xl border border-gray-200 bg-white p-4">
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <div id="preview-drilldown-title" class="text-sm font-semibold text-gray-900">Detalle</div>
+                                <div class="mt-1 text-[11px] text-gray-500">Detectadas en el Excel (se crearán si no existen).</div>
+                            </div>
+                            <button id="btn-preview-drilldown-back" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md border border-gray-200 bg-white hover:bg-gray-50">Volver a la tabla</button>
+                        </div>
+                        <div class="mt-3 rounded-lg border border-gray-200 overflow-hidden">
+                            <div id="preview-drilldown-list" class="max-h-64 overflow-auto divide-y divide-gray-100"></div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                        <div class="overflow-x-auto overflow-y-auto" style="max-height: 55vh;">
+                            <table class="min-w-full divide-y divide-gray-200" style="min-width: 1350px;">
+                                <thead class="bg-gray-50 sticky top-0">
+                                    <tr>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:140px;">Fila</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:210px;">Nombre</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:160px;">Categoría</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:110px;">Unidad</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:115px;">Precio lista</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:220px;">Descripción</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:110px;">Cantidad</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:115px;">Costo unit.</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:180px;">Proveedor</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:140px;">Vencimiento</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:200px;">Nota lote</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:110px;">Stock mín.</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:120px;">Punto pedido</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:110px;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="preview-tbody" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="preview-result" class="hidden rounded-xl border border-gray-200 bg-white p-4"></div>
+                </div>
+            </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-import-confirm" class="hidden fixed inset-0 z-50" style="z-index: 80;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 id="import-confirm-title" class="text-base font-semibold text-gray-900">Confirmar importación</h3>
+                    <p id="import-confirm-subtitle" class="text-xs text-gray-500">Revisá el resumen antes de impactar datos.</p>
+                </div>
+                <button id="btn-close-import-confirm" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600" aria-label="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+                    <div class="rounded-xl border border-gray-200 p-3">
+                        <div class="text-xs text-gray-500">Ítems</div>
+                        <div id="import-confirm-items" class="text-lg font-semibold text-gray-900">0</div>
+                    </div>
+                    <div class="rounded-xl border border-gray-200 p-3">
+                        <div class="text-xs text-gray-500">Lotes</div>
+                        <div id="import-confirm-lots" class="text-lg font-semibold text-gray-900">0</div>
+                    </div>
+                    <div class="rounded-xl border border-gray-200 p-3">
+                        <div class="text-xs text-gray-500">Categorías nuevas</div>
+                        <div id="import-confirm-cats" class="text-lg font-semibold text-gray-900">0</div>
+                    </div>
+                    <div class="rounded-xl border border-gray-200 p-3">
+                        <div class="text-xs text-gray-500">Proveedores nuevos</div>
+                        <div id="import-confirm-sups" class="text-lg font-semibold text-gray-900">0</div>
+                    </div>
+                    <div class="rounded-xl border border-gray-200 p-3">
+                        <div class="text-xs text-gray-500">Filas</div>
+                        <div id="import-confirm-rows" class="text-lg font-semibold text-gray-900">0</div>
+                    </div>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div class="flex items-start gap-3">
+                        <div class="h-9 w-9 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="text-sm font-semibold text-gray-900">Qué va a pasar</div>
+                            <div id="import-confirm-note" class="mt-1 text-xs text-gray-600"></div>
+                            <div class="mt-2 text-[11px] text-gray-500">Esto registra inventario con “Ajuste interno” (no afecta caja).</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+                <button id="btn-cancel-import-confirm" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-ok-import-confirm" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">Confirmar importación</button>
             </div>
         </div>
     </div>
@@ -932,10 +1116,11 @@
 </div>
 
 <script id="inv-permissions" type="application/json">{{ {
-    'lot_adjust': (current_user.is_authenticated and current_user.can('inventario.ajuste_lote')),
+    'lot_adjust': (current_user.is_authenticated),
 } | tojson }}</script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const btnRegister = document.getElementById('btn-register-inv');
     const btnCreate = document.getElementById('btn-create-inv');
     const btnAddLot = document.getElementById('btn-add-lot');
     const btnPrecios = document.getElementById('btn-precios-inv');
@@ -963,18 +1148,60 @@ document.addEventListener('DOMContentLoaded', function () {
     const kpiAlertsHint = document.getElementById('kpi-alerts-hint');
 
     const modalCreate = document.getElementById('modal-create-inv');
+    const createInvPanel = document.getElementById('create-inv-panel');
     const btnCloseCreate = document.getElementById('btn-close-create-inv');
     const choiceWrap = document.getElementById('create-choice');
+
+    const modalImportConfirm = document.getElementById('modal-import-confirm');
+    const btnCloseImportConfirm = document.getElementById('btn-close-import-confirm');
+    const btnCancelImportConfirm = document.getElementById('btn-cancel-import-confirm');
+    const btnOkImportConfirm = document.getElementById('btn-ok-import-confirm');
+    const importConfirmTitle = document.getElementById('import-confirm-title');
+    const importConfirmSubtitle = document.getElementById('import-confirm-subtitle');
+    const importConfirmItems = document.getElementById('import-confirm-items');
+    const importConfirmLots = document.getElementById('import-confirm-lots');
+    const importConfirmCats = document.getElementById('import-confirm-cats');
+    const importConfirmSups = document.getElementById('import-confirm-sups');
+    const importConfirmRows = document.getElementById('import-confirm-rows');
+    const importConfirmNote = document.getElementById('import-confirm-note');
 
     const createInvTitle = document.getElementById('create-inv-title');
     const createInvSubtitle = document.getElementById('create-inv-subtitle');
     const formProduct = document.getElementById('form-product');
     const formLot = document.getElementById('form-lot');
+    const formImport = document.getElementById('form-import');
+    const formPreview = document.getElementById('form-preview');
     const btnChoiceProduct = document.getElementById('btn-choice-product');
     const btnChoiceLot = document.getElementById('btn-choice-lot');
+    const btnChoiceImport = document.getElementById('btn-choice-import');
     const btnBack1 = document.getElementById('btn-back-1');
     const btnBack2 = document.getElementById('btn-back-2');
+    const btnBack3 = document.getElementById('btn-back-3');
     const createInvScroll = document.getElementById('create-inv-scroll');
+
+    const importFile = document.getElementById('import-file');
+    const btnDownloadImportTemplate = document.getElementById('btn-download-import-template');
+    const btnRunImport = document.getElementById('btn-run-import');
+    const importResult = document.getElementById('import-result');
+
+    const btnPreviewBack = document.getElementById('btn-preview-back');
+    const btnImportValid = document.getElementById('btn-import-valid');
+    const btnConfirmImport = document.getElementById('btn-confirm-import');
+    const previewTbody = document.getElementById('preview-tbody');
+    const previewResult = document.getElementById('preview-result');
+
+    const previewCountTotal = document.getElementById('preview-count-total');
+    const previewCountValid = document.getElementById('preview-count-valid');
+    const previewCountErrors = document.getElementById('preview-count-errors');
+    const previewCountNewCats = document.getElementById('preview-count-new-cats');
+    const previewCountNewSups = document.getElementById('preview-count-new-sups');
+    const previewCountExists = document.getElementById('preview-count-exists');
+    const previewCardNewCats = document.getElementById('preview-card-new-cats');
+    const previewCardNewSups = document.getElementById('preview-card-new-sups');
+    const previewDrilldown = document.getElementById('preview-drilldown');
+    const previewDrilldownTitle = document.getElementById('preview-drilldown-title');
+    const previewDrilldownList = document.getElementById('preview-drilldown-list');
+    const btnPreviewDrilldownBack = document.getElementById('btn-preview-drilldown-back');
 
     const modalCreateCat = document.getElementById('modal-create-category');
     const btnOpenCreateCat = document.getElementById('btn-open-create-cat');
@@ -1045,6 +1272,30 @@ document.addEventListener('DOMContentLoaded', function () {
             if (prodLotExp) flatpickr(prodLotExp, commonOptsDmY);
         }
     } catch (e) {
+    }
+
+    function todayIso() {
+        try {
+            return new Date().toISOString().slice(0, 10);
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function todayDisplay() {
+        try {
+            if (window.formatFechaDisplay) return window.formatFechaDisplay(new Date());
+        } catch (e) {
+        }
+        try {
+            const d = new Date();
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yy = String(d.getFullYear());
+            return dd + '/' + mm + '/' + yy;
+        } catch (e) {
+            return '';
+        }
     }
 
     let editingLotId = '';
@@ -1254,10 +1505,10 @@ document.addEventListener('DOMContentLoaded', function () {
                  category_id: String(prodCatId?.value || ''),
                  unit_base: unitBase,
                  unit_other: unitOther,
-                 active: !!prodActive?.checked,
+                 active: true,
                  description: String(prodDesc?.value || ''),
-                 uses_lots: !!prodLots?.checked,
-                 method: String(prodMethod?.value || 'FIFO'),
+                 uses_lots: true,
+                 method: 'FIFO',
                  min_stock: String(prodMin?.value ?? ''),
                  reorder_point: String(prodReorder?.value ?? ''),
                  sale_price: String(prodSalePrice?.value ?? '')
@@ -1280,10 +1531,7 @@ document.addEventListener('DOMContentLoaded', function () {
              if (prodUnitOther && d.unit_other != null) prodUnitOther.value = String(d.unit_other || '');
              if (wrapProdUnit) wrapProdUnit.classList.toggle('hidden', String(prodUnit?.value || '') !== 'Otro');
 
-             if (prodActive && d.active != null) prodActive.checked = !!d.active;
              if (prodDesc && d.description != null) prodDesc.value = String(d.description || '');
-             if (prodLots && d.uses_lots != null) prodLots.checked = !!d.uses_lots;
-             if (prodMethod && d.method != null) prodMethod.value = String(d.method || 'FIFO') || 'FIFO';
              if (prodMin && d.min_stock != null) prodMin.value = String(d.min_stock ?? '');
              if (prodReorder && d.reorder_point != null) prodReorder.value = String(d.reorder_point ?? '');
              if (prodSalePrice && d.sale_price != null) prodSalePrice.value = formatMonedaARS(parseMonedaARS(d.sale_price));
@@ -1392,6 +1640,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (formLot) {
             formLot.classList.remove('hidden');
         }
+        if (formImport) formImport.classList.add('hidden');
+        if (formPreview) formPreview.classList.add('hidden');
         try {
             poblarProductosSelect();
             if (prefillLotProductId && lotProduct) {
@@ -1897,12 +2147,29 @@ document.addEventListener('DOMContentLoaded', function () {
         return Math.max(0, Math.round(n));
     }
 
-    function getDraft(pid, oldP) {
+    function getDraft(pid, oldP, unitCost) {
         const id = String(pid || '').trim();
         const base = roundPrecio(oldP);
         const d = preciosDraft.get(id);
         if (d && typeof d === 'object') return d;
-        return { newPrice: base, pct: 0, dirty: false };
+        const cost = parseNumeroSeguro(unitCost);
+        const pct = (isFinite(cost) && cost > 0) ? pctFromNewPrice(cost, base) : 0;
+        return { newPrice: base, pct: pct, dirty: false };
+    }
+
+    function unitCostForProduct(productId) {
+        const pid = String(productId || '').trim();
+        if (!pid) return 0;
+        try {
+            const lots = Array.isArray(cacheLots) ? cacheLots : [];
+            const rel = lots.filter(l => String(l?.product_id || '') === pid);
+            const stock = rel.reduce((acc, l) => acc + Math.max(0, parseNumeroSeguro(l?.qty_available)), 0);
+            const costSum = rel.reduce((acc, l) => acc + (Math.max(0, parseNumeroSeguro(l?.qty_available)) * Math.max(0, parseNumeroSeguro(l?.unit_cost))), 0);
+            const avg = stock > 0 ? (costSum / stock) : 0;
+            return isFinite(avg) ? avg : 0;
+        } catch (e) {
+            return 0;
+        }
     }
 
     function setDraft(pid, draft) {
@@ -1949,7 +2216,7 @@ document.addEventListener('DOMContentLoaded', function () {
         syncSaveButton();
         if (preciosMsg) preciosMsg.textContent = 'Guardá para aplicar los cambios.';
         if (!Array.isArray(cacheProducts) || !cacheProducts.length) {
-            if (preciosTbody) preciosTbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>';
+            if (preciosTbody) preciosTbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>';
             loadProductsLots(function (products, lots, movements) {
                 updateFilterOptions(products, lots);
                 renderKPIs(products, lots);
@@ -2739,10 +3006,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (prodFirstLot) prodFirstLot.classList.remove('hidden');
 
-        try {
-            if (prodLotDate && window.formatFechaDisplay) prodLotDate.value = window.formatFechaDisplay(new Date());
-        } catch (e) {
-        }
         if (prodLotSupplier) prodLotSupplier.value = '';
         if (prodLotSupplierId) prodLotSupplierId.value = '';
         if (prodLotCu) prodLotCu.value = '';
@@ -2788,8 +3051,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (choiceWrap) choiceWrap.classList.add('hidden');
         if (formProduct) formProduct.classList.add('hidden');
         if (formLot) formLot.classList.add('hidden');
+        if (formImport) formImport.classList.add('hidden');
+        if (formPreview) formPreview.classList.add('hidden');
         try { if (formProduct) formProduct.style.display = ''; } catch (e) { }
         try { if (formLot) formLot.style.display = ''; } catch (e) { }
+        try { if (formImport) formImport.style.display = ''; } catch (e) { }
+        try { if (formPreview) formPreview.style.display = ''; } catch (e) { }
     }
 
     function openEditProduct(productId) {
@@ -2807,6 +3074,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (choiceWrap) choiceWrap.classList.add('hidden');
         if (formProduct) formProduct.classList.remove('hidden');
         try { if (formLot) formLot.style.display = ''; } catch (e) { }
+        if (formImport) formImport.classList.add('hidden');
+        if (formPreview) formPreview.classList.add('hidden');
 
         if (prodFirstLot) prodFirstLot.classList.add('hidden');
 
@@ -2876,6 +3145,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (choiceWrap) choiceWrap.classList.add('hidden');
         if (formProduct) formProduct.classList.remove('hidden');
         try { if (formLot) formLot.style.display = ''; } catch (e) { }
+        if (formImport) formImport.classList.add('hidden');
+        if (formPreview) formPreview.classList.add('hidden');
 
         if (prodFirstLot) prodFirstLot.classList.remove('hidden');
         if (!didLoadCategories) {
@@ -2890,6 +3161,435 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function closeCreate() {
         abrirModal(modalCreate, false);
+    }
+
+    function resetImportState() {
+        try { previewRows = []; } catch (e) { }
+        try {
+            if (importFile) importFile.value = '';
+        } catch (e) {
+        }
+        try {
+            if (importResult) {
+                importResult.classList.add('hidden');
+                importResult.innerHTML = '';
+            }
+        } catch (e) {
+        }
+        try {
+            if (previewResult) {
+                previewResult.classList.add('hidden');
+                previewResult.innerHTML = '';
+            }
+        } catch (e) {
+        }
+    }
+
+    function openRegisterInventory() {
+        resetCreateModal();
+        abrirModal(modalCreate, true);
+        try { if (createInvScroll) createInvScroll.scrollTop = 0; } catch (e) { }
+        if (createInvTitle) createInvTitle.textContent = 'Registrar Inventario';
+        if (createInvSubtitle) createInvSubtitle.textContent = 'Elegí una opción.';
+        if (choiceWrap) choiceWrap.classList.remove('hidden');
+        if (formProduct) formProduct.classList.add('hidden');
+        if (formLot) formLot.classList.add('hidden');
+        if (formImport) formImport.classList.add('hidden');
+        if (formPreview) formPreview.classList.add('hidden');
+        try {
+            if (importFile) importFile.value = '';
+            if (importResult) {
+                importResult.classList.add('hidden');
+                importResult.innerHTML = '';
+            }
+        } catch (e) {
+        }
+    }
+
+    function openImportExcel() {
+        try {
+            if (createInvPanel) {
+                createInvPanel.classList.remove('max-w-6xl');
+                createInvPanel.classList.add('max-w-4xl');
+            }
+        } catch (e) { }
+        resetCreateModal();
+        abrirModal(modalCreate, true);
+        try { if (createInvScroll) createInvScroll.scrollTop = 0; } catch (e) { }
+        if (createInvTitle) createInvTitle.textContent = 'Importar inventario';
+        if (createInvSubtitle) createInvSubtitle.textContent = 'Importación masiva por Excel.';
+        if (choiceWrap) choiceWrap.classList.add('hidden');
+        if (formProduct) formProduct.classList.add('hidden');
+        if (formLot) formLot.classList.add('hidden');
+        if (formImport) formImport.classList.remove('hidden');
+        if (formPreview) formPreview.classList.add('hidden');
+        try {
+            if (importFile) importFile.value = '';
+            if (importResult) {
+                importResult.classList.add('hidden');
+                importResult.innerHTML = '';
+            }
+        } catch (e) {
+        }
+    }
+
+    function openPreviewScreen() {
+        try {
+            if (createInvPanel) {
+                createInvPanel.classList.remove('max-w-4xl');
+                createInvPanel.classList.add('max-w-6xl');
+            }
+        } catch (e) { }
+        if (choiceWrap) choiceWrap.classList.add('hidden');
+        if (formProduct) formProduct.classList.add('hidden');
+        if (formLot) formLot.classList.add('hidden');
+        if (formImport) formImport.classList.add('hidden');
+        if (formPreview) formPreview.classList.remove('hidden');
+        if (previewDrilldown) previewDrilldown.classList.add('hidden');
+        try { if (createInvScroll) createInvScroll.scrollTop = 0; } catch (e) { }
+    }
+
+    function openPreviewDrilldown(kind) {
+        const k = String(kind || '').trim();
+        if (!previewDrilldown || !previewDrilldownList) return;
+        const rows = (Array.isArray(previewRows) ? previewRows : []).filter(r => r && !r._deleted);
+
+        let title = 'Detalle';
+        let values = [];
+        if (k === 'cats') {
+            title = 'Categorías nuevas';
+            values = rows.filter(r => !!r.will_create_category).map(r => String(r.categoria || '').trim()).filter(Boolean);
+        } else if (k === 'sups') {
+            title = 'Proveedores nuevos';
+            values = rows.filter(r => !!r.will_create_supplier).map(r => String(r.proveedor || '').trim()).filter(Boolean);
+        }
+        const uniq = Array.from(new Set(values.map(v => v))).sort((a, b) => a.localeCompare(b));
+
+        if (previewDrilldownTitle) previewDrilldownTitle.textContent = title;
+        previewDrilldownList.innerHTML = '';
+        if (!uniq.length) {
+            previewDrilldownList.innerHTML = '<div class="px-3 py-3 text-sm text-gray-600">No hay elementos para mostrar.</div>';
+        } else {
+            uniq.forEach(function (name) {
+                const row = document.createElement('div');
+                row.className = 'px-3 py-3 text-sm text-gray-800 flex items-center justify-between';
+                row.innerHTML = '<div class="font-medium">' + esc(name) + '</div><div class="text-[11px] text-gray-500">Se creará</div>';
+                previewDrilldownList.appendChild(row);
+            });
+        }
+
+        if (previewDrilldown) previewDrilldown.classList.remove('hidden');
+        try {
+            const tableWrap = previewDrilldown.closest('#form-preview')?.querySelector('.rounded-xl.border.border-gray-200.bg-white.overflow-hidden');
+            if (tableWrap) tableWrap.classList.add('hidden');
+        } catch (e) { }
+        if (previewResult) previewResult.classList.add('hidden');
+        try { if (createInvScroll) createInvScroll.scrollTop = 0; } catch (e) { }
+    }
+
+    function closePreviewDrilldown() {
+        if (previewDrilldown) previewDrilldown.classList.add('hidden');
+        try {
+            const tableWrap = document.getElementById('form-preview')?.querySelector('.rounded-xl.border.border-gray-200.bg-white.overflow-hidden');
+            if (tableWrap) tableWrap.classList.remove('hidden');
+        } catch (e) { }
+        renderPreviewTable();
+        renderPreviewSummary();
+    }
+
+    function apiPreviewExcel(file) {
+        const fd = new FormData();
+        fd.append('file', file);
+        return fetch('/inventory/api/import-excel/preview', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: fd
+        }).then(r => r.json());
+    }
+
+    function apiCommitExcel(rows) {
+        return fetch('/inventory/api/import-excel/commit', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows: Array.isArray(rows) ? rows : [] })
+        }).then(r => r.json());
+    }
+
+    let previewRows = [];
+
+    function parseNumberRaw(raw) {
+        const s = String(raw ?? '').trim();
+        if (s === '') return { ok: true, value: null };
+        const v = Number(String(s).replace(',', '.'));
+        if (!isFinite(v)) return { ok: false, value: null };
+        return { ok: true, value: v };
+    }
+
+    let pendingImportConfirmRows = [];
+
+    function closeImportConfirm() {
+        abrirModal(modalImportConfirm, false);
+        pendingImportConfirmRows = [];
+    }
+
+    function countLotsFromRows(rows) {
+        const list = Array.isArray(rows) ? rows : [];
+        return list.filter(r => {
+            const n = parseNumberRaw(r?.cantidad);
+            return n.ok && (n.value || 0) > 0;
+        }).length;
+    }
+
+    function openImportConfirm(opts) {
+        const o = (opts && typeof opts === 'object') ? opts : {};
+        const rows = Array.isArray(o.rows) ? o.rows : [];
+        const mode = String(o.mode || '').trim() || 'all';
+        const totalAll = Math.max(0, parseInt(String(o.totalAll ?? rows.length), 10) || rows.length);
+        const skipped = Math.max(0, totalAll - rows.length);
+
+        const items = rows.length;
+        const lots = countLotsFromRows(rows);
+        const newCats = rows.filter(r => !!r?.will_create_category).length;
+        const newSups = rows.filter(r => !!r?.will_create_supplier).length;
+
+        if (importConfirmTitle) importConfirmTitle.textContent = 'Confirmar importación';
+        if (importConfirmSubtitle) importConfirmSubtitle.textContent = (mode === 'valid') ? 'Se importarán solo filas válidas.' : 'Se importarán todas las filas seleccionadas.';
+        if (importConfirmItems) importConfirmItems.textContent = String(items);
+        if (importConfirmLots) importConfirmLots.textContent = String(lots);
+        if (importConfirmCats) importConfirmCats.textContent = String(newCats);
+        if (importConfirmSups) importConfirmSups.textContent = String(newSups);
+        if (importConfirmRows) importConfirmRows.textContent = String(items);
+        if (importConfirmNote) {
+            let msg = '';
+            msg += 'Se crearán ' + String(items) + ' ítems';
+            msg += ' y ' + String(lots) + ' lotes.';
+            if (newCats > 0) msg += ' Categorías nuevas: ' + String(newCats) + '.';
+            if (newSups > 0) msg += ' Proveedores nuevos: ' + String(newSups) + '.';
+            if (mode === 'valid' && skipped > 0) msg += ' Filas descartadas: ' + String(skipped) + '.';
+            importConfirmNote.textContent = msg;
+        }
+
+        pendingImportConfirmRows = rows;
+        abrirModal(modalImportConfirm, true);
+    }
+
+    function isValidDateFlexible(raw) {
+        const s = String(raw ?? '').trim();
+        if (!s) return true;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return true;
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return true;
+        return false;
+    }
+
+    function validatePreviewRow(r) {
+        const d = r || {};
+        const errs = {};
+        const nombre = String(d.nombre ?? '').trim();
+        const categoria = String(d.categoria ?? '').trim();
+        const precio = parseNumberRaw(d.precio_lista);
+        const cantidad = parseNumberRaw(d.cantidad);
+        const cu = parseNumberRaw(d.costo_unitario);
+        const venc = String(d.vencimiento ?? '').trim();
+
+        if (!nombre) errs.nombre = 'Completá el nombre.';
+        if (!categoria) errs.categoria = 'Completá la categoría.';
+        if (!precio.ok) errs.precio_lista = 'Precio de lista debe ser numérico.';
+        else if ((precio.value ?? 0) < 0) errs.precio_lista = 'Precio de lista debe ser ≥ 0.';
+
+        if (!cantidad.ok) errs.cantidad = 'Cantidad debe ser numérica.';
+        else if ((cantidad.value ?? 0) < 0) errs.cantidad = 'Cantidad debe ser ≥ 0.';
+
+        if (!cu.ok) errs.costo_unitario = 'Costo unitario debe ser numérico.';
+        else if ((cu.value ?? 0) < 0) errs.costo_unitario = 'Costo unitario debe ser ≥ 0.';
+
+        if (!isValidDateFlexible(venc)) errs.vencimiento = 'Vencimiento inválido (usa dd/mm/aaaa o yyyy-mm-dd).';
+
+        r._errors = errs;
+        r._errorCount = Object.keys(errs).length;
+        r._isValid = r._errorCount === 0;
+        return r;
+    }
+
+    function validateAllPreviewRows() {
+        previewRows = (Array.isArray(previewRows) ? previewRows : []).map(function (r) {
+            if (r && r._deleted) return r;
+            return validatePreviewRow(r);
+        });
+    }
+
+    function setCellErrorUI(inputEl, msg) {
+        if (!inputEl) return;
+        const hasErr = !!msg;
+        inputEl.classList.toggle('border-red-300', hasErr);
+        inputEl.classList.toggle('ring-1', hasErr);
+        inputEl.classList.toggle('ring-red-200', hasErr);
+        inputEl.title = hasErr ? String(msg) : '';
+        try {
+            const icon = inputEl.parentElement ? inputEl.parentElement.querySelector('.cell-err-icon') : null;
+            if (icon) icon.classList.toggle('hidden', !hasErr);
+        } catch (e) {
+        }
+    }
+
+    function renderPreviewSummary() {
+        const rows = (Array.isArray(previewRows) ? previewRows : []).filter(r => r && !r._deleted);
+        const total = rows.length;
+        const errRows = rows.filter(r => (r._errorCount || 0) > 0).length;
+        const valid = total - errRows;
+        const newCats = rows.filter(r => !!r.will_create_category).length;
+        const newSups = rows.filter(r => !!r.will_create_supplier).length;
+        const exists = rows.filter(r => !!r.product_exists).length;
+
+        if (previewCountTotal) previewCountTotal.textContent = String(total);
+        if (previewCountValid) previewCountValid.textContent = String(valid);
+        if (previewCountErrors) previewCountErrors.textContent = String(errRows);
+        if (previewCountNewCats) previewCountNewCats.textContent = String(newCats);
+        if (previewCountNewSups) previewCountNewSups.textContent = String(newSups);
+        if (previewCountExists) previewCountExists.textContent = String(exists);
+
+        if (previewCardNewCats) {
+            previewCardNewCats.disabled = !(newCats > 0);
+            previewCardNewCats.classList.toggle('opacity-50', !(newCats > 0));
+            previewCardNewCats.classList.toggle('cursor-not-allowed', !(newCats > 0));
+        }
+        if (previewCardNewSups) {
+            previewCardNewSups.disabled = !(newSups > 0);
+            previewCardNewSups.classList.toggle('opacity-50', !(newSups > 0));
+            previewCardNewSups.classList.toggle('cursor-not-allowed', !(newSups > 0));
+        }
+
+        const canConfirm = errRows === 0 && total > 0;
+        if (btnConfirmImport) {
+            btnConfirmImport.disabled = !canConfirm;
+            btnConfirmImport.classList.toggle('opacity-50', !canConfirm);
+            btnConfirmImport.classList.toggle('cursor-not-allowed', !canConfirm);
+        }
+    }
+
+    function renderPreviewTable() {
+        if (!previewTbody) return;
+        const rows = Array.isArray(previewRows) ? previewRows : [];
+        previewTbody.innerHTML = '';
+        rows.forEach(function (r, idx) {
+            if (!r || r._deleted) return;
+            const tr = document.createElement('tr');
+            tr.className = 'align-top';
+            if ((r._errorCount || 0) > 0) tr.classList.add('bg-red-50');
+
+            const badge = function (txt, cls) {
+                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ' + cls + '">' + esc(txt) + '</span>';
+            };
+            const flags = [];
+            if (r.product_exists) flags.push(badge('Ya existe', 'bg-gray-100 text-gray-700'));
+            else flags.push(badge('Nuevo', 'bg-indigo-50 text-indigo-700'));
+
+            const td = function (html) {
+                const el = document.createElement('td');
+                el.className = 'px-3 py-2 text-sm text-gray-700 text-center align-top';
+                el.innerHTML = html;
+                return el;
+            };
+
+            const input = function (field, extraCls, placeholder) {
+                const v = String(r[field] ?? '');
+                const err = (r._errors && r._errors[field]) ? String(r._errors[field]) : '';
+                return ''
+                    + '<div class="relative">'
+                    + '<input data-row-idx="' + idx + '" data-field="' + esc(field) + '" value="' + esc(v) + '" placeholder="' + esc(placeholder || '') + '"'
+                    + ' class="w-full px-2 py-1.5 pr-8 text-sm border rounded-md text-center ' + (extraCls || '') + (err ? ' border-red-300 ring-1 ring-red-200' : ' border-gray-200') + '"'
+                    + ' title="' + esc(err || '') + '">'
+                    + '<span class="cell-err-icon pointer-events-none absolute inset-y-0 right-2 flex items-center text-red-500 ' + (err ? '' : 'hidden') + '"><i class="fas fa-exclamation-circle"></i></span>'
+                    + '</div>';
+            };
+
+            const cellCategory = function () {
+                const err = (r._errors && r._errors['categoria']) ? String(r._errors['categoria']) : '';
+                const isNew = !!r.will_create_category;
+                const extra = (isNew && !err) ? 'border-emerald-300 ring-1 ring-emerald-100 bg-emerald-50/40' : '';
+                return '<div class="space-y-1">'
+                    + input('categoria', extra, 'Categoría')
+                    + (isNew ? '<div class="text-[11px] text-emerald-700">Nueva</div>' : '')
+                    + '</div>';
+            };
+
+            const cellSupplier = function () {
+                const err = (r._errors && r._errors['proveedor']) ? String(r._errors['proveedor']) : '';
+                const isNew = !!r.will_create_supplier;
+                const extra = (isNew && !err) ? 'border-emerald-300 ring-1 ring-emerald-100 bg-emerald-50/40' : '';
+                return '<div class="space-y-1">'
+                    + input('proveedor', extra, '')
+                    + (isNew ? '<div class="text-[11px] text-emerald-700">Nuevo</div>' : '')
+                    + '</div>';
+            };
+
+            tr.appendChild(td('<div class="flex flex-col items-center gap-1">'
+                + '<div class="text-sm font-semibold text-gray-900">' + esc(r.row) + '</div>'
+                + '<div class="space-x-1">' + flags.join(' ') + '</div>'
+                + '<div class="text-[11px] text-gray-500">Err: ' + esc(r._errorCount || 0) + '</div>'
+                + '</div>'));
+            tr.appendChild(td(input('nombre', '', 'Nombre')));
+            tr.appendChild(td(cellCategory()));
+            tr.appendChild(td(input('unidad', '', 'Unidad')));
+            tr.appendChild(td(input('precio_lista', '', '0')));
+            tr.appendChild(td(input('descripcion', '', '')));
+            tr.appendChild(td(input('cantidad', '', '0')));
+            tr.appendChild(td(input('costo_unitario', '', '0')));
+            tr.appendChild(td(cellSupplier()));
+            tr.appendChild(td(input('vencimiento', '', 'dd/mm/aaaa')));
+            tr.appendChild(td(input('nota_lote', '', '')));
+            tr.appendChild(td(input('stock_minimo', '', '0')));
+            tr.appendChild(td(input('punto_pedido', '', '0')));
+            tr.appendChild(td('<button data-action="delete-row" data-row-idx="' + idx + '" type="button" class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50">Quitar</button>'));
+
+            previewTbody.appendChild(tr);
+        });
+
+        // Attach events
+        Array.from(previewTbody.querySelectorAll('input[data-row-idx][data-field]')).forEach(function (el) {
+            el.addEventListener('input', function () {
+                const ridx = parseInt(String(el.getAttribute('data-row-idx') || '0'), 10);
+                const field = String(el.getAttribute('data-field') || '').trim();
+                if (!isFinite(ridx) || !field) return;
+                const row = previewRows[ridx];
+                if (!row || row._deleted) return;
+                row[field] = String(el.value ?? '');
+                validatePreviewRow(row);
+                setCellErrorUI(el, row._errors ? row._errors[field] : '');
+                renderPreviewSummary();
+                // update row error counter
+                try {
+                    const firstTd = el.closest('tr')?.querySelector('td');
+                    const info = el.closest('tr')?.querySelector('td div.mt-1.text-\[11px\].text-gray-500');
+                    if (info) info.textContent = 'Errores: ' + String(row._errorCount || 0);
+                    if (el.closest('tr')) {
+                        el.closest('tr').classList.toggle('bg-red-50', (row._errorCount || 0) > 0);
+                    }
+                } catch (e) {
+                }
+            });
+        });
+
+        Array.from(previewTbody.querySelectorAll('button[data-action="delete-row"][data-row-idx]')).forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const ridx = parseInt(String(btn.getAttribute('data-row-idx') || '0'), 10);
+                const row = previewRows[ridx];
+                if (!row) return;
+                row._deleted = true;
+                renderPreviewTable();
+                renderPreviewSummary();
+            });
+        });
+    }
+
+    function apiImportExcel(file) {
+        const fd = new FormData();
+        fd.append('file', file);
+        return fetch('/inventory/api/import-excel', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: fd
+        }).then(r => r.json());
     }
 
     function openExport() {
@@ -3093,8 +3793,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(categoryLabel(p)) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + fmtNumero(m.stock) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(p.unit_name || '') + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-600 text-right">' + fmtMoneda(m.avg) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-600 text-right">' + fmtMoneda(m.total) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-600">' + fmtMoneda(m.avg) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-600">' + fmtMoneda(m.total) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + (p.description ? esc(p.description) : '—') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + statusBadgeHtml(m.status) + '</td>'
                 + '<td class="px-4 py-3 text-right relative">'
@@ -3149,8 +3849,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 const id = this.getAttribute('data-product-id') || '';
                 if (!id) return;
                 closeAllMenus();
-                prefillLotProductId = String(id);
-                openAddLot();
+
+                const confirmFn = (window.confirmModal && typeof window.confirmModal === 'function')
+                    ? window.confirmModal
+                    : function (m) { return Promise.resolve(window.confirm(m)); };
+
+                confirmFn('¿Querés agregar un lote a este producto?', 'Agregar lote', 'Se creará un nuevo lote.', { okText: 'Agregar', cancelText: 'Cancelar' })
+                    .then(function (ok) {
+                        if (!ok) return;
+                        prefillLotProductId = String(id);
+                        openAddLot();
+                    });
             });
         });
 
@@ -3225,7 +3934,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         apiHardDeleteProduct(id).then(function (res) {
                             if (!res || res.ok !== true) {
                                 const err = String(res?.error || '').trim();
-                                const msg = (err === 'not_found') ? 'El producto ya no existe.' : 'No se pudo eliminar el producto.';
+                                const msg = (err === 'not_found')
+                                    ? 'El producto ya no existe.'
+                                    : 'No se pudo eliminar el producto.';
                                 if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Operación fallida');
                                 else alert(msg);
                                 return;
@@ -3471,11 +4182,20 @@ document.addEventListener('DOMContentLoaded', function () {
         }).then(function (res) {
             if (!res || res.ok !== true) {
                 const err = String(res?.error || '').trim();
+                const det = String(res?.details || '').trim();
                 const msg = (err === 'qty_below_consumed')
                     ? 'La cantidad nueva no puede ser menor a lo consumido.'
-                    : (err === 'forbidden')
-                        ? 'No tenés permisos para ajustar lotes.'
-                        : 'No se pudo aplicar el ajuste.';
+                    : (err === 'qty_required')
+                        ? 'La cantidad debe ser mayor a 0.'
+                        : (err === 'unit_cost_invalid')
+                            ? 'El costo unitario no puede ser negativo.'
+                            : (err === 'no_company')
+                                ? 'Empresa no detectada. Reintentá recargando la página.'
+                                : (err === 'forbidden')
+                                    ? 'No tenés permisos para ajustar lotes.'
+                                    : (err === 'db_error')
+                                        ? ('No se pudo aplicar el ajuste.' + (det ? (' (' + det + ')') : ''))
+                                        : ('No se pudo aplicar el ajuste.' + (err ? (' (' + err + ')') : ''));
                 if (adjustLotMsg) adjustLotMsg.textContent = msg;
                 return;
             }
@@ -3651,7 +4371,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function newPriceFromPct(oldPrice, pct) {
-        const oldv = roundPrecio(oldPrice);
+        const oldv = parseNumeroSeguro(oldPrice);
         const pv = parseNumeroSeguro(pct);
         const factor = 1 + (pv / 100);
         const n = oldv * factor;
@@ -3659,7 +4379,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function pctFromNewPrice(oldPrice, newPrice) {
-        const oldv = roundPrecio(oldPrice);
+        const oldv = parseNumeroSeguro(oldPrice);
         const newv = roundPrecio(newPrice);
         if (!(oldv > 0)) return 0;
         const pct = ((newv - oldv) / oldv) * 100;
@@ -3674,7 +4394,9 @@ document.addEventListener('DOMContentLoaded', function () {
         products.forEach(p => {
             const oldP = parseNumeroSeguro(p?.sale_price);
             const base = roundPrecio(oldP);
-            const newP = newPriceFromPct(base, pv);
+            const unitCost = unitCostForProduct(p?.id);
+            if (!(unitCost > 0)) return;
+            const newP = newPriceFromPct(unitCost, pv);
             const dirty = Math.abs(newP - base) >= 1;
             setDraft(p?.id, { newPrice: newP, pct: pv, dirty });
         });
@@ -3711,7 +4433,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         if (!visible.length) {
-            preciosTbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">No hay productos para los filtros actuales.</td></tr>';
+            preciosTbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">No hay productos para los filtros actuales.</td></tr>';
             return;
         }
 
@@ -3719,20 +4441,24 @@ document.addEventListener('DOMContentLoaded', function () {
         visible.forEach(p => {
             const oldP = parseNumeroSeguro(p?.sale_price);
             const base = roundPrecio(oldP);
-            const draft = getDraft(p?.id, base);
+            const unitCost = unitCostForProduct(p?.id);
+            const hasCost = (isFinite(unitCost) && unitCost > 0);
+            const draft = getDraft(p?.id, base, unitCost);
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-gray-50';
             tr.setAttribute('data-product-id', String(p?.id || ''));
             tr.setAttribute('data-old-price', String(base));
+            tr.setAttribute('data-unit-cost', String(parseNumeroSeguro(unitCost)));
             tr.innerHTML = ''
                 + '<td class="px-4 py-3 text-sm text-gray-900">' + String(p?.name || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + String(p?.category?.name || p?.category || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + (hasCost ? formatMoneyARS0(unitCost) : '<span class="text-amber-700" title="Este producto no tiene costo cargado">—</span>') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoneyARS0(base) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right">'
-                +   '<input type="text" inputmode="numeric" class="w-32 px-2 py-1 border rounded-md text-right text-sm input-new-price" value="' + esc(formatMoneyARS0(draft?.newPrice ?? base)) + '">' 
+                +   '<input type="text" inputmode="numeric" class="w-32 px-2 py-1 border rounded-md text-right text-sm input-new-price' + (hasCost ? '' : ' bg-gray-50 cursor-not-allowed') + '" value="' + esc(formatMoneyARS0(draft?.newPrice ?? base)) + '"' + (hasCost ? '' : ' disabled title="Este producto no tiene costo cargado"') + '>' 
                 + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right">'
-                +   '<input type="number" step="0.01" class="w-24 px-2 py-1 border rounded-md text-right text-sm input-pct-change" value="' + esc(String(parseNumeroSeguro(draft?.pct ?? 0).toFixed(2))) + '">' 
+                +   '<input type="number" step="0.01" class="w-24 px-2 py-1 border rounded-md text-right text-sm input-pct-change' + (hasCost ? '' : ' bg-gray-50 cursor-not-allowed') + '" value="' + esc(String(parseNumeroSeguro(draft?.pct ?? 0).toFixed(2))) + '"' + (hasCost ? '' : ' disabled title="Este producto no tiene costo cargado"') + '>' 
                 + '</td>';
             preciosTbody.appendChild(tr);
 
@@ -3742,7 +4468,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const pid = String(p?.id || '').trim();
             const recalcDirty = function (newP) {
                 const dirty = Math.abs(roundPrecio(newP) - base) >= 1;
-                const d = getDraft(pid, base);
+                const d = getDraft(pid, base, unitCost);
                 d.dirty = dirty;
                 setDraft(pid, d);
                 setRowDirty(tr, dirty);
@@ -3751,16 +4477,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (input) {
                 input.addEventListener('focus', function () {
-                    const d = getDraft(pid, base);
+                    if (!hasCost) return;
+                    const d = getDraft(pid, base, unitCost);
                     input.value = String(roundPrecio(d?.newPrice ?? base));
                     try { input.select(); } catch (e) { }
                 });
 
                 input.addEventListener('input', function () {
+                    if (!hasCost) return;
                     const raw = parseMonedaARS(input.value);
                     const newP = roundPrecio(raw);
-                    const pct = pctFromNewPrice(base, newP);
-                    const d = getDraft(pid, base);
+                    const pct = pctFromNewPrice(unitCost, newP);
+                    const d = getDraft(pid, base, unitCost);
                     d.newPrice = newP;
                     d.pct = pct;
                     setDraft(pid, d);
@@ -3769,16 +4497,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
 
                 input.addEventListener('blur', function () {
-                    const d = getDraft(pid, base);
+                    const d = getDraft(pid, base, unitCost);
                     input.value = formatMoneyARS0(d?.newPrice ?? base);
                 });
             }
 
             if (pctInput) {
                 pctInput.addEventListener('input', function () {
+                    if (!hasCost) return;
                     const pv = parseNumeroSeguro(pctInput.value);
-                    const newP = newPriceFromPct(base, pv);
-                    const d = getDraft(pid, base);
+                    const newP = newPriceFromPct(unitCost, pv);
+                    const d = getDraft(pid, base, unitCost);
                     d.pct = pv;
                     d.newPrice = newP;
                     setDraft(pid, d);
@@ -3900,6 +4629,7 @@ document.addEventListener('DOMContentLoaded', function () {
         w.document.close();
     }
 
+    if (btnRegister) btnRegister.addEventListener('click', openRegisterInventory);
     if (btnCreate) btnCreate.addEventListener('click', openCreate);
     if (btnCloseCreate) btnCloseCreate.addEventListener('click', closeCreate);
 
@@ -3926,16 +4656,29 @@ document.addEventListener('DOMContentLoaded', function () {
         btnSavePrecios.addEventListener('click', function () {
             const rows = Array.from(preciosTbody ? preciosTbody.querySelectorAll('tr[data-product-id]') : []);
             const changes = [];
+            const invalidRows = [];
             rows.forEach(tr => {
                 const id = tr.getAttribute('data-product-id');
                 const oldP = roundPrecio(tr.getAttribute('data-old-price'));
+                const unitCost = parseNumeroSeguro(tr.getAttribute('data-unit-cost'));
                 const input = tr.querySelector('.input-new-price');
                 const newP = roundPrecio(parseMonedaARS(input?.value));
                 if (!id) return;
-                if (!isFinite(newP) || newP < 0) return;
+                if (!(unitCost > 0)) {
+                    if (Math.abs(newP - oldP) >= 1) invalidRows.push('No se puede actualizar el precio sin costo unitario.');
+                    return;
+                }
+                if (!isFinite(newP) || newP <= 0) {
+                    if (Math.abs(newP - oldP) >= 1) invalidRows.push('El nuevo precio debe ser mayor a cero.');
+                    return;
+                }
                 if (Math.abs(newP - oldP) < 1) return;
                 changes.push({ id: parseInt(id, 10), sale_price: newP });
             });
+            if (invalidRows.length) {
+                if (preciosMsg) preciosMsg.textContent = String(invalidRows[0] || 'No se pudieron guardar los precios.');
+                return;
+            }
             if (!changes.length) {
                 if (preciosMsg) preciosMsg.textContent = 'No hay cambios para guardar.';
                 return;
@@ -3974,6 +4717,235 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (btnBack1) btnBack1.addEventListener('click', closeCreate);
     if (btnBack2) btnBack2.addEventListener('click', closeCreate);
+    if (btnBack3) btnBack3.addEventListener('click', openRegisterInventory);
+
+    if (btnChoiceProduct) btnChoiceProduct.addEventListener('click', openCreate);
+    if (btnChoiceLot) btnChoiceLot.addEventListener('click', openAddLot);
+    if (btnChoiceImport) btnChoiceImport.addEventListener('click', openImportExcel);
+
+    if (btnDownloadImportTemplate) {
+        btnDownloadImportTemplate.addEventListener('click', function () {
+            try {
+                window.location.href = '/inventory/api/import-excel/template';
+            } catch (e) {
+            }
+        });
+    }
+
+    if (btnRunImport) {
+        btnRunImport.addEventListener('click', function () {
+            const f = (importFile && importFile.files && importFile.files.length) ? importFile.files[0] : null;
+            if (!f) {
+                if (window.showAlertModal) window.showAlertModal('Seleccioná un archivo .xlsx para importar.', 'Atención', 'Validación requerida');
+                else alert('Seleccioná un archivo .xlsx para importar.');
+                return;
+            }
+            if (!String(f.name || '').toLowerCase().endsWith('.xlsx')) {
+                if (window.showAlertModal) window.showAlertModal('El archivo debe ser .xlsx.', 'Atención', 'Validación requerida');
+                else alert('El archivo debe ser .xlsx.');
+                return;
+            }
+            if (importResult) {
+                importResult.classList.remove('hidden');
+                importResult.innerHTML = '<div class="text-sm text-gray-700">Previsualizando…</div>';
+            }
+            apiPreviewExcel(f).then(function (res) {
+                if (!res || res.ok !== true) {
+                    const msg = (res && (res.error || res.message)) ? String(res.error || res.message) : 'No se pudo previsualizar.';
+                    if (importResult) {
+                        importResult.classList.remove('hidden');
+                        importResult.innerHTML = '<div class="text-sm font-semibold text-gray-900">Previsualización</div>'
+                            + '<div class="mt-2 text-sm text-red-700">' + esc(msg) + '</div>';
+                    }
+                    return;
+                }
+                previewRows = Array.isArray(res.rows) ? res.rows.map(r => ({ ...r })) : [];
+                validateAllPreviewRows();
+                openPreviewScreen();
+                renderPreviewTable();
+                renderPreviewSummary();
+            }).catch(function () {
+                if (importResult) {
+                    importResult.classList.remove('hidden');
+                    importResult.innerHTML = '<div class="text-sm font-semibold text-gray-900">Previsualización</div>'
+                        + '<div class="mt-2 text-sm text-red-700">No se pudo previsualizar.</div>';
+                }
+            });
+        });
+    }
+
+    if (importFile && btnRunImport) {
+        importFile.addEventListener('change', function () {
+            const f = (importFile.files && importFile.files.length) ? importFile.files[0] : null;
+            if (!f) return;
+            try { btnRunImport.click(); } catch (e) { }
+        });
+    }
+
+    if (btnPreviewBack) {
+        btnPreviewBack.addEventListener('click', function () {
+            try {
+                if (createInvPanel) {
+                    createInvPanel.classList.remove('max-w-6xl');
+                    createInvPanel.classList.add('max-w-4xl');
+                }
+            } catch (e) { }
+            openImportExcel();
+        });
+    }
+
+    if (btnPreviewDrilldownBack) {
+        btnPreviewDrilldownBack.addEventListener('click', function () {
+            closePreviewDrilldown();
+        });
+    }
+
+    if (previewCardNewCats) {
+        previewCardNewCats.addEventListener('click', function () {
+            if (previewCardNewCats.disabled) return;
+            openPreviewDrilldown('cats');
+        });
+    }
+    if (previewCardNewSups) {
+        previewCardNewSups.addEventListener('click', function () {
+            if (previewCardNewSups.disabled) return;
+            openPreviewDrilldown('sups');
+        });
+    }
+
+    function runCommit(rowsToSend) {
+        if (previewResult) {
+            previewResult.classList.remove('hidden');
+            previewResult.innerHTML = '<div class="text-sm text-gray-700">Importando…</div>';
+        }
+        apiCommitExcel(rowsToSend).then(function (res) {
+            if (!res || res.ok !== true) {
+                const msg = (res && (res.error || res.message)) ? String(res.error || res.message) : 'No se pudo importar.';
+                if (previewResult) {
+                    previewResult.classList.remove('hidden');
+                    previewResult.innerHTML = '<div class="text-sm font-semibold text-gray-900">Resultado</div>'
+                        + '<div class="mt-2 text-sm text-red-700">' + esc(msg) + '</div>';
+                }
+                return;
+            }
+            const sum = res.summary || {};
+            const errs = Array.isArray(res.errors) ? res.errors : [];
+            if (!errs.length) {
+                if (previewResult) {
+                    previewResult.classList.remove('hidden');
+                    previewResult.innerHTML = ''
+                        + '<div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">'
+                        + '<div class="flex items-start gap-3">'
+                        + '<div class="h-9 w-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><i class="fas fa-check"></i></div>'
+                        + '<div class="min-w-0">'
+                        + '<div class="text-sm font-semibold text-emerald-900">Éxito</div>'
+                        + '<div class="mt-1 text-xs text-emerald-800">Importación exitosa. Cerrando…</div>'
+                        + '<div class="mt-2 text-[11px] text-emerald-800">Ítems: ' + esc(sum.items_created ?? 0) + ' · Lotes: ' + esc(sum.lots_created ?? 0) + ' · Categorías: ' + esc(sum.categories_created ?? 0) + ' · Proveedores: ' + esc(sum.suppliers_created ?? 0) + '</div>'
+                        + '</div>'
+                        + '</div>'
+                        + '</div>';
+                }
+                try {
+                    if (btnConfirmImport) {
+                        btnConfirmImport.disabled = true;
+                        btnConfirmImport.classList.add('opacity-50');
+                    }
+                    if (btnImportValid) {
+                        btnImportValid.disabled = true;
+                        btnImportValid.classList.add('opacity-50');
+                    }
+                } catch (e) {
+                }
+
+                setTimeout(function () {
+                    resetImportState();
+                    closeImportConfirm();
+                    try {
+                        if (createInvPanel) {
+                            createInvPanel.classList.remove('max-w-6xl');
+                            createInvPanel.classList.add('max-w-4xl');
+                        }
+                    } catch (e) { }
+                    closeCreate();
+                    loadProductsLots(renderAll);
+                }, 1500);
+                return;
+            }
+            let html = '';
+            html += '<div class="text-sm font-semibold text-gray-900">Resultado</div>';
+            html += '<div class="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3">'
+                + '<div class="rounded-lg border border-gray-200 p-3"><div class="text-xs text-gray-500">Ítems creados</div><div class="text-lg font-semibold text-gray-900">' + esc(sum.items_created ?? 0) + '</div></div>'
+                + '<div class="rounded-lg border border-gray-200 p-3"><div class="text-xs text-gray-500">Lotes creados</div><div class="text-lg font-semibold text-gray-900">' + esc(sum.lots_created ?? 0) + '</div></div>'
+                + '<div class="rounded-lg border border-gray-200 p-3"><div class="text-xs text-gray-500">Errores</div><div class="text-lg font-semibold text-gray-900">' + esc(sum.errors ?? 0) + '</div></div>'
+                + '</div>';
+            html += '<div class="mt-3 text-[11px] text-gray-600">Categorías creadas: ' + esc(sum.categories_created ?? 0) + ' · Proveedores creados: ' + esc(sum.suppliers_created ?? 0) + '</div>';
+            if (errs.length) {
+                html += '<div class="mt-4 text-xs font-semibold text-gray-700">Errores por fila</div>';
+                html += '<div class="mt-2 rounded-lg border border-gray-200 overflow-hidden">';
+                html += '<div class="max-h-56 overflow-auto divide-y divide-gray-100">';
+                errs.slice(0, 200).forEach(function (e) {
+                    html += '<div class="px-3 py-2 text-xs text-gray-700">Fila <span class="font-semibold">' + esc(e.row) + '</span>: ' + esc(e.error) + '</div>';
+                });
+                html += '</div></div>';
+            }
+            if (previewResult) {
+                previewResult.classList.remove('hidden');
+                previewResult.innerHTML = html;
+            }
+            loadProductsLots(renderAll);
+        }).catch(function () {
+            if (previewResult) {
+                previewResult.classList.remove('hidden');
+                previewResult.innerHTML = '<div class="text-sm font-semibold text-gray-900">Resultado</div>'
+                    + '<div class="mt-2 text-sm text-red-700">No se pudo importar.</div>';
+            }
+        });
+    }
+
+    if (btnImportValid) {
+        btnImportValid.addEventListener('click', function () {
+            validateAllPreviewRows();
+            const rows = (Array.isArray(previewRows) ? previewRows : []).filter(r => r && !r._deleted && r._isValid);
+            if (!rows.length) {
+                if (window.showAlertModal) window.showAlertModal('No hay filas válidas para importar.', 'Atención', 'Importación');
+                else alert('No hay filas válidas para importar.');
+                return;
+            }
+            const totalAll = (Array.isArray(previewRows) ? previewRows : []).filter(r => r && !r._deleted).length;
+            openImportConfirm({ mode: 'valid', rows: rows, totalAll: totalAll });
+        });
+    }
+
+    if (btnConfirmImport) {
+        btnConfirmImport.addEventListener('click', function () {
+            validateAllPreviewRows();
+            const rows = (Array.isArray(previewRows) ? previewRows : []).filter(r => r && !r._deleted);
+            const hasErr = rows.some(r => (r._errorCount || 0) > 0);
+            if (hasErr) {
+                if (window.showAlertModal) window.showAlertModal('Corregí los errores antes de confirmar la importación.', 'Atención', 'Importación');
+                else alert('Corregí los errores antes de confirmar la importación.');
+                renderPreviewSummary();
+                return;
+            }
+            if (!rows.length) {
+                if (window.showAlertModal) window.showAlertModal('No hay filas para importar.', 'Atención', 'Importación');
+                else alert('No hay filas para importar.');
+                return;
+            }
+            openImportConfirm({ mode: 'all', rows: rows, totalAll: rows.length });
+        });
+    }
+
+    if (btnCloseImportConfirm) btnCloseImportConfirm.addEventListener('click', closeImportConfirm);
+    if (btnCancelImportConfirm) btnCancelImportConfirm.addEventListener('click', closeImportConfirm);
+    if (btnOkImportConfirm) {
+        btnOkImportConfirm.addEventListener('click', function () {
+            const rows = Array.isArray(pendingImportConfirmRows) ? pendingImportConfirmRows : [];
+            closeImportConfirm();
+            if (!rows.length) return;
+            runCommit(rows);
+        });
+    }
 
     if (prodUnit) {
         prodUnit.addEventListener('change', function () {
@@ -4071,7 +5043,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const reorderPoint = parseNumeroSeguro(prodReorder?.value);
             const desc = String(prodDesc?.value || '').trim();
             const salePrice = parseMonedaARS(prodSalePrice?.value);
-            const active = !!prodActive?.checked;
+            const active = true;
 
             const firstLotQty = parseNumeroSeguro(prodLotQty?.value);
             const wantsFirstLot = (!editingProductId) && (firstLotQty > 0);
@@ -4084,12 +5056,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 name,
                 category_id: parseInt(categoryId, 10),
                 unit_name: unit,
-                uses_lots: manageLots,
-                method,
+                uses_lots: true,
+                method: 'FIFO',
                 min_stock: min,
                 reorder_point: reorderPoint,
                 description: desc,
-                active: active,
+                active: true,
                 sale_price: salePrice
             };
 
@@ -4117,11 +5089,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 let lotInvalid = false;
                 const createFirstLot = function () {
                     if (!wantsFirstLot) return Promise.resolve({ skipped: true });
-                    const entryIso = toIsoDate(String(prodLotDate?.value || '').trim());
-                    if (!entryIso) {
-                        lotInvalid = true;
-                        return Promise.resolve({ skipped: true });
-                    }
+                    const entryIso = todayIso();
                     const supplierName = String(prodLotSupplier?.value || '').trim();
                     const supplierId = String(prodLotSupplierId?.value || '').trim();
                     const unitCost = parseMonedaARS(prodLotCu?.value);
@@ -4557,7 +5525,6 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btnSaveLot) {
         btnSaveLot.addEventListener('click', function () {
             const productId = String(lotProduct?.value || '').trim();
-            const entryDate = String(lotDate?.value || '').trim();
             const supplier = String(lotSupplier?.value || '').trim();
             const supplierId = String(lotSupplierId?.value || '').trim();
             const cu = parseMonedaARS(lotCu?.value);
@@ -4565,11 +5532,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const expiration = (lotNoExp?.checked) ? '' : String(lotExp?.value || '').trim();
             const note = String(lotNote?.value || '').trim();
 
-            const entryIso = toIsoDate(entryDate);
+            const entryIso = todayIso();
             const expIso = (lotNoExp?.checked) ? '' : toIsoDate(expiration);
 
             if (!productId) { if (window.showAlertModal) window.showAlertModal('Seleccioná un producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná un producto.'); return; }
-            if (!entryIso) { if (window.showAlertModal) window.showAlertModal('Completá la fecha de ingreso.', 'Atención', 'Validación requerida'); else alert('Completá la fecha de ingreso.'); return; }
             if (!supplier) { if (window.showAlertModal) window.showAlertModal('Completá el proveedor.', 'Atención', 'Validación requerida'); else alert('Completá el proveedor.'); return; }
             if (!(cu >= 0)) { if (window.showAlertModal) window.showAlertModal('El costo unitario no puede ser negativo.', 'Atención', 'Validación requerida'); else alert('El costo unitario no puede ser negativo.'); return; }
             if (!(qty > 0)) { if (window.showAlertModal) window.showAlertModal('La cantidad debe ser mayor a 0.', 'Atención', 'Validación requerida'); else alert('La cantidad debe ser mayor a 0.'); return; }
@@ -4582,6 +5548,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const lotCode = 'L-' + lotId.slice(-6);
 
             const total = cu * qty;
+            const entryDate = todayDisplay();
             const expensePayload = {
                 id: String(Date.now()),
                 fecha: entryDate,

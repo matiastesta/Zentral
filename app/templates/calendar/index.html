@@ -4,6 +4,7 @@
 {% set module_styles = {
     'manual': 'bg-slate-200 border-slate-400',
     'clientes': 'bg-sky-200 border-sky-400',
+    'stock': 'bg-amber-100 border-amber-300',
     'ventas': 'bg-indigo-200 border-indigo-400',
     'empleados': 'bg-emerald-200 border-emerald-400',
     'movimientos': 'bg-violet-200 border-violet-400',
@@ -99,30 +100,31 @@
                             <div class="text-gray-400" style="font-size:9px;">{{ d.strftime('%a') }}</div>
                         </div>
                         <div class="mt-1 space-y-1">
-                            {% for ev in cell.events[:3] %}
-                                {% set mod = (ev.source_module or 'manual') %}
+                            {% for ev in cell.events %}
+                                {% set bucket = (ev.module_bucket or 'Ventas') %}
+                                {% set mod = (bucket|lower) %}
                                 {% set pr = (ev.priority or 'media')|lower %}
                                 {% set pr_info = prio_styles.get(pr, prio_styles.get('media')) %}
                                 {% set mod_cls = module_styles.get(mod, module_styles.get('manual')) %}
                                 {% if ev.is_system %}
-                                    <div class="w-full text-left px-2 py-1 rounded-md border {{ mod_cls }} text-gray-900" style="font-size:9px;line-height:1.15;">
+                                    <div class="cal-ev w-full text-left px-2 py-1 rounded-md border {{ mod_cls }} text-gray-900 {% if loop.index0 >= 3 %}hidden cal-ev-extra{% endif %}" data-bucket="{{ bucket }}" style="font-size:9px;line-height:1.15;">
                                         <div class="flex items-start gap-1">
                                             <span class="shrink-0 mt-0.5 h-2.5 w-2.5 rounded-full {{ pr_info.dot }}" title="{{ pr_info.label }}"></span>
+                                            <span class="shrink-0 px-1 py-0.5 rounded bg-white/40 border border-black/10 text-[8px] leading-none" title="{{ bucket }}">{{ bucket }}</span>
                                             <span class="font-medium" title="{{ ev.title|e }}" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ ev.title }}</span>
                                         </div>
                                     </div>
                                 {% else %}
-                                    <button type="button" class="w-full text-left px-2 py-1 rounded-md border {{ mod_cls }} text-gray-900 hover:bg-white/60" style="font-size:9px;line-height:1.15;" data-edit-event="{{ ev.id }}" data-title="{{ ev.title|e }}" data-description="{{ (ev.description or '')|e }}" data-date="{{ ev.event_date.isoformat() }}" data-priority="{{ ev.priority }}" data-status="{{ ev.status }}" data-source-module="{{ ev.source_module }}">
+                                    <button type="button" class="cal-ev w-full text-left px-2 py-1 rounded-md border {{ mod_cls }} text-gray-900 hover:bg-white/60 {% if loop.index0 >= 3 %}hidden cal-ev-extra{% endif %}" data-bucket="{{ bucket }}" style="font-size:9px;line-height:1.15;" data-edit-event="{{ ev.id }}" data-title="{{ ev.title|e }}" data-description="{{ (ev.description or '')|e }}" data-date="{{ ev.event_date.isoformat() }}" data-priority="{{ ev.priority }}" data-status="{{ ev.status }}" data-source-module="{{ ev.source_module }}">
                                         <div class="flex items-start gap-1">
                                             <span class="shrink-0 mt-0.5 h-2.5 w-2.5 rounded-full {{ pr_info.dot }}" title="{{ pr_info.label }}"></span>
+                                            <span class="shrink-0 px-1 py-0.5 rounded bg-white/40 border border-black/10 text-[8px] leading-none" title="{{ bucket }}">{{ bucket }}</span>
                                             <span class="font-medium" title="{{ ev.title|e }}" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ ev.title }}</span>
                                         </div>
                                     </button>
                                 {% endif %}
                             {% endfor %}
-                            {% if cell.events|length > 3 %}
-                                <div class="text-[10px] text-gray-500">+{{ cell.events|length - 3 }} más</div>
-                            {% endif %}
+                            <div class="cal-more text-[10px] text-gray-500 hidden" data-more></div>
                         </div>
                     </div>
                 {% endfor %}
@@ -151,33 +153,43 @@
                 {% for group in events %}
                     <div data-group-date="{{ group['date'].isoformat() }}">
                         <div class="text-xs font-semibold text-gray-700 mb-2">{{ group['date'].strftime('%A %d/%m/%Y') }}</div>
-                        <div class="space-y-2" data-group-items="{{ group['date'].isoformat() }}">
-                            {% for row in group['items'] %}
-                                {% set ev = row.event %}
-                                {% set mod = (ev.source_module or 'manual') %}
-                                {% set pr = (ev.priority or 'media')|lower %}
-                                {% set pr_info = prio_styles.get(pr, prio_styles.get('media')) %}
+                        <div class="space-y-3" data-group-items="{{ group['date'].isoformat() }}">
+                            {% for modg in group['modules'] %}
+                                {% set bucket = (modg['bucket'] or 'Ventas') %}
+                                {% set mod = (bucket|lower) %}
                                 {% set mod_cls = module_styles.get(mod, module_styles.get('manual')) %}
-                                <div class="p-3 border rounded-lg flex items-start justify-between gap-3 {{ mod_cls }}">
-                                    <div class="min-w-0">
-                                        <div class="flex items-center gap-2">
-                                            <span class="h-2.5 w-2.5 rounded-full {{ pr_info.dot }}" title="{{ pr_info.label }}"></span>
-                                            <span class="px-2 py-0.5 rounded text-[10px] border bg-white/40 border-black/10 text-gray-900">{{ mod|capitalize }}</span>
-                                            <div class="text-sm font-semibold text-gray-900" title="{{ ev.title|e }}" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ ev.title }}</div>
-                                            {% if row.overdue %}<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-100">vencido</span>{% endif %}
-                                            {% if ev.status == 'done' %}<span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 border border-gray-200">resuelto</span>{% endif %}
-                                        </div>
-                                        <div class="mt-1 text-xs text-gray-500">{{ ev.event_date.strftime('%d/%m/%Y') }}{% if ev.description %} · {{ ev.description }}{% endif %}</div>
+                                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                                    <button type="button" class="cal-mod-toggle w-full flex items-center justify-between px-3 py-2 text-left bg-white hover:bg-gray-50" data-target="{{ group['date'].isoformat() }}::{{ bucket }}" aria-expanded="true">
+                                        <div class="text-sm font-semibold text-gray-900">{{ bucket }}</div>
+                                        <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
+                                    </button>
+                                    <div class="cal-mod-body space-y-2 p-2 {{ mod_cls }}" data-body="{{ group['date'].isoformat() }}::{{ bucket }}">
+                                        {% for row in modg['items'] %}
+                                            {% set ev = row.event %}
+                                            {% set pr = (ev.priority or 'media')|lower %}
+                                            {% set pr_info = prio_styles.get(pr, prio_styles.get('media')) %}
+                                            <div class="cal-row p-3 border rounded-lg flex items-start justify-between gap-3 bg-white/40" data-bucket="{{ bucket }}">
+                                                <div class="min-w-0">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="h-2.5 w-2.5 rounded-full {{ pr_info.dot }}" title="{{ pr_info.label }}"></span>
+                                                        <div class="text-sm font-semibold text-gray-900" title="{{ ev.title|e }}" style="display:-webkit-box;line-clamp:2;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ ev.title }}</div>
+                                                        {% if row.overdue %}<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-100">vencido</span>{% endif %}
+                                                        {% if ev.status == 'done' %}<span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 border border-gray-200">resuelto</span>{% endif %}
+                                                    </div>
+                                                    <div class="mt-1 text-xs text-gray-500">{{ ev.event_date.strftime('%d/%m/%Y') }}{% if ev.description %} · {{ ev.description }}{% endif %}</div>
+                                                </div>
+                                                {% if ev.is_system %}
+                                                    <div class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 text-gray-300" title="Evento del sistema">
+                                                        <i class="fas fa-lock"></i>
+                                                    </div>
+                                                {% else %}
+                                                    <button type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 hover:bg-gray-50 text-gray-700" data-edit-event="{{ ev.id }}" data-title="{{ ev.title|e }}" data-description="{{ (ev.description or '')|e }}" data-date="{{ ev.event_date.isoformat() }}" data-priority="{{ ev.priority }}" data-status="{{ ev.status }}" data-source-module="{{ ev.source_module }}" title="Editar">
+                                                        <i class="fas fa-pen"></i>
+                                                    </button>
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
                                     </div>
-                                    {% if ev.is_system %}
-                                        <div class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 text-gray-300" title="Evento del sistema">
-                                            <i class="fas fa-lock"></i>
-                                        </div>
-                                    {% else %}
-                                        <button type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 hover:bg-gray-50 text-gray-700" data-edit-event="{{ ev.id }}" data-title="{{ ev.title|e }}" data-description="{{ (ev.description or '')|e }}" data-date="{{ ev.event_date.isoformat() }}" data-priority="{{ ev.priority }}" data-status="{{ ev.status }}" data-source-module="{{ ev.source_module }}" title="Editar">
-                                            <i class="fas fa-pen"></i>
-                                        </button>
-                                    {% endif %}
                                 </div>
                             {% endfor %}
                         </div>
@@ -356,6 +368,27 @@
                             </div>
                         </div>
                     </div>
+                </div>
+
+                {% set debt_rules = (cfg.get('debt_rules') if cfg else {}) %}
+                {% if not debt_rules %}{% set debt_rules = {} %}{% endif %}
+                <div class="border border-gray-200 rounded-xl p-3">
+                    <div class="text-xs font-semibold text-gray-700">Clientes · Reglas de deuda</div>
+                    <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Vencida (días)</label>
+                            <input name="debt_overdue_days" type="number" min="0" class="w-full px-3 py-2 text-sm border rounded-md" value="{{ debt_rules.get('overdue_days', 30) }}">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Crítica (días)</label>
+                            <input name="debt_critical_days" type="number" min="0" class="w-full px-3 py-2 text-sm border rounded-md" value="{{ debt_rules.get('critical_days', 60) }}">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Crítica (monto)</label>
+                            <input name="debt_critical_amount" type="text" class="w-full px-3 py-2 text-sm border rounded-md" value="{{ debt_rules.get('critical_amount', 0) }}" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="mt-2 text-[11px] text-gray-500">La deuda crítica se activa por días de atraso o por monto (si el monto es mayor a 0).</div>
                 </div>
 
                 <div class="border border-gray-200 rounded-xl p-3">
@@ -564,6 +597,32 @@ document.addEventListener('DOMContentLoaded', function () {
             if (t && typeof t.closest === 'function' && t.closest('[data-edit-event]')) return;
             const iso = cell.getAttribute('data-day');
             openDayListByIso(iso);
+        });
+    });
+
+    // Secciones desplegables por módulo (vista lista)
+    document.querySelectorAll('.cal-mod-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const key = String(btn.getAttribute('data-target') || '').trim();
+            if (!key) return;
+            const esc = function (s) {
+                try {
+                    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(s);
+                } catch (e) {
+                }
+                return String(s).replace(/"/g, '\\"');
+            };
+            const body = document.querySelector('[data-body="' + esc(key) + '"]');
+            if (!body) return;
+            const isOpen = btn.getAttribute('aria-expanded') === 'true';
+            const next = !isOpen;
+            btn.setAttribute('aria-expanded', next ? 'true' : 'false');
+            body.classList.toggle('hidden', !next);
+            const icon = btn.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-chevron-down', next);
+                icon.classList.toggle('fa-chevron-right', !next);
+            }
         });
     });
 
