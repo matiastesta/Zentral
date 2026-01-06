@@ -724,6 +724,23 @@ document.addEventListener('DOMContentLoaded', function () {
             .replace(/'/g, '&#039;');
     }
 
+    function buildNoteCellHtml(note, rowKey) {
+        const raw = String(note || '');
+        const parts = raw.split(/\r?\n/);
+        const summary = String(parts[0] || '').trim();
+        const rest = String(parts.slice(1).join('\n') || '').trim();
+        const sid = 'note_' + String(rowKey || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+        const summaryHtml = escapeHtml(summary || raw).replace(/\n/g, '<br>');
+        const restHtml = escapeHtml(rest).replace(/\n/g, '<br>');
+        if (!restHtml) return '<div class="whitespace-pre-line">' + summaryHtml + '</div>';
+        return ''
+            + '<div class="whitespace-pre-line">'
+            +   '<div>' + summaryHtml + '</div>'
+            +   '<button type="button" class="btn-note-toggle mt-1 text-[11px] text-indigo-700 hover:text-indigo-900" data-target="' + sid + '" data-open="0">Ver más</button>'
+            +   '<div id="' + sid + '" class="hidden mt-1 text-gray-500">' + restHtml + '</div>'
+            + '</div>';
+    }
+
     function buildTraceHint(e) {
         const createdAt = String(e?.created_at || '').trim();
         const originRef = String(e?.origin_ref || '').trim();
@@ -823,6 +840,8 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.className = 'hover:bg-gray-50 group';
             const adjCount = countAdjuntos(e);
 
+            const noteHtml = buildNoteCellHtml((e?.nota || ''), (e?.id || e?.fecha || ''));
+
             const files = Array.isArray(e?.comprobante) ? e.comprobante : [];
             const fileBtn = adjCount
                 ? ('<button type="button" class="btn-egreso-file inline-flex items-center gap-1 text-indigo-700 hover:text-indigo-900" data-id="' + String(e?.id || '') + '"><i class="fas fa-paperclip"></i><span class="text-[11px]">Ver (' + String(adjCount) + ')</span></button>')
@@ -838,7 +857,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </td>
                 <td class="px-3 py-2 text-xs text-right text-gray-700">${formatearMoneda(parseNumeroSeguro(e?.valor))}</td>
                 <td class="px-3 py-2 text-xs text-gray-700">${e?.supplier_name || e?.proveedor || '-'}</td>
-                <td class="px-3 py-2 text-xs text-gray-500">${(e?.nota || '')}</td>
+                <td class="px-3 py-2 text-xs text-gray-500">${noteHtml}</td>
                 <td class="px-3 py-2 text-xs text-gray-500">${fileBtn}</td>
                 <td class="px-3 py-2 text-xs text-right">
                     <div class="inline-flex items-center justify-end gap-1">
@@ -866,6 +885,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (tbody) {
         tbody.addEventListener('click', function(e) {
+            const btnNote = e.target.closest('.btn-note-toggle');
+            if (btnNote) {
+                const targetId = String(btnNote.getAttribute('data-target') || '').trim();
+                if (!targetId) return;
+                const el = document.getElementById(targetId);
+                if (!el) return;
+                const open = String(btnNote.getAttribute('data-open') || '0') === '1';
+                el.classList.toggle('hidden', open);
+                btnNote.setAttribute('data-open', open ? '0' : '1');
+                btnNote.textContent = open ? 'Ver más' : 'Ver menos';
+                return;
+            }
+
             const btnRemito = e.target.closest('.btn-egreso-remito');
             if (btnRemito) {
                 const id = btnRemito.getAttribute('data-id');

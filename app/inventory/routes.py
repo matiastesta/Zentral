@@ -2,14 +2,19 @@ from datetime import date as dt_date, datetime
 
 import json
 import os
+import unicodedata
+from io import BytesIO
 from uuid import uuid4
 
-from flask import current_app, jsonify, render_template, request, url_for
+from flask import current_app, jsonify, render_template, request, send_file, url_for
 from flask import g
 from flask_login import login_required
 from sqlalchemy import func, or_
 from typing import Optional
 from werkzeug.utils import secure_filename
+
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font
 
 from app import db
 from app.models import Category, Expense, FileAsset, InventoryLot, InventoryMovement, Product, Sale, Supplier
@@ -40,6 +45,28 @@ def _parse_date_iso(raw, fallback=None):
         return dt_date.fromisoformat(str(raw).strip())
     except Exception:
         return fallback
+
+
+def _parse_date_flexible(raw, fallback=None):
+    s = str(raw or '').strip()
+    if not s:
+        return fallback
+    # Accept ISO
+    try:
+        return dt_date.fromisoformat(s)
+    except Exception:
+        pass
+    # Accept dd/mm/yyyy
+    try:
+        parts = s.split('/')
+        if len(parts) == 3:
+            dd = int(parts[0])
+            mm = int(parts[1])
+            yy = int(parts[2])
+            return dt_date(yy, mm, dd)
+    except Exception:
+        pass
+    return fallback
 
 
 def _num(v):
@@ -106,7 +133,99 @@ def _serialize_product(p: Product):
 
 
 def _normalize_name(name: str) -> str:
-    return str(name or '').strip().lower()
+    raw = str(name or '')
+    try:
+        raw = unicodedata.normalize('NFKD', raw)
+        raw = ''.join([c for c in raw if not unicodedata.combining(c)])
+    except Exception:
+        raw = str(name or '')
+    raw = raw.strip().lower()
+    raw = ' '.join(raw.split())
+    return raw
+
+
+def _normalize_header(name: str) -> str:
+    key = _normalize_name(name)
+    key = key.replace('-', ' ').replace('/', ' ').replace('.', ' ')
+    key = '_'.join([p for p in key.split(' ') if p])
+    key = key.replace('__', '_')
+    return key
+
+
+def _find_category_by_norm(company_id: str, norm: str):
+    cid = str(company_id or '').strip()
+    if not cid:
+        return None
+    target = _normalize_name(norm)
+    if not target:
+        return None
+    rows = (
+        db.session.query(Category)
+        .filter(Category.company_id == cid, Category.parent_id == None)  # noqa: E711
+        .order_by(Category.name.asc())
+        .limit(10000)
+        .all()
+    )
+    for r in rows:
+        if _normalize_name(getattr(r, 'name', '') or '') == target:
+            return r
+    return None
+
+
+def _get_or_create_category(company_id: str, name: str):
+    cid = str(company_id or '').strip()
+    raw = str(name or '').strip()
+    if not cid or not raw:
+        return None, False
+    existing = _find_category_by_norm(cid, raw)
+    if existing:
+        return existing, False
+    row = Category(company_id=cid, name=raw, active=True)
+    db.session.add(row)
+    db.session.flush()
+    return row, True
+
+
+def _find_supplier_by_norm(company_id: str, norm: str):
+    cid = str(company_id or '').strip()
+    if not cid:
+        return None
+    target = _normalize_name(norm)
+    if not target:
+        return None
+    rows = (
+        db.session.query(Supplier)
+        .filter(Supplier.company_id == cid)
+        .order_by(Supplier.updated_at.desc(), Supplier.created_at.desc())
+        .limit(10000)
+        .all()
+    )
+    for r in rows:
+        if _normalize_name(getattr(r, 'name', '') or '') == target:
+            return r
+    return None
+
+
+def _get_or_create_supplier(company_id: str, name: str):
+    cid = str(company_id or '').strip()
+    raw = str(name or '').strip()
+    if not cid or not raw:
+        return None, False
+    existing = _find_supplier_by_norm(cid, raw)
+    if existing:
+        return existing, False
+    sid = uuid4().hex
+    row = Supplier(
+        id=sid,
+        company_id=cid,
+        name=raw,
+        supplier_type='Inventory',
+        status='Active',
+        categories_json=json.dumps(['Inventario'], ensure_ascii=False),
+    )
+    db.session.add(row)
+    db.session.flush()
+    return row, True
 
 
 def _product_method_locked(product_id: int) -> bool:
@@ -142,6 +261,7 @@ def list_categories_api():
         ensure_request_context()
     except Exception:
         pass
+
     cid = str(getattr(g, 'company_id', '') or '').strip()
     if not cid:
         return jsonify({'ok': True, 'items': []})
@@ -171,18 +291,718 @@ def create_category_api():
     name = str(payload.get('name') or '').strip()
     if not name:
         return jsonify({'ok': False, 'error': 'name_required'}), 400
-    norm = _normalize_name(name)
-    existing = (
-        db.session.query(Category)
-        .filter(Category.company_id == cid, func.lower(Category.name) == norm, Category.parent_id == None)
-        .first()
-    )  # noqa: E711
+    existing = _find_category_by_norm(cid, name)
     if existing:
         return jsonify({'ok': False, 'error': 'already_exists', 'item': _serialize_category(existing)}), 400
     row = Category(company_id=cid, name=name, active=bool(payload.get('active', True)))
     db.session.add(row)
     db.session.commit()
     return jsonify({'ok': True, 'item': _serialize_category(row)})
+
+
+@bp.get('/api/import-excel/template')
+@login_required
+@module_required('inventory')
+def inventory_import_excel_template():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Inventario'
+    headers = [
+        'nombre',
+        'categoria',
+        'unidad',
+        'precio_lista',
+        'descripcion',
+        'costo_unitario',
+        'cantidad',
+        'proveedor',
+        'vencimiento',
+        'nota_lote',
+        'stock_minimo',
+        'punto_pedido',
+    ]
+    ws.append(headers)
+
+    try:
+        ws.freeze_panes = 'A2'
+    except Exception:
+        pass
+
+    try:
+        bold = Font(bold=True)
+        for col_idx in range(1, len(headers) + 1):
+            ws.cell(row=1, column=col_idx).font = bold
+    except Exception:
+        pass
+
+    try:
+        widths = {
+            'A': 16,  # nombre
+            'B': 14,  # categoria
+            'C': 10,  # unidad
+            'D': 12,  # precio_lista
+            'E': 18,  # descripcion
+            'F': 14,  # costo_unitario
+            'G': 10,  # cantidad
+            'H': 14,  # proveedor
+            'I': 12,  # vencimiento
+            'J': 14,  # nota_lote
+            'K': 12,  # stock_minimo
+            'L': 12,  # punto_pedido
+        }
+        for col, w in widths.items():
+            ws.column_dimensions[col].width = w
+    except Exception:
+        pass
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name='plantilla_inventario.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+
+
+@bp.post('/api/import-excel')
+@login_required
+@module_required('inventory')
+def inventory_import_excel():
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    f = None
+    try:
+        f = request.files.get('file')
+    except Exception:
+        f = None
+    if not f:
+        return jsonify({'ok': False, 'error': 'file_required'}), 400
+
+    filename = str(getattr(f, 'filename', '') or '').strip().lower()
+    if not filename.endswith('.xlsx'):
+        return jsonify({'ok': False, 'error': 'invalid_file_type'}), 400
+
+    try:
+        wb = load_workbook(f, data_only=True)
+    except Exception:
+        return jsonify({'ok': False, 'error': 'invalid_excel'}), 400
+
+    try:
+        ws = wb.worksheets[0]
+    except Exception:
+        return jsonify({'ok': False, 'error': 'invalid_excel'}), 400
+
+    rows_iter = ws.iter_rows(values_only=True)
+    try:
+        header_row = next(rows_iter)
+    except StopIteration:
+        header_row = None
+    if not header_row:
+        return jsonify({'ok': False, 'error': 'missing_header'}), 400
+
+    header_map = {}
+    for idx, val in enumerate(header_row):
+        key = _normalize_header(val)
+        if not key:
+            continue
+        if key not in header_map:
+            header_map[key] = idx
+
+    required = ['nombre', 'categoria', 'precio_lista']
+    missing = [k for k in required if k not in header_map]
+    if missing:
+        return jsonify({'ok': False, 'error': 'missing_required_columns', 'missing': missing}), 400
+
+    def get_cell(row_vals, key: str):
+        try:
+            pos = header_map.get(key)
+            if pos is None:
+                return None
+            if pos >= len(row_vals):
+                return None
+            return row_vals[pos]
+        except Exception:
+            return None
+
+    errors = []
+    created_products = 0
+    created_lots = 0
+    created_categories = 0
+    created_suppliers = 0
+    processed_rows = 0
+
+    today = dt_date.today()
+    try:
+        received_at = datetime.combine(today, datetime.min.time())
+    except Exception:
+        received_at = datetime.utcnow()
+
+    for i, row_vals in enumerate(rows_iter, start=2):
+        vals = row_vals or ()
+        is_blank = True
+        for v in vals:
+            if v is None:
+                continue
+            if str(v).strip() != '':
+                is_blank = False
+                break
+        if is_blank:
+            continue
+
+        processed_rows += 1
+
+        nested = db.session.begin_nested()
+        try:
+            nombre = str(get_cell(vals, 'nombre') or '').strip()
+            categoria = str(get_cell(vals, 'categoria') or '').strip()
+            precio_lista = _num(get_cell(vals, 'precio_lista'))
+
+            if not nombre:
+                raise ValueError('nombre_required')
+            if not categoria:
+                raise ValueError('categoria_required')
+            if precio_lista < 0:
+                raise ValueError('precio_lista_invalid')
+
+            costo_unitario_raw = get_cell(vals, 'costo_unitario')
+            costo_unitario = _num(costo_unitario_raw) if costo_unitario_raw is not None and str(costo_unitario_raw).strip() != '' else 0.0
+            if costo_unitario < 0:
+                raise ValueError('costo_unitario_invalid')
+
+            cantidad_raw = get_cell(vals, 'cantidad')
+            cantidad = _num(cantidad_raw) if cantidad_raw is not None and str(cantidad_raw).strip() != '' else 0.0
+            if cantidad < 0:
+                raise ValueError('cantidad_invalid')
+
+            descripcion = str(get_cell(vals, 'descripcion') or '').strip() or None
+            unidad = str(get_cell(vals, 'unidad') or '').strip() or ''
+            nota_lote = str(get_cell(vals, 'nota_lote') or '').strip() or None
+
+            stock_minimo_raw = get_cell(vals, 'stock_minimo')
+            stock_minimo = _num(stock_minimo_raw) if stock_minimo_raw is not None and str(stock_minimo_raw).strip() != '' else 0.0
+            if stock_minimo < 0:
+                raise ValueError('stock_minimo_invalid')
+
+            punto_pedido_raw = get_cell(vals, 'punto_pedido')
+            punto_pedido = _num(punto_pedido_raw) if punto_pedido_raw is not None and str(punto_pedido_raw).strip() != '' else 0.0
+            if punto_pedido < 0:
+                raise ValueError('punto_pedido_invalid')
+
+            proveedor = str(get_cell(vals, 'proveedor') or '').strip() or ''
+
+            vencimiento_raw = str(get_cell(vals, 'vencimiento') or '').strip()
+            exp_dt = _parse_date_flexible(vencimiento_raw, None) if vencimiento_raw else None
+            if vencimiento_raw and not exp_dt:
+                raise ValueError('vencimiento_invalid')
+
+            cat_row, cat_created = _get_or_create_category(cid, categoria)
+            if not cat_row:
+                raise ValueError('categoria_required')
+            if cat_created:
+                created_categories += 1
+
+            supplier_id = None
+            supplier_name = None
+            if proveedor:
+                srow, screated = _get_or_create_supplier(cid, proveedor)
+                if screated:
+                    created_suppliers += 1
+                supplier_id = str(getattr(srow, 'id', '') or '').strip() or None
+                supplier_name = str(getattr(srow, 'name', '') or '').strip() or None
+
+            internal_code = _generate_unique_internal_code()
+            prod = Product(
+                company_id=cid,
+                name=nombre,
+                description=descripcion,
+                category_id=cat_row.id,
+                sale_price=precio_lista,
+                internal_code=internal_code,
+                unit_name=(unidad or 'Unidad'),
+                uses_lots=True,
+                method='FIFO',
+                min_stock=stock_minimo,
+                reorder_point=punto_pedido,
+                primary_supplier_id=supplier_id,
+                primary_supplier_name=supplier_name,
+                active=True,
+            )
+            db.session.add(prod)
+            db.session.flush()
+            created_products += 1
+
+            if cantidad > 0:
+                lot = InventoryLot(
+                    company_id=cid,
+                    product_id=prod.id,
+                    qty_initial=cantidad,
+                    qty_available=cantidad,
+                    unit_cost=costo_unitario,
+                    supplier_id=supplier_id,
+                    supplier_name=supplier_name,
+                    expiration_date=exp_dt,
+                    lot_code=('IMP-' + uuid4().hex[:8].upper()),
+                    note=nota_lote or 'Ingreso por inventario (importación Excel)',
+                )
+                if not supplier_id and not supplier_name:
+                    lot.supplier_id = None
+                    lot.supplier_name = 'Ajuste interno'
+                lot.received_at = received_at
+                db.session.add(lot)
+                db.session.flush()
+
+                mv = InventoryMovement(
+                    company_id=cid,
+                    movement_date=today,
+                    type='purchase',
+                    sale_ticket=None,
+                    product_id=prod.id,
+                    lot_id=lot.id,
+                    qty_delta=cantidad,
+                    unit_cost=costo_unitario,
+                    total_cost=cantidad * costo_unitario,
+                )
+                db.session.add(mv)
+
+                exp_amount = round(float(cantidad * costo_unitario), 2)
+                exp_supplier_name = supplier_name or (lot.supplier_name or '')
+                exp = Expense(
+                    id=uuid4().hex,
+                    company_id=cid,
+                    expense_date=today,
+                    payment_method='Ajuste interno',
+                    amount=exp_amount,
+                    category='Inventario',
+                    supplier_id=supplier_id,
+                    supplier_name=exp_supplier_name,
+                    note=('Ingreso por inventario (importación Excel) - ' + str(nombre) + ' (' + str(lot.lot_code or '') + ')'),
+                    description=None,
+                    expense_type='Variable',
+                    frequency='Único',
+                    origin='inventory',
+                )
+                try:
+                    exp.meta_json = json.dumps({
+                        'origin_ref': {
+                            'kind': 'inventory_import_excel',
+                            'product_id': int(prod.id),
+                            'lot_id': int(lot.id),
+                            'lot_code': str(lot.lot_code or ''),
+                        }
+                    }, ensure_ascii=False)
+                except Exception:
+                    exp.meta_json = None
+                db.session.add(exp)
+                created_lots += 1
+
+            nested.commit()
+        except Exception as e:
+            try:
+                nested.rollback()
+            except Exception:
+                pass
+            code = str(e) if str(e) else 'row_error'
+            errors.append({'row': i, 'error': code})
+            continue
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+
+    return jsonify({
+        'ok': True,
+        'summary': {
+            'rows_processed': processed_rows,
+            'items_created': created_products,
+            'lots_created': created_lots,
+            'categories_created': created_categories,
+            'suppliers_created': created_suppliers,
+            'errors': len(errors),
+        },
+        'errors': errors,
+    })
+
+
+@bp.post('/api/import-excel/preview')
+@login_required
+@module_required('inventory')
+def inventory_import_excel_preview():
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    f = None
+    try:
+        f = request.files.get('file')
+    except Exception:
+        f = None
+    if not f:
+        return jsonify({'ok': False, 'error': 'file_required'}), 400
+
+    filename = str(getattr(f, 'filename', '') or '').strip().lower()
+    if not filename.endswith('.xlsx'):
+        return jsonify({'ok': False, 'error': 'invalid_file_type'}), 400
+
+    try:
+        wb = load_workbook(f, data_only=True)
+    except Exception:
+        return jsonify({'ok': False, 'error': 'invalid_excel'}), 400
+
+    try:
+        ws = wb.worksheets[0]
+    except Exception:
+        return jsonify({'ok': False, 'error': 'invalid_excel'}), 400
+
+    rows_iter = ws.iter_rows(values_only=True)
+    try:
+        header_row = next(rows_iter)
+    except StopIteration:
+        header_row = None
+    if not header_row:
+        return jsonify({'ok': False, 'error': 'missing_header'}), 400
+
+    header_map = {}
+    for idx, val in enumerate(header_row):
+        key = _normalize_header(val)
+        if not key:
+            continue
+        if key not in header_map:
+            header_map[key] = idx
+
+    required = ['nombre', 'categoria', 'precio_lista']
+    missing = [k for k in required if k not in header_map]
+    if missing:
+        return jsonify({'ok': False, 'error': 'missing_required_columns', 'missing': missing}), 400
+
+    def get_cell(row_vals, key: str):
+        try:
+            pos = header_map.get(key)
+            if pos is None:
+                return None
+            if pos >= len(row_vals):
+                return None
+            return row_vals[pos]
+        except Exception:
+            return None
+
+    # Existing names (normalized)
+    existing_cat = set()
+    existing_sup = set()
+    existing_prod = set()
+    try:
+        cats = (
+            db.session.query(Category)
+            .filter(Category.company_id == cid, Category.parent_id == None)  # noqa: E711
+            .limit(10000)
+            .all()
+        )
+        for c in (cats or []):
+            existing_cat.add(_normalize_name(getattr(c, 'name', '') or ''))
+    except Exception:
+        existing_cat = set()
+    try:
+        sups = db.session.query(Supplier).filter(Supplier.company_id == cid).limit(10000).all()
+        for s in (sups or []):
+            existing_sup.add(_normalize_name(getattr(s, 'name', '') or ''))
+    except Exception:
+        existing_sup = set()
+    try:
+        prods = db.session.query(Product).filter(Product.company_id == cid).limit(100000).all()
+        for p in (prods or []):
+            existing_prod.add(_normalize_name(getattr(p, 'name', '') or ''))
+    except Exception:
+        existing_prod = set()
+
+    out_rows = []
+    new_cats = set()
+    new_sups = set()
+
+    for i, row_vals in enumerate(rows_iter, start=2):
+        vals = row_vals or ()
+        is_blank = True
+        for v in vals:
+            if v is None:
+                continue
+            if str(v).strip() != '':
+                is_blank = False
+                break
+        if is_blank:
+            continue
+
+        nombre = str(get_cell(vals, 'nombre') or '').strip()
+        categoria = str(get_cell(vals, 'categoria') or '').strip()
+        unidad = str(get_cell(vals, 'unidad') or '').strip()
+        precio_lista = str(get_cell(vals, 'precio_lista') or '').strip()
+        descripcion = str(get_cell(vals, 'descripcion') or '').strip()
+        cantidad = str(get_cell(vals, 'cantidad') or '').strip()
+        costo_unitario = str(get_cell(vals, 'costo_unitario') or '').strip()
+        proveedor = str(get_cell(vals, 'proveedor') or '').strip()
+        vencimiento = str(get_cell(vals, 'vencimiento') or '').strip()
+        nota_lote = str(get_cell(vals, 'nota_lote') or '').strip()
+        stock_minimo = str(get_cell(vals, 'stock_minimo') or '').strip()
+        punto_pedido = str(get_cell(vals, 'punto_pedido') or '').strip()
+
+        cat_norm = _normalize_name(categoria)
+        sup_norm = _normalize_name(proveedor)
+        prod_norm = _normalize_name(nombre)
+
+        will_create_category = bool(cat_norm) and (cat_norm not in existing_cat)
+        will_create_supplier = bool(sup_norm) and (sup_norm not in existing_sup)
+        product_exists = bool(prod_norm) and (prod_norm in existing_prod)
+
+        if will_create_category:
+            new_cats.add(cat_norm)
+        if will_create_supplier:
+            new_sups.add(sup_norm)
+
+        out_rows.append({
+            'row': i,
+            'nombre': nombre,
+            'categoria': categoria,
+            'unidad': unidad,
+            'precio_lista': precio_lista,
+            'descripcion': descripcion,
+            'cantidad': cantidad,
+            'costo_unitario': costo_unitario,
+            'proveedor': proveedor,
+            'vencimiento': vencimiento,
+            'nota_lote': nota_lote,
+            'stock_minimo': stock_minimo,
+            'punto_pedido': punto_pedido,
+            'will_create_category': will_create_category,
+            'will_create_supplier': will_create_supplier,
+            'product_exists': product_exists,
+        })
+
+    return jsonify({
+        'ok': True,
+        'rows': out_rows,
+        'summary': {
+            'rows_detected': len(out_rows),
+            'new_categories': len(new_cats),
+            'new_suppliers': len(new_sups),
+        }
+    })
+
+
+@bp.post('/api/import-excel/commit')
+@login_required
+@module_required('inventory')
+def inventory_import_excel_commit():
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    payload = request.get_json(silent=True) or {}
+    rows = payload.get('rows')
+    if not isinstance(rows, list) or not rows:
+        return jsonify({'ok': False, 'error': 'rows_required'}), 400
+
+    created_products = 0
+    created_lots = 0
+    created_categories = 0
+    created_suppliers = 0
+    errors = []
+
+    today = dt_date.today()
+    try:
+        received_at = datetime.combine(today, datetime.min.time())
+    except Exception:
+        received_at = datetime.utcnow()
+
+    for idx, r in enumerate(rows, start=1):
+        d = r if isinstance(r, dict) else {}
+        row_num = d.get('row') or idx
+        nested = db.session.begin_nested()
+        try:
+            nombre = str(d.get('nombre') or '').strip()
+            categoria = str(d.get('categoria') or '').strip()
+            unidad = str(d.get('unidad') or '').strip() or 'Unidad'
+            descripcion = str(d.get('descripcion') or '').strip() or None
+
+            precio_lista = _num(d.get('precio_lista'))
+            if not nombre:
+                raise ValueError('nombre_required')
+            if not categoria:
+                raise ValueError('categoria_required')
+            if precio_lista < 0:
+                raise ValueError('precio_lista_invalid')
+
+            cantidad_raw = str(d.get('cantidad') or '').strip()
+            cantidad = _num(cantidad_raw) if cantidad_raw != '' else 0.0
+            if cantidad < 0:
+                raise ValueError('cantidad_invalid')
+
+            costo_raw = str(d.get('costo_unitario') or '').strip()
+            costo_unitario = _num(costo_raw) if costo_raw != '' else 0.0
+            if costo_unitario < 0:
+                raise ValueError('costo_unitario_invalid')
+
+            proveedor = str(d.get('proveedor') or '').strip() or ''
+            vencimiento_raw = str(d.get('vencimiento') or '').strip() or ''
+            exp_dt = _parse_date_flexible(vencimiento_raw, None) if vencimiento_raw else None
+            if vencimiento_raw and not exp_dt:
+                raise ValueError('vencimiento_invalid')
+
+            nota_lote = str(d.get('nota_lote') or '').strip() or None
+
+            stock_min_raw = str(d.get('stock_minimo') or '').strip()
+            stock_minimo = _num(stock_min_raw) if stock_min_raw != '' else 0.0
+            if stock_minimo < 0:
+                raise ValueError('stock_minimo_invalid')
+
+            punto_raw = str(d.get('punto_pedido') or '').strip()
+            punto_pedido = _num(punto_raw) if punto_raw != '' else 0.0
+            if punto_pedido < 0:
+                raise ValueError('punto_pedido_invalid')
+
+            cat_row, cat_created = _get_or_create_category(cid, categoria)
+            if not cat_row:
+                raise ValueError('categoria_required')
+            if cat_created:
+                created_categories += 1
+
+            supplier_id = None
+            supplier_name = None
+            if proveedor:
+                srow, screated = _get_or_create_supplier(cid, proveedor)
+                if screated:
+                    created_suppliers += 1
+                supplier_id = str(getattr(srow, 'id', '') or '').strip() or None
+                supplier_name = str(getattr(srow, 'name', '') or '').strip() or None
+
+            internal_code = _generate_unique_internal_code()
+            prod = Product(
+                company_id=cid,
+                name=nombre,
+                description=descripcion,
+                category_id=cat_row.id,
+                sale_price=precio_lista,
+                internal_code=internal_code,
+                unit_name=unidad,
+                uses_lots=True,
+                method='FIFO',
+                min_stock=stock_minimo,
+                reorder_point=punto_pedido,
+                primary_supplier_id=supplier_id,
+                primary_supplier_name=supplier_name,
+                active=True,
+            )
+            db.session.add(prod)
+            db.session.flush()
+            created_products += 1
+
+            if cantidad > 0:
+                lot = InventoryLot(
+                    company_id=cid,
+                    product_id=prod.id,
+                    qty_initial=cantidad,
+                    qty_available=cantidad,
+                    unit_cost=costo_unitario,
+                    supplier_id=supplier_id,
+                    supplier_name=supplier_name,
+                    expiration_date=exp_dt,
+                    lot_code=('IMP-' + uuid4().hex[:8].upper()),
+                    note=nota_lote or 'Ingreso por inventario (importación Excel)',
+                )
+                if not supplier_id and not supplier_name:
+                    lot.supplier_id = None
+                    lot.supplier_name = 'Ajuste interno'
+                lot.received_at = received_at
+                db.session.add(lot)
+                db.session.flush()
+
+                mv = InventoryMovement(
+                    company_id=cid,
+                    movement_date=today,
+                    type='purchase',
+                    sale_ticket=None,
+                    product_id=prod.id,
+                    lot_id=lot.id,
+                    qty_delta=cantidad,
+                    unit_cost=costo_unitario,
+                    total_cost=cantidad * costo_unitario,
+                )
+                db.session.add(mv)
+
+                exp_amount = round(float(cantidad * costo_unitario), 2)
+                exp_supplier_name = supplier_name or (lot.supplier_name or '')
+                exp = Expense(
+                    id=uuid4().hex,
+                    company_id=cid,
+                    expense_date=today,
+                    payment_method='Ajuste interno',
+                    amount=exp_amount,
+                    category='Inventario',
+                    supplier_id=supplier_id,
+                    supplier_name=exp_supplier_name,
+                    note=('Ingreso por inventario (importación Excel) - ' + str(nombre) + ' (' + str(lot.lot_code or '') + ')'),
+                    description=None,
+                    expense_type='Variable',
+                    frequency='Único',
+                    origin='inventory',
+                )
+                try:
+                    exp.meta_json = json.dumps({
+                        'origin_ref': {
+                            'kind': 'inventory_import_excel',
+                            'product_id': int(prod.id),
+                            'lot_id': int(lot.id),
+                            'lot_code': str(lot.lot_code or ''),
+                        }
+                    }, ensure_ascii=False)
+                except Exception:
+                    exp.meta_json = None
+                db.session.add(exp)
+                created_lots += 1
+
+            nested.commit()
+        except Exception as e:
+            try:
+                nested.rollback()
+            except Exception:
+                pass
+            code = str(e) if str(e) else 'row_error'
+            errors.append({'row': row_num, 'error': code})
+            continue
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+
+    return jsonify({
+        'ok': True,
+        'summary': {
+            'items_created': created_products,
+            'lots_created': created_lots,
+            'categories_created': created_categories,
+            'suppliers_created': created_suppliers,
+            'errors': len(errors),
+        },
+        'errors': errors,
+    })
 
 
 @bp.delete('/api/categories/<int:category_id>')
@@ -372,13 +1192,13 @@ def create_product():
         barcode=str(payload.get('barcode') or '').strip() or None,
         image_filename=str(payload.get('image_filename') or '').strip() or None,
         unit_name=str(payload.get('unit_name') or '').strip() or None,
-        uses_lots=bool(payload.get('uses_lots', True)),
-        method=str(payload.get('method') or 'FIFO').strip() or 'FIFO',
+        uses_lots=True,
+        method='FIFO',
         min_stock=_num(payload.get('min_stock')),
         reorder_point=_num(payload.get('reorder_point')),
         primary_supplier_id=supplier_id,
         primary_supplier_name=supplier_name,
-        active=bool(payload.get('active', True)),
+        active=True,
     )
     db.session.add(row)
     try:
@@ -676,7 +1496,7 @@ def create_lot():
     db.session.add(row)
     db.session.flush()
 
-    movement_date = _parse_date_iso(payload.get('date'), dt_date.today())
+    movement_date = dt_date.today()
     try:
         received_at = datetime.combine(movement_date, datetime.min.time())
     except Exception:
@@ -823,23 +1643,19 @@ def adjust_lot(lot_id: int):
     from flask_login import current_user
 
     try:
-        if getattr(current_user, 'can', None):
-            allowed = True
-            try:
-                allowed = bool(current_user.can('inventario.ajuste_lote'))
-            except Exception:
-                allowed = True
-            if not allowed:
-                return jsonify({'ok': False, 'error': 'forbidden'}), 403
+        ensure_request_context()
     except Exception:
         pass
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
 
     lot = db.session.get(InventoryLot, int(lot_id))
     if not lot:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
-    cid = _company_id()
-    if cid and str(getattr(lot, 'company_id', '') or '') != cid:
+    if str(getattr(lot, 'company_id', '') or '') != cid:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
     payload = request.get_json(silent=True) or {}
@@ -885,22 +1701,65 @@ def adjust_lot(lot_id: int):
 
     adjustment_id = uuid4().hex
 
-    value_old = float(old_qty_initial or 0.0) * float(old_unit_cost or 0.0)
-    value_new = float(new_qty_initial or 0.0) * float(new_unit_cost or 0.0)
-    difference_valor = float(value_new or 0.0) - float(value_old or 0.0)
-    amount_abs = abs(float(difference_valor or 0.0))
-
     product_name = str(getattr(getattr(lot, 'product', None), 'name', '') or '').strip() or 'Producto'
     lot_label = str(getattr(lot, 'lot_code', '') or '').strip() or str(lot.id)
 
+    delta_qty = float(new_qty_initial or 0.0) - float(old_qty_initial or 0.0)
+    delta_cost = float(new_unit_cost or 0.0) - float(old_unit_cost or 0.0)
+    stock_base = float(old_qty_initial or 0.0)
+    impact_cost = float(delta_cost or 0.0) * float(stock_base or 0.0)
+    impact_qty = float(delta_qty or 0.0) * float(new_unit_cost or 0.0)
+
+    ingreso = 0.0
+    gasto = 0.0
+    if impact_cost > 1e-9:
+        gasto += abs(impact_cost)
+    elif impact_cost < -1e-9:
+        ingreso += abs(impact_cost)
+    if impact_qty > 1e-9:
+        ingreso += abs(impact_qty)
+    elif impact_qty < -1e-9:
+        gasto += abs(impact_qty)
+
+    neto = float(ingreso or 0.0) - float(gasto or 0.0)
+    amount_abs = abs(float(neto or 0.0))
+
+    supplier_id = str(getattr(lot, 'supplier_id', '') or '').strip() or None
+    supplier_name = str(getattr(lot, 'supplier_name', '') or '').strip() or None
+    if not supplier_id and not supplier_name:
+        supplier_id = 'system_adjustment'
+        supplier_name = 'Ajuste interno / Sin proveedor'
+
+    summary_sign = '+' if neto >= 0 else '-'
+    summary_reason = 'Ajuste interno de inventario'
+    if abs(impact_cost) > 1e-9 and abs(impact_qty) > 1e-9:
+        summary_reason = 'Ajuste de inventario (costo + cantidad)'
+    elif abs(impact_cost) > 1e-9:
+        summary_reason = 'Revalorización de inventario'
+    elif abs(impact_qty) > 1e-9:
+        summary_reason = 'Corrección de stock'
+
+    summary_line = (
+        f"Ajuste de inventario – Lote {lot_label} · {supplier_name or '-'} · "
+        f"Total {summary_sign}${round(amount_abs, 2)}"
+    )
+
     base_note_lines = [
-        f"Ajuste de inventario del producto {product_name} – Lote {lot_label}.",
-        f"AdjustmentId: {adjustment_id}",
-        f"Diferencia_valor: {round(difference_valor, 4)} (nuevo {round(value_new, 4)} - anterior {round(value_old, 4)})",
-        "Este registro NO corresponde a una operación comercial, sino a una corrección interna.",
+        summary_line,
+        '',
+        f"Producto: {product_name}",
+        f"Proveedor: {supplier_name or '-'}",
+        f"Stock: {round(old_qty_initial, 6)} → {round(new_qty_initial, 6)}",
+        f"Costo: ${round(old_unit_cost, 6)} → ${round(new_unit_cost, 6)}",
+        f"Tipo: {summary_reason}",
     ]
+    if abs(impact_cost) > 1e-9:
+        base_note_lines.append(f"Impacto por costo: {'+' if impact_cost >= 0 else '-'}${round(abs(impact_cost), 2)}")
+    if abs(impact_qty) > 1e-9:
+        base_note_lines.append(f"Impacto por cantidad: {'+' if impact_qty >= 0 else '-'}${round(abs(impact_qty), 2)}")
+    base_note_lines.append(f"AdjustmentId: {adjustment_id}")
     if note_user:
-        base_note_lines.append(f"Nota: {note_user}")
+        base_note_lines.extend(['', f"Nota: {note_user}"])
 
     try:
         lot.qty_initial = float(new_qty_initial or 0.0)
@@ -945,121 +1804,58 @@ def adjust_lot(lot_id: int):
             'adjustment_id': adjustment_id,
             'sales': [],
             'expenses': [],
-            'difference_valor': round(difference_valor, 4),
+            'difference_valor': round(neto, 4),
         }
 
         if amount_abs > 1e-9:
-            if difference_valor > 0:
-                op_ticket = f"AJOP-{adjustment_id[:10]}"
-                mv_ticket = f"AJMV-{adjustment_id[:10]}"
-                op_notes = '\n'.join(base_note_lines + [
-                    'Layer: operativa',
-                    'Tipo: Venta por ajuste de costo de mercadería',
-                ])
-                mv_notes = '\n'.join(base_note_lines + [
-                    'Layer: contable',
-                    'Tipo: Ingreso por ajuste de inventario',
-                    'Categoría: Inventario',
-                ])
+            mv_notes = '\n'.join(base_note_lines)
+            mv_origin_ref = {
+                'kind': 'lot_adjustment',
+                'adjustment_id': adjustment_id,
+                'product_id': lot.product_id,
+                'lot_id': lot.id,
+            }
+            mv_meta = {
+                'origin_ref': mv_origin_ref,
+                'inventory_adjustment': {
+                    'provider_attribution': {
+                        'supplier_id': supplier_id,
+                        'supplier_name': supplier_name,
+                    },
+                    'calculation': {
+                        'old_qty': float(old_qty_initial or 0.0),
+                        'new_qty': float(new_qty_initial or 0.0),
+                        'old_unit_cost': float(old_unit_cost or 0.0),
+                        'new_unit_cost': float(new_unit_cost or 0.0),
+                        'delta_qty': float(delta_qty or 0.0),
+                        'delta_cost': float(delta_cost or 0.0),
+                        'stock_base': float(stock_base or 0.0),
+                        'impact_cost': float(impact_cost or 0.0),
+                        'impact_qty': float(impact_qty or 0.0),
+                        'ingreso': float(ingreso or 0.0),
+                        'gasto': float(gasto or 0.0),
+                        'neto': float(neto or 0.0),
+                    },
+                },
+            }
 
-                db.session.add(Sale(
-                    company_id=cid,
-                    ticket=op_ticket,
-                    sale_date=date_adj,
-                    sale_type='AjusteInvCosto',
-                    status='Completada',
-                    payment_method='Ajuste interno',
-                    notes=op_notes,
-                    total=amount_abs,
-                    discount_general_pct=0.0,
-                    discount_general_amount=0.0,
-                    on_account=False,
-                    paid_amount=amount_abs,
-                    due_amount=0.0,
-                    customer_id=None,
-                    customer_name='Sistema / Ajuste interno',
-                ))
-                db.session.add(Sale(
-                    company_id=cid,
-                    ticket=mv_ticket,
-                    sale_date=date_adj,
-                    sale_type='IngresoAjusteInv',
-                    status='Completada',
-                    payment_method='Ajuste interno',
-                    notes=mv_notes,
-                    total=amount_abs,
-                    discount_general_pct=0.0,
-                    discount_general_amount=0.0,
-                    on_account=False,
-                    paid_amount=amount_abs,
-                    due_amount=0.0,
-                    customer_id=None,
-                    customer_name='Sistema / Ajuste interno',
-                ))
-                created['sales'] = [op_ticket, mv_ticket]
-            elif difference_valor < 0:
-                supplier_id = str(getattr(lot, 'supplier_id', '') or '').strip() or None
-                supplier_name = str(getattr(lot, 'supplier_name', '') or '').strip() or None
-                base_meta = {
-                    'origin_ref': {
-                        'kind': 'lot_adjustment',
-                        'adjustment_id': adjustment_id,
-                        'product_id': lot.product_id,
-                        'lot_id': lot.id,
-                    }
-                }
-
-                op_eid = uuid4().hex
-                mv_eid = uuid4().hex
-
-                op_meta = json.loads(json.dumps(base_meta, ensure_ascii=False))
-                op_meta['origin_ref']['layer'] = 'operational'
-                op_meta['origin_ref']['linked_expense_id'] = mv_eid
-
-                mv_meta = json.loads(json.dumps(base_meta, ensure_ascii=False))
-                mv_meta['origin_ref']['layer'] = 'movement'
-                mv_meta['origin_ref']['linked_expense_id'] = op_eid
-
-                op_notes = '\n'.join(base_note_lines + [
-                    'Layer: operativa',
-                    'Tipo: Gasto por ajuste de inventario',
-                    'Categoría: Inventario',
-                ])
-                mv_notes = '\n'.join(base_note_lines + [
-                    'Layer: contable',
-                    'Tipo: Gasto por ajuste de inventario',
-                    'Categoría: Inventario',
-                ])
-
-                db.session.add(Expense(
-                    id=op_eid,
-                    company_id=cid,
-                    expense_date=date_adj,
-                    payment_method='Ajuste interno',
-                    amount=amount_abs,
-                    category='Inventario',
-                    supplier_id=supplier_id,
-                    supplier_name=supplier_name,
-                    note=op_notes,
-                    expense_type='AjusteInventario',
-                    origin='inventory',
-                    meta_json=json.dumps(op_meta, ensure_ascii=False),
-                ))
-                db.session.add(Expense(
-                    id=mv_eid,
-                    company_id=cid,
-                    expense_date=date_adj,
-                    payment_method='Ajuste interno',
-                    amount=amount_abs,
-                    category='Inventario',
-                    supplier_id=supplier_id,
-                    supplier_name=supplier_name,
-                    note=mv_notes,
-                    expense_type='AjusteInventario',
-                    origin='inventory',
-                    meta_json=json.dumps(mv_meta, ensure_ascii=False),
-                ))
-                created['expenses'] = [op_eid, mv_eid]
+            mv_eid = uuid4().hex
+            mv_amount = -amount_abs if neto > 0 else amount_abs
+            db.session.add(Expense(
+                id=mv_eid,
+                company_id=cid,
+                expense_date=date_adj,
+                payment_method='Ajuste interno',
+                amount=mv_amount,
+                category='Inventario',
+                supplier_id=supplier_id,
+                supplier_name=supplier_name,
+                note=mv_notes,
+                expense_type='AjusteInventario',
+                origin='inventory',
+                meta_json=json.dumps(mv_meta, ensure_ascii=False),
+            ))
+            created['expenses'] = [mv_eid]
 
         db.session.commit()
         return jsonify({
@@ -1067,10 +1863,16 @@ def adjust_lot(lot_id: int):
             'item': _serialize_lot(lot),
             'created': created,
         })
-    except Exception:
+    except Exception as e:
         db.session.rollback()
         current_app.logger.exception('Failed to adjust inventory lot')
-        return jsonify({'ok': False, 'error': 'db_error'}), 400
+        payload = {'ok': False, 'error': 'db_error'}
+        try:
+            if bool(getattr(current_app, 'debug', False)):
+                payload['details'] = str(e)
+        except Exception:
+            pass
+        return jsonify(payload), 400
 
 
 @bp.delete('/api/lots/<int:lot_id>')

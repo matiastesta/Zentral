@@ -1,12 +1,13 @@
 from datetime import date as dt_date
 from datetime import datetime
+import json
 from uuid import uuid4
 
 from flask import jsonify, render_template, request
 from flask_login import login_required
 
 from app import db
-from app.models import Customer
+from app.models import Customer, SystemMeta
 from app.permissions import module_required, module_required_any
 from app.customers import bp
 
@@ -54,6 +55,92 @@ def _serialize_customer(row: Customer):
     }
 
 
+def _crm_meta_key(company_id: str) -> str:
+    return f"crm_config::{str(company_id or '').strip()}"
+
+
+def _default_crm_config() -> dict:
+    return {
+        'recent_days': 60,
+        'debt_overdue_days': 30,
+        'debt_critical_days': 60,
+        'freq_min_purchases': 1,
+        'best_min_purchases': 2,
+        'labels': {
+            'clas_title': 'Clasificación',
+            'best': 'Mejor cliente',
+            'freq': 'Frecuente',
+            'inactive': 'Inactivo',
+            'debtor': 'Deudor',
+            'debtor_critical': 'Deudor crítico',
+        },
+    }
+
+
+def _load_crm_config(company_id: str) -> dict:
+    cid = str(company_id or '').strip()
+    if not cid:
+        return _default_crm_config()
+    row = db.session.get(SystemMeta, _crm_meta_key(cid))
+    raw = str(getattr(row, 'value', '') or '').strip() if row else ''
+    if not raw:
+        return _default_crm_config()
+    try:
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            return _default_crm_config()
+    except Exception:
+        return _default_crm_config()
+
+    out = _default_crm_config()
+    out.update({k: parsed.get(k) for k in ['recent_days', 'debt_overdue_days', 'debt_critical_days', 'freq_min_purchases', 'best_min_purchases']})
+    lbl = parsed.get('labels') if isinstance(parsed.get('labels'), dict) else {}
+    out['labels'] = {**out.get('labels', {}), **lbl}
+    return out
+
+
+def _normalize_crm_config(payload: dict) -> dict:
+    p = payload if isinstance(payload, dict) else {}
+    base = _default_crm_config()
+    try:
+        base['recent_days'] = max(1, int(p.get('recent_days') or base['recent_days']))
+    except Exception:
+        pass
+    try:
+        base['debt_overdue_days'] = max(1, int(p.get('debt_overdue_days') or base['debt_overdue_days']))
+    except Exception:
+        pass
+    try:
+        base['debt_critical_days'] = max(base['debt_overdue_days'], int(p.get('debt_critical_days') or base['debt_critical_days']))
+    except Exception:
+        pass
+    try:
+        base['freq_min_purchases'] = max(1, int(p.get('freq_min_purchases') or base['freq_min_purchases']))
+    except Exception:
+        pass
+    try:
+        base['best_min_purchases'] = max(base['freq_min_purchases'] + 1, int(p.get('best_min_purchases') or base['best_min_purchases']))
+    except Exception:
+        pass
+
+    labels = p.get('labels') if isinstance(p.get('labels'), dict) else {}
+    cur = base.get('labels') if isinstance(base.get('labels'), dict) else {}
+
+    def _s(v, fallback):
+        s = str(v or '').strip()
+        return s or fallback
+
+    base['labels'] = {
+        'clas_title': _s(labels.get('clas_title'), cur.get('clas_title') or 'Clasificación'),
+        'best': _s(labels.get('best'), cur.get('best') or 'Mejor cliente'),
+        'freq': _s(labels.get('freq'), cur.get('freq') or 'Frecuente'),
+        'inactive': _s(labels.get('inactive'), cur.get('inactive') or 'Inactivo'),
+        'debtor': _s(labels.get('debtor'), cur.get('debtor') or 'Deudor'),
+        'debtor_critical': _s(labels.get('debtor_critical'), cur.get('debtor_critical') or 'Deudor crítico'),
+    }
+    return base
+
+
 @bp.route("/")
 @bp.route("/index")
 @login_required
@@ -61,6 +148,41 @@ def _serialize_customer(row: Customer):
 def index():
     """Listado básico de clientes (dummy)."""
     return render_template("customers/list.html", title="Clientes")
+
+
+@bp.get('/api/crm-config')
+@login_required
+@module_required('customers')
+def get_crm_config_api():
+    company_id = _company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    cfg = _load_crm_config(company_id)
+    return jsonify({'ok': True, 'item': cfg})
+
+
+@bp.put('/api/crm-config')
+@login_required
+@module_required('customers')
+def save_crm_config_api():
+    company_id = _company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    payload = request.get_json(silent=True) or {}
+    cfg = _normalize_crm_config(payload)
+
+    key = _crm_meta_key(company_id)
+    row = db.session.get(SystemMeta, key)
+    if not row:
+        row = SystemMeta(key=key)
+        db.session.add(row)
+    row.value = json.dumps(cfg, ensure_ascii=False)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+    return jsonify({'ok': True, 'item': cfg})
 
 
 @bp.get('/api/customers')

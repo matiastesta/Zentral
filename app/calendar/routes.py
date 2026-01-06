@@ -13,12 +13,28 @@ from app.models import CalendarEvent, CalendarUserConfig, CashCount, Customer, E
 from app.permissions import module_required
 
 
+def _load_crm_config(company_id: str) -> dict:
+    try:
+        from app.customers.routes import _load_crm_config as _load
+        return _load(company_id)
+    except Exception:
+        return {
+            'debt_overdue_days': 30,
+            'debt_critical_days': 60,
+        }
+
+
 def _default_calendar_config():
     return {
         "views": ["mensual", "semanal", "diaria", "lista"],
+        "debt_rules": {
+            "overdue_days": 30,
+            "critical_days": 60,
+            "critical_amount": 0,
+        },
         "event_sources": {
             "clientes": {
-                "cumpleanos": True,
+                "cumpleanos": False,
                 "deuda_vencida": True,
                 "deuda_critica": True,
             },
@@ -35,7 +51,7 @@ def _default_calendar_config():
                 "diferencias_caja": True,
             },
             "empleados": {
-                "cumpleanos": True,
+                "cumpleanos": False,
             },
             "manual": {
                 "notas_avisos": True,
@@ -336,11 +352,29 @@ def _get_system_events(cfg_data: dict, start: date, end: date):
                 if start <= d <= end:
                     _add(title='Cumpleaños: ' + nm, description=None, d=d, priority='baja', source_module='empleados', event_type='cumpleanos')
 
-    # Clientes · Deuda vencida / crítica (heurística: +30/+60 días desde venta con saldo)
+    # Clientes · Deuda vencida / crítica (solo HOY, 1 evento por cliente)
     wants_v = _is_source_enabled(cfg_data, 'clientes', 'deuda_vencida')
     wants_c = _is_source_enabled(cfg_data, 'clientes', 'deuda_critica')
-    if wants_v or wants_c:
-        lookback = start - timedelta(days=120)
+    if (wants_v or wants_c) and (start <= today <= end):
+        crm_cfg = _load_crm_config(cid)
+        try:
+            overdue_days = int((crm_cfg or {}).get('debt_overdue_days') or 30)
+        except Exception:
+            overdue_days = 30
+        try:
+            critical_days = int((crm_cfg or {}).get('debt_critical_days') or 60)
+        except Exception:
+            critical_days = 60
+        critical_amount = 0.0
+
+        if overdue_days < 0:
+            overdue_days = 0
+        if critical_days < 0:
+            critical_days = 0
+        if critical_amount < 0:
+            critical_amount = 0.0
+
+        lookback = today - timedelta(days=max(365, critical_days + 30, overdue_days + 30))
         rows = (
             db.session.query(Sale)
             .filter(Sale.company_id == cid)
@@ -348,44 +382,93 @@ def _get_system_events(cfg_data: dict, start: date, end: date):
             .filter(Sale.status != 'Reemplazada')
             .filter(Sale.due_amount > 0)
             .filter(Sale.sale_date >= lookback)
-            .filter(Sale.sale_date <= end)
+            .filter(Sale.sale_date <= today)
             .all()
         )
-        vencida_map: dict[tuple[str, date], float] = {}
-        critica_map: dict[tuple[str, date], float] = {}
+
+        # Agrupar por cliente: suma de saldo + fecha más antigua para el conteo.
+        by_customer: dict[str, dict] = {}
         for s in rows:
             sd = getattr(s, 'sale_date', None)
             if not sd:
                 continue
-            cust = str(getattr(s, 'customer_name', '') or '').strip() or str(getattr(s, 'customer_id', '') or '').strip() or 'Cliente'
+            cid_key = str(getattr(s, 'customer_id', '') or '').strip()
+            cname = str(getattr(s, 'customer_name', '') or '').strip()
+            key = cid_key or cname or 'cliente'
+            label = cname or cid_key or 'Cliente'
             due = float(getattr(s, 'due_amount', 0.0) or 0.0)
-            d30 = sd + timedelta(days=30)
-            d60 = sd + timedelta(days=60)
-            if start <= d30 <= end:
-                vencida_map[(cust, d30)] = vencida_map.get((cust, d30), 0.0) + due
-            if start <= d60 <= end:
-                critica_map[(cust, d60)] = critica_map.get((cust, d60), 0.0) + due
+            if due <= 0:
+                continue
 
-        if wants_v:
-            for (cust, d30), amt in vencida_map.items():
-                _add(
-                    title='Deuda vencida: ' + cust,
-                    description='Saldo: $' + _fmt_money(amt),
-                    d=d30,
-                    priority='media',
-                    source_module='clientes',
-                    event_type='deuda_vencida',
-                )
-        if wants_c:
-            for (cust, d60), amt in critica_map.items():
-                _add(
-                    title='Deuda crítica: ' + cust,
-                    description='Saldo: $' + _fmt_money(amt),
-                    d=d60,
-                    priority='alta',
-                    source_module='clientes',
-                    event_type='deuda_critica',
-                )
+            cur = by_customer.get(key)
+            if not cur:
+                by_customer[key] = {
+                    'name': label,
+                    'amount': due,
+                    'oldest_sale_date': sd,
+                }
+            else:
+                cur['amount'] = float(cur.get('amount') or 0.0) + due
+                oldest = cur.get('oldest_sale_date')
+                if not oldest or sd < oldest:
+                    cur['oldest_sale_date'] = sd
+
+        for key, info in by_customer.items():
+            cust = str(info.get('name') or 'Cliente')
+            amt = float(info.get('amount') or 0.0)
+            sd = info.get('oldest_sale_date')
+            if not sd or amt <= 0:
+                continue
+
+            base_overdue_date = sd + timedelta(days=overdue_days)
+            base_critical_date = sd + timedelta(days=critical_days)
+
+            is_overdue = (today >= base_overdue_date)
+            is_critical = False
+            if critical_days > 0 and today >= base_critical_date:
+                is_critical = True
+            if critical_amount > 0 and amt >= critical_amount:
+                is_critical = True
+
+            if not is_overdue and not is_critical:
+                continue
+
+            # Prioridad estricta: crítica > vencida
+            # Si el cliente es crítico, se muestra SOLO como crítico.
+            if is_critical and not (wants_c or wants_v):
+                continue
+            if (not is_critical) and (not wants_v):
+                continue
+
+            # 1 evento por cliente: si es crítica, no duplicar con vencida.
+            kind = 'deuda_critica' if is_critical else 'deuda_vencida'
+            pr = 'critica' if is_critical else 'media'
+            label = 'Deuda crítica' if is_critical else 'Deuda vencida'
+
+            days_overdue = 0
+            try:
+                days_overdue = max(0, (today - base_overdue_date).days)
+            except Exception:
+                days_overdue = 0
+
+            desc = (
+                'Cliente: ' + cust
+                + ' · Tipo: ' + label
+                + ' · Saldo: $' + _fmt_money(amt)
+                + ' · Atraso: ' + str(days_overdue) + ' días'
+                + ' · Inicio conteo: ' + sd.strftime('%d/%m/%Y')
+                + ' · Vencida desde: ' + base_overdue_date.strftime('%d/%m/%Y')
+                + ((' · Crítica desde: ' + base_critical_date.strftime('%d/%m/%Y')) if is_critical else '')
+            )
+
+            _add(
+                title=label + ': ' + cust + ' ($' + _fmt_money(amt) + ', ' + str(days_overdue) + 'd)',
+                description=desc,
+                d=today,
+                priority=pr,
+                source_module='clientes',
+                event_type=kind,
+            )
 
     # Proveedores · Cuenta corriente (desde meta_json.supplier_cc.schedule)
     wants_past = _is_source_enabled(cfg_data, 'proveedores', 'deuda_vencida')
@@ -699,6 +782,48 @@ def index():
 
             cfg_data['event_sources'] = sources
 
+            rules = cfg_data.get('debt_rules') if isinstance(cfg_data, dict) else None
+            if not isinstance(rules, dict):
+                rules = {}
+
+            def _parse_int(name: str, default: int) -> int:
+                raw = (request.form.get(name) or '').strip()
+                if raw == '':
+                    return default
+                try:
+                    return int(raw)
+                except Exception:
+                    return default
+
+            def _parse_float(name: str, default: float) -> float:
+                raw = (request.form.get(name) or '').strip()
+                if raw == '':
+                    return default
+                try:
+                    return float(raw.replace('.', '').replace(',', '.'))
+                except Exception:
+                    try:
+                        return float(raw)
+                    except Exception:
+                        return default
+
+            overdue_days = _parse_int('debt_overdue_days', int(rules.get('overdue_days') or 30))
+            critical_days = _parse_int('debt_critical_days', int(rules.get('critical_days') or 60))
+            critical_amount = _parse_float('debt_critical_amount', float(rules.get('critical_amount') or 0.0))
+
+            if overdue_days < 0:
+                overdue_days = 0
+            if critical_days < 0:
+                critical_days = 0
+            if critical_amount < 0:
+                critical_amount = 0.0
+
+            cfg_data['debt_rules'] = {
+                'overdue_days': overdue_days,
+                'critical_days': critical_days,
+                'critical_amount': critical_amount,
+            }
+
             cfg_data['dashboard_integration'] = (request.form.get('calendar_dashboard_integration') == 'on')
 
             cfg.set_config(cfg_data)
@@ -760,6 +885,46 @@ def index():
     for ev in sys_events:
         if _is_source_enabled(cfg_data, ev.source_module, ev.event_type):
             events.append(ev)
+
+    filtered_events = []
+    for ev in events:
+        d = getattr(ev, 'event_date', None)
+        if d and d < today:
+            continue
+        filtered_events.append(ev)
+    events = filtered_events
+
+    def _bucket_for(ev: CalendarEvent) -> str:
+        try:
+            sm = str(getattr(ev, 'source_module', '') or '').strip().lower()
+            et = str(getattr(ev, 'event_type', '') or '').strip().lower()
+        except Exception:
+            sm = ''
+            et = ''
+        if sm == 'clientes':
+            return 'Clientes'
+        if sm == 'movimientos':
+            return 'Movimientos'
+        if sm == 'empleados':
+            return 'Empleados'
+        if sm == 'inventario':
+            if et in {'stock_critico', 'reposicion'}:
+                return 'Stock'
+            return 'Inventario'
+        if sm in {'proveedores', 'gastos'}:
+            return 'Gastos'
+        if sm == 'ventas':
+            return 'Ventas'
+        if sm == 'manual':
+            return 'Ventas'
+        return 'Ventas'
+
+    for ev in events:
+        try:
+            setattr(ev, 'module_bucket', _bucket_for(ev))
+        except Exception:
+            pass
+
     events.sort(key=lambda ev: (ev.event_date, getattr(ev, 'id', 0) or 0))
 
     events_by_day = {}
@@ -790,6 +955,28 @@ def index():
             if not groups or groups[-1]['date'] != d:
                 groups.append({'date': d, 'items': []})
             groups[-1]['items'].append(row)
+
+        module_order = ['Clientes', 'Movimientos', 'Stock', 'Inventario', 'Ventas', 'Gastos', 'Empleados']
+        grouped = []
+        for g in groups:
+            by_mod: dict[str, list] = {}
+            for row in (g.get('items') or []):
+                ev = row.get('event')
+                bucket = str(getattr(ev, 'module_bucket', '') or '').strip() if ev else ''
+                bucket = bucket or (_bucket_for(ev) if ev else 'Ventas')
+                by_mod.setdefault(bucket, []).append(row)
+
+            mods = []
+            for label in module_order:
+                if label in by_mod:
+                    mods.append({'bucket': label, 'items': by_mod.get(label) or []})
+
+            for label in sorted([k for k in by_mod.keys() if k not in set(module_order)]):
+                mods.append({'bucket': label, 'items': by_mod.get(label) or []})
+
+            grouped.append({'date': g.get('date'), 'modules': mods})
+
+        groups = grouped
 
         week_start = None
         if range_mode == 'day':

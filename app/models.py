@@ -311,6 +311,7 @@ class Sale(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     ticket = db.Column(db.String(32), nullable=False, index=True)
+    ticket_number = db.Column(db.Integer, nullable=True, index=True)
     sale_date = db.Column(db.Date, nullable=False, index=True)
     sale_type = db.Column(db.String(16), nullable=False, default='Venta')
     status = db.Column(db.String(16), nullable=False, default='Completada')
@@ -343,6 +344,7 @@ class Sale(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('company_id', 'ticket', name='uq_sale_company_ticket'),
+        db.UniqueConstraint('company_id', 'ticket_number', name='uq_sale_company_ticket_number'),
     )
 
     items = db.relationship('SaleItem', backref='sale', cascade='all, delete-orphan', lazy=True)

@@ -246,6 +246,32 @@ document.addEventListener('DOMContentLoaded', function () {
         return String(v ?? '');
     }
 
+    function escapeHtml(v) {
+        return String(v ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function buildNoteCellHtml(note, rowKey) {
+        const raw = String(note || '');
+        const parts = raw.split(/\r?\n/);
+        const summary = String(parts[0] || '').trim();
+        const rest = String(parts.slice(1).join('\n') || '').trim();
+        const sid = 'note_' + String(rowKey || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+        const summaryHtml = escapeHtml(summary || raw).replace(/\n/g, '<br>');
+        const restHtml = escapeHtml(rest).replace(/\n/g, '<br>');
+        if (!restHtml) return '<div class="whitespace-pre-line">' + summaryHtml + '</div>';
+        return ''
+            + '<div class="whitespace-pre-line">'
+            +   '<div>' + summaryHtml + '</div>'
+            +   '<button type="button" class="btn-note-toggle mt-1 text-xs text-blue-700 hover:text-blue-900" data-target="' + sid + '" data-open="0">Ver más</button>'
+            +   '<div id="' + sid + '" class="hidden mt-1 text-gray-500">' + restHtml + '</div>'
+            + '</div>';
+    }
+
     function parseNumeroSeguro(v) {
         const n = parseFloat(String(v || '').replace(',', '.'));
         return isNaN(n) ? 0 : n;
@@ -331,9 +357,9 @@ document.addEventListener('DOMContentLoaded', function () {
             .map(o => String(o.value || ''))
             .filter(v => v !== emptyValue && String(v).trim());
 
-        if (selectedVals.includes(emptyValue)) return { mode: 'all', values: [] };
+        // Regla: "TODOS" no es un valor real. Vacío = sin filtro.
         if (!allVals.length) return { mode: 'all', values: [] };
-        if (!realSelected.length) return { mode: 'none', values: [] };
+        if (!realSelected.length) return { mode: 'all', values: [] };
         if (realSelected.length >= allVals.length) return { mode: 'all', values: [] };
         return { mode: 'some', values: realSelected };
     }
@@ -451,7 +477,9 @@ document.addEventListener('DOMContentLoaded', function () {
     function selectAllMultiSelect(selectEl) {
         if (!selectEl) return;
         try {
-            Array.from(selectEl.options || []).forEach(function (o) { o.selected = true; });
+            const allOpt = Array.from(selectEl.options || []).find(o => String(o.value || '') === '');
+            Array.from(selectEl.options || []).forEach(function (o) { o.selected = false; });
+            if (allOpt) allOpt.selected = true;
         } catch (e) {
         }
     }
@@ -680,10 +708,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }).then(r => r.json()).catch(() => ({ ok: false, error: 'network' }));
     }
 
-    function getExpenses(cb) {
+    function getExpenses(opts, cb) {
         try {
             if (window.StorageService && typeof window.StorageService.getExpenses === 'function') {
-                const res = window.StorageService.getExpenses();
+                const res = window.StorageService.getExpenses(opts);
                 if (isPromise(res)) return res.then(x => cb(Array.isArray(x) ? x : []));
                 return cb(Array.isArray(res) ? res : []);
             }
@@ -715,24 +743,53 @@ document.addEventListener('DOMContentLoaded', function () {
 
         tbodyVentas.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
         getSalesFromApi(rango, function (sales) {
+            const fromIso = (rango && rango.from) ? isoFromDate(rango.from) : '';
+            const toIso = (rango && rango.to) ? isoFromDate(rango.to) : '';
+            getExpenses({ from: fromIso, to: toIso, limit: 20000 }, function (egresos) {
+                let list = Array.isArray(sales) ? sales.slice() : [];
 
-            let list = Array.isArray(sales) ? sales.slice() : [];
-            list = list.filter(s => {
-                const txt = (String(s?.ticket || '') + ' ' + String(s?.notes_display || s?.notes || '')).toLowerCase();
-                if (q && !txt.includes(q)) return false;
-                const pm = String(s?.payment_method || '').trim();
-                if (pagosState.mode === 'none') return false;
-                if (pagosState.mode === 'some' && pagosState.values.indexOf(pm) < 0) return false;
+                const expList = Array.isArray(egresos) ? egresos : [];
+                const adjIngresos = expList
+                    .filter(e => {
+                        const origin = String(e?.origin || '').toLowerCase();
+                        const t = String(e?.type || '').trim();
+                        const amt = parseNumeroSeguro(e?.valor);
+                        if (origin !== 'inventory') return false;
+                        if (t !== 'AjusteInventario') return false;
+                        return amt < -1e-9;
+                    })
+                    .map(e => {
+                        const id = String(e?.id || '').trim();
+                        const amtAbs = Math.abs(parseNumeroSeguro(e?.valor));
+                        return {
+                            ticket: id ? ('AJI-' + id.slice(0, 8)) : 'AJI',
+                            fecha: e?.fecha || '',
+                            type: 'IngresoAjusteInv',
+                            payment_method: String(e?.forma_pago || e?.payment_method || 'Ajuste interno'),
+                            notes: String(e?.nota || ''),
+                            notes_display: String(e?.nota || ''),
+                            total: amtAbs,
+                            created_at: (typeof e?.created_at === 'number') ? e.created_at : 0,
+                        };
+                    });
 
-                const kind = saleKind(s);
-                if (tiposState.mode === 'none') return false;
-                if (tiposState.mode === 'some' && tiposState.values.indexOf(kind) < 0) return false;
+                list = list.concat(adjIngresos);
+                list = list.filter(s => {
+                    const txt = (String(s?.ticket || '') + ' ' + String(s?.notes_display || s?.notes || '')).toLowerCase();
+                    if (q && !txt.includes(q)) return false;
+                    const pm = String(s?.payment_method || '').trim();
+                    if (pagosState.mode === 'none') return false;
+                    if (pagosState.mode === 'some' && pagosState.values.indexOf(pm) < 0) return false;
 
-                const dt = parseFecha(s?.fecha || s?.date || '');
-                if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
-                return true;
-            });
-            list.sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
+                    const kind = saleKind(s);
+                    if (tiposState.mode === 'none') return false;
+                    if (tiposState.mode === 'some' && tiposState.values.indexOf(kind) < 0) return false;
+
+                    const dt = parseFecha(s?.fecha || s?.date || '');
+                    if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
+                    return true;
+                });
+                list.sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
 
             const buildNotes = function (s) {
                 const base = String(s?.notes_display || s?.notes || '').trim();
@@ -742,90 +799,91 @@ document.addEventListener('DOMContentLoaded', function () {
                 return base + ' · ' + detail;
             };
 
-            lastRendered = list.map(s => ({
-                Ticket: s?.ticket || '',
-                Fecha: fmtFecha(s?.fecha || s?.date || ''),
-                Tipo: labelTipo(s),
-                Total: formatearMoneda(parseFloat(s?.total || 0) || 0),
-                Pago: s?.payment_method || '',
-                Notas: buildNotes(s)
-            }));
+                lastRendered = list.map(s => ({
+                    Ticket: s?.ticket || '',
+                    Fecha: fmtFecha(s?.fecha || s?.date || ''),
+                    Tipo: (String(s?.type || '') === 'IngresoAjusteInv') ? 'Ingreso por ajuste' : labelTipo(s),
+                    Total: formatearMoneda(parseFloat(s?.total || 0) || 0),
+                    Pago: s?.payment_method || '',
+                    Notas: buildNotes(s)
+                }));
 
-            tbodyVentas.innerHTML = '';
-            if (!list.length) {
-                tbodyVentas.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
-                return;
-            }
-            list.forEach(s => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-gray-50';
-                const ticket = String(s?.ticket || '').trim();
-                const locked = isLockedSale(s);
-                tr.innerHTML = ''
-                    + '<td class="px-4 py-3 text-sm text-gray-900">' + String(s?.ticket || '') + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(s?.fecha || s?.date || '') + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-gray-500">' + labelTipo(s) + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(s?.payment_method || '') + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(buildNotes(s) || '').replace(/__tmp__|_tmp_/gi, '') + '</td>'
-                    + '<td class="px-4 py-3 text-center">'
-                    +   (locked ? '' : ('<button type="button" class="btn-del-sale h-8 w-8 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-ticket="' + String(ticket).replace(/"/g, '&quot;') + '" title="Eliminar">'
-                    +       '<i class="fas fa-trash text-[12px]"></i>'
-                    +   '</button>'))
-                    + '</td>';
-                tbodyVentas.appendChild(tr);
-            });
-
-            try {
-                tbodyVentas.querySelectorAll('.btn-del-sale').forEach(function (btn) {
-                    btn.addEventListener('click', async function () {
-                        const t = String(btn.getAttribute('data-ticket') || '').trim();
-                        if (!t) return;
-                        const ok = await (window.confirmModal ? window.confirmModal(
-                            '¿Querés eliminar el ticket ' + t + '? Esta acción revierte inventario y elimina el movimiento asociado.',
-                            'Eliminar ingreso',
-                            'No se puede deshacer.'
-                        ) : Promise.resolve(window.confirm('¿Eliminar el ticket ' + t + '?')));
-                        if (!ok) return;
-                        const res = await apiDeleteSale(t);
-                        if (!res || res.ok !== true) {
-                            const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo eliminar.';
-                            if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Eliminar ingreso');
-                            return;
-                        }
-                        renderVentas();
-                    });
+                tbodyVentas.innerHTML = '';
+                if (!list.length) {
+                    tbodyVentas.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+                    return;
+                }
+                list.forEach(s => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50';
+                    const ticket = String(s?.ticket || '').trim();
+                    const locked = isLockedSale(s);
+                    const noteHtml = buildNoteCellHtml(buildNotes(s), ticket || (s?.created_at || ''));
+                    tr.innerHTML = ''
+                        + '<td class="px-4 py-3 text-sm text-gray-900">' + String(s?.ticket || '') + '</td>'
+                        + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(s?.fecha || s?.date || '') + '</td>'
+                        + '<td class="px-4 py-3 text-sm text-gray-500">' + (String(s?.type || '') === 'IngresoAjusteInv' ? 'Ingreso por ajuste' : labelTipo(s)) + '</td>'
+                        + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>'
+                        + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(s?.payment_method || '') + '</td>'
+                        + '<td class="px-4 py-3 text-sm text-gray-500">' + noteHtml + '</td>'
+                        + '<td class="px-4 py-3 text-center">'
+                        +   (locked ? '' : ('<button type="button" class="btn-del-sale h-8 w-8 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-ticket="' + String(ticket).replace(/"/g, '&quot;') + '" title="Eliminar">'
+                        +       '<i class="fas fa-trash text-[12px]"></i>'
+                        +   '</button>'))
+                        + '</td>';
+                    tbodyVentas.appendChild(tr);
                 });
-            } catch (e) {}
+
+                try {
+                    tbodyVentas.querySelectorAll('.btn-del-sale').forEach(function (btn) {
+                        btn.addEventListener('click', async function () {
+                            const t = String(btn.getAttribute('data-ticket') || '').trim();
+                            if (!t) return;
+                            const ok = await (window.confirmModal ? window.confirmModal(
+                                '¿Querés eliminar el ticket ' + t + '? Esta acción revierte inventario y elimina el movimiento asociado.',
+                                'Eliminar ingreso',
+                                'No se puede deshacer.'
+                            ) : Promise.resolve(window.confirm('¿Eliminar el ticket ' + t + '?')));
+                            if (!ok) return;
+                            const res = await apiDeleteSale(t);
+                            if (!res || res.ok !== true) {
+                                const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo eliminar.';
+                                if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Eliminar ingreso');
+                                return;
+                            }
+                            renderVentas();
+                        });
+                    });
+                } catch (e) {}
+            });
         });
     }
 
     function renderEgresos() {
         if (!tbodyEgresos) return;
-        getExpenses(function (egresos) {
+        const rango = parseRangoFechas(fEgresosRange?.value);
+        const fromIso = (rango && rango.from) ? isoFromDate(rango.from) : '';
+        const toIso = (rango && rango.to) ? isoFromDate(rango.to) : '';
+        getExpenses({ from: fromIso, to: toIso, limit: 20000 }, function (egresos) {
             updateEgresosFilterOptions(egresos);
 
-            const rango = parseRangoFechas(fEgresosRange?.value);
             const pagosState = getSelectFilterState(fEgresosPago);
 
             let list = Array.isArray(egresos) ? egresos.slice() : [];
             list = list.filter(e => {
                 const catKey = normKey(e?.categoria || '');
                 if (!egresosCatsAllSelected) {
-                    if (!egresosCatsSelected.size) return false;
-                    if (!egresosCatsSelected.has(catKey)) return false;
+                    if (egresosCatsSelected.size && !egresosCatsSelected.has(catKey)) return false;
                 }
 
                 const supKey = normKey(e?.supplier_name || e?.proveedor || '');
                 if (!egresosSupsAllSelected) {
-                    if (!egresosSupsSelected.size) return false;
-                    if (!egresosSupsSelected.has(supKey)) return false;
+                    if (egresosSupsSelected.size && !egresosSupsSelected.has(supKey)) return false;
                 }
                 const dt = parseFecha(e?.fecha || '');
                 if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
 
                 const pay = String(e?.forma_pago || e?.payment_method || e?.pago || '').trim();
-                if (pagosState.mode === 'none') return false;
                 if (pagosState.mode === 'some' && pagosState.values.indexOf(pay) < 0) return false;
 
                 return true;
@@ -850,13 +908,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
                 const eid = String(e?.id || '').trim();
+                const noteHtml = buildNoteCellHtml(e?.nota || '', eid || (e?.fecha || ''));
                 tr.innerHTML = ''
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(e?.fecha || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-900">' + String(e?.categoria || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.supplier_name || e?.proveedor || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(e?.valor || 0) || 0) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(e?.forma_pago || e?.payment_method || e?.pago || '') + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.nota || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + noteHtml + '</td>'
                     + '<td class="px-4 py-3 text-center">'
                     +   '<button type="button" class="btn-del-exp h-8 w-8 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-expense-id="' + String(eid).replace(/"/g, '&quot;') + '" title="Eliminar">'
                     +       '<i class="fas fa-trash text-[12px]"></i>'
@@ -968,6 +1027,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [fVentasQ, fVentasPago, fVentasTipo].forEach(el => { if (el) el.addEventListener('input', renderVentas); if (el) el.addEventListener('change', renderVentas); });
     if (fEgresosPago) fEgresosPago.addEventListener('change', function () { try { renderEgresos(); } catch (e) { } });
+
+    document.addEventListener('click', function (ev) {
+        const btn = ev && ev.target ? ev.target.closest('.btn-note-toggle') : null;
+        if (!btn) return;
+        const targetId = String(btn.getAttribute('data-target') || '').trim();
+        if (!targetId) return;
+        const el = document.getElementById(targetId);
+        if (!el) return;
+        const open = String(btn.getAttribute('data-open') || '0') === '1';
+        el.classList.toggle('hidden', open);
+        btn.setAttribute('data-open', open ? '0' : '1');
+        btn.textContent = open ? 'Ver más' : 'Ver menos';
+    });
 
     if (fEgresosCatBtn && fEgresosCatMenu) {
         fEgresosCatBtn.addEventListener('click', function () {
@@ -1095,19 +1167,29 @@ document.addEventListener('DOMContentLoaded', function () {
         const apply = function (mode) {
             internal = true;
             try {
-                const allVals = getAllOptionValues();
                 const opts = Array.from(selectEl.options || []);
+                const allVals = getAllOptionValues();
+                const allOpt = opts.find(o => String(o.value || '') === allValue);
                 if (mode === 'all') {
-                    opts.forEach(o => { if (String(o.value || '') === allValue) o.selected = true; else o.selected = true; });
+                    // Master: solo "TODOS" seleccionado (no mezclar con valores reales)
+                    opts.forEach(o => { o.selected = false; });
+                    if (allOpt) allOpt.selected = true;
                 } else if (mode === 'none') {
                     opts.forEach(o => { o.selected = false; });
                 } else if (mode === 'sync') {
                     const selectedVals = Array.from(selectEl.selectedOptions || []).map(o => String(o.value || ''));
-                    const selectedReal = selectedVals.filter(v => v !== allValue);
+                    const selectedReal = selectedVals.filter(v => v !== allValue && String(v).trim());
                     const hasAll = selectedVals.includes(allValue);
-                    const allOpt = opts.find(o => String(o.value || '') === allValue);
-                    if (allOpt) {
-                        allOpt.selected = hasAll || (allVals.length > 0 && selectedReal.length >= allVals.length);
+
+                    // No permitir estado: TODOS + opciones individuales
+                    if (hasAll && selectedReal.length) {
+                        if (allOpt) allOpt.selected = false;
+                    }
+
+                    // Si el usuario seleccionó todas las reales, colapsar a TODOS
+                    if (!hasAll && allVals.length > 0 && selectedReal.length >= allVals.length) {
+                        opts.forEach(o => { o.selected = false; });
+                        if (allOpt) allOpt.selected = true;
                     }
                 }
             } catch (e) {
@@ -1120,17 +1202,29 @@ document.addEventListener('DOMContentLoaded', function () {
             const selectedVals = Array.from(selectEl.selectedOptions || []).map(o => String(o.value || ''));
             const hasAll = selectedVals.includes(allValue);
             const allVals = getAllOptionValues();
-            const realSelected = selectedVals.filter(v => v !== allValue);
+            const realSelected = selectedVals.filter(v => v !== allValue && String(v).trim());
 
-            if (hasAll) {
-                if (realSelected.length >= allVals.length) {
-                    apply('none');
-                } else {
-                    apply('all');
-                }
-            } else {
-                apply('sync');
+            // Si se selecciona TODOS mientras hay selección parcial, se interpreta como "activar todos"
+            // (equivalente a no filtrar) => colapsar a solo TODOS.
+            if (hasAll && realSelected.length) {
+                apply('all');
+                return;
             }
+
+            // Si el usuario dejó todas las opciones vacías, queda "sin selección" (vacío)
+            if (!hasAll && !realSelected.length) {
+                apply('none');
+                return;
+            }
+
+            // Si seleccionó todas las reales => colapsar a TODOS
+            if (!hasAll && allVals.length > 0 && realSelected.length >= allVals.length) {
+                apply('all');
+                return;
+            }
+
+            // Si seleccionó opciones individuales => asegurar TODOS apagado
+            apply('sync');
         });
 
         apply('sync');
