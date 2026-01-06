@@ -14,6 +14,7 @@ from config import Config, config
 login_manager = LoginManager()
 login_manager.login_view = 'auth.login'
 login_manager.login_message_category = 'info'
+login_manager.login_message = None
 babel = Babel()
 db = SQLAlchemy()
 migrate = Migrate()
