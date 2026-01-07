@@ -71,8 +71,8 @@ def _default_crm_config() -> dict:
             'best': 'Mejor cliente',
             'freq': 'Frecuente',
             'inactive': 'Inactivo',
-            'debtor': 'Deudor',
-            'debtor_critical': 'Deudor crítico',
+            'debtor': 'CC Vencida',
+            'debtor_critical': 'CC Vencida Crítica',
         },
     }
 
@@ -96,6 +96,13 @@ def _load_crm_config(company_id: str) -> dict:
     out.update({k: parsed.get(k) for k in ['recent_days', 'debt_overdue_days', 'debt_critical_days', 'freq_min_purchases', 'best_min_purchases']})
     lbl = parsed.get('labels') if isinstance(parsed.get('labels'), dict) else {}
     out['labels'] = {**out.get('labels', {}), **lbl}
+    # Ensure legacy/subjective labels cannot leak back into the UI.
+    try:
+        if isinstance(out.get('labels'), dict):
+            out['labels']['debtor'] = 'CC Vencida'
+            out['labels']['debtor_critical'] = 'CC Vencida Crítica'
+    except Exception:
+        pass
     return out
 
 
@@ -135,8 +142,9 @@ def _normalize_crm_config(payload: dict) -> dict:
         'best': _s(labels.get('best'), cur.get('best') or 'Mejor cliente'),
         'freq': _s(labels.get('freq'), cur.get('freq') or 'Frecuente'),
         'inactive': _s(labels.get('inactive'), cur.get('inactive') or 'Inactivo'),
-        'debtor': _s(labels.get('debtor'), cur.get('debtor') or 'Deudor'),
-        'debtor_critical': _s(labels.get('debtor_critical'), cur.get('debtor_critical') or 'Deudor crítico'),
+        # Fixed financial labels (must not be subjective / legacy).
+        'debtor': 'CC Vencida',
+        'debtor_critical': 'CC Vencida Crítica',
     }
     return base
 

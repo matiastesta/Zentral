@@ -46,9 +46,9 @@
             <div class="h-10 w-10 rounded-full bg-amber-50 text-amber-800 flex items-center justify-center">
                 <i class="fas fa-exclamation-triangle text-sm"></i>
             </div>
-            <p class="mt-2 text-sm font-medium text-gray-500">{{ label_customers }} deudores</p>
-            <p id="kpi-clientes-deudores" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
-            <div id="kpi-clientes-deudores-sub" class="mt-1 text-xs text-gray-500"></div>
+            <p class="mt-2 text-sm font-medium text-gray-500">{{ label_customers }} con CC vencida</p>
+            <p id="kpi-clientes-cc-vencida" class="mt-2 text-2xl font-semibold text-gray-900">0</p>
+            <div id="kpi-clientes-cc-vencida-sub" class="mt-1 text-xs text-gray-500"></div>
         </div>
     </div>
     <div class="p-4 bg-white rounded-lg shadow border border-gray-200">
@@ -193,7 +193,7 @@
                     <div class="text-sm font-semibold text-gray-900">Clasificación de clientes</div>
                     <div class="mt-1 text-[11px] text-gray-500">Reglas basadas en compras recientes. El cliente “Mejor” siempre exige más compras que “Frecuente”.</div>
                     <div class="mt-2 p-3 rounded-lg border border-amber-200 bg-amber-50 text-[11px] text-amber-900">
-                        La condición de Deudor / Deudor crítico tiene prioridad absoluta sobre las clasificaciones comerciales. Mientras exista deuda, el cliente será considerado deudor independientemente de sus compras.
+                        La condición de CC Vencida / CC Vencida Crítica tiene prioridad absoluta sobre las clasificaciones comerciales. Solo se aplica cuando la cuenta corriente está vencida (según días de deuda).
                     </div>
                     <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
@@ -250,8 +250,14 @@
                                 <input id="crm-label-inactive" type="text" class="w-full px-3 py-2 text-sm border rounded-md" value="Inactivo">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Deudor</label>
-                                <input id="crm-label-debtor" type="text" class="w-full px-3 py-2 text-sm border rounded-md" value="Deudor">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">CC Vencida</label>
+                                <input id="crm-label-debtor" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" value="CC Vencida" disabled>
+                                <div class="mt-1 text-[11px] text-gray-500">Nombre fijo.</div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">CC Vencida Crítica</label>
+                                <input id="crm-label-debtor-critical" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" value="CC Vencida Crítica" disabled>
+                                <div class="mt-1 text-[11px] text-gray-500">Nombre fijo.</div>
                             </div>
                         </div>
                     </div>
@@ -442,9 +448,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const kpiTotal = document.getElementById('kpi-clientes-total');
     const kpiActivos = document.getElementById('kpi-clientes-activos');
-    const kpiDeudores = document.getElementById('kpi-clientes-deudores');
+    const kpiCcVencida = document.getElementById('kpi-clientes-cc-vencida');
     const kpiDeuda = document.getElementById('kpi-clientes-deuda');
-    const kpiDeudoresSub = document.getElementById('kpi-clientes-deudores-sub');
+    const kpiCcVencidaSub = document.getElementById('kpi-clientes-cc-vencida-sub');
 
     const inputSearch = document.getElementById('clientes-search');
     const filterClasBtn = document.getElementById('clientes-filter-clasificacion-btn');
@@ -485,6 +491,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const inputCrmLabelFreq = document.getElementById('crm-label-freq');
     const inputCrmLabelInactive = document.getElementById('crm-label-inactive');
     const inputCrmLabelDebtor = document.getElementById('crm-label-debtor');
+    const inputCrmLabelDebtorCritical = document.getElementById('crm-label-debtor-critical');
 
     const crmPreview = document.getElementById('crm-preview');
     const crmConfigError = document.getElementById('crm-config-error');
@@ -550,8 +557,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let clasTitle = 'Clasificación';
     let clasOpts = [
-        { k: 'deudor_critico', label: 'Deudor crítico' },
-        { k: 'deudor', label: 'Deudor' },
+        { k: 'deudor_critico', label: 'CC Vencida Crítica' },
+        { k: 'deudor', label: 'CC Vencida' },
         { k: 'mejor_cliente', label: 'Mejor cliente' },
         { k: 'frecuente', label: 'Frecuente' },
         { k: 'inactivo', label: 'Inactivo' },
@@ -632,7 +639,8 @@ document.addEventListener('DOMContentLoaded', function () {
             best: safeStr(inputCrmLabelBest?.value || 'Mejor cliente').trim() || 'Mejor cliente',
             freq: safeStr(inputCrmLabelFreq?.value || 'Frecuente').trim() || 'Frecuente',
             inactive: safeStr(inputCrmLabelInactive?.value || 'Inactivo').trim() || 'Inactivo',
-            debtor: safeStr(inputCrmLabelDebtor?.value || 'Deudor').trim() || 'Deudor',
+            debtor: safeStr(inputCrmLabelDebtor?.value || 'CC Vencida').trim() || 'CC Vencida',
+            debtor_critical: safeStr(inputCrmLabelDebtorCritical?.value || 'CC Vencida Crítica').trim() || 'CC Vencida Crítica',
         };
         return {
             recent_days: recentDays,
@@ -656,7 +664,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!safeStr(c.labels?.best).trim()) return 'El nombre de "Mejor cliente" no puede estar vacío.';
         if (!safeStr(c.labels?.freq).trim()) return 'El nombre de "Frecuente" no puede estar vacío.';
         if (!safeStr(c.labels?.inactive).trim()) return 'El nombre de "Inactivo" no puede estar vacío.';
-        if (!safeStr(c.labels?.debtor).trim()) return 'El nombre de "Deudor" no puede estar vacío.';
+        if (!safeStr(c.labels?.debtor).trim()) return 'El nombre de "CC Vencida" no puede estar vacío.';
         return '';
     }
 
@@ -667,13 +675,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const best = safeStr(c.labels?.best || 'Mejor cliente') || 'Mejor cliente';
         const freq = safeStr(c.labels?.freq || 'Frecuente') || 'Frecuente';
         const inactive = safeStr(c.labels?.inactive || 'Inactivo') || 'Inactivo';
-        const debtor = safeStr(c.labels?.debtor || 'Deudor') || 'Deudor';
+        const overdue = safeStr(c.labels?.debtor || 'CC Vencida') || 'CC Vencida';
+        const critical = safeStr(c.labels?.debtor_critical || 'CC Vencida Crítica') || 'CC Vencida Crítica';
 
         const rows = [
-            { k: debtor, c1: 'Con deuda (saldo > 0)', c2: 'Crítica si >= ' + safeStr(c.debt_critical_days) + ' días' },
-            { k: best, c1: '>= ' + safeStr(c.best_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'Sin deuda' },
-            { k: freq, c1: '>= ' + safeStr(c.freq_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'Sin deuda' },
-            { k: inactive, c1: 'No cumple Mejor/Frecuente', c2: 'Sin deuda y sin actividad reciente' },
+            { k: critical, c1: 'Saldo > 0', c2: 'Días de deuda >= ' + safeStr(c.debt_critical_days) + ' (crítica)' },
+            { k: overdue, c1: 'Saldo > 0', c2: 'Días de deuda >= ' + safeStr(c.debt_overdue_days) + ' (vencida) y < ' + safeStr(c.debt_critical_days) },
+            { k: best, c1: '>= ' + safeStr(c.best_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'CC no vencida' },
+            { k: freq, c1: '>= ' + safeStr(c.freq_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'CC no vencida' },
+            { k: inactive, c1: 'No cumple Mejor/Frecuente', c2: 'CC no vencida y sin actividad reciente' },
         ];
 
         const html = [];
@@ -725,7 +735,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         best: safeStr(parsed.labels?.best || 'Mejor cliente') || 'Mejor cliente',
                         freq: safeStr(parsed.labels?.freq || 'Frecuente') || 'Frecuente',
                         inactive: safeStr(parsed.labels?.inactive || 'Inactivo') || 'Inactivo',
-                        debtor: safeStr(parsed.labels?.debtor || 'Deudor') || 'Deudor'
+                        debtor: safeStr(parsed.labels?.debtor || 'CC Vencida') || 'CC Vencida',
+                        debtor_critical: safeStr(parsed.labels?.debtor_critical || 'CC Vencida Crítica') || 'CC Vencida Crítica'
                     }
                 };
             }
@@ -744,7 +755,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 debt_critical_days: critical,
                 freq_min_purchases: 1,
                 best_min_purchases: 2,
-                labels: { clas_title: 'Clasificación', best: 'Mejor cliente', freq: 'Frecuente', inactive: 'Inactivo', debtor: 'Deudor' }
+                labels: { clas_title: 'Clasificación', best: 'Mejor cliente', freq: 'Frecuente', inactive: 'Inactivo', debtor: 'CC Vencida', debtor_critical: 'CC Vencida Crítica' }
             };
         } catch (e) {
         }
@@ -755,7 +766,7 @@ document.addEventListener('DOMContentLoaded', function () {
             debt_critical_days: 60,
             freq_min_purchases: 1,
             best_min_purchases: 2,
-            labels: { clas_title: 'Clasificación', best: 'Mejor cliente', freq: 'Frecuente', inactive: 'Inactivo', debtor: 'Deudor', debtor_critical: 'Deudor crítico' }
+            labels: { clas_title: 'Clasificación', best: 'Mejor cliente', freq: 'Frecuente', inactive: 'Inactivo', debtor: 'CC Vencida', debtor_critical: 'CC Vencida Crítica' }
         };
     }
 
@@ -1027,8 +1038,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const title = safeStr(c.labels?.clas_title || 'Clasificación') || 'Clasificación';
         clasTitle = title;
         clasOpts = [
-            { k: 'deudor_critico', label: safeStr(c.labels?.debtor_critical || 'Deudor crítico') || 'Deudor crítico' },
-            { k: 'deudor', label: safeStr(c.labels?.debtor || 'Deudor') || 'Deudor' },
+            { k: 'deudor_critico', label: safeStr(c.labels?.debtor_critical || 'CC Vencida Crítica') || 'CC Vencida Crítica' },
+            { k: 'deudor', label: safeStr(c.labels?.debtor || 'CC Vencida') || 'CC Vencida' },
             { k: 'mejor_cliente', label: safeStr(c.labels?.best || 'Mejor cliente') || 'Mejor cliente' },
             { k: 'frecuente', label: safeStr(c.labels?.freq || 'Frecuente') || 'Frecuente' },
             { k: 'inactivo', label: safeStr(c.labels?.inactive || 'Inactivo') || 'Inactivo' },
@@ -1302,8 +1313,10 @@ document.addEventListener('DOMContentLoaded', function () {
             }).length;
 
             let clas = 'inactivo';
-            if (saldo > 0) {
-                clas = (diasDeuda >= criticalDays) ? 'deudor_critico' : 'deudor';
+            if ((saldo > 0) && (diasDeuda >= criticalDays)) {
+                clas = 'deudor_critico';
+            } else if ((saldo > 0) && (diasDeuda >= overdueDays)) {
+                clas = 'deudor';
             } else if (recentPurchases >= bestMin) {
                 clas = 'mejor_cliente';
             } else if (recentPurchases >= freqMin) {
@@ -1358,9 +1371,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     const dias = (parseInt(c.dias_deuda || 0, 10) || 0);
                     const hasCc = !!c.tiene_cuenta_corriente;
                     if (k === 'sin_cc') return !hasCc;
-                    if (k === 'al_dia') return hasCc && (saldo <= 0 || dias <= overdueDays);
-                    if (k === 'vencida') return (saldo > 0) && (dias > overdueDays) && (dias <= criticalDays);
-                    if (k === 'vencida_critica') return (saldo > 0) && (dias > criticalDays);
+                    if (k === 'al_dia') return hasCc && (saldo <= 0 || dias < overdueDays);
+                    if (k === 'vencida') return (saldo > 0) && (dias >= overdueDays) && (dias < criticalDays);
+                    if (k === 'vencida_critica') return (saldo > 0) && (dias >= criticalDays);
                     return false;
                 };
                 const ok = Array.from(ccSelected).some(has);
@@ -1409,10 +1422,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const lblBest = safeStr(crm?.labels?.best || 'Mejor cliente') || 'Mejor cliente';
         const lblFreq = safeStr(crm?.labels?.freq || 'Frecuente') || 'Frecuente';
         const lblInactive = safeStr(crm?.labels?.inactive || 'Inactivo') || 'Inactivo';
-        const lblDebtor = safeStr(crm?.labels?.debtor || 'Deudor') || 'Deudor';
-        const lblDebtorCrit = safeStr(crm?.labels?.debtor_critical || 'Deudor crítico') || 'Deudor crítico';
+        const lblDebtor = safeStr(crm?.labels?.debtor || 'CC Vencida') || 'CC Vencida';
+        const lblDebtorCrit = safeStr(crm?.labels?.debtor_critical || 'CC Vencida Crítica') || 'CC Vencida Crítica';
         if (cls === 'deudor_critico') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-600 text-white text-[11px] font-medium">' + lblDebtorCrit + '</span>';
-        if (cls === 'deudor') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-medium">' + lblDebtor + '</span>';
+        if (cls === 'deudor') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-medium">' + lblDebtor + '</span>';
         if (cls === 'inactivo') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">' + lblInactive + '</span>';
         if (cls === 'mejor_cliente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium">' + lblBest + '</span>';
         if (cls === 'frecuente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">' + lblFreq + '</span>';
@@ -1480,17 +1493,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const crm = getCrmCfg();
         const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
-        const conDeuda = derived.filter(x => (x.saldo_actual || 0) > 0 && ((parseInt(x.dias_deuda || 0, 10) || 0) <= overdueDays)).length;
-        const conDeudaVencida = derived.filter(x => (x.saldo_actual || 0) > 0 && ((parseInt(x.dias_deuda || 0, 10) || 0) > overdueDays)).length;
-        const deudores = conDeuda + conDeudaVencida;
+        const conSaldoNoVencido = derived.filter(x => (x.saldo_actual || 0) > 0 && ((parseInt(x.dias_deuda || 0, 10) || 0) < overdueDays)).length;
+        const ccVencidaCount = derived.filter(x => (x.saldo_actual || 0) > 0 && ((parseInt(x.dias_deuda || 0, 10) || 0) >= overdueDays)).length;
         const deudaTotal = derived.reduce((acc, x) => acc + (parseFloat(x.saldo_actual || 0) || 0), 0);
 
         if (kpiTotal) kpiTotal.textContent = safeStr(totalClientes);
         if (kpiActivos) kpiActivos.textContent = safeStr(activos);
-        if (kpiDeudores) kpiDeudores.textContent = safeStr(deudores);
+        if (kpiCcVencida) kpiCcVencida.textContent = safeStr(ccVencidaCount);
         if (kpiDeuda) kpiDeuda.textContent = fmtMoney(deudaTotal);
-        if (kpiDeudoresSub) {
-            kpiDeudoresSub.textContent = 'Con deuda: ' + safeStr(conDeuda) + ' · Con deuda vencida: ' + safeStr(conDeudaVencida);
+        if (kpiCcVencidaSub) {
+            kpiCcVencidaSub.textContent = 'Con saldo (no vencida): ' + safeStr(conSaldoNoVencido) + ' · CC vencida: ' + safeStr(ccVencidaCount);
         }
 
         if (!sorted.length) {
@@ -1698,7 +1710,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (inputCrmLabelBest) inputCrmLabelBest.value = safeStr(cfg.labels?.best || 'Mejor cliente');
                     if (inputCrmLabelFreq) inputCrmLabelFreq.value = safeStr(cfg.labels?.freq || 'Frecuente');
                     if (inputCrmLabelInactive) inputCrmLabelInactive.value = safeStr(cfg.labels?.inactive || 'Inactivo');
-                    if (inputCrmLabelDebtor) inputCrmLabelDebtor.value = safeStr(cfg.labels?.debtor || 'Deudor');
+                    if (inputCrmLabelDebtor) inputCrmLabelDebtor.value = safeStr(cfg.labels?.debtor || 'CC Vencida');
+                    if (inputCrmLabelDebtorCritical) inputCrmLabelDebtorCritical.value = safeStr(cfg.labels?.debtor_critical || 'CC Vencida Crítica');
                     try { renderCrmPreview(readCrmFormValues()); } catch (e) { }
                     openModal(modalAlerts);
                 });
