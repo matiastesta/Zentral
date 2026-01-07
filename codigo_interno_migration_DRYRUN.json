@@ -1,0 +1,118 @@
+{
+  "ok": true,
+  "dry_run": true,
+  "generated_at": "2026-01-07T14:57:55.562635Z",
+  "companies": [
+    {
+      "company_id": "e279242b-1a5f-4a22-ba69-b838458729ae",
+      "ok": true,
+      "total": 17,
+      "updated": 17,
+      "errors": [],
+      "changes": [
+        {
+          "id": 5,
+          "name": "Cafe",
+          "before": "WBPN7TWA",
+          "after": "CAFALI01"
+        },
+        {
+          "id": 6,
+          "name": "Cafe",
+          "before": "SRRCWGV5",
+          "after": "CAFALI02"
+        },
+        {
+          "id": 7,
+          "name": "Cafe",
+          "before": "5YFLGC5F",
+          "after": "CAFALI03"
+        },
+        {
+          "id": 8,
+          "name": "Estante de librería",
+          "before": "UNK4WEZQ",
+          "after": "ESTALI01"
+        },
+        {
+          "id": 9,
+          "name": "Lata",
+          "before": "2UKM4HQ3",
+          "after": "LATALI01"
+        },
+        {
+          "id": 10,
+          "name": "Carton",
+          "before": "PXACT72L",
+          "after": "CARCAJ01"
+        },
+        {
+          "id": 11,
+          "name": "Lechon",
+          "before": "24EBFPZR",
+          "after": "LECMUE01"
+        },
+        {
+          "id": 12,
+          "name": "Lata",
+          "before": "IM32ZZ6O",
+          "after": "LATALI02"
+        },
+        {
+          "id": 13,
+          "name": "Carton",
+          "before": "FNMMU7TQ",
+          "after": "CARCAJ02"
+        },
+        {
+          "id": 14,
+          "name": "Lechon",
+          "before": "XKAIYJCD",
+          "after": "LECMUE02"
+        },
+        {
+          "id": 15,
+          "name": "Lata",
+          "before": "VTPPWS7O",
+          "after": "LATALI03"
+        },
+        {
+          "id": 16,
+          "name": "Carton",
+          "before": "EEJ2YCAW",
+          "after": "CARCAJ03"
+        },
+        {
+          "id": 17,
+          "name": "Lechon",
+          "before": "4IIWH6AU",
+          "after": "LECMUE03"
+        },
+        {
+          "id": 18,
+          "name": "Leche",
+          "before": "MP6XVIIT",
+          "after": "LECLAC01"
+        },
+        {
+          "id": 19,
+          "name": "Polenta",
+          "before": "74NURMXW",
+          "after": "POLALI01"
+        },
+        {
+          "id": 20,
+          "name": "Arroz",
+          "before": "ADJKX7CJ",
+          "after": "ARRMUE01"
+        },
+        {
+          "id": 21,
+          "name": "Huevo",
+          "before": "XMNZCDMQ",
+          "after": "HUEALI01"
+        }
+      ]
+    }
+  ]
+}

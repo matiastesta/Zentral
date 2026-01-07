@@ -253,7 +253,7 @@
                             <div class="mt-2 text-xs text-gray-600 space-y-1">
                                 <div><span class="text-gray-500">Nombre:</span> <span id="file-v-name" class="text-gray-800"></span></div>
                                 <div><span class="text-gray-500">Categoría:</span> <span id="file-v-category" class="text-gray-800"></span></div>
-                                <div><span class="text-gray-500">Unidad:</span> <span id="file-v-unit" class="text-gray-800"></span></div>
+                                <div><span class="text-gray-500">Código interno:</span> <span id="file-v-codigo-interno" class="text-gray-800"></span></div>
                                 <div><span class="text-gray-500">Estado:</span> <span id="file-v-active" class="text-gray-800"></span></div>
                                 <div><span class="text-gray-500">Proveedor:</span> <span id="file-v-supplier" class="text-gray-800"></span></div>
                                 <div><span class="text-gray-500">Descripción:</span> <span id="file-v-desc" class="text-gray-800"></span></div>
@@ -297,23 +297,11 @@
                                     <option value="">— Seleccionar —</option>
                                 </select>
                             </div>
-                            <div class="md:col-span-2">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Unidad</label>
-                                <div id="file-unit-view" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
-                                <select id="file-unit" class="hidden w-full px-3 py-2 text-sm border rounded-md bg-white">
-                                    <option value="Unidad">Unidad</option>
-                                    <option value="Kg">Kg</option>
-                                    <option value="L">L</option>
-                                    <option value="Otro">Otro</option>
-                                </select>
-                            </div>
-                            <div id="wrap-file-unit" class="md:col-span-3 hidden">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Unidad (otro)</label>
-                                <input id="file-unit-other" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: caja">
-                            </div>
                             <div class="md:col-span-3">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Código interno / SKU</label>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Código interno</label>
                                 <div id="file-sku" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
+                                <input id="file-codigo-interno" type="text" maxlength="8" class="hidden w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
+                                <div id="file-codigo-interno-hint" class="hidden mt-1 text-[11px] text-gray-500">0/8 · A-Z y 0-9</div>
                             </div>
                             <div class="md:col-span-3">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>
@@ -529,10 +517,9 @@
                     <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Producto</th>
                     <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
                     <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Stock</th>
-                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Unidad</th>
                     <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Costo prom.</th>
                     <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Valor total</th>
-                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Descripción</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Código interno</th>
                     <th class="px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">Estado</th>
                     <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"></th>
                 </tr>
@@ -565,7 +552,7 @@
             </thead>
             <tbody id="inv-tbody-current" class="bg-white divide-y divide-gray-200">
                 <tr>
-                    <td colspan="10" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay productos. Usá “Crear ítem” para comenzar.</td>
+                    <td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay productos. Usá “Crear ítem” para comenzar.</td>
                 </tr>
             </tbody>
         </table>
@@ -577,7 +564,7 @@
                 <tr>
                     <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Imagen</th>
                     <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Producto</th>
-                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Descripción</th>
+                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Código interno</th>
                     <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha de ingreso</th>
                     <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Cantidad</th>
                     <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Costo unitario</th>
@@ -723,17 +710,9 @@
                                 </div>
                             </div>
                             <div class="md:col-span-2">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Unidad <span class="text-red-600">*</span></label>
-                                <select id="prod-unit" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                                    <option value="Unidad">Unidad</option>
-                                    <option value="Kg">Kg</option>
-                                    <option value="L">L</option>
-                                    <option value="Otro">Otro</option>
-                                </select>
-                            </div>
-                            <div id="wrap-prod-unit" class="md:col-span-3 hidden">
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Unidad (otro)</label>
-                                <input id="prod-unit-other" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: caja">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Código interno</label>
+                                <input id="prod-codigo-interno" type="text" maxlength="8" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
+                                <div id="prod-codigo-interno-hint" class="mt-1 text-[11px] text-gray-500">0/8 · A-Z y 0-9</div>
                             </div>
                             <div class="md:col-span-5">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Descripción</label>
@@ -897,7 +876,7 @@
                             <div>
                                 <div class="text-xs font-semibold text-gray-700">Columnas opcionales</div>
                                 <div class="mt-2 text-xs text-gray-600 grid grid-cols-2 gap-x-6 gap-y-1">
-                                    <div>unidad</div>
+                                    <div>codigo_interno</div>
                                     <div>descripcion</div>
                                     <div>costo_unitario</div>
                                     <div>cantidad</div>
@@ -998,7 +977,7 @@
                                         <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:140px;">Fila</th>
                                         <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:210px;">Nombre</th>
                                         <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:160px;">Categoría</th>
-                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:110px;">Unidad</th>
+                                        <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:140px;">Código interno</th>
                                         <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:115px;">Precio lista</th>
                                         <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:220px;">Descripción</th>
                                         <th class="px-3 py-2 text-xs font-semibold text-gray-600 text-center" style="min-width:110px;">Cantidad</th>
@@ -1343,11 +1322,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const fileName = document.getElementById('file-name');
     const fileCatView = document.getElementById('file-cat-view');
     const fileCat = document.getElementById('file-cat');
-    const fileUnitView = document.getElementById('file-unit-view');
-    const fileUnit = document.getElementById('file-unit');
-    const wrapFileUnit = document.getElementById('wrap-file-unit');
-    const fileUnitOther = document.getElementById('file-unit-other');
     const fileSku = document.getElementById('file-sku');
+    const fileCodigoInterno = document.getElementById('file-codigo-interno');
+    const fileCodigoInternoHint = document.getElementById('file-codigo-interno-hint');
     const fileActiveView = document.getElementById('file-active-view');
     const fileActiveEditWrap = document.getElementById('file-active-edit-wrap');
     const fileActive = document.getElementById('file-active');
@@ -1384,7 +1361,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const fileViewCards = document.getElementById('file-view-cards');
     const fileVName = document.getElementById('file-v-name');
     const fileVCategory = document.getElementById('file-v-category');
-    const fileVUnit = document.getElementById('file-v-unit');
+    const fileVCodigoInterno = document.getElementById('file-v-codigo-interno');
     const fileVActive = document.getElementById('file-v-active');
     const fileVSupplier = document.getElementById('file-v-supplier');
     const fileVDesc = document.getElementById('file-v-desc');
@@ -1419,9 +1396,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const prodName = document.getElementById('prod-name');
     const prodCatId = document.getElementById('prod-cat-id');
-    const prodUnit = document.getElementById('prod-unit');
-    const wrapProdUnit = document.getElementById('wrap-prod-unit');
-    const prodUnitOther = document.getElementById('prod-unit-other');
+    const prodCodigoInterno = document.getElementById('prod-codigo-interno');
+    const prodCodigoInternoHint = document.getElementById('prod-codigo-interno-hint');
     const prodActive = document.getElementById('prod-active');
     const prodActiveLabel = document.getElementById('prod-active-label');
     const prodImage = document.getElementById('prod-image');
@@ -1498,13 +1474,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
      function saveProductDraft() {
          try {
-             const unitBase = String(prodUnit?.value || '').trim();
-             const unitOther = String(prodUnitOther?.value || '').trim();
+             const codigoInterno = String(prodCodigoInterno?.value || '').trim();
              const payload = {
                  name: String(prodName?.value || ''),
                  category_id: String(prodCatId?.value || ''),
-                 unit_base: unitBase,
-                 unit_other: unitOther,
+                 codigo_interno: codigoInterno,
                  active: true,
                  description: String(prodDesc?.value || ''),
                  uses_lots: true,
@@ -1527,9 +1501,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
              if (prodName && d.name != null) prodName.value = String(d.name || '');
              if (prodCatId && d.category_id != null) prodCatId.value = String(d.category_id || '');
-             if (prodUnit && d.unit_base != null) prodUnit.value = String(d.unit_base || 'Unidad') || 'Unidad';
-             if (prodUnitOther && d.unit_other != null) prodUnitOther.value = String(d.unit_other || '');
-             if (wrapProdUnit) wrapProdUnit.classList.toggle('hidden', String(prodUnit?.value || '') !== 'Otro');
+             if (prodCodigoInterno && d.codigo_interno != null) prodCodigoInterno.value = String(d.codigo_interno || '');
 
              if (prodDesc && d.description != null) prodDesc.value = String(d.description || '');
              if (prodMin && d.min_stock != null) prodMin.value = String(d.min_stock ?? '');
@@ -2548,9 +2520,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (fileCatView) fileCatView.classList.toggle('hidden', fileEditMode);
         if (fileCat) fileCat.classList.toggle('hidden', !fileEditMode);
 
-        if (fileUnitView) fileUnitView.classList.toggle('hidden', fileEditMode);
-        if (fileUnit) fileUnit.classList.toggle('hidden', !fileEditMode);
-        if (wrapFileUnit) wrapFileUnit.classList.toggle('hidden', !fileEditMode || String(fileUnit?.value || '') !== 'Otro');
+        if (fileSku) fileSku.classList.toggle('hidden', fileEditMode);
+        if (fileCodigoInterno) fileCodigoInterno.classList.toggle('hidden', !fileEditMode);
+        if (fileCodigoInternoHint) fileCodigoInternoHint.classList.toggle('hidden', !fileEditMode);
 
         if (fileActiveView) fileActiveView.classList.toggle('hidden', fileEditMode);
         if (fileActiveEditWrap) fileActiveEditWrap.classList.toggle('hidden', !fileEditMode);
@@ -2628,7 +2600,6 @@ document.addEventListener('DOMContentLoaded', function () {
         // Campos en modo vista
         setField(fileNameView);
         setField(fileCatView);
-        setField(fileUnitView);
         setField(fileSku);
         setField(fileActiveView);
         setField(fileSupplierView);
@@ -2735,7 +2706,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fileImageWasChanged = false;
         if (fileVName) fileVName.textContent = '—';
         if (fileVCategory) fileVCategory.textContent = '—';
-        if (fileVUnit) fileVUnit.textContent = '—';
+        if (fileVCodigoInterno) fileVCodigoInterno.textContent = '—';
         if (fileVActive) fileVActive.textContent = '—';
         if (fileVSupplier) fileVSupplier.textContent = '—';
         if (fileVDesc) fileVDesc.textContent = '—';
@@ -2770,17 +2741,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (fileSubtitle) fileSubtitle.textContent = String(prod?.name || '');
 
                 const catName = String(prod?.category?.name || prod?.category || '').trim();
-                const unitName = String(prod?.unit_name || prod?.unit || '').trim();
                 const supplierName = String(prod?.primary_supplier_name || '').trim();
                 const supplierId = String(prod?.primary_supplier_id || '').trim();
-                const internalCode = String(prod?.internal_code || '').trim();
+                const internalCode = String(prod?.codigo_interno || prod?.internal_code || '').trim();
 
                 if (fileNameView) fileNameView.textContent = String(prod?.name || '');
                 if (fileName) fileName.value = String(prod?.name || '');
 
                 if (fileVName) fileVName.textContent = String(prod?.name || '—');
                 if (fileVCategory) fileVCategory.textContent = catName || '—';
-                if (fileVUnit) fileVUnit.textContent = unitName || '—';
+                if (fileVCodigoInterno) fileVCodigoInterno.textContent = internalCode || '—';
                 if (fileVActive) fileVActive.textContent = (prod?.active !== false) ? 'Activo' : 'Inactivo';
                 if (fileVSupplier) fileVSupplier.textContent = supplierName || '—';
                 if (fileVDesc) fileVDesc.textContent = (String(prod?.description || '').trim() || '—');
@@ -2796,26 +2766,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     refreshFileCategorySelect(String(prod?.category_id || prod?.category?.id || ''));
                 }
 
-                const knownUnits = ['Unidad', 'Kg', 'L', 'Otro'];
-                if (fileUnitView) fileUnitView.textContent = unitName || '—';
-                if (fileUnit) {
-                    if (knownUnits.includes(unitName)) {
-                        fileUnit.value = unitName || 'Unidad';
-                        if (wrapFileUnit) wrapFileUnit.classList.toggle('hidden', String(fileUnit.value) !== 'Otro');
-                        if (fileUnitOther && String(fileUnit.value) !== 'Otro') fileUnitOther.value = '';
-                    } else {
-                        fileUnit.value = 'Otro';
-                        if (wrapFileUnit) wrapFileUnit.classList.remove('hidden');
-                        if (fileUnitOther) fileUnitOther.value = unitName;
-                    }
-                }
-
                 const active = (prod?.active !== false);
                 if (fileActiveView) fileActiveView.textContent = active ? 'Activo' : 'Inactivo';
                 if (fileActive) fileActive.checked = active;
                 syncFileToggleLabels();
 
                 if (fileSku) fileSku.textContent = internalCode || '—';
+                if (fileCodigoInterno) fileCodigoInterno.value = internalCode;
 
                 if (fileSupplierView) fileSupplierView.textContent = supplierName || '—';
                 if (filePrimarySupplier) filePrimarySupplier.value = supplierName;
@@ -2897,9 +2854,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const name = String(fileName?.value || '').trim();
         const categoryId = String(fileCat?.value || '').trim();
-        const unitBase = String(fileUnit?.value || '').trim();
-        const unitOther = String(fileUnitOther?.value || '').trim();
-        const unit = (unitBase === 'Otro') ? unitOther : unitBase;
+        const codigoInterno = String(fileCodigoInterno?.value || '').trim();
         const desc = String(fileDesc?.value || '').trim();
         const primarySupplierName = String(filePrimarySupplier?.value || '').trim();
         const primarySupplierId = String(filePrimarySupplierId?.value || '').trim();
@@ -2910,12 +2865,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (!name) { if (window.showAlertModal) window.showAlertModal('Completá el nombre del producto.', 'Atención', 'Validación requerida'); else alert('Completá el nombre del producto.'); return; }
         if (!categoryId) { if (window.showAlertModal) window.showAlertModal('Seleccioná la categoría del producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná la categoría del producto.'); return; }
-        if (!unit) { if (window.showAlertModal) window.showAlertModal('Completá la unidad.', 'Atención', 'Validación requerida'); else alert('Completá la unidad.'); return; }
+        if (codigoInterno && codigoInterno.length !== 8) { if (window.showAlertModal) window.showAlertModal('El código interno debe tener 8 caracteres.', 'Atención', 'Validación requerida'); else alert('El código interno debe tener 8 caracteres.'); return; }
+        if (codigoInterno && !/^[A-Za-z0-9]+$/.test(codigoInterno)) { if (window.showAlertModal) window.showAlertModal('El código interno solo admite letras y números.', 'Atención', 'Validación requerida'); else alert('El código interno solo admite letras y números.'); return; }
 
         const payload = {
             name,
             category_id: parseInt(categoryId, 10),
-            unit_name: unit,
+            codigo_interno: codigoInterno,
             description: desc,
             primary_supplier_id: primarySupplierId,
             primary_supplier_name: primarySupplierName,
@@ -2975,9 +2931,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function clearProductForm() {
         if (prodName) prodName.value = '';
         if (prodCatId) prodCatId.value = '';
-        if (prodUnit) prodUnit.value = 'Unidad';
-        if (prodUnitOther) prodUnitOther.value = '';
-        if (wrapProdUnit) wrapProdUnit.classList.add('hidden');
+        if (prodCodigoInterno) prodCodigoInterno.value = '';
         if (prodActive) prodActive.checked = true;
         if (prodReorder) prodReorder.value = '';
         if (prodLots) prodLots.checked = true;
@@ -3081,19 +3035,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (prodName) prodName.value = String(prod?.name || '');
         if (prodCatId) prodCatId.value = String(prod?.category_id || prod?.category?.id || '');
-        const unitName = String(prod?.unit_name || prod?.unit || 'Unidad').trim() || 'Unidad';
-        if (prodUnit) {
-            const known = ['Unidad', 'Kg', 'L', 'Otro'];
-            if (known.includes(unitName)) {
-                prodUnit.value = unitName;
-                if (wrapProdUnit) wrapProdUnit.classList.toggle('hidden', unitName !== 'Otro');
-                if (prodUnitOther && unitName !== 'Otro') prodUnitOther.value = '';
-            } else {
-                prodUnit.value = 'Otro';
-                if (wrapProdUnit) wrapProdUnit.classList.remove('hidden');
-                if (prodUnitOther) prodUnitOther.value = unitName;
-            }
-        }
+        if (prodCodigoInterno) prodCodigoInterno.value = String(prod?.codigo_interno || prod?.internal_code || '');
         if (prodLots) prodLots.checked = !!prod?.uses_lots;
         if (prodMethod) prodMethod.value = String(prod?.method || 'FIFO');
         if (prodMin) prodMin.value = String(prod?.min_stock ?? '');
@@ -3387,6 +3329,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const errs = {};
         const nombre = String(d.nombre ?? '').trim();
         const categoria = String(d.categoria ?? '').trim();
+        const codigoInterno = String(d.codigo_interno ?? '').trim();
         const precio = parseNumberRaw(d.precio_lista);
         const cantidad = parseNumberRaw(d.cantidad);
         const cu = parseNumberRaw(d.costo_unitario);
@@ -3402,6 +3345,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (!cu.ok) errs.costo_unitario = 'Costo unitario debe ser numérico.';
         else if ((cu.value ?? 0) < 0) errs.costo_unitario = 'Costo unitario debe ser ≥ 0.';
+
+        if (codigoInterno && codigoInterno.length !== 8) errs.codigo_interno = 'Código interno: 8 caracteres.';
+        else if (codigoInterno && !/^[A-Za-z0-9]+$/.test(codigoInterno)) errs.codigo_interno = 'Código interno: solo letras y números.';
 
         if (!isValidDateFlexible(venc)) errs.vencimiento = 'Vencimiento inválido (usa dd/mm/aaaa o yyyy-mm-dd).';
 
@@ -3530,7 +3476,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '</div>'));
             tr.appendChild(td(input('nombre', '', 'Nombre')));
             tr.appendChild(td(cellCategory()));
-            tr.appendChild(td(input('unidad', '', 'Unidad')));
+            tr.appendChild(td(input('codigo_interno', '', '')));
             tr.appendChild(td(input('precio_lista', '', '0')));
             tr.appendChild(td(input('descripcion', '', '')));
             tr.appendChild(td(input('cantidad', '', '0')));
@@ -3770,7 +3716,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderCurrent(filteredProducts) {
         if (!tbodyCurrent) return;
         if (!filteredProducts.length) {
-            tbodyCurrent.innerHTML = '<tr><td colspan="10" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados para los filtros actuales.</td></tr>';
+            tbodyCurrent.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados para los filtros actuales.</td></tr>';
             return;
         }
         tbodyCurrent.innerHTML = '';
@@ -3781,7 +3727,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const imgCell = imgUrl
                 ? ('<img src="' + imgUrl + '" alt="" class="h-9 w-9 rounded-md object-cover border border-gray-200 bg-gray-50">')
                 : ('<div class="h-9 w-9 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400"><i class="fas fa-image"></i></div>');
-            const desc = String(p?.description || '').trim();
+            const codigoInterno = String(p?.codigo_interno || p?.internal_code || '').trim();
 
             const isInactive = (p && p.active === false);
             const toggleText = isInactive ? 'Activar' : 'Inactivar';
@@ -3792,10 +3738,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '<td class="px-4 py-3 text-sm font-medium text-gray-900">' + esc(p.name) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(categoryLabel(p)) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + fmtNumero(m.stock) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(p.unit_name || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-600">' + fmtMoneda(m.avg) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-600">' + fmtMoneda(m.total) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-600">' + (p.description ? esc(p.description) : '—') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(codigoInterno || '—') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + statusBadgeHtml(m.status) + '</td>'
                 + '<td class="px-4 py-3 text-right relative">'
                 + '  <button type="button" class="btn-actions-toggle h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-600">'
@@ -3965,11 +3910,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const imgCell = imgUrl
                 ? ('<img src="' + imgUrl + '" alt="" class="h-9 w-9 rounded-md object-cover border border-gray-200 bg-gray-50">')
                 : ('<div class="h-9 w-9 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400"><i class="fas fa-image"></i></div>');
-            const desc = String(p?.description || '').trim();
+            const codigoInterno = String(l?.codigo_interno || p?.codigo_interno || p?.internal_code || '').trim();
             tr.innerHTML = ''
                 + '<td class="px-4 py-3">' + imgCell + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-900">' + String(p?.name || '') + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500"><div class="max-w-xs truncate">' + (desc || '—') + '</div></td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + esc(codigoInterno || '—') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(l.received_at || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(parseNumeroSeguro(l.qty_initial).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + formatMoney(parseNumeroSeguro(l.unit_cost)) + '</td>'
@@ -4530,24 +4475,25 @@ document.addEventListener('DOMContentLoaded', function () {
         const { filteredProducts, filteredLots } = getVisibleRowsData();
         let rows = [];
         if (activeTab === 'current') {
-            rows.push(['Producto','Categoría','Stock','Unidad','Costo prom.','Valor total','Estado']);
+            rows.push(['Producto','Categoría','Código interno','Stock','Costo prom.','Valor total','Estado']);
             filteredProducts.forEach(({ p, m }) => {
                 rows.push([
                     String(p.name || ''),
                     String(p?.category?.name || p?.category || ''),
+                    String(p.codigo_interno || p.internal_code || ''),
                     String(m.stock),
-                    String(p.unit_name || p.unit || ''),
                     String(m.avg),
                     String(m.total),
                     String(m.status)
                 ]);
             });
         } else {
-            rows.push(['Producto','Lote','Ingreso','Proveedor','CU','Disponible','CT','Vencimiento']);
+            rows.push(['Producto','Código interno','Lote','Ingreso','Proveedor','CU','Disponible','CT','Vencimiento']);
             filteredLots.forEach(({ l, p }) => {
                 const ct = parseNumeroSeguro(l.qty_available) * parseNumeroSeguro(l.unit_cost);
                 rows.push([
                     String(p?.name || ''),
+                    String(l?.codigo_interno || p?.codigo_interno || p?.internal_code || ''),
                     String(l.lot_code || ''),
                     String(fmtFecha(l.received_at || '')),
                     String(l.supplier_name || ''),
@@ -4577,14 +4523,14 @@ document.addEventListener('DOMContentLoaded', function () {
         let body = '';
         if (activeTab === 'current') {
             head = '<tr>'
-                + '<th>Producto</th><th>Categoría</th><th style="text-align:right">Stock</th><th>Unidad</th><th style="text-align:right">Costo prom.</th><th style="text-align:right">Valor total</th><th>Estado</th>'
+                + '<th>Producto</th><th>Categoría</th><th>Código interno</th><th style="text-align:right">Stock</th><th style="text-align:right">Costo prom.</th><th style="text-align:right">Valor total</th><th>Estado</th>'
                 + '</tr>';
             filteredProducts.forEach(({ p, m }) => {
                 body += '<tr>'
                     + '<td>' + String(p.name || '') + '</td>'
                     + '<td>' + String(p?.category?.name || p?.category || '') + '</td>'
+                    + '<td>' + String(p.codigo_interno || p.internal_code || '') + '</td>'
                     + '<td style="text-align:right">' + String(m.stock.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
-                    + '<td>' + String(p.unit_name || p.unit || '') + '</td>'
                     + '<td style="text-align:right">' + formatMoney(m.avg) + '</td>'
                     + '<td style="text-align:right">' + formatMoney(m.total) + '</td>'
                     + '<td>' + String(m.status) + '</td>'
@@ -4592,12 +4538,13 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         } else {
             head = '<tr>'
-                + '<th>Producto</th><th>Lote</th><th>Ingreso</th><th>Proveedor</th><th style="text-align:right">CU</th><th style="text-align:right">Disponible</th><th style="text-align:right">CT</th><th>Vencimiento</th>'
+                + '<th>Producto</th><th>Código interno</th><th>Lote</th><th>Ingreso</th><th>Proveedor</th><th style="text-align:right">CU</th><th style="text-align:right">Disponible</th><th style="text-align:right">CT</th><th>Vencimiento</th>'
                 + '</tr>';
             filteredLots.forEach(({ l, p }) => {
                 const ct = parseNumeroSeguro(l.qty_available) * parseNumeroSeguro(l.unit_cost);
                 body += '<tr>'
                     + '<td>' + String(p?.name || '') + '</td>'
+                    + '<td>' + String(l?.codigo_interno || p?.codigo_interno || p?.internal_code || '') + '</td>'
                     + '<td>' + String(l.lot_code || '') + '</td>'
                     + '<td>' + String(fmtFecha(l.received_at || '')) + '</td>'
                     + '<td>' + String(l.supplier_name || '') + '</td>'
@@ -4947,13 +4894,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    if (prodUnit) {
-        prodUnit.addEventListener('change', function () {
-            const esOtro = String(prodUnit.value) === 'Otro';
-            if (wrapProdUnit) wrapProdUnit.classList.toggle('hidden', !esOtro);
-        });
-    }
-
     if (prodActive) prodActive.addEventListener('change', syncProductToggleLabels);
     if (prodLots) prodLots.addEventListener('change', syncProductToggleLabels);
 
@@ -4964,12 +4904,6 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btnCloseFileBottom) btnCloseFileBottom.addEventListener('click', closeProductFile);
 
     if (fileActive) fileActive.addEventListener('change', syncFileToggleLabels);
-    if (fileUnit) {
-        fileUnit.addEventListener('change', function () {
-            const esOtro = String(fileUnit.value) === 'Otro';
-            if (wrapFileUnit) wrapFileUnit.classList.toggle('hidden', !esOtro || !fileEditMode);
-        });
-    }
 
     if (filePrimarySupplier) {
         filePrimarySupplier.addEventListener('input', function () {
@@ -5034,9 +4968,7 @@ document.addEventListener('DOMContentLoaded', function () {
         btnSaveProduct.addEventListener('click', function () {
             const name = String(prodName?.value || '').trim();
             const categoryId = String(prodCatId?.value || '').trim();
-            const unitBase = String(prodUnit?.value || '').trim();
-            const unitOther = String(prodUnitOther?.value || '').trim();
-            const unit = (unitBase === 'Otro') ? unitOther : unitBase;
+            const codigoInterno = String(prodCodigoInterno?.value || '').trim();
             const manageLots = !!prodLots?.checked;
             const method = String(prodMethod?.value || 'FIFO').trim();
             const min = parseNumeroSeguro(prodMin?.value);
@@ -5050,12 +4982,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (!name) { if (window.showAlertModal) window.showAlertModal('Completá el nombre del producto.', 'Atención', 'Validación requerida'); else alert('Completá el nombre del producto.'); return; }
             if (!categoryId) { if (window.showAlertModal) window.showAlertModal('Seleccioná la categoría del producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná la categoría del producto.'); return; }
-            if (!unit) { if (window.showAlertModal) window.showAlertModal('Completá la unidad.', 'Atención', 'Validación requerida'); else alert('Completá la unidad.'); return; }
+            if (codigoInterno && codigoInterno.length !== 8) { if (window.showAlertModal) window.showAlertModal('El código interno debe tener 8 caracteres.', 'Atención', 'Validación requerida'); else alert('El código interno debe tener 8 caracteres.'); return; }
+            if (codigoInterno && !/^[A-Za-z0-9]+$/.test(codigoInterno)) { if (window.showAlertModal) window.showAlertModal('El código interno solo admite letras y números.', 'Atención', 'Validación requerida'); else alert('El código interno solo admite letras y números.'); return; }
 
             const payload = {
                 name,
                 category_id: parseInt(categoryId, 10),
-                unit_name: unit,
+                codigo_interno: codigoInterno,
                 uses_lots: true,
                 method: 'FIFO',
                 min_stock: min,
@@ -5341,8 +5274,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 product: {
                     name: String(prodName?.value || ''),
                     categoryId: String(prodCatId?.value || ''),
-                    unit: String(prodUnit?.value || ''),
-                    unitOther: String(prodUnitOther?.value || ''),
+                    codigoInterno: String(prodCodigoInterno?.value || ''),
                     manageLots: !!prodLots?.checked,
                     method: String(prodMethod?.value || ''),
                     min: String(prodMin?.value || ''),
@@ -5421,8 +5353,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             if (prodName) prodName.value = String(d?.product?.name || '');
             if (prodCatId) prodCatId.value = String(d?.product?.categoryId || '');
-            if (prodUnit) prodUnit.value = String(d?.product?.unit || '');
-            if (prodUnitOther) prodUnitOther.value = String(d?.product?.unitOther || '');
+            if (prodCodigoInterno) prodCodigoInterno.value = String(d?.product?.codigoInterno || '');
             if (prodLots) prodLots.checked = !!d?.product?.manageLots;
             if (prodMethod) prodMethod.value = String(d?.product?.method || '');
             if (prodMin) prodMin.value = String(d?.product?.min || '');

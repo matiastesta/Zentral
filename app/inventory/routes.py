@@ -1,7 +1,10 @@
 from datetime import date as dt_date, datetime
 
 import json
+import base64
+import hashlib
 import os
+import re
 import unicodedata
 from io import BytesIO
 from uuid import uuid4
@@ -10,6 +13,7 @@ from flask import current_app, jsonify, render_template, request, send_file, url
 from flask import g
 from flask_login import login_required
 from sqlalchemy import func, or_
+from sqlalchemy.orm import joinedload
 from typing import Optional
 from werkzeug.utils import secure_filename
 
@@ -22,6 +26,11 @@ from app.files.storage import upload_to_r2_and_create_asset
 from app.permissions import module_required, module_required_any
 from app.tenancy import ensure_request_context
 from app.inventory import bp
+
+
+_CODIGO_INTERNO_MAX_LEN = 8
+_CODIGO_INTERNO_AUTO_LEN = 8
+_CODIGO_INTERNO_PATTERN = re.compile(r'^[A-Za-z0-9]{8}$')
 
 
 def _company_id() -> str:
@@ -118,10 +127,11 @@ def _serialize_product(p: Product):
         'category': cat_name,
         'category_obj': cat_obj,
         'sale_price': p.sale_price,
+        'codigo_interno': p.internal_code or '',
         'internal_code': p.internal_code or '',
         'barcode': p.barcode or '',
         'image_url': _image_url(p),
-        'unit_name': p.unit_name or '',
+        'unit_name': (p.unit_name or 'Unidad'),
         'uses_lots': bool(p.uses_lots),
         'method': p.method or 'FIFO',
         'min_stock': p.min_stock,
@@ -237,12 +247,236 @@ def _product_method_locked(product_id: int) -> bool:
 
 
 def _generate_unique_internal_code() -> str:
-    for _ in range(10):
-        code = 'SKU-' + uuid4().hex[:10].upper()
+    # Legacy helper (kept for backward compatibility): generate an 8-char code.
+    for _ in range(30):
+        code = uuid4().hex[:_CODIGO_INTERNO_AUTO_LEN].upper()
         exists = db.session.query(Product.id).filter(Product.internal_code == code).first() is not None
         if not exists:
             return code
-    return 'SKU-' + uuid4().hex.upper()
+    return uuid4().hex[:_CODIGO_INTERNO_AUTO_LEN].upper()
+
+
+def _normalize_codigo_interno(raw: str) -> str:
+    return str(raw or '').strip().upper()
+
+
+def _validate_codigo_interno_or_raise(code: str) -> str:
+    c = _normalize_codigo_interno(code)
+    if not c:
+        return ''
+    if len(c) != _CODIGO_INTERNO_MAX_LEN:
+        raise ValueError('codigo_interno_length')
+    if _CODIGO_INTERNO_PATTERN.match(c) is None:
+        raise ValueError('codigo_interno_invalid')
+    return c
+
+
+def _is_valid_codigo_interno(code: str) -> bool:
+    try:
+        c = _normalize_codigo_interno(code)
+        if not c:
+            return False
+        if len(c) != _CODIGO_INTERNO_MAX_LEN:
+            return False
+        return _CODIGO_INTERNO_PATTERN.match(c) is not None
+    except Exception:
+        return False
+
+
+def _strip_accents(s: str) -> str:
+    try:
+        return ''.join(ch for ch in unicodedata.normalize('NFKD', s) if not unicodedata.combining(ch))
+    except Exception:
+        return s
+
+
+def _alnum_upper(s: str) -> str:
+    raw = _strip_accents(str(s or '').upper())
+    return re.sub(r'[^A-Z0-9]', '', raw)
+
+
+def _code3(s: str, fallback: str = 'XXX') -> str:
+    base = _alnum_upper(s)
+    if not base:
+        base = _alnum_upper(fallback)
+    base = (base + 'XXX')[:3]
+    return base
+
+
+def _codigo_prefix_from(name: str, category_name: str) -> str:
+    nnn = _code3(name, 'XXX')
+    ccc = _code3(category_name, 'GEN')
+    if not ccc:
+        ccc = 'GEN'
+    return (nnn + ccc)[:6]
+
+
+def _generate_codigo_interno(company_id: str, name: str, category_name: str = '', used: Optional[set] = None) -> str:
+    prefix = _codigo_prefix_from(name, category_name or 'GEN')
+    used_set = used if isinstance(used, set) else None
+
+    taken = set()
+    if used_set is not None:
+        # Batch generation path (migration): rely on in-memory set for uniqueness.
+        taken = used_set
+    else:
+        try:
+            like = f"{prefix}%"
+            rows = (
+                db.session.query(Product.internal_code)
+                .filter(Product.company_id == str(company_id or '').strip())
+                .filter(Product.internal_code.ilike(like))
+                .all()
+            )
+            for (code,) in rows:
+                c = str(code or '').strip().upper()
+                if len(c) == 8 and c.startswith(prefix):
+                    taken.add(c)
+        except Exception:
+            taken = set()
+
+    for n in range(1, 100):
+        suf = str(n).zfill(2)
+        candidate = prefix + suf
+        if candidate in taken:
+            continue
+        try:
+            exists_global = db.session.query(Product.id).filter(Product.internal_code == candidate).first() is not None
+        except Exception:
+            exists_global = False
+        if exists_global:
+            continue
+        if used_set is not None and taken is used_set:
+            used_set.add(candidate)
+        return candidate
+
+    # Fallback (extremely rare): prefix space exhausted (01-99). Ensure DB uniqueness.
+    try:
+        current_app.logger.warning('codigo_interno prefix exhausted for prefix=%s (company_id=%s)', prefix, str(company_id or '').strip())
+    except Exception:
+        pass
+    return _generate_unique_internal_code()
+
+
+def _ensure_codigo_interno(product: Product) -> None:
+    raw_existing = str(getattr(product, 'internal_code', '') or '').strip()
+    if raw_existing:
+        normalized = _normalize_codigo_interno(raw_existing)
+        # Keep as-is only if valid under current rules.
+        if _is_valid_codigo_interno(normalized):
+            if normalized != raw_existing:
+                product.internal_code = normalized
+            return
+    try:
+        cid = str(getattr(product, 'company_id', '') or '').strip() or _company_id()
+    except Exception:
+        cid = _company_id()
+    try:
+        cat_name = ''
+        if getattr(product, 'category', None) is not None:
+            cat_name = str(getattr(getattr(product, 'category', None), 'name', '') or '').strip()
+    except Exception:
+        cat_name = ''
+    if not cat_name:
+        cat_name = 'GEN'
+    product.internal_code = _generate_codigo_interno(cid, getattr(product, 'name', '') or '', cat_name)
+
+
+@bp.post('/api/products/migrate-codigo-interno')
+@login_required
+@module_required('inventory')
+def migrate_codigo_interno_all_products():
+    """Re-generate codigo_interno for all products of the company using NNNCCC## format."""
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    payload = request.get_json(silent=True) or {}
+    dry_run = bool(payload.get('dry_run')) or (str(request.args.get('dry_run') or '').strip() in ('1', 'true', 'True'))
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    rows = (
+        db.session.query(Product)
+        .options(joinedload(Product.category))
+        .filter(Product.company_id == cid)
+        .order_by(Product.id.asc())
+        .all()
+    )
+    used = set()
+    updated = 0
+    errors = []
+    changes = []
+
+    for p in (rows or []):
+        try:
+            cat_name = ''
+            try:
+                cat_name = str(getattr(getattr(p, 'category', None), 'name', '') or '').strip()
+            except Exception:
+                cat_name = ''
+            if not cat_name:
+                cat_name = 'GEN'
+            next_code = _generate_codigo_interno(cid, getattr(p, 'name', '') or '', cat_name, used=used)
+            if not next_code or len(next_code) != 8:
+                raise ValueError('codigo_interno_generation_failed')
+            before = str(getattr(p, 'internal_code', '') or '').strip()
+            if before != next_code:
+                p.internal_code = next_code
+                updated += 1
+                changes.append({'id': int(getattr(p, 'id', 0) or 0), 'name': str(getattr(p, 'name', '') or ''), 'before': before, 'after': next_code})
+        except Exception:
+            errors.append({'id': getattr(p, 'id', None), 'error': 'failed'})
+
+    try:
+        if dry_run:
+            db.session.rollback()
+        else:
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+
+    return jsonify({'ok': True, 'dry_run': dry_run, 'total': len(rows or []), 'updated': updated, 'errors': errors, 'changes': changes})
+
+
+def _ensure_codigo_interno_on_products(products) -> bool:
+    changed = False
+    for p in (products or []):
+        if not p:
+            continue
+        before = str(getattr(p, 'internal_code', '') or '').strip()
+        _ensure_codigo_interno(p)
+        after = str(getattr(p, 'internal_code', '') or '').strip()
+        if before != after:
+            changed = True
+    return changed
+
+
+def _encode_base36(n: int) -> str:
+    chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    if n <= 0:
+        return '0'
+    out = ''
+    x = int(n)
+    while x > 0:
+        x, r = divmod(x, 36)
+        out = chars[r] + out
+    return out
+
+
+def _generate_lot_code() -> str:
+    ts = int(datetime.utcnow().timestamp() * 1000)
+    base = _encode_base36(ts).rjust(10, '0')[-10:]
+    for _ in range(20):
+        code = base
+        exists = db.session.query(InventoryLot.id).filter(InventoryLot.lot_code == code).first() is not None
+        if not exists:
+            return code
+        ts2 = int(datetime.utcnow().timestamp() * 1000) + int(uuid4().hex[:4], 16)
+        base = _encode_base36(ts2).rjust(10, '0')[-10:]
+    return uuid4().hex[:10].upper()
 
 
 def _allowed_image(filename: str) -> bool:
@@ -310,7 +544,7 @@ def inventory_import_excel_template():
     headers = [
         'nombre',
         'categoria',
-        'unidad',
+        'codigo_interno',
         'precio_lista',
         'descripcion',
         'costo_unitario',
@@ -339,7 +573,7 @@ def inventory_import_excel_template():
         widths = {
             'A': 16,  # nombre
             'B': 14,  # categoria
-            'C': 10,  # unidad
+            'C': 16,  # codigo_interno
             'D': 12,  # precio_lista
             'E': 18,  # descripcion
             'F': 14,  # costo_unitario
@@ -483,7 +717,7 @@ def inventory_import_excel():
                 raise ValueError('cantidad_invalid')
 
             descripcion = str(get_cell(vals, 'descripcion') or '').strip() or None
-            unidad = str(get_cell(vals, 'unidad') or '').strip() or ''
+            codigo_interno_raw = str(get_cell(vals, 'codigo_interno') or '').strip() or ''
             nota_lote = str(get_cell(vals, 'nota_lote') or '').strip() or None
 
             stock_minimo_raw = get_cell(vals, 'stock_minimo')
@@ -518,7 +752,14 @@ def inventory_import_excel():
                 supplier_id = str(getattr(srow, 'id', '') or '').strip() or None
                 supplier_name = str(getattr(srow, 'name', '') or '').strip() or None
 
-            internal_code = _generate_unique_internal_code()
+            internal_code = ''
+            if codigo_interno_raw:
+                internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
+                exists = db.session.query(Product.id).filter(Product.internal_code == internal_code).first() is not None
+                if exists:
+                    raise ValueError('codigo_interno_already_exists')
+            if not internal_code:
+                internal_code = _generate_codigo_interno(cid, nombre, categoria or 'GEN')
             prod = Product(
                 company_id=cid,
                 name=nombre,
@@ -526,7 +767,7 @@ def inventory_import_excel():
                 category_id=cat_row.id,
                 sale_price=precio_lista,
                 internal_code=internal_code,
-                unit_name=(unidad or 'Unidad'),
+                unit_name='Unidad',
                 uses_lots=True,
                 method='FIFO',
                 min_stock=stock_minimo,
@@ -549,7 +790,7 @@ def inventory_import_excel():
                     supplier_id=supplier_id,
                     supplier_name=supplier_name,
                     expiration_date=exp_dt,
-                    lot_code=('IMP-' + uuid4().hex[:8].upper()),
+                    lot_code=_generate_lot_code(),
                     note=nota_lote or 'Ingreso por inventario (importación Excel)',
                 )
                 if not supplier_id and not supplier_name:
@@ -746,7 +987,7 @@ def inventory_import_excel_preview():
 
         nombre = str(get_cell(vals, 'nombre') or '').strip()
         categoria = str(get_cell(vals, 'categoria') or '').strip()
-        unidad = str(get_cell(vals, 'unidad') or '').strip()
+        codigo_interno = str(get_cell(vals, 'codigo_interno') or '').strip()
         precio_lista = str(get_cell(vals, 'precio_lista') or '').strip()
         descripcion = str(get_cell(vals, 'descripcion') or '').strip()
         cantidad = str(get_cell(vals, 'cantidad') or '').strip()
@@ -774,7 +1015,7 @@ def inventory_import_excel_preview():
             'row': i,
             'nombre': nombre,
             'categoria': categoria,
-            'unidad': unidad,
+            'codigo_interno': codigo_interno,
             'precio_lista': precio_lista,
             'descripcion': descripcion,
             'cantidad': cantidad,
@@ -837,7 +1078,7 @@ def inventory_import_excel_commit():
         try:
             nombre = str(d.get('nombre') or '').strip()
             categoria = str(d.get('categoria') or '').strip()
-            unidad = str(d.get('unidad') or '').strip() or 'Unidad'
+            codigo_interno_raw = str(d.get('codigo_interno') or '').strip() or ''
             descripcion = str(d.get('descripcion') or '').strip() or None
 
             precio_lista = _num(d.get('precio_lista'))
@@ -891,7 +1132,14 @@ def inventory_import_excel_commit():
                 supplier_id = str(getattr(srow, 'id', '') or '').strip() or None
                 supplier_name = str(getattr(srow, 'name', '') or '').strip() or None
 
-            internal_code = _generate_unique_internal_code()
+            internal_code = ''
+            if codigo_interno_raw:
+                internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
+                exists = db.session.query(Product.id).filter(Product.internal_code == internal_code).first() is not None
+                if exists:
+                    raise ValueError('codigo_interno_already_exists')
+            if not internal_code:
+                internal_code = _generate_codigo_interno(cid, nombre, categoria or 'GEN')
             prod = Product(
                 company_id=cid,
                 name=nombre,
@@ -899,7 +1147,7 @@ def inventory_import_excel_commit():
                 category_id=cat_row.id,
                 sale_price=precio_lista,
                 internal_code=internal_code,
-                unit_name=unidad,
+                unit_name='Unidad',
                 uses_lots=True,
                 method='FIFO',
                 min_stock=stock_minimo,
@@ -922,7 +1170,7 @@ def inventory_import_excel_commit():
                     supplier_id=supplier_id,
                     supplier_name=supplier_name,
                     expiration_date=exp_dt,
-                    lot_code=('IMP-' + uuid4().hex[:8].upper()),
+                    lot_code=_generate_lot_code(),
                     note=nota_lote or 'Ingreso por inventario (importación Excel)',
                 )
                 if not supplier_id and not supplier_name:
@@ -1055,6 +1303,7 @@ def _serialize_lot(l: InventoryLot):
         'id': l.id,
         'product_id': l.product_id,
         'product_name': (l.product.name if l.product else ''),
+        'codigo_interno': ((l.product.internal_code or '') if l.product else ''),
         'qty_initial': l.qty_initial,
         'qty_available': l.qty_available,
         'unit_cost': l.unit_cost,
@@ -1105,6 +1354,15 @@ def list_products():
         q = q.filter(Product.active == True)  # noqa: E712
     q = q.order_by(Product.name.asc()).limit(limit)
     rows = q.all()
+    try:
+        changed = _ensure_codigo_interno_on_products(rows)
+        if changed:
+            db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
     return jsonify({'ok': True, 'items': [_serialize_product(r) for r in rows]})
 
 
@@ -1137,6 +1395,15 @@ def search_products():
         )
     q = q.order_by(Product.name.asc()).limit(limit)
     rows = q.all()
+    try:
+        changed = _ensure_codigo_interno_on_products(rows)
+        if changed:
+            db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
     return jsonify({'ok': True, 'items': [_serialize_product(r) for r in rows]})
 
 
@@ -1169,9 +1436,19 @@ def create_product():
     if hasattr(category, 'active') and not bool(category.active):
         return jsonify({'ok': False, 'error': 'category_inactive'}), 400
 
-    internal_code = str(payload.get('internal_code') or '').strip() or None
+    codigo_interno_raw = None
+    if 'codigo_interno' in payload:
+        codigo_interno_raw = str(payload.get('codigo_interno') or '').strip()
+    elif 'internal_code' in payload:
+        codigo_interno_raw = str(payload.get('internal_code') or '').strip()
+    internal_code = None
+    if codigo_interno_raw:
+        internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
+        exists = db.session.query(Product.id).filter(Product.internal_code == internal_code).first() is not None
+        if exists:
+            return jsonify({'ok': False, 'error': 'codigo_interno_already_exists'}), 400
     if not internal_code:
-        internal_code = _generate_unique_internal_code()
+        internal_code = _generate_codigo_interno(cid, name, str(getattr(category, 'name', '') or '').strip() or 'GEN')
 
     supplier_id = str(payload.get('primary_supplier_id') or '').strip() or None
     supplier_name = str(payload.get('primary_supplier_name') or '').strip() or None
@@ -1191,7 +1468,7 @@ def create_product():
         internal_code=internal_code,
         barcode=str(payload.get('barcode') or '').strip() or None,
         image_filename=str(payload.get('image_filename') or '').strip() or None,
-        unit_name=str(payload.get('unit_name') or '').strip() or None,
+        unit_name='Unidad',
         uses_lots=True,
         method='FIFO',
         min_stock=_num(payload.get('min_stock')),
@@ -1200,6 +1477,7 @@ def create_product():
         primary_supplier_name=supplier_name,
         active=True,
     )
+    _ensure_codigo_interno(row)
     db.session.add(row)
     try:
         db.session.commit()
@@ -1236,8 +1514,17 @@ def update_product(product_id: int):
     if category:
         row.category_id = category.id
     row.sale_price = _num(payload.get('sale_price') if payload.get('sale_price') is not None else row.sale_price)
-    if payload.get('internal_code') is not None:
-        row.internal_code = str(payload.get('internal_code') or '').strip() or None
+    if payload.get('codigo_interno') is not None or payload.get('internal_code') is not None:
+        raw_ci = payload.get('codigo_interno') if payload.get('codigo_interno') is not None else payload.get('internal_code')
+        raw_ci = str(raw_ci or '').strip()
+        if raw_ci:
+            next_ci = _validate_codigo_interno_or_raise(raw_ci)
+            exists = db.session.query(Product.id).filter(Product.internal_code == next_ci, Product.id != row.id).first() is not None
+            if exists:
+                return jsonify({'ok': False, 'error': 'codigo_interno_already_exists'}), 400
+            row.internal_code = next_ci
+        else:
+            row.internal_code = None
     row.barcode = str(payload.get('barcode') or '').strip() or None
     if payload.get('primary_supplier_id') is not None:
         next_sid = str(payload.get('primary_supplier_id') or '').strip() or None
@@ -1257,8 +1544,7 @@ def update_product(product_id: int):
             row.primary_supplier_id = None
     if payload.get('reorder_point') is not None:
         row.reorder_point = _num(payload.get('reorder_point'))
-    if payload.get('unit_name') is not None:
-        row.unit_name = str(payload.get('unit_name') or '').strip() or None
+    row.unit_name = 'Unidad'
     if payload.get('uses_lots') is not None:
         row.uses_lots = bool(payload.get('uses_lots'))
     if payload.get('method') is not None:
@@ -1272,6 +1558,7 @@ def update_product(product_id: int):
     if payload.get('active') is not None:
         row.active = bool(payload.get('active'))
 
+    _ensure_codigo_interno(row)
     db.session.commit()
     return jsonify({'ok': True, 'item': _serialize_product(row)})
 
@@ -1449,6 +1736,28 @@ def list_lots():
             return jsonify({'ok': True, 'items': []})
     q = q.order_by(InventoryLot.received_at.desc(), InventoryLot.id.desc()).limit(limit)
     rows = q.all()
+    try:
+        prods = []
+        seen = set()
+        for l in (rows or []):
+            p = getattr(l, 'product', None)
+            if not p:
+                continue
+            pid = getattr(p, 'id', None)
+            if pid is None:
+                continue
+            if pid in seen:
+                continue
+            seen.add(pid)
+            prods.append(p)
+        changed = _ensure_codigo_interno_on_products(prods)
+        if changed:
+            db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
     return jsonify({'ok': True, 'items': [_serialize_lot(r) for r in rows]})
 
 
@@ -1478,7 +1787,7 @@ def create_lot():
         if not srow:
             return jsonify({'ok': False, 'error': 'supplier_not_found'}), 400
         supplier_name = str(srow.name or '').strip() or supplier_name
-    lot_code = str(payload.get('lot_code') or '').strip() or None
+    lot_code = _generate_lot_code()
     note = str(payload.get('note') or '').strip() or None
     exp_raw = str(payload.get('expiration_date') or '').strip()
     exp_dt = _parse_date_iso(exp_raw, None) if exp_raw else None
@@ -1576,7 +1885,7 @@ def update_lot(lot_id: int):
             return jsonify({'ok': False, 'error': 'supplier_not_found'}), 400
         supplier_name = str(srow.name or '').strip() or supplier_name
 
-    lot_code = str(payload.get('lot_code') or '').strip() or None
+    lot_code = str(getattr(lot, 'lot_code', '') or '').strip() or None
     note = str(payload.get('note') or '').strip() or None
 
     exp_raw = str(payload.get('expiration_date') or '').strip()

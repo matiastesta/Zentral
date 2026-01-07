@@ -413,7 +413,7 @@
                                 <th class="px-2 py-2 text-left text-gray-500 font-medium">Categoría</th>
                                 <th class="px-2 py-2 text-right text-gray-500 font-medium">Precio</th>
                                 <th class="px-2 py-2 text-right text-gray-500 font-medium">Stock</th>
-                                <th class="px-2 py-2 text-center text-gray-500 font-medium">Acción</th>
+                                <th class="px-2 py-2 text-center text-gray-500 font-medium">Info</th>
                             </tr>
                         </thead>
                         <tbody id="tabla-productos-cambio-body" class="divide-y divide-gray-100">
@@ -490,7 +490,7 @@
                                 <th class="px-2 py-2 text-left text-gray-500 font-medium">Categoría</th>
                                 <th class="px-2 py-2 text-right text-gray-500 font-medium">Precio</th>
                                 <th class="px-2 py-2 text-right text-gray-500 font-medium">Stock</th>
-                                <th class="px-2 py-2 text-center text-gray-500 font-medium">Acción</th>
+                                <th class="px-2 py-2 text-center text-gray-500 font-medium">Info</th>
                             </tr>
                         </thead>
                         <tbody id="tabla-productos-cambio-venta-body" class="divide-y divide-gray-100">
@@ -760,7 +760,7 @@
                             <th class="px-2 py-2 text-left text-gray-500 font-medium">Categoría</th>
                             <th class="px-2 py-2 text-right text-gray-500 font-medium">Precio</th>
                             <th class="px-2 py-2 text-right text-gray-500 font-medium">Stock</th>
-                            <th class="px-2 py-2 text-center text-gray-500 font-medium">Acción</th>
+                            <th class="px-2 py-2 text-center text-gray-500 font-medium">Info</th>
                         </tr>
                     </thead>
                     <tbody id="tabla-productos-body" class="divide-y divide-gray-100">
@@ -1582,12 +1582,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const list = getCambioFilterElements();
         const categoria = String(selectedCategoriaCambio || '').trim();
         const q = String(cambioSearchQuery || '').trim().toLowerCase();
+
+        let hasExactCodigo = false;
+        if (q) {
+            try {
+                hasExactCodigo = list.some(el => {
+                    const ci = String(el?.getAttribute('data-codigo-interno') || '').trim().toLowerCase();
+                    return ci && ci === q;
+                });
+            } catch (e) {
+            }
+        }
         list.forEach(el => {
             const cat = String(el?.getAttribute('data-categoria') || '').trim();
             const nombre = String(el?.getAttribute('data-nombre') || el?.textContent || '').trim();
-            const haystack = (nombre + ' ' + cat).toLowerCase();
+            const codigoInterno = String(el?.getAttribute('data-codigo-interno') || '').trim();
+            const haystack = (nombre + ' ' + codigoInterno).toLowerCase();
             const okCat = (!categoria || categoria === 'Todos' || cat === categoria);
-            const okQ = (!q || haystack.indexOf(q) >= 0);
+            const okQ = (!q || (hasExactCodigo ? (String(codigoInterno || '').trim().toLowerCase() === q) : (haystack.indexOf(q) >= 0)));
             if (okCat && okQ) el.classList.remove('hidden');
             else el.classList.add('hidden');
         });
@@ -1604,12 +1616,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const list = getCambioVentaFilterElements();
         const categoria = String(selectedCategoriaCambioVenta || '').trim();
         const q = String(cambioVentaSearchQuery || '').trim().toLowerCase();
+
+        let hasExactCodigo = false;
+        if (q) {
+            try {
+                hasExactCodigo = list.some(el => {
+                    const ci = String(el?.getAttribute('data-codigo-interno') || '').trim().toLowerCase();
+                    return ci && ci === q;
+                });
+            } catch (e) {
+            }
+        }
         list.forEach(el => {
             const cat = String(el?.getAttribute('data-categoria') || '').trim();
             const nombre = String(el?.getAttribute('data-nombre') || el?.textContent || '').trim();
-            const haystack = (nombre + ' ' + cat).toLowerCase();
+            const codigoInterno = String(el?.getAttribute('data-codigo-interno') || '').trim();
+            const haystack = (nombre + ' ' + codigoInterno).toLowerCase();
             const okCat = (!categoria || categoria === 'Todos' || cat === categoria);
-            const okQ = (!q || haystack.indexOf(q) >= 0);
+            const okQ = (!q || (hasExactCodigo ? (String(codigoInterno || '').trim().toLowerCase() === q) : (haystack.indexOf(q) >= 0)));
             if (okCat && okQ) el.classList.remove('hidden');
             else el.classList.add('hidden');
         });
@@ -1646,6 +1670,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const cat = String(p?.category?.name || p?.category_name || '').trim();
+                const codigoInterno = String(p?.codigo_interno || p?.internal_code || '').trim();
+                const desc = String(p?.description || '').trim();
+                const infoTitle = 'Código interno: ' + (codigoInterno || '—') + (desc ? ('\nDescripción: ' + desc) : '');
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-indigo-50 cursor-pointer';
                 tr.tabIndex = 0;
@@ -1653,6 +1680,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 tr.setAttribute('data-nombre', String(p?.name || 'Producto'));
                 tr.setAttribute('data-precio', String(price.toFixed(2)));
                 tr.setAttribute('data-categoria', cat);
+                tr.setAttribute('data-codigo-interno', codigoInterno);
                 const stockCls = stockColorClass(stock);
                 tr.innerHTML = ''
                     + '<td class="px-2 py-2 text-gray-800">' + String(p?.name || 'Producto') + '</td>'
@@ -1660,15 +1688,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     + '<td class="px-2 py-2 text-right text-gray-900 font-medium">' + formatearMoneda(price) + '</td>'
                     + '<td class="px-2 py-2 text-right ' + stockCls + ' font-medium">' + String((isNaN(stock) ? 0 : stock).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
                     + '<td class="px-2 py-2 text-center">'
-                    + '  <button type="button" class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-indigo-600 text-white hover:bg-indigo-700" data-action="add">'
-                    + '    <i class="fas fa-plus text-[10px]"></i>'
+                    + '  <button type="button" class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200" data-action="info" title="' + escapeHtml(infoTitle) + '">'
+                    + '    <i class="fas fa-info-circle text-[12px]"></i>'
                     + '  </button>'
                     + '</td>';
 
                 tr.addEventListener('click', function (e) {
-                    const btn = e && e.target ? e.target.closest('button[data-action="add"]') : null;
-                    if (btn) {
-                        agregarProductoDesdeElCambio(tr);
+                    const infoBtn = e && e.target ? e.target.closest('button[data-action="info"]') : null;
+                    if (infoBtn) {
+                        try { e.preventDefault(); } catch (ex) {}
+                        try { e.stopPropagation(); } catch (ex) {}
                         return;
                     }
                     agregarProductoDesdeElCambio(tr);
@@ -1707,6 +1736,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const cat = String(p?.category?.name || p?.category_name || '').trim();
+                const codigoInterno = String(p?.codigo_interno || p?.internal_code || '').trim();
+                const desc = String(p?.description || '').trim();
+                const infoTitle = 'Código interno: ' + (codigoInterno || '—') + (desc ? ('\nDescripción: ' + desc) : '');
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-indigo-50 cursor-pointer';
                 tr.tabIndex = 0;
@@ -1714,6 +1746,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 tr.setAttribute('data-nombre', String(p?.name || 'Producto'));
                 tr.setAttribute('data-precio', String(price.toFixed(2)));
                 tr.setAttribute('data-categoria', cat);
+                tr.setAttribute('data-codigo-interno', codigoInterno);
                 const stockCls = stockColorClass(stock);
                 tr.innerHTML = ''
                     + '<td class="px-2 py-2 text-gray-800">' + String(p?.name || 'Producto') + '</td>'
@@ -1721,15 +1754,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     + '<td class="px-2 py-2 text-right text-gray-900 font-medium">' + formatearMoneda(price) + '</td>'
                     + '<td class="px-2 py-2 text-right ' + stockCls + ' font-medium">' + String((isNaN(stock) ? 0 : stock).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
                     + '<td class="px-2 py-2 text-center">'
-                    + '  <button type="button" class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-indigo-600 text-white hover:bg-indigo-700" data-action="add">'
-                    + '    <i class="fas fa-plus text-[10px]"></i>'
+                    + '  <button type="button" class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200" data-action="info" title="' + escapeHtml(infoTitle) + '">'
+                    + '    <i class="fas fa-info-circle text-[12px]"></i>'
                     + '  </button>'
                     + '</td>';
 
                 tr.addEventListener('click', function (e) {
-                    const btn = e && e.target ? e.target.closest('button[data-action="add"]') : null;
-                    if (btn) {
-                        agregarProductoDesdeElCambioVenta(tr);
+                    const infoBtn = e && e.target ? e.target.closest('button[data-action="info"]') : null;
+                    if (infoBtn) {
+                        try { e.preventDefault(); } catch (ex) {}
+                        try { e.stopPropagation(); } catch (ex) {}
                         return;
                     }
                     agregarProductoDesdeElCambioVenta(tr);
@@ -4061,12 +4095,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const list = getVentaFilterElements();
         const categoria = String(selectedCategoriaVenta || '').trim();
         const q = String(ventaSearchQuery || '').trim().toLowerCase();
+
+        let hasExactCodigo = false;
+        if (q) {
+            try {
+                hasExactCodigo = list.some(el => {
+                    const ci = String(el?.getAttribute('data-codigo-interno') || '').trim().toLowerCase();
+                    return ci && ci === q;
+                });
+            } catch (e) {
+            }
+        }
         list.forEach(el => {
             const cat = String(el?.getAttribute('data-categoria') || '').trim();
             const nombre = String(el?.getAttribute('data-nombre') || el?.textContent || '').trim();
-            const haystack = (nombre + ' ' + cat).toLowerCase();
+            const codigoInterno = String(el?.getAttribute('data-codigo-interno') || '').trim();
+            const haystack = (nombre + ' ' + codigoInterno).toLowerCase();
             const okCat = (!categoria || categoria === 'Todos' || cat === categoria);
-            const okQ = (!q || haystack.indexOf(q) >= 0);
+            const okQ = (!q || (hasExactCodigo ? (String(codigoInterno || '').trim().toLowerCase() === q) : (haystack.indexOf(q) >= 0)));
             if (okCat && okQ) {
                 el.classList.remove('hidden');
             } else {
@@ -4116,6 +4162,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const displayPrice = price > 0 ? price : 0;
                 const cat = String(p?.category?.name || p?.category_name || '').trim();
+                const codigoInterno = String(p?.codigo_interno || p?.internal_code || '').trim();
+                const desc = String(p?.description || '').trim();
+                const infoTitle = 'Código interno: ' + (codigoInterno || '—') + (desc ? ('\nDescripción: ' + desc) : '');
 
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-indigo-50 cursor-pointer';
@@ -4124,6 +4173,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 tr.setAttribute('data-nombre', String(p?.name || 'Producto'));
                 tr.setAttribute('data-precio', String(displayPrice.toFixed(2)));
                 tr.setAttribute('data-categoria', cat);
+                tr.setAttribute('data-codigo-interno', codigoInterno);
 
                 const stockCls = stockColorClass(stock);
                 tr.innerHTML = ''
@@ -4132,15 +4182,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     + '<td class="px-2 py-2 text-right text-gray-900 font-medium">' + formatearMoneda(displayPrice) + '</td>'
                     + '<td class="px-2 py-2 text-right ' + stockCls + ' font-medium">' + String((isNaN(stock) ? 0 : stock).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
                     + '<td class="px-2 py-2 text-center">'
-                    + '  <button type="button" class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-indigo-600 text-white hover:bg-indigo-700" data-action="add">'
-                    + '    <i class="fas fa-plus text-[10px]"></i>'
+                    + '  <button type="button" class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200" data-action="info" title="' + escapeHtml(infoTitle) + '">'
+                    + '    <i class="fas fa-info-circle text-[12px]"></i>'
                     + '  </button>'
                     + '</td>';
 
                 tr.addEventListener('click', function (e) {
-                    const btn = e && e.target ? e.target.closest('button[data-action="add"]') : null;
-                    if (btn) {
-                        agregarProductoDesdeEl(tr);
+                    const infoBtn = e && e.target ? e.target.closest('button[data-action="info"]') : null;
+                    if (infoBtn) {
+                        try { e.preventDefault(); } catch (ex) {}
+                        try { e.stopPropagation(); } catch (ex) {}
                         return;
                     }
                     agregarProductoDesdeEl(tr);
@@ -4167,13 +4218,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const displayPrice = price > 0 ? price : 0;
+                const codigoInterno = String(p?.codigo_interno || p?.internal_code || '').trim();
+                const desc = String(p?.description || '').trim();
+                const infoTitle = 'Código interno: ' + (codigoInterno || '—') + (desc ? ('\nDescripción: ' + desc) : '');
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = 'btn-producto flex flex-col items-start p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 text-left text-xs';
+                btn.className = 'btn-producto relative flex flex-col items-start p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 text-left text-xs';
                 btn.setAttribute('data-product-id', String(p?.id || ''));
                 btn.setAttribute('data-nombre', String(p?.name || 'Producto'));
                 btn.setAttribute('data-precio', String(displayPrice.toFixed(2)));
                 btn.setAttribute('data-categoria', String(p?.category?.name || p?.category_name || ''));
+                btn.setAttribute('data-codigo-interno', codigoInterno);
                 const stockCls = stockColorClass(stock);
 
                 const imgUrl = String(p?.image_url || '').trim();
@@ -4181,6 +4236,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const imgCls = imgUrl ? 'h-full w-full object-cover' : 'h-10';
                 const imgOnErr = "this.onerror=null;this.src='" + logoUrl + "';this.className='h-10';";
                 btn.innerHTML = ''
+                    + '<div class="absolute top-2 right-2">'
+                    + '  <span class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-white/80 border border-gray-200 text-gray-600 hover:bg-white cursor-help" data-action="info" title="' + escapeHtml(infoTitle) + '">'
+                    + '    <i class="fas fa-info-circle text-[12px]"></i>'
+                    + '  </span>'
+                    + '</div>'
                     + '<div class="w-full mb-2 flex items-center justify-center">'
                     + '  <div class="h-16 w-16 rounded-md bg-white border border-gray-200 flex items-center justify-center overflow-hidden">'
                     + '    <img src="' + imgSrc + '" alt="" class="' + imgCls + '" onerror="' + imgOnErr + '">'
@@ -4403,7 +4463,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function bindProductButtons() {
         botonesProducto = gridProductos ? gridProductos.querySelectorAll('.btn-producto') : document.querySelectorAll('.btn-producto');
         botonesProducto.forEach(btn => {
-            btn.addEventListener('click', function () {
+            btn.addEventListener('click', function (e) {
+                const infoEl = e && e.target ? e.target.closest('[data-action="info"]') : null;
+                if (infoEl) {
+                    try { e.preventDefault(); } catch (ex) {}
+                    try { e.stopPropagation(); } catch (ex) {}
+                    return;
+                }
                 const nombre = this.getAttribute('data-nombre') || 'Producto';
                 const precio = this.getAttribute('data-precio') || '0';
                 const productId = this.getAttribute('data-product-id') || '';

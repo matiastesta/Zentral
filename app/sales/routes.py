@@ -1,14 +1,18 @@
 from datetime import date as dt_date, datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import re
 import uuid
+import json
+import math
+import os
+import unicodedata
 
 from flask import current_app, g, jsonify, render_template, request, url_for
 from flask_login import login_required
 
-from sqlalchemy import func, inspect, text
+from sqlalchemy import func, inspect, text, and_, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from app import db
 from app.models import CashCount, Category, Employee, InventoryLot, InventoryMovement, Product, Sale, SaleItem
@@ -482,6 +486,104 @@ def _serialize_sale(row: Sale, related: dict = None):
     }
 
 
+_CODIGO_INTERNO_LEN = 8
+_CODIGO_INTERNO_PATTERN = re.compile(r'^[A-Z0-9]{8}$')
+
+
+def _normalize_codigo_interno(raw: str) -> str:
+    return str(raw or '').strip().upper()
+
+
+def _is_valid_codigo_interno(code: str) -> bool:
+    c = _normalize_codigo_interno(code)
+    if not c or len(c) != _CODIGO_INTERNO_LEN:
+        return False
+    return _CODIGO_INTERNO_PATTERN.match(c) is not None
+
+
+def _strip_accents(s: str) -> str:
+    try:
+        return ''.join(ch for ch in unicodedata.normalize('NFKD', s) if not unicodedata.combining(ch))
+    except Exception:
+        return s
+
+
+def _alnum_upper(s: str) -> str:
+    raw = _strip_accents(str(s or '').upper())
+    return re.sub(r'[^A-Z0-9]', '', raw)
+
+
+def _code3(s: str, fallback: str = 'XXX') -> str:
+    base = _alnum_upper(s)
+    if not base:
+        base = _alnum_upper(fallback)
+    return (base + 'XXX')[:3]
+
+
+def _codigo_prefix_from(name: str, category_name: str) -> str:
+    nnn = _code3(name, 'XXX')
+    ccc = _code3(category_name or 'GEN', 'GEN')
+    return (nnn + ccc)[:6]
+
+
+def _generate_unique_internal_code_for_sales() -> str:
+    for _ in range(30):
+        code = uuid.uuid4().hex[:_CODIGO_INTERNO_LEN].upper()
+        try:
+            exists = db.session.query(Product.id).filter(Product.internal_code == code).first() is not None
+        except Exception:
+            exists = False
+        if not exists:
+            return code
+    return uuid.uuid4().hex[:_CODIGO_INTERNO_LEN].upper()
+
+
+def _generate_codigo_interno(company_id: str, name: str, category_name: str = '', used: Optional[set] = None) -> str:
+    prefix = _codigo_prefix_from(name, category_name or 'GEN')
+    taken = used if isinstance(used, set) else set()
+    for n in range(1, 100):
+        candidate = prefix + str(n).zfill(2)
+        if candidate in taken:
+            continue
+        try:
+            exists_global = db.session.query(Product.id).filter(Product.internal_code == candidate).first() is not None
+        except Exception:
+            exists_global = False
+        if exists_global:
+            continue
+        if isinstance(taken, set):
+            taken.add(candidate)
+        return candidate
+    try:
+        current_app.logger.warning('codigo_interno prefix exhausted for prefix=%s (company_id=%s)', prefix, str(company_id or '').strip())
+    except Exception:
+        pass
+    return _generate_unique_internal_code_for_sales()
+
+
+def _ensure_codigo_interno_for_sales(rows) -> bool:
+    changed = False
+    used = set()
+    for p in (rows or []):
+        if not p:
+            continue
+        before = str(getattr(p, 'internal_code', '') or '').strip()
+        if _is_valid_codigo_interno(before):
+            continue
+        cat_name = ''
+        try:
+            cat_name = str(getattr(getattr(p, 'category', None), 'name', '') or '').strip()
+        except Exception:
+            cat_name = ''
+        if not cat_name:
+            cat_name = 'GEN'
+        next_code = _generate_codigo_interno(str(getattr(p, 'company_id', '') or _company_id()), getattr(p, 'name', '') or '', cat_name, used=used)
+        if next_code and before != next_code:
+            p.internal_code = next_code
+            changed = True
+    return changed
+
+
 def _make_gift_code(ticket: str, items_list: list) -> str:
     t = str(ticket or '').strip()
     digits = ''.join([ch for ch in t if ch.isdigit()])
@@ -538,6 +640,9 @@ def _serialize_product_for_sales(p: Product):
     return {
         'id': p.id,
         'name': p.name,
+        'codigo_interno': (p.internal_code or ''),
+        'internal_code': (p.internal_code or ''),
+        'description': (p.description or ''),
         'sale_price': p.sale_price,
         'category_id': p.category_id,
         'category': cat,
@@ -804,10 +909,15 @@ def list_products_for_sales():
     cid = _company_id()
     if not cid:
         return jsonify({'ok': True, 'items': [], 'has_more': False, 'next_offset': None})
-    q = db.session.query(Product).filter(Product.company_id == cid).filter(Product.active == True)  # noqa: E712
+    q = (
+        db.session.query(Product)
+        .options(joinedload(Product.category))
+        .filter(Product.company_id == cid)
+        .filter(Product.active == True)  # noqa: E712
+    )
     if qraw:
         like = f"%{qraw}%"
-        q = q.filter(Product.name.ilike(like))
+        q = q.filter(or_(Product.name.ilike(like), Product.internal_code.ilike(like)))
     q = q.order_by(Product.name.asc(), Product.id.asc())
 
     rows = q.offset(offset).limit(limit + 1).all()
@@ -815,6 +925,15 @@ def list_products_for_sales():
     if has_more:
         rows = rows[:limit]
     next_offset = (offset + limit) if has_more else None
+    try:
+        changed = _ensure_codigo_interno_for_sales(rows)
+        if changed:
+            db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
     return jsonify({'ok': True, 'items': [_serialize_product_for_sales(r) for r in rows], 'has_more': has_more, 'next_offset': next_offset})
 
 
