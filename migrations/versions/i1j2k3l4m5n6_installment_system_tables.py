@@ -1,5 +1,6 @@
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 revision = 'i1j2k3l4m5n6'
 down_revision = 'h1a2b3c4d5e6'
@@ -9,11 +10,16 @@ depends_on = None
 
 def upgrade() -> None:
     # sale.is_installments
-    with op.batch_alter_table('sale', schema=None) as batch_op:
-        try:
-            batch_op.add_column(sa.Column('is_installments', sa.Boolean(), nullable=False, server_default=sa.text('0')))
-        except Exception:
-            pass
+    bind = op.get_bind()
+    insp = inspect(bind)
+    tables = set(insp.get_table_names() or [])
+    if 'sale' in tables:
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('sale') or [])}
+        if 'is_installments' not in cols:
+            try:
+                op.execute(sa.text('ALTER TABLE sale ADD COLUMN IF NOT EXISTS is_installments BOOLEAN NOT NULL DEFAULT FALSE'))
+            except Exception:
+                pass
 
     op.create_table(
         'installment_plan',
@@ -58,8 +64,13 @@ def downgrade() -> None:
         op.drop_table('installment_plan')
     except Exception:
         pass
-    with op.batch_alter_table('sale', schema=None) as batch_op:
-        try:
-            batch_op.drop_column('is_installments')
-        except Exception:
-            pass
+    bind = op.get_bind()
+    insp = inspect(bind)
+    tables = set(insp.get_table_names() or [])
+    if 'sale' in tables:
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('sale') or [])}
+        if 'is_installments' in cols:
+            try:
+                op.execute(sa.text('ALTER TABLE sale DROP COLUMN is_installments'))
+            except Exception:
+                pass
