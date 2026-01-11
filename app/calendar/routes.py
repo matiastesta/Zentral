@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.calendar import bp
-from app.models import CalendarEvent, CalendarUserConfig, CashCount, Customer, Employee, Expense, InventoryLot, Product, Sale
+from app.models import BusinessSettings, CalendarEvent, CalendarUserConfig, CashCount, Customer, Employee, Expense, Installment, InstallmentPlan, InventoryLot, Product, Sale
 from app.permissions import module_required
 
 
@@ -27,16 +27,14 @@ def _load_crm_config(company_id: str) -> dict:
 def _default_calendar_config():
     return {
         "views": ["mensual", "semanal", "diaria", "lista"],
-        "debt_rules": {
-            "overdue_days": 30,
-            "critical_days": 60,
-            "critical_amount": 0,
-        },
         "event_sources": {
             "clientes": {
                 "cumpleanos": False,
                 "deuda_vencida": True,
                 "deuda_critica": True,
+            },
+            "cuotas": {
+                "vencimientos": True,
             },
             "proveedores": {
                 "deuda_vencida": True,
@@ -282,29 +280,40 @@ def _get_system_events(cfg_data: dict, start: date, end: date):
     today = date.today()
     out: list[CalendarEvent] = []
 
+    installments_enabled = False
+    try:
+        bs = BusinessSettings.get_for_company(cid)
+        installments_enabled = bool(bs and bool(getattr(bs, 'habilitar_sistema_cuotas', False)))
+    except Exception:
+        installments_enabled = False
+
     def _fmt_money(v: float) -> str:
         try:
             return f"{float(v or 0.0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
         except Exception:
             return '0,00'
 
-    def _add(*, title: str, description: str | None, d: date, priority: str, source_module: str, event_type: str):
-        out.append(
-            CalendarEvent(
-                company_id=cid,
-                title=title,
-                description=description,
-                event_date=d,
-                priority=priority,
-                color=_priority_color(priority, None),
-                source_module=source_module,
-                event_type=event_type,
-                is_system=True,
-                assigned_user_id=None,
-                created_by_user_id=None,
-                status='open',
-            )
+    def _add(*, title: str, description: str | None, d: date, priority: str, source_module: str, event_type: str, href: str | None = None):
+        ev = CalendarEvent(
+            company_id=cid,
+            title=title,
+            description=description,
+            event_date=d,
+            priority=priority,
+            color=_priority_color(priority, None),
+            source_module=source_module,
+            event_type=event_type,
+            is_system=True,
+            assigned_user_id=None,
+            created_by_user_id=None,
+            status='open',
         )
+        if href:
+            try:
+                setattr(ev, 'href', href)
+            except Exception:
+                pass
+        out.append(ev)
 
     # Clientes · Cumpleaños
     if _is_source_enabled(cfg_data, 'clientes', 'cumpleanos'):
@@ -628,6 +637,139 @@ def _get_system_events(cfg_data: dict, start: date, end: date):
                 event_type='diferencias_caja',
             )
 
+    # Cuotas · Vencimientos (evento por cuota) + Alertas hoy (vencido/crítico)
+    if installments_enabled and _is_source_enabled(cfg_data, 'cuotas', 'vencimientos'):
+        q = (
+            db.session.query(Installment, InstallmentPlan)
+            .join(InstallmentPlan, Installment.plan_id == InstallmentPlan.id)
+            .filter(Installment.company_id == cid)
+            .filter(InstallmentPlan.company_id == cid)
+            .filter(func.lower(InstallmentPlan.status) == 'activo')
+            .filter(func.lower(Installment.status) != 'pagada')
+            .filter(Installment.due_date >= start)
+            .filter(Installment.due_date <= end)
+            .order_by(Installment.due_date.asc(), Installment.id.asc())
+            .limit(5000)
+        )
+
+        rows = []
+        try:
+            rows = q.all()
+        except Exception:
+            rows = []
+
+        for it, plan in (rows or []):
+            due_d = getattr(it, 'due_date', None)
+            if not due_d:
+                continue
+
+            cust = str(getattr(plan, 'customer_name', '') or '').strip() or str(getattr(plan, 'customer_id', '') or '').strip() or 'Cliente'
+            try:
+                n = int(getattr(it, 'installment_number', 0) or 0)
+            except Exception:
+                n = 0
+            amt = float(getattr(it, 'amount', 0.0) or 0.0)
+
+            title = 'Vencimiento de cuota'
+            pr = 'media'
+            if due_d == today:
+                title = 'Cuota vence hoy'
+                pr = 'alta'
+            elif due_d < today:
+                title = 'Cuota vencida'
+                pr = 'alta'
+
+            t = title + ': ' + cust
+            if n > 0:
+                t += ' (#' + str(n) + ')'
+            if amt > 0:
+                t += ' ($' + _fmt_money(amt) + ')'
+
+            desc = 'Cliente: ' + cust
+            if n > 0:
+                desc += ' · Cuota #' + str(n)
+            if amt > 0:
+                desc += ' · Importe: $' + _fmt_money(amt)
+
+            href = None
+            try:
+                cid_link = str(getattr(plan, 'customer_id', '') or '').strip()
+                if cid_link:
+                    href = url_for('customers.index', open_legajo=cid_link)
+            except Exception:
+                href = None
+            _add(title=t, description=desc, d=due_d, priority=pr, source_module='cuotas', event_type='vencimientos', href=href)
+
+        # Alertas agregadas HOY por cliente según umbrales del CRM
+        if start <= today <= end:
+            crm_cfg = _load_crm_config(cid)
+            try:
+                inst_overdue_count = int((crm_cfg or {}).get('installments_overdue_count') or 1)
+            except Exception:
+                inst_overdue_count = 1
+            try:
+                inst_critical_count = int((crm_cfg or {}).get('installments_critical_count') or 3)
+            except Exception:
+                inst_critical_count = 3
+            if inst_overdue_count < 1:
+                inst_overdue_count = 1
+            if inst_critical_count <= inst_overdue_count:
+                inst_critical_count = inst_overdue_count + 1
+
+            try:
+                overdue_rows = (
+                    db.session.query(
+                        InstallmentPlan.customer_id,
+                        InstallmentPlan.customer_name,
+                        func.count(Installment.id).label('overdue_count'),
+                    )
+                    .join(Installment, Installment.plan_id == InstallmentPlan.id)
+                    .filter(InstallmentPlan.company_id == cid)
+                    .filter(Installment.company_id == cid)
+                    .filter(func.lower(InstallmentPlan.status) == 'activo')
+                    .filter(func.lower(Installment.status) != 'pagada')
+                    .filter(Installment.due_date < today)
+                    .group_by(InstallmentPlan.customer_id, InstallmentPlan.customer_name)
+                    .limit(5000)
+                    .all()
+                )
+            except Exception:
+                overdue_rows = []
+
+            for cust_id, cust_name, overdue_count in (overdue_rows or []):
+                try:
+                    oc = int(overdue_count or 0)
+                except Exception:
+                    oc = 0
+                if oc <= 0:
+                    continue
+
+                is_critical = oc >= inst_critical_count
+                is_overdue = oc >= inst_overdue_count
+                if not is_critical and not is_overdue:
+                    continue
+
+                cust = str(cust_name or '').strip() or str(cust_id or '').strip() or 'Cliente'
+                pr = 'critica' if is_critical else 'alta'
+                suffix = ('vencida' if oc == 1 else 'vencidas')
+                label = 'Cuotas vencidas críticas' if is_critical else 'Cuotas vencidas'
+                href = None
+                try:
+                    cid_link = str(cust_id or '').strip()
+                    if cid_link:
+                        href = url_for('customers.index', open_legajo=cid_link)
+                except Exception:
+                    href = None
+                _add(
+                    title=label + ' · Cliente: ' + cust + ' (' + str(oc) + ' ' + suffix + ')',
+                    description='Cliente: ' + cust + ' · ' + str(oc) + ' ' + suffix,
+                    d=today,
+                    priority=pr,
+                    source_module='cuotas',
+                    event_type='vencimientos',
+                    href=href,
+                )
+
     return out
 
 
@@ -767,6 +909,8 @@ def index():
             _set(['clientes', 'deuda_vencida'], request.form.get('src_clientes_deuda_vencida') == 'on')
             _set(['clientes', 'deuda_critica'], request.form.get('src_clientes_deuda_critica') == 'on')
 
+            _set(['cuotas', 'vencimientos'], request.form.get('src_cuotas_vencimientos') == 'on')
+
             _set(['proveedores', 'deuda_vencida'], request.form.get('src_proveedores_deuda_vencida') == 'on')
             _set(['proveedores', 'proximo_vencimiento'], request.form.get('src_proveedores_proximo_vencimiento') == 'on')
 
@@ -782,47 +926,12 @@ def index():
 
             cfg_data['event_sources'] = sources
 
-            rules = cfg_data.get('debt_rules') if isinstance(cfg_data, dict) else None
-            if not isinstance(rules, dict):
-                rules = {}
-
-            def _parse_int(name: str, default: int) -> int:
-                raw = (request.form.get(name) or '').strip()
-                if raw == '':
-                    return default
-                try:
-                    return int(raw)
-                except Exception:
-                    return default
-
-            def _parse_float(name: str, default: float) -> float:
-                raw = (request.form.get(name) or '').strip()
-                if raw == '':
-                    return default
-                try:
-                    return float(raw.replace('.', '').replace(',', '.'))
-                except Exception:
-                    try:
-                        return float(raw)
-                    except Exception:
-                        return default
-
-            overdue_days = _parse_int('debt_overdue_days', int(rules.get('overdue_days') or 30))
-            critical_days = _parse_int('debt_critical_days', int(rules.get('critical_days') or 60))
-            critical_amount = _parse_float('debt_critical_amount', float(rules.get('critical_amount') or 0.0))
-
-            if overdue_days < 0:
-                overdue_days = 0
-            if critical_days < 0:
-                critical_days = 0
-            if critical_amount < 0:
-                critical_amount = 0.0
-
-            cfg_data['debt_rules'] = {
-                'overdue_days': overdue_days,
-                'critical_days': critical_days,
-                'critical_amount': critical_amount,
-            }
+            # Calendar must not store debt thresholds; it consumes CRM configuration from Clientes.
+            try:
+                if isinstance(cfg_data, dict) and 'debt_rules' in cfg_data:
+                    cfg_data.pop('debt_rules', None)
+            except Exception:
+                pass
 
             cfg_data['dashboard_integration'] = (request.form.get('calendar_dashboard_integration') == 'on')
 
@@ -902,6 +1011,8 @@ def index():
             sm = ''
             et = ''
         if sm == 'clientes':
+            return 'Clientes'
+        if sm == 'cuotas':
             return 'Clientes'
         if sm == 'movimientos':
             return 'Movimientos'

@@ -1,11 +1,11 @@
 from datetime import date, timedelta
 
-from flask import render_template
+from flask import jsonify, render_template
 from flask_login import login_required, current_user
 
 from app import db
-from app.models import CalendarEvent, CalendarUserConfig
-from app.permissions import module_required
+from app.models import CalendarEvent, CalendarUserConfig, Installment, InstallmentPlan
+from app.permissions import module_required, module_required_any
 from app.main import bp
 
 
@@ -15,6 +15,34 @@ def _company_id() -> str:
         return str(getattr(g, 'company_id', '') or '').strip()
     except Exception:
         return ''
+
+
+def _has_active_installments(company_id: str) -> bool:
+    cid = str(company_id or '').strip()
+    if not cid:
+        return False
+    try:
+        row = (
+            db.session.query(Installment.id)
+            .join(InstallmentPlan, Installment.plan_id == InstallmentPlan.id)
+            .filter(Installment.company_id == cid)
+            .filter(InstallmentPlan.company_id == cid)
+            .filter(db.func.lower(InstallmentPlan.status) == 'activo')
+            .filter(db.func.lower(Installment.status) != 'pagada')
+            .limit(1)
+            .first()
+        )
+        return bool(row is not None)
+    except Exception:
+        return False
+
+
+@bp.get('/api/customers/has_active_installments')
+@login_required
+@module_required_any('settings', 'customers', 'sales')
+def has_active_installments_api():
+    cid = _company_id()
+    return jsonify({'has_active_installments': bool(_has_active_installments(cid))})
 
 
 @bp.route('/')

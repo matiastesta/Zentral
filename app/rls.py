@@ -14,6 +14,8 @@ TENANT_TABLES = [
     'inventory_movement',
     'sale',
     'sale_item',
+    'installment_plan',
+    'installment',
     'calendar_user_config',
     'cash_count',
     'customer',
@@ -115,22 +117,37 @@ def bootstrap_schema(reset: bool) -> None:
         except Exception:
             return
         try:
-            if 'sale' not in set(insp.get_table_names() or []):
-                return
+            tables = set(insp.get_table_names() or [])
         except Exception:
             return
 
-        try:
-            existing = {str(c.get('name') or '') for c in (insp.get_columns('sale') or [])}
-        except Exception:
-            existing = set()
+        if 'sale' in tables:
+            try:
+                existing = {str(c.get('name') or '') for c in (insp.get_columns('sale') or [])}
+            except Exception:
+                existing = set()
 
-        if 'employee_id' not in existing:
-            db.session.execute(text('ALTER TABLE sale ADD COLUMN IF NOT EXISTS employee_id VARCHAR(64)'))
-            existing.add('employee_id')
-        if 'employee_name' not in existing:
-            db.session.execute(text('ALTER TABLE sale ADD COLUMN IF NOT EXISTS employee_name VARCHAR(255)'))
-            existing.add('employee_name')
+            if 'employee_id' not in existing:
+                db.session.execute(text('ALTER TABLE sale ADD COLUMN IF NOT EXISTS employee_id VARCHAR(64)'))
+                existing.add('employee_id')
+            if 'employee_name' not in existing:
+                db.session.execute(text('ALTER TABLE sale ADD COLUMN IF NOT EXISTS employee_name VARCHAR(255)'))
+                existing.add('employee_name')
+            if 'is_installments' not in existing:
+                db.session.execute(text('ALTER TABLE sale ADD COLUMN IF NOT EXISTS is_installments BOOLEAN NOT NULL DEFAULT FALSE'))
+                existing.add('is_installments')
+
+        if 'business_settings' in tables:
+            try:
+                bs_existing = {str(c.get('name') or '') for c in (insp.get_columns('business_settings') or [])}
+            except Exception:
+                bs_existing = set()
+            if 'habilitar_sistema_cuotas' not in bs_existing:
+                db.session.execute(
+                    text(
+                        'ALTER TABLE business_settings ADD COLUMN IF NOT EXISTS habilitar_sistema_cuotas BOOLEAN NOT NULL DEFAULT FALSE'
+                    )
+                )
 
     def _upgrade_db_to_head() -> None:
         try:
@@ -306,6 +323,8 @@ def bootstrap_schema(reset: bool) -> None:
                 Category,
                 CompanyRole,
                 Plan,
+                Installment,
+                InstallmentPlan,
                 Customer,
                 Employee,
                 Expense,
@@ -338,6 +357,8 @@ def bootstrap_schema(reset: bool) -> None:
                 Product,
                 Sale,
                 SaleItem,
+                InstallmentPlan,
+                Installment,
                 Supplier,
             ):
                 _sqlite_ensure_model_columns(m)

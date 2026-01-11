@@ -7,7 +7,6 @@
             <h1 class="text-2xl font-bold text-gray-900">Reportes y Análisis</h1>
             <p class="mt-1 text-sm text-gray-600">Transformá tus datos operativos en decisiones: entendé qué está pasando, por qué, y qué hacer.</p>
         </div>
-
         <div class="flex flex-col gap-2 sm:items-end">
             <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
                 <select id="reports-period-preset" class="col-span-2 sm:col-auto px-3 py-2 text-sm border border-gray-200 rounded-md bg-white text-gray-700">
@@ -86,6 +85,31 @@
                     </div>
                 </div>
             </button>
+        </div>
+    </div>
+</div>
+
+<div id="lookup-modal" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="absolute inset-0 flex items-center justify-center p-4">
+        <div class="w-full max-w-xl rounded-xl bg-white shadow-xl border border-gray-200">
+            <div class="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-3">
+                <div>
+                    <div id="lookup-title" class="text-sm font-semibold text-gray-900">Seleccionar</div>
+                    <div id="lookup-subtitle" class="text-xs text-gray-500">Buscá y seleccioná un valor.</div>
+                </div>
+                <button id="btn-lookup-close" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-gray-100" aria-label="Cerrar">
+                    <i class="fas fa-times text-gray-500"></i>
+                </button>
+            </div>
+            <div class="p-4">
+                <div class="flex items-center gap-2">
+                    <input id="lookup-q" type="text" class="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white text-gray-700" placeholder="Buscar…" />
+                    <button id="btn-lookup-clear" type="button" class="shrink-0 inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 rounded-md hover:bg-gray-100">Limpiar</button>
+                    <button id="btn-lookup-all" type="button" class="shrink-0 inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">Todos</button>
+                </div>
+                <div id="lookup-results" class="mt-3 max-h-[360px] overflow-auto border border-gray-200 rounded-lg"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -499,8 +523,8 @@
     <div class="bg-white rounded-lg shadow border border-gray-200 hidden" id="finance-report">
         <div class="px-4 py-3 border-b border-gray-100 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-                <div class="text-sm font-semibold text-gray-900">Informe Financiero Complementario</div>
-                <div id="reports-finance-subtitle" class="text-xs text-gray-500">Ingresos vs Gastos: claridad mensual para decidir.</div>
+                <div class="text-sm font-semibold text-gray-900">Finanzas (Flujo de caja)</div>
+                <div id="reports-finance-subtitle" class="text-xs text-gray-500">Criterio caja: cobros y pagos reales del período (no devengado).</div>
             </div>
             <div class="flex flex-col gap-2 lg:items-end">
                 <div class="flex items-center justify-end gap-2 overflow-x-auto whitespace-nowrap">
@@ -513,174 +537,171 @@
         </div>
 
         <div class="p-4">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4" id="finance-kpis">
-                <div class="p-4 rounded-xl border border-blue-100 bg-blue-50">
-                    <div class="text-xs text-blue-800 uppercase tracking-wide">Ingresos totales</div>
-                    <div id="fin-kpi-income" class="mt-1 text-xl font-semibold text-blue-900">$0,00</div>
-                    <div class="mt-1 text-xs text-blue-800">Var. <span id="fin-kpi-income-var">0%</span></div>
-                </div>
-                <div class="p-4 rounded-xl border border-rose-100 bg-rose-50">
-                    <div class="text-xs text-rose-800 uppercase tracking-wide">Gastos totales</div>
-                    <div id="fin-kpi-expense" class="mt-1 text-xl font-semibold text-rose-900">$0,00</div>
-                    <div class="mt-1 text-xs text-rose-800">Var. <span id="fin-kpi-expense-var">0%</span></div>
-                </div>
-                <div class="p-4 rounded-xl border border-emerald-100 bg-emerald-50">
-                    <div class="text-xs text-emerald-800 uppercase tracking-wide">Resultado mensual</div>
-                    <div id="fin-kpi-result" class="mt-1 text-xl font-semibold text-emerald-900">$0,00</div>
-                    <div class="mt-1 text-xs"><span id="fin-kpi-result-pct" class="text-emerald-800">0%</span></div>
-                </div>
-                <div class="p-4 rounded-xl border border-amber-100 bg-amber-50">
-                    <div class="text-xs text-amber-800 uppercase tracking-wide">Ratio gastos/ingresos</div>
-                    <div id="fin-kpi-ratio" class="mt-1 text-xl font-semibold text-amber-900">0%</div>
-                    <div class="mt-1 text-xs text-amber-800">Cuánto gastás por cada $1 que entra</div>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4" id="finance-kpis">
+            <div class="p-4 rounded-xl border border-blue-100 bg-blue-50">
+                <div class="text-xs text-blue-800 uppercase tracking-wide">Cobros totales</div>
+                <div id="fin-kpi-income" class="mt-1 text-xl font-semibold text-blue-900">$0,00</div>
+                <div class="mt-1 text-xs text-blue-800">Var. <span id="fin-kpi-income-var">0%</span></div>
+            </div>
+            <div class="p-4 rounded-xl border border-indigo-100 bg-indigo-50">
+                <div class="text-xs text-indigo-800 uppercase tracking-wide">Cobros de cuotas</div>
+                <div id="fin-kpi-installments" class="mt-1 text-xl font-semibold text-indigo-900">$0,00</div>
+                <div class="mt-1 text-xs text-indigo-800">No son ventas nuevas.</div>
+            </div>
+            <div class="p-4 rounded-xl border border-rose-100 bg-rose-50">
+                <div class="text-xs text-rose-800 uppercase tracking-wide">Pagos totales</div>
+                <div id="fin-kpi-expense" class="mt-1 text-xl font-semibold text-rose-900">$0,00</div>
+                <div class="mt-1 text-xs text-rose-800">Var. <span id="fin-kpi-expense-var">0%</span></div>
+            </div>
+            <div class="p-4 rounded-xl border border-emerald-100 bg-emerald-50">
+                <div class="text-xs text-emerald-800 uppercase tracking-wide">Flujo neto</div>
+                <div id="fin-kpi-result" class="mt-1 text-xl font-semibold text-emerald-900">$0,00</div>
+                <div class="mt-1 text-xs text-emerald-800">Var. <span id="fin-kpi-result-var">0%</span></div>
+            </div>
+            <div class="p-4 rounded-xl border border-amber-100 bg-amber-50">
+                <div class="text-xs text-amber-800 uppercase tracking-wide">Ratio gastos/ingresos</div>
+                <div id="fin-kpi-ratio" class="mt-1 text-xl font-semibold text-amber-900">0%</div>
+                <div class="mt-1 text-xs text-amber-800">Cuánto gastás por cada $1 que entra</div>
+            </div>
+        </div>
+
+        <div class="mt-4 p-4 rounded-xl border border-gray-200 bg-white" id="finance-section-cash">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <div class="text-sm font-semibold text-gray-900">Resumen de caja</div>
+                    <div class="text-xs text-gray-500">Caja inicial, cobros/pagos efectivos, flujo neto y caja final (si hay arqueos cargados).</div>
                 </div>
             </div>
-
-            <div class="mt-4 p-4 rounded-xl border border-gray-200 bg-white" id="finance-section-chart">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <div class="text-sm font-semibold text-gray-900">Ingresos vs Gastos (mensual)</div>
-                        <div class="text-xs text-gray-500">Barras: Ingresos y Gastos · Línea: Resultado.</div>
-                    </div>
+            <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5" id="fin-cash-summary">
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Caja inicial</div>
+                    <div id="fin-cash-initial" class="mt-1 text-sm font-semibold text-gray-900">—</div>
                 </div>
-                <div id="finance-chart" class="mt-3 h-72 relative overflow-hidden border border-gray-200 rounded-lg bg-white"></div>
-            </div>
-
-            <div class="mt-4 p-4 rounded-xl border border-gray-200 bg-white" id="finance-advanced">
-                <div class="text-sm font-semibold text-gray-900">Análisis financiero avanzado</div>
-                <div class="mt-1 text-xs text-gray-500">Resultado, estructura de gastos, punto de equilibrio y riesgos de sostenibilidad.</div>
-
-                <div class="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                    <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                        <div class="text-[11px] uppercase tracking-wide text-gray-500">Resultado acumulado</div>
-                        <div id="fin-adv-result-acc" class="mt-1 text-sm font-semibold text-gray-900">—</div>
-                    </div>
-                    <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                        <div class="text-[11px] uppercase tracking-wide text-gray-500">Margen neto</div>
-                        <div id="fin-adv-net-margin" class="mt-1 text-sm font-semibold text-gray-900">—</div>
-                    </div>
-                    <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                        <div class="text-[11px] uppercase tracking-wide text-gray-500">Punto de equilibrio</div>
-                        <div id="fin-adv-breakeven" class="mt-1 text-sm font-semibold text-gray-900">—</div>
-                    </div>
-                    <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                        <div class="text-[11px] uppercase tracking-wide text-gray-500">Concentración de ventas</div>
-                        <div id="fin-adv-concentration" class="mt-1 text-sm font-semibold text-gray-900">—</div>
-                    </div>
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Cobros efectivos</div>
+                    <div id="fin-cash-inflows" class="mt-1 text-sm font-semibold text-gray-900">—</div>
                 </div>
-
-                <div class="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    <div class="p-3 rounded-lg border border-gray-200 bg-white">
-                        <div class="text-xs font-semibold text-gray-700">Estructura de gastos</div>
-                        <div class="mt-2 text-xs text-gray-600">Estimación fija vs variable (heurística).</div>
-                        <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                            <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                                <div class="text-[11px] uppercase tracking-wide text-gray-500">Fijos (estimado)</div>
-                                <div id="fin-adv-fixed" class="mt-1 text-sm font-semibold text-gray-900">—</div>
-                            </div>
-                            <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                                <div class="text-[11px] uppercase tracking-wide text-gray-500">Variables (estimado)</div>
-                                <div id="fin-adv-variable" class="mt-1 text-sm font-semibold text-gray-900">—</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="p-3 rounded-lg border border-gray-200 bg-white">
-                        <div class="text-xs font-semibold text-gray-700">Sostenibilidad</div>
-                        <div class="mt-2 text-xs text-gray-600">Ingresos mínimos necesarios y margen bruto.</div>
-                        <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                            <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                                <div class="text-[11px] uppercase tracking-wide text-gray-500">Margen bruto</div>
-                                <div id="fin-adv-gross-margin" class="mt-1 text-sm font-semibold text-gray-900">—</div>
-                            </div>
-                            <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                                <div class="text-[11px] uppercase tracking-wide text-gray-500">CMV</div>
-                                <div id="fin-adv-cmv" class="mt-1 text-sm font-semibold text-gray-900">—</div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Pagos efectivos</div>
+                    <div id="fin-cash-outflows" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                </div>
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Flujo neto</div>
+                    <div id="fin-cash-net" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                </div>
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Caja final</div>
+                    <div id="fin-cash-final" class="mt-1 text-sm font-semibold text-gray-900">—</div>
                 </div>
             </div>
+        </div>
 
-            <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4" id="finance-breakdowns">
-                <div class="p-4 rounded-xl border border-gray-200 bg-white">
-                    <div class="text-sm font-semibold text-gray-900">Desglose de ingresos</div>
-                    <div class="mt-1 text-xs text-gray-500">Ventas netas por medio de pago.</div>
-                    <div id="fin-break-income" class="mt-3"></div>
+        <div class="mt-4 p-4 rounded-xl border border-gray-200 bg-white" id="finance-section-collections">
+            <div class="text-sm font-semibold text-gray-900">Cobros del período (desglosados)</div>
+            <div class="mt-1 text-xs text-gray-500">Qué entró efectivamente. Las ventas devengadas se analizan en Estado de Resultados.</div>
+
+            <div class="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Cobros por ventas contado / parcial</div>
+                    <div id="fin-col-sales" class="mt-1 text-sm font-semibold text-gray-900">—</div>
                 </div>
-                <div class="p-4 rounded-xl border border-gray-200 bg-white">
-                    <div class="text-sm font-semibold text-gray-900">Desglose de gastos</div>
-                    <div class="mt-1 text-xs text-gray-500">Gastos por categoría y % sobre ingresos.</div>
-                    <div id="fin-break-expense" class="mt-3"></div>
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Cobros cuenta corriente</div>
+                    <div id="fin-col-cc" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                </div>
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Cobros sistema de cuotas</div>
+                    <div id="fin-col-cuotas" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                </div>
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Otros ingresos</div>
+                    <div id="fin-col-other" class="mt-1 text-sm font-semibold text-gray-900">—</div>
                 </div>
             </div>
+        </div>
 
-            <div class="mt-4 p-4 rounded-xl border border-gray-200 bg-white" id="finance-section-insights">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <div class="text-sm font-semibold text-gray-900">Insights del informe</div>
-                        <div class="text-xs text-gray-500">Mensajes accionables para el dueño.</div>
-                    </div>
-                </div>
-                <div id="finance-insights" class="mt-3 space-y-2">
-                    <div class="p-3 rounded-lg bg-gray-50 text-sm text-gray-700">Sin insights aún.</div>
+        <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4" id="finance-projections">
+            <div class="p-4 rounded-xl border border-gray-200 bg-white">
+                <div class="text-sm font-semibold text-gray-900">Proyección de cobros · Cuenta corriente</div>
+                <div class="mt-1 text-xs text-gray-500">Saldo pendiente y próximos vencimientos (según reglas CRM).</div>
+                <div class="mt-3 grid grid-cols-1 gap-2">
+                    <div class="flex items-center justify-between text-xs"><span class="text-gray-600">Saldo pendiente total</span><span id="fin-proj-cc-pending" class="font-medium text-gray-900">—</span></div>
+                    <div class="flex items-center justify-between text-xs"><span class="text-gray-600">Próximo vencimiento</span><span id="fin-proj-cc-next" class="font-medium text-gray-900">—</span></div>
+                    <div class="flex items-center justify-between text-xs"><span class="text-gray-600">A vencer (≤ 7/15/30 días)</span><span id="fin-proj-cc-ranges" class="font-medium text-gray-900">—</span></div>
+                    <div class="flex items-center justify-between text-xs"><span class="text-gray-600">Vencida / crítica</span><span id="fin-proj-cc-overdue" class="font-medium text-gray-900">—</span></div>
                 </div>
             </div>
+            <div class="p-4 rounded-xl border border-gray-200 bg-white">
+                <div class="text-sm font-semibold text-gray-900">Proyección de cobros · Sistema de cuotas</div>
+                <div class="mt-1 text-xs text-gray-500">Saldo pendiente y próximas cuotas (si el módulo está habilitado).</div>
+                <div class="mt-3 grid grid-cols-1 gap-2">
+                    <div class="flex items-center justify-between text-xs"><span class="text-gray-600">Saldo pendiente</span><span id="fin-proj-inst-pending" class="font-medium text-gray-900">—</span></div>
+                    <div class="flex items-center justify-between text-xs"><span class="text-gray-600">Próxima cuota</span><span id="fin-proj-inst-next" class="font-medium text-gray-900">—</span></div>
+                    <div class="flex items-center justify-between text-xs"><span class="text-gray-600">Cuotas del período</span><span id="fin-proj-inst-period" class="font-medium text-gray-900">—</span></div>
+                    <div class="flex items-center justify-between text-xs"><span class="text-gray-600">Vencidas</span><span id="fin-proj-inst-overdue" class="font-medium text-gray-900">—</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4 p-4 rounded-xl border border-gray-200 bg-white" id="finance-gap">
+            <div class="text-sm font-semibold text-gray-900">Gap financiero</div>
+            <div class="mt-1 text-xs text-gray-500">Devengado vs caja: cuánto financiás a clientes en el período.</div>
+            <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Ventas devengadas (neto)</div>
+                    <div id="fin-gap-accrued" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                </div>
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Cobros reales</div>
+                    <div id="fin-gap-cash" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                </div>
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-[11px] uppercase tracking-wide text-gray-500">Diferencia</div>
+                    <div id="fin-gap-diff" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4 p-4 rounded-xl border border-gray-200 bg-white" id="finance-section-insights">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <div class="text-sm font-semibold text-gray-900">Insights del informe</div>
+                    <div class="text-xs text-gray-500">Mensajes accionables para el dueño.</div>
+                </div>
+            </div>
+            <div id="finance-insights" class="mt-3 space-y-2">
+                <div class="p-3 rounded-lg bg-gray-50 text-sm text-gray-700">Sin insights aún.</div>
+            </div>
+        </div>
         </div>
     </div>
 </div>
 
-<div id="modal-export-reports" class="hidden fixed inset-0 z-50">
+<div id="modal-export" class="hidden fixed inset-0 z-50">
     <div class="absolute inset-0 bg-black/40"></div>
-    <div class="relative h-full w-full flex items-center justify-center p-4">
-        <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+    <div class="absolute inset-0 flex items-center justify-center p-4">
+        <div class="w-full max-w-lg rounded-xl bg-white shadow-xl border border-gray-200">
+            <div class="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-3">
                 <div>
-                    <h3 class="text-base font-semibold text-gray-900">Exportar informe</h3>
-                    <p id="reports-export-subtitle" class="text-xs text-gray-500">Se exporta el reporte activo del período seleccionado.</p>
+                    <div class="text-sm font-semibold text-gray-900">Exportar</div>
+                    <div id="export-subtitle" class="text-xs text-gray-500">Elegí el formato.</div>
                 </div>
-                <button id="btn-close-export-reports" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
-                    <i class="fas fa-times"></i>
+                <button id="btn-export-close" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-gray-100" aria-label="Cerrar">
+                    <i class="fas fa-times text-gray-500"></i>
                 </button>
             </div>
-            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button id="btn-export-reports-pdf" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
-                    <div class="text-2xl">📄</div>
-                    <div class="mt-2 font-semibold text-gray-900">Exportar a PDF</div>
-                    <div class="text-xs text-gray-500">Ideal para imprimir o enviar.</div>
-                </button>
-                <button id="btn-export-reports-xls" type="button" class="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50">
-                    <div class="text-2xl">📊</div>
-                    <div class="mt-2 font-semibold text-gray-900">Exportar a Excel</div>
-                    <div class="text-xs text-gray-500">Descarga un archivo .xlsx.</div>
-                </button>
-            </div>
-            <div class="px-5 py-4 border-t border-gray-100 flex justify-end">
-                <button id="btn-cancel-export-reports" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div id="modal-lookup" class="hidden fixed inset-0 z-50">
-    <div class="absolute inset-0 bg-black/40"></div>
-    <div class="relative h-full w-full flex items-center justify-center p-4">
-        <div class="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
-                <div>
-                    <h3 id="lookup-title" class="text-base font-semibold text-gray-900">Seleccionar</h3>
-                    <p id="lookup-subtitle" class="text-xs text-gray-500">Elegí una opción o buscá por nombre.</p>
+            <div class="p-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button id="btn-export-pdf" type="button" class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                        <i class="fas fa-file-pdf mr-2 text-rose-600"></i> PDF
+                    </button>
+                    <button id="btn-export-excel" type="button" class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                        <i class="fas fa-file-excel mr-2 text-emerald-600"></i> Excel
+                    </button>
                 </div>
-                <button id="btn-close-lookup" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="p-5">
-                <div class="flex flex-col sm:flex-row gap-2">
-                    <input id="lookup-q" type="text" class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-md bg-white text-gray-700" placeholder="Buscar…" />
-                    <button id="btn-lookup-clear" type="button" class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Limpiar</button>
-                    <button id="btn-lookup-all" type="button" class="px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 rounded-md hover:bg-indigo-100">Todos</button>
+                <div class="mt-3 flex justify-end">
+                    <button id="btn-export-cancel" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 rounded-md hover:bg-gray-100">Cancelar</button>
                 </div>
-                <div id="lookup-results" class="mt-4 max-h-[60vh] overflow-auto border border-gray-200 rounded-lg"></div>
             </div>
         </div>
     </div>
@@ -688,39 +709,51 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const EERR_API_BASE = "{{ url_for('reports.eerr_api') }}";
-    const EERR_EXPORT_PDF_URL = "{{ url_for('reports.eerr_export_pdf_api') }}";
-    const EERR_EXPORT_EXCEL_URL = "{{ url_for('reports.eerr_export_excel_api') }}";
-    const SALES_API_BASE = "{{ url_for('reports.sales_analysis_api') }}";
-    const SALES_EXPORT_PDF_URL = "{{ url_for('reports.sales_analysis_export_pdf_api') }}";
-    const SALES_EXPORT_EXCEL_URL = "{{ url_for('reports.sales_analysis_export_excel_api') }}";
-    const INVENTORY_API_BASE = "{{ url_for('reports.inventory_rotation_api') }}";
-    const INVENTORY_EXPORT_PDF_URL = "{{ url_for('reports.inventory_rotation_export_pdf_api') }}";
-    const INVENTORY_EXPORT_EXCEL_URL = "{{ url_for('reports.inventory_rotation_export_excel_api') }}";
-    const FINANCE_API_BASE = "{{ url_for('reports.finance_api') }}";
-    const FINANCE_EXPORT_PDF_URL = "{{ url_for('reports.finance_export_pdf_api') }}";
-    const FINANCE_EXPORT_EXCEL_URL = "{{ url_for('reports.finance_export_excel_api') }}";
-    const LOOKUP_CATEGORIES_URL = "{{ url_for('reports.lookup_categories_api') }}";
-    const LOOKUP_PRODUCTS_URL = "{{ url_for('reports.lookup_products_api') }}";
-    const LOOKUP_CUSTOMERS_URL = "{{ url_for('reports.lookup_customers_api') }}";
-    const LOOKUP_PAYMENT_URL = "{{ url_for('reports.lookup_payment_methods_api') }}";
+    const EERR_API_BASE = '/reports/api/eerr';
+    const SALES_API_BASE = '/reports/api/sales_analysis';
+    const INVENTORY_API_BASE = '/reports/api/inventory_rotation';
+    const FINANCE_API_BASE = '/reports/api/finance';
+
+    const EERR_EXPORT_PDF_URL = '/reports/api/eerr/export/pdf';
+    const EERR_EXPORT_EXCEL_URL = '/reports/api/eerr/export/excel';
+    const SALES_EXPORT_PDF_URL = '/reports/api/sales_analysis/export/pdf';
+    const SALES_EXPORT_EXCEL_URL = '/reports/api/sales_analysis/export/excel';
+    const INVENTORY_EXPORT_PDF_URL = '/reports/api/inventory_rotation/export/pdf';
+    const INVENTORY_EXPORT_EXCEL_URL = '/reports/api/inventory_rotation/export/excel';
+    const FINANCE_EXPORT_PDF_URL = '/reports/api/finance/export/pdf';
+    const FINANCE_EXPORT_EXCEL_URL = '/reports/api/finance/export/excel';
+
+    const LOOKUP_CATEGORIES_API = '/reports/api/lookups/categories';
+    const LOOKUP_PRODUCTS_API = '/reports/api/lookups/products';
+    const LOOKUP_CUSTOMERS_API = '/reports/api/lookups/customers';
+    const LOOKUP_PAYMENT_METHODS_API = '/reports/api/lookups/payment_methods';
+
     const preset = document.getElementById('reports-period-preset');
     const inputMonth = document.getElementById('reports-month');
     const inputFrom = document.getElementById('reports-date-from');
     const inputTo = document.getElementById('reports-date-to');
     const btnApply = document.getElementById('btn-reports-apply');
-
     const btnExport = document.getElementById('btn-reports-export');
-    const modalExport = document.getElementById('modal-export-reports');
-    const exportSubtitle = document.getElementById('reports-export-subtitle');
-    const btnCloseExport = document.getElementById('btn-close-export-reports');
-    const btnCancelExport = document.getElementById('btn-cancel-export-reports');
-    const btnExportPdf = document.getElementById('btn-export-reports-pdf');
-    const btnExportExcel = document.getElementById('btn-export-reports-xls');
+    const exportSubtitle = document.getElementById('export-subtitle');
+    const modalExport = document.getElementById('modal-export');
+    const btnCloseExport = document.getElementById('btn-export-close');
+    const btnCancelExport = document.getElementById('btn-export-cancel');
+    const btnExportPdf = document.getElementById('btn-export-pdf');
+    const btnExportExcel = document.getElementById('btn-export-excel');
+
+    const btnNavEerr = document.getElementById('reports-nav-eerr');
+    const btnNavSales = document.getElementById('reports-nav-sales');
+    const btnNavInv = document.getElementById('reports-nav-inventory');
+    const btnNavFin = document.getElementById('reports-nav-finance');
 
     const btnEerrExport = document.getElementById('btn-eerr-export');
+    const btnSalesRefresh = document.getElementById('btn-sales-refresh');
+    const btnInvRefresh = document.getElementById('btn-inventory-refresh');
 
+    const chartEl = document.getElementById('eerr-chart-main');
+    const insightsWrap = document.getElementById('eerr-insights');
     const kpiSales = document.getElementById('eerr-kpi-sales');
+    const kpiSalesVar = document.getElementById('eerr-kpi-sales-var');
     const kpiCmv = document.getElementById('eerr-kpi-cmv');
     const kpiCmvPct = document.getElementById('eerr-kpi-cmv-pct');
     const kpiGross = document.getElementById('eerr-kpi-gross');
@@ -729,11 +762,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const kpiOpexPct = document.getElementById('eerr-kpi-opex-pct');
     const kpiNet = document.getElementById('eerr-kpi-net');
     const kpiNetPct = document.getElementById('eerr-kpi-net-pct');
-
+    const kpiNetAcc = document.getElementById('eerr-kpi-net-acc');
     const rowGrossSales = document.getElementById('eerr-row-gross-sales');
+    const rowGrossSalesPct = document.getElementById('eerr-row-gross-sales-pct');
     const rowDiscounts = document.getElementById('eerr-row-discounts');
+    const rowDiscountsPct = document.getElementById('eerr-row-discounts-pct');
     const rowExchanges = document.getElementById('eerr-row-exchanges');
+    const rowExchangesPct = document.getElementById('eerr-row-exchanges-pct');
     const rowNetSales = document.getElementById('eerr-row-net-sales');
+    const rowNetSalesPct = document.getElementById('eerr-row-net-sales-pct');
     const rowCmv = document.getElementById('eerr-row-cmv');
     const rowCmvPct = document.getElementById('eerr-row-cmv-pct');
     const rowGrossMargin = document.getElementById('eerr-row-gross-margin');
@@ -742,136 +779,30 @@ document.addEventListener('DOMContentLoaded', function () {
     const rowOpexPct = document.getElementById('eerr-row-opex-pct');
     const rowNet = document.getElementById('eerr-row-net');
     const rowNetPct = document.getElementById('eerr-row-net-pct');
+    const subIncome = document.getElementById('eerr-sub-income');
+    const subCmv = document.getElementById('eerr-sub-cmv');
+    const subOpex = document.getElementById('eerr-sub-opex');
 
-    const chartEl = document.getElementById('eerr-chart-main');
-    const insightsWrap = document.getElementById('eerr-insights');
-
+    const salesScatterEl = document.getElementById('sales-scatter');
+    const salesTableEl = document.getElementById('sales-table');
+    const salesTableSearch = document.getElementById('sales-table-search');
+    const salesSubTop = document.getElementById('sales-sub-top');
+    const salesSubProblem = document.getElementById('sales-sub-problem');
+    const salesInsightsWrap = document.getElementById('sales-insights');
     const salesGroupBy = document.getElementById('sales-group-by');
     const salesFilterCategory = document.getElementById('sales-filter-category');
     const salesFilterProduct = document.getElementById('sales-filter-product');
     const salesFilterCustomer = document.getElementById('sales-filter-customer');
     const salesFilterPayment = document.getElementById('sales-filter-payment');
-    const btnSalesRefresh = document.getElementById('btn-sales-refresh');
 
     const btnPickCategory = document.getElementById('btn-sales-pick-category');
     const btnPickProduct = document.getElementById('btn-sales-pick-product');
     const btnPickCustomer = document.getElementById('btn-sales-pick-customer');
     const btnPickPayment = document.getElementById('btn-sales-pick-payment');
-    const labelPickCategory = document.getElementById('sales-filter-category-label');
-    const labelPickProduct = document.getElementById('sales-filter-product-label');
-    const labelPickCustomer = document.getElementById('sales-filter-customer-label');
-    const labelPickPayment = document.getElementById('sales-filter-payment-label');
-
-    const lookupModal = document.getElementById('modal-lookup');
-    const lookupTitle = document.getElementById('lookup-title');
-    const lookupSubtitle = document.getElementById('lookup-subtitle');
-    const lookupQ = document.getElementById('lookup-q');
-    const lookupResults = document.getElementById('lookup-results');
-    const btnCloseLookup = document.getElementById('btn-close-lookup');
-    const btnLookupClear = document.getElementById('btn-lookup-clear');
-    const btnLookupAll = document.getElementById('btn-lookup-all');
-
-    let lookupActive = null; // category|product|customer|payment
-
-    function openLookup(kind) {
-        lookupActive = String(kind || '').toLowerCase();
-        if (!lookupModal) return;
-        if (lookupQ) lookupQ.value = '';
-        if (lookupResults) lookupResults.innerHTML = '<div class="p-3 text-sm text-gray-600">Cargando…</div>';
-        if (lookupTitle) {
-            lookupTitle.textContent = (
-                lookupActive === 'category' ? 'Seleccionar categoría' :
-                lookupActive === 'product' ? 'Seleccionar producto' :
-                lookupActive === 'customer' ? 'Seleccionar cliente' :
-                'Seleccionar medio de pago'
-            );
-        }
-        if (lookupSubtitle) {
-            lookupSubtitle.textContent = 'Usá el buscador para filtrar la lista.';
-        }
-        lookupModal.classList.remove('hidden');
-        fetchLookup();
-        try { if (lookupQ) lookupQ.focus(); } catch (e) {}
-    }
-
-    function closeLookup() {
-        if (!lookupModal) return;
-        lookupModal.classList.add('hidden');
-        lookupActive = null;
-    }
-
-    async function fetchLookup() {
-        if (!lookupActive) return;
-        let base = LOOKUP_CATEGORIES_URL;
-        if (lookupActive === 'product') base = LOOKUP_PRODUCTS_URL;
-        if (lookupActive === 'customer') base = LOOKUP_CUSTOMERS_URL;
-        if (lookupActive === 'payment') base = LOOKUP_PAYMENT_URL;
-
-        const params = new URLSearchParams();
-        const q = (lookupQ && lookupQ.value) ? lookupQ.value.trim() : '';
-        if (q) params.set('q', q);
-        if (lookupActive === 'product') {
-            const cid = (salesFilterCategory && salesFilterCategory.value) ? salesFilterCategory.value.trim() : '';
-            if (cid) params.set('category_id', cid);
-        }
-        params.set('limit', lookupActive === 'payment' ? '80' : '120');
-
-        try {
-            const res = await fetch(base + '?' + params.toString(), { headers: { 'Accept': 'application/json' } });
-            const data = await res.json();
-            const items = (data && data.ok && Array.isArray(data.items)) ? data.items : [];
-            renderLookup(items);
-        } catch (e) {
-            if (lookupResults) lookupResults.innerHTML = '<div class="p-3 text-sm text-gray-600">No se pudo cargar la lista.</div>';
-        }
-    }
-
-    function renderLookup(items) {
-        const list = Array.isArray(items) ? items : [];
-        if (!lookupResults) return;
-        if (!list.length) {
-            lookupResults.innerHTML = '<div class="p-3 text-sm text-gray-600">Sin resultados.</div>';
-            return;
-        }
-        lookupResults.innerHTML = list.map(function (it) {
-            const id = String(it.id || '').trim();
-            const label = String(it.label || it.name || id || '—');
-            const meta = (lookupActive === 'product' && (it.category || it.category_id)) ? ('<div class="text-[11px] text-gray-500">' + escapeHtml(String(it.category || '')) + '</div>') : '';
-            return (
-                '<button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-100" data-lookup-id="' + escapeHtml(id) + '" data-lookup-label="' + escapeHtml(label) + '">' +
-                    '<div class="text-sm font-medium text-gray-900">' + escapeHtml(label) + '</div>' +
-                    meta +
-                '</button>'
-            );
-        }).join('');
-    }
-
-    function setFilter(kind, id, label) {
-        const k = String(kind || '').toLowerCase();
-        const val = String(id || '').trim();
-        const lbl = String(label || '').trim();
-        if (k === 'category') {
-            if (salesFilterCategory) salesFilterCategory.value = val;
-            if (labelPickCategory) labelPickCategory.textContent = val ? ('Categoría: ' + lbl) : 'Categoría: Todas';
-            if (!val) {
-                if (salesFilterProduct) salesFilterProduct.value = '';
-                if (labelPickProduct) labelPickProduct.textContent = 'Producto: Todos';
-            }
-        }
-        if (k === 'product') {
-            if (salesFilterProduct) salesFilterProduct.value = val;
-            if (labelPickProduct) labelPickProduct.textContent = val ? ('Producto: ' + lbl) : 'Producto: Todos';
-        }
-        if (k === 'customer') {
-            if (salesFilterCustomer) salesFilterCustomer.value = val;
-            if (labelPickCustomer) labelPickCustomer.textContent = val ? ('Cliente: ' + lbl) : 'Cliente: Todos';
-        }
-        if (k === 'payment') {
-            if (salesFilterPayment) salesFilterPayment.value = val;
-            if (labelPickPayment) labelPickPayment.textContent = val ? ('Medio de pago: ' + lbl) : 'Medio de pago: Todos';
-        }
-    }
-
+    const salesFilterCategoryLabel = document.getElementById('sales-filter-category-label');
+    const salesFilterProductLabel = document.getElementById('sales-filter-product-label');
+    const salesFilterCustomerLabel = document.getElementById('sales-filter-customer-label');
+    const salesFilterPaymentLabel = document.getElementById('sales-filter-payment-label');
     const salesKpiSales = document.getElementById('sales-kpi-sales');
     const salesKpiSalesVar = document.getElementById('sales-kpi-sales-var');
     const salesKpiCmv = document.getElementById('sales-kpi-cmv');
@@ -879,269 +810,64 @@ document.addEventListener('DOMContentLoaded', function () {
     const salesKpiMargin = document.getElementById('sales-kpi-margin');
     const salesKpiMarginPct = document.getElementById('sales-kpi-margin-pct');
     const salesKpiAvg = document.getElementById('sales-kpi-avg');
-    const salesScatterEl = document.getElementById('sales-scatter');
-    const salesTableEl = document.getElementById('sales-table');
-    const salesTableSearch = document.getElementById('sales-table-search');
-    const salesSubTop = document.getElementById('sales-sub-top');
-    const salesSubProblem = document.getElementById('sales-sub-problem');
-    const salesInsightsWrap = document.getElementById('sales-insights');
 
-    const subIncome = document.getElementById('eerr-sub-income');
-    const subCmv = document.getElementById('eerr-sub-cmv');
-    const subOpex = document.getElementById('eerr-sub-opex');
-
-    let lastEerrData = null;
-    let lastInventoryData = null;
-    let lastFinanceData = null;
-    let activeReport = 'eerr';
-
-    const btnNavEerr = document.getElementById('reports-nav-eerr');
-    const btnNavSales = document.getElementById('reports-nav-sales');
-    const btnNavInv = document.getElementById('reports-nav-inventory');
-    const btnNavFin = document.getElementById('reports-nav-finance');
-    const eerrReportEl = document.getElementById('eerr-report');
-    const salesReportEl = document.getElementById('sales-report');
-    const invReportEl = document.getElementById('inventory-report');
-    const finReportEl = document.getElementById('finance-report');
-
-    function setActiveReport(key, opts) {
-        const k = String(key || '').toLowerCase();
-        if (k !== 'eerr' && k !== 'sales' && k !== 'inventory' && k !== 'finance') return;
-        activeReport = k;
-
-        if (eerrReportEl) eerrReportEl.classList.toggle('hidden', k !== 'eerr');
-        if (salesReportEl) salesReportEl.classList.toggle('hidden', k !== 'sales');
-        if (invReportEl) invReportEl.classList.toggle('hidden', k !== 'inventory');
-        if (finReportEl) finReportEl.classList.toggle('hidden', k !== 'finance');
-
-        if (btnNavEerr) {
-            btnNavEerr.classList.toggle('border-indigo-300', k === 'eerr');
-            btnNavEerr.classList.toggle('bg-indigo-50', k === 'eerr');
-        }
-        if (btnNavSales) {
-            btnNavSales.classList.toggle('border-emerald-300', k === 'sales');
-            btnNavSales.classList.toggle('bg-emerald-50', k === 'sales');
-        }
-        if (btnNavInv) {
-            btnNavInv.classList.toggle('border-amber-300', k === 'inventory');
-            btnNavInv.classList.toggle('bg-amber-50', k === 'inventory');
-        }
-        if (btnNavFin) {
-            btnNavFin.classList.toggle('border-blue-300', k === 'finance');
-            btnNavFin.classList.toggle('bg-blue-50', k === 'finance');
-        }
-
-        const o = opts || {};
-        if (o.scroll) {
-            const el = (k === 'sales') ? salesReportEl : (k === 'inventory' ? invReportEl : (k === 'finance' ? finReportEl : eerrReportEl));
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }
-
-    const btnInvRefresh = document.getElementById('btn-inventory-refresh');
+    const invTableEl = document.getElementById('inv-table');
+    const invTableSearch = document.getElementById('inv-table-search');
+    const invInsightsWrap = document.getElementById('inventory-insights');
     const invKpiStockValue = document.getElementById('inv-kpi-stock-value');
     const invKpiDeadValue = document.getElementById('inv-kpi-dead-value');
     const invKpiAvgRot = document.getElementById('inv-kpi-avg-rot');
     const invKpiAvgDays = document.getElementById('inv-kpi-avg-days');
-    const invTableEl = document.getElementById('inv-table');
-    const invTableSearch = document.getElementById('inv-table-search');
     const invSubNoMovement = document.getElementById('inv-sub-no-movement');
     const invSubBreak = document.getElementById('inv-sub-break');
     const invSubOverstock = document.getElementById('inv-sub-overstock');
-    const invInsightsWrap = document.getElementById('inventory-insights');
 
-    let _invRowsState = [];
-    let _invSortKey = 'stock_value';
-    let _invSortDir = 'desc';
+    const finInsightsWrap = document.getElementById('finance-insights');
+    const finCashInitial = document.getElementById('fin-cash-initial');
+    const finCashInflows = document.getElementById('fin-cash-inflows');
+    const finCashOutflows = document.getElementById('fin-cash-outflows');
+    const finCashNet = document.getElementById('fin-cash-net');
+    const finCashFinal = document.getElementById('fin-cash-final');
+    const finColSales = document.getElementById('fin-col-sales');
+    const finColCc = document.getElementById('fin-col-cc');
+    const finColCuotas = document.getElementById('fin-col-cuotas');
+    const finColOther = document.getElementById('fin-col-other');
+    const finProjCcPending = document.getElementById('fin-proj-cc-pending');
+    const finProjCcNext = document.getElementById('fin-proj-cc-next');
+    const finProjCcRanges = document.getElementById('fin-proj-cc-ranges');
+    const finProjCcOverdue = document.getElementById('fin-proj-cc-overdue');
+    const finProjInstPending = document.getElementById('fin-proj-inst-pending');
+    const finProjInstNext = document.getElementById('fin-proj-inst-next');
+    const finProjInstPeriod = document.getElementById('fin-proj-inst-period');
+    const finProjInstOverdue = document.getElementById('fin-proj-inst-overdue');
+    const finGapAccrued = document.getElementById('fin-gap-accrued');
+    const finGapCash = document.getElementById('fin-gap-cash');
+    const finGapDiff = document.getElementById('fin-gap-diff');
+
+    let lastEerrData = null;
+    let lastInventoryData = null;
+    let lastFinanceData = null;
 
     const btnFinRefresh = document.getElementById('btn-finance-refresh');
     const finKpiIncome = document.getElementById('fin-kpi-income');
     const finKpiIncomeVar = document.getElementById('fin-kpi-income-var');
+    const finKpiInstallments = document.getElementById('fin-kpi-installments');
     const finKpiExpense = document.getElementById('fin-kpi-expense');
     const finKpiExpenseVar = document.getElementById('fin-kpi-expense-var');
     const finKpiResult = document.getElementById('fin-kpi-result');
-    const finKpiResultPct = document.getElementById('fin-kpi-result-pct');
+    const finKpiResultVar = document.getElementById('fin-kpi-result-var');
     const finKpiRatio = document.getElementById('fin-kpi-ratio');
-    const finAdvResultAcc = document.getElementById('fin-adv-result-acc');
-    const finAdvNetMargin = document.getElementById('fin-adv-net-margin');
-    const finAdvBreakeven = document.getElementById('fin-adv-breakeven');
-    const finAdvConcentration = document.getElementById('fin-adv-concentration');
-    const finAdvFixed = document.getElementById('fin-adv-fixed');
-    const finAdvVariable = document.getElementById('fin-adv-variable');
-    const finAdvGrossMargin = document.getElementById('fin-adv-gross-margin');
-    const finAdvCmv = document.getElementById('fin-adv-cmv');
-    const finBreakIncome = document.getElementById('fin-break-income');
-    const finBreakExpense = document.getElementById('fin-break-expense');
-    const finInsightsWrap = document.getElementById('finance-insights');
-    const finChartEl = document.getElementById('finance-chart');
 
-    function renderFinanceChart(series) {
-        if (!finChartEl) return;
-        const rows = Array.isArray(series) ? series : [];
-        if (!rows.length) {
-            finChartEl.textContent = 'Sin datos para el período';
-            return;
-        }
+    const lookupModal = document.getElementById('lookup-modal');
+    const lookupTitle = document.getElementById('lookup-title');
+    const lookupSubtitle = document.getElementById('lookup-subtitle');
+    const lookupQ = document.getElementById('lookup-q');
+    const lookupResults = document.getElementById('lookup-results');
+    const btnCloseLookup = document.getElementById('btn-lookup-close');
+    const btnLookupClear = document.getElementById('btn-lookup-clear');
+    const btnLookupAll = document.getElementById('btn-lookup-all');
 
-        const maxPos = rows.reduce(function (acc, r) {
-            const inc = Math.max(0, Number(r.income_total || 0));
-            const exp = Math.max(0, Number(r.expense_total || 0));
-            const res = Math.max(0, Number(r.result_total || 0));
-            return Math.max(acc, inc, exp, res);
-        }, 0);
-        const maxNeg = rows.reduce(function (acc, r) {
-            const res = Math.abs(Math.min(0, Number(r.result_total || 0)));
-            return Math.max(acc, res);
-        }, 0);
-
-        const safePos = maxPos > 0 ? maxPos : 1;
-        const safeNeg = maxNeg > 0 ? maxNeg : 1;
-
-        const w = 980;
-        const h = 280;
-        const padX = 56;
-        const padY = 26;
-        const padBottom = 86;
-        const innerW = w - padX * 2;
-        const innerH = h - padY - padBottom;
-
-        const span = safePos + safeNeg;
-        const zeroY = padY + (safePos / span) * innerH;
-
-        function y(v) {
-            const vv = Number(v || 0);
-            return zeroY - (vv / span) * innerH;
-        }
-
-        const n = rows.length;
-        const step = innerW / Math.max(1, n);
-        const barW = Math.max(6, step * 0.36);
-        const bars = [];
-        const linePts = [];
-        const dots = [];
-        const grid = [];
-        const axis = [];
-        const xLabels = [];
-        const yLabels = [];
-
-        function fmtShort(v) {
-            const n = Math.round(Number(v || 0));
-            const abs = Math.abs(n);
-            if (abs >= 1000000) return (n / 1000000).toFixed(1).replace('.', ',') + 'M';
-            if (abs >= 1000) return (n / 1000).toFixed(1).replace('.', ',') + 'k';
-            return String(n);
-        }
-
-        for (let t = 0; t <= 4; t++) {
-            const yy = padY + (t / 4) * innerH;
-            grid.push('<line x1="' + padX + '" y1="' + yy.toFixed(2) + '" x2="' + (w - padX) + '" y2="' + yy.toFixed(2) + '" stroke="#f3f4f6" stroke-width="1" />');
-            const val = safePos - (t / 4) * (safePos + safeNeg);
-            yLabels.push('<text x="' + (padX - 8) + '" y="' + (yy + 3).toFixed(2) + '" text-anchor="end" font-size="10" fill="#6b7280">' + escapeHtml(fmtShort(val)) + '</text>');
-        }
-        axis.push('<line x1="' + padX + '" y1="' + zeroY.toFixed(2) + '" x2="' + (w - padX) + '" y2="' + zeroY.toFixed(2) + '" stroke="#e5e7eb" stroke-width="1.25" />');
-        axis.push('<line x1="' + padX + '" y1="' + padY + '" x2="' + padX + '" y2="' + (padY + innerH) + '" stroke="#e5e7eb" stroke-width="1" />');
-
-        for (let i = 0; i < n; i++) {
-            const r = rows[i] || {};
-            const cx = padX + i * step + step / 2;
-            const inc = Number(r.income_total || 0);
-            const exp = Number(r.expense_total || 0);
-            const res = Number(r.result_total || 0);
-
-            const y0 = y(0);
-            const yInc = y(Math.max(0, inc));
-            const yExp = y(Math.max(0, exp));
-            const incH = Math.max(0, y0 - yInc);
-            const expH = Math.max(0, y0 - yExp);
-            bars.push('<rect x="' + (cx - barW - 2).toFixed(2) + '" y="' + yInc.toFixed(2) + '" width="' + barW.toFixed(2) + '" height="' + incH.toFixed(2) + '" rx="2" fill="#3b82f6" opacity="0.78" />');
-            bars.push('<rect x="' + (cx + 2).toFixed(2) + '" y="' + yExp.toFixed(2) + '" width="' + barW.toFixed(2) + '" height="' + expH.toFixed(2) + '" rx="2" fill="#fb7185" opacity="0.78" />');
-
-            const cy = y(res);
-            linePts.push(cx.toFixed(2) + ',' + cy.toFixed(2));
-            dots.push('<circle cx="' + cx.toFixed(2) + '" cy="' + cy.toFixed(2) + '" r="2.6" fill="#10b981" opacity="0.9" />');
-
-            const label = String(r.month || '');
-            xLabels.push('<text x="' + cx.toFixed(2) + '" y="' + (padY + innerH + 16).toFixed(2) + '" text-anchor="middle" font-size="10" fill="#6b7280">' + escapeHtml(label) + '</text>');
-        }
-
-        const line = '<polyline points="' + linePts.join(' ') + '" fill="none" stroke="#10b981" stroke-width="2.2" opacity="0.85" />';
-        const svg = (
-            '<svg viewBox="0 0 ' + w + ' ' + h + '" class="w-full h-full block">' +
-                '<rect x="0" y="0" width="' + w + '" height="' + h + '" fill="#ffffff" />' +
-                grid.join('') +
-                axis.join('') +
-                yLabels.join('') +
-                bars.join('') +
-                line +
-                dots.join('') +
-                xLabels.join('') +
-            '</svg>'
-        );
-        const legend = (
-            '<div class="absolute left-3 right-3 bottom-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11px] text-gray-600 bg-white/90 px-2 py-1 rounded-md border border-gray-100">' +
-                '<div class="inline-flex items-center gap-2"><span class="inline-block h-2.5 w-2.5 rounded" style="background:#3b82f6"></span><span>Ingresos</span></div>' +
-                '<div class="inline-flex items-center gap-2"><span class="inline-block h-2.5 w-2.5 rounded" style="background:#fb7185"></span><span>Gastos</span></div>' +
-                '<div class="inline-flex items-center gap-2"><span class="inline-block h-[2px] w-5" style="background:#10b981"></span><span>Resultado</span></div>' +
-            '</div>'
-        );
-        finChartEl.innerHTML = svg + legend;
-    }
-
-    function renderFinanceBreakdowns(breakdowns) {
-        const b = breakdowns && typeof breakdowns === 'object' ? breakdowns : {};
-        const inc = Array.isArray(b.net_sales_by_payment_method) ? b.net_sales_by_payment_method : [];
-        const exp = Array.isArray(b.expenses_by_category) ? b.expenses_by_category : [];
-
-        if (finBreakIncome) {
-            if (!inc.length) finBreakIncome.innerHTML = '<div class="text-sm text-gray-500">Sin datos.</div>';
-            else {
-                finBreakIncome.innerHTML = (
-                    '<div class="overflow-x-auto">' +
-                        '<table class="min-w-full text-sm">' +
-                            '<thead class="bg-gray-50"><tr>' +
-                                '<th class="px-2 py-2 text-[11px] font-medium text-gray-500 uppercase text-left">Medio</th>' +
-                                '<th class="px-2 py-2 text-[11px] font-medium text-gray-500 uppercase text-right">Ventas netas</th>' +
-                            '</tr></thead>' +
-                            '<tbody>' +
-                                inc.map(function (r) {
-                                    return '<tr class="border-t border-gray-100">' +
-                                        '<td class="px-2 py-2 text-xs text-gray-800">' + escapeHtml(String(r.label || '—')) + '</td>' +
-                                        '<td class="px-2 py-2 text-xs text-right text-gray-900">' + escapeHtml(formatMoneyARS(r.value || 0)) + '</td>' +
-                                    '</tr>';
-                                }).join('') +
-                            '</tbody>' +
-                        '</table>' +
-                    '</div>'
-                );
-            }
-        }
-
-        if (finBreakExpense) {
-            if (!exp.length) finBreakExpense.innerHTML = '<div class="text-sm text-gray-500">Sin datos.</div>';
-            else {
-                finBreakExpense.innerHTML = (
-                    '<div class="overflow-x-auto">' +
-                        '<table class="min-w-full text-sm">' +
-                            '<thead class="bg-gray-50"><tr>' +
-                                '<th class="px-2 py-2 text-[11px] font-medium text-gray-500 uppercase text-left">Categoría</th>' +
-                                '<th class="px-2 py-2 text-[11px] font-medium text-gray-500 uppercase text-right">Monto</th>' +
-                                '<th class="px-2 py-2 text-[11px] font-medium text-gray-500 uppercase text-right">% ingresos</th>' +
-                            '</tr></thead>' +
-                            '<tbody>' +
-                                exp.map(function (r) {
-                                    return '<tr class="border-t border-gray-100">' +
-                                        '<td class="px-2 py-2 text-xs text-gray-800">' + escapeHtml(String(r.label || '—')) + '</td>' +
-                                        '<td class="px-2 py-2 text-xs text-right text-gray-900">' + escapeHtml(formatMoneyARS(r.value || 0)) + '</td>' +
-                                        '<td class="px-2 py-2 text-xs text-right text-gray-600">' + escapeHtml(formatPct(r.pct_of_income || 0)) + '</td>' +
-                                    '</tr>';
-                                }).join('') +
-                            '</tbody>' +
-                        '</table>' +
-                    '</div>'
-                );
-            }
-        }
-    }
+    let lookupActive = '';
 
     function renderInsightsFinance(items) {
         if (!finInsightsWrap) return;
@@ -1154,9 +880,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const kind = String((it && it.kind) || '').toLowerCase();
             const title = escapeHtml((it && it.title) ? it.title : 'Insight');
             const desc = escapeHtml((it && (it.detail || it.description)) ? (it.detail || it.description) : '');
-            const key = (it && it.key) ? String(it.key) : '';
-            const isNoSignals = key === 'finance.no_strong_signals';
-
             let border = 'border-emerald-200';
             let bg = 'bg-emerald-50';
             let icon = 'fa-check-circle';
@@ -1173,48 +896,96 @@ document.addEventListener('DOMContentLoaded', function () {
                 icon = 'fa-circle-info';
                 iconColor = 'text-blue-700';
             }
-
-            const btn = isNoSignals ? '' : '<button type="button" class="mt-2 inline-flex items-center text-xs font-medium text-indigo-700 hover:text-indigo-800" data-fin-detail="1">Ver detalle</button>';
             return (
                 '<div class="p-4 rounded-xl border ' + border + ' ' + bg + '">' +
                     '<div class="flex items-start gap-3">' +
                         '<div class="h-9 w-9 rounded-lg bg-white/70 border border-white/60 flex items-center justify-center">' +
                             '<i class="fas ' + icon + ' ' + iconColor + '"></i>' +
                         '</div>' +
-                        '<div class="flex-1">' +
+                        '<div>' +
                             '<div class="text-sm font-semibold text-gray-900">' + title + '</div>' +
-                            '<div class="mt-1 text-xs text-gray-700">' + (isNoSignals ? 'No se detectaron señales relevantes para el período seleccionado.' : desc) + '</div>' +
-                            btn +
+                            '<div class="mt-1 text-xs text-gray-700">' + desc + '</div>' +
                         '</div>' +
                     '</div>' +
                 '</div>'
             );
         }).join('');
-        try {
-            finInsightsWrap.querySelectorAll('[data-fin-detail]').forEach(function (b) {
-                b.addEventListener('click', function () {
-                    const target = document.getElementById('finance-breakdowns') || document.getElementById('finance-report');
-                    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                });
-            });
-        } catch (e) {}
     }
 
-    async function loadFinance() {
-        if (finInsightsWrap) finInsightsWrap.innerHTML = '<div class="p-3 rounded-lg bg-gray-50 text-sm text-gray-700">Cargando…</div>';
-        if (finChartEl) finChartEl.textContent = 'Cargando…';
+    function setFilter(kind, id, label) {
+        const k = String(kind || '');
+        const val = String(id || '');
+        const lbl = String(label || '').trim();
+
+        if (k === 'category') {
+            if (salesFilterCategory) salesFilterCategory.value = val;
+            if (salesFilterCategoryLabel) salesFilterCategoryLabel.textContent = 'Categoría: ' + (lbl || 'Todas');
+            if (!val) {
+                if (salesFilterProduct) salesFilterProduct.value = '';
+                if (salesFilterProductLabel) salesFilterProductLabel.textContent = 'Producto: Todos';
+            }
+            return;
+        }
+        if (k === 'product') {
+            if (salesFilterProduct) salesFilterProduct.value = val;
+            if (salesFilterProductLabel) salesFilterProductLabel.textContent = 'Producto: ' + (lbl || 'Todos');
+            return;
+        }
+        if (k === 'customer') {
+            if (salesFilterCustomer) salesFilterCustomer.value = val;
+            if (salesFilterCustomerLabel) salesFilterCustomerLabel.textContent = 'Cliente: ' + (lbl || 'Todos');
+            return;
+        }
+        if (k === 'payment') {
+            if (salesFilterPayment) salesFilterPayment.value = val;
+            if (salesFilterPaymentLabel) salesFilterPaymentLabel.textContent = 'Medio de pago: ' + (lbl || 'Todos');
+            return;
+        }
+    }
+
+    function openLookup(kind) {
+        if (!lookupModal) return;
+        lookupActive = String(kind || '');
+        if (lookupTitle) {
+            if (lookupActive === 'category') lookupTitle.textContent = 'Seleccionar categoría';
+            else if (lookupActive === 'product') lookupTitle.textContent = 'Seleccionar producto';
+            else if (lookupActive === 'customer') lookupTitle.textContent = 'Seleccionar cliente';
+            else if (lookupActive === 'payment') lookupTitle.textContent = 'Seleccionar medio de pago';
+            else lookupTitle.textContent = 'Seleccionar';
+        }
+        if (lookupSubtitle) lookupSubtitle.textContent = 'Buscá y seleccioná un valor. Luego se actualiza el informe.';
+        if (lookupQ) lookupQ.value = '';
+        if (lookupResults) lookupResults.innerHTML = '<div class="p-3 text-sm text-gray-500">Cargando…</div>';
+        lookupModal.classList.remove('hidden');
+        try { if (lookupQ) lookupQ.focus(); } catch (e) {}
+        fetchLookup();
+    }
+
+    function closeLookup() {
+        if (!lookupModal) return;
+        lookupModal.classList.add('hidden');
+    }
+
+    async function fetchLookup() {
+        if (!lookupActive || !lookupResults) return;
+        const q = (lookupQ && lookupQ.value) ? lookupQ.value.trim() : '';
+        const params = new URLSearchParams();
+        if (q) params.set('q', q);
+        params.set('limit', '120');
+
+        let base = '';
+        if (lookupActive === 'category') base = LOOKUP_CATEGORIES_API;
+        else if (lookupActive === 'product') {
+            base = LOOKUP_PRODUCTS_API;
+            const cid = (salesFilterCategory && salesFilterCategory.value) ? salesFilterCategory.value.trim() : '';
+            if (cid) params.set('category_id', cid);
+        }
+        else if (lookupActive === 'customer') base = LOOKUP_CUSTOMERS_API;
+        else if (lookupActive === 'payment') base = LOOKUP_PAYMENT_METHODS_API;
+        else return;
+
+        const url = base + '?' + params.toString();
         try {
-            const p = getPeriod();
-            const sub = document.getElementById('reports-finance-subtitle');
-            if (sub && p && p.from && p.to) sub.textContent = 'Período: ' + p.from + ' a ' + p.to;
-
-            const cmp = (document.getElementById('reports-compare-mode') && document.getElementById('reports-compare-mode').value) ? String(document.getElementById('reports-compare-mode').value) : 'none';
-            const params = new URLSearchParams();
-            params.set('from', p.from);
-            params.set('to', p.to);
-            if (cmp && cmp !== 'none') params.set('compare', cmp);
-            const url = FINANCE_API_BASE + '?' + params.toString();
-
             const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
             const ct = String(res.headers.get('content-type') || '').toLowerCase();
             if (!res.ok) {
@@ -1226,66 +997,171 @@ document.addEventListener('DOMContentLoaded', function () {
                 throw new Error('Respuesta no JSON (posible redirect). ' + (txt ? txt.slice(0, 180) : ''));
             }
             const data = await res.json();
-            if (!data || !data.ok) throw new Error((data && (data.message || data.error)) ? String(data.message || data.error) : 'No se pudo cargar Finanzas');
-
-            lastFinanceData = data;
-            const k = data.kpis || {};
-            const d = data.deltas || {};
-
-            if (finKpiIncome) finKpiIncome.textContent = formatMoneyARS(k.income_total || 0);
-            if (finKpiExpense) finKpiExpense.textContent = formatMoneyARS(k.expense_total || 0);
-
-            if (finKpiIncomeVar) finKpiIncomeVar.textContent = (d.income_total && typeof d.income_total.pct !== 'undefined') ? (String(d.income_total.pct).replace('.', ',') + '%') : '0%';
-            if (finKpiExpenseVar) finKpiExpenseVar.textContent = (d.expense_total && typeof d.expense_total.pct !== 'undefined') ? (String(d.expense_total.pct).replace('.', ',') + '%') : '0%';
-
-            const resAmt = Number(k.result_total || 0);
-            if (finKpiResult) finKpiResult.textContent = formatMoneyARS(resAmt);
-            if (finKpiResultPct) {
-                finKpiResultPct.textContent = String(Number(k.result_pct || 0).toFixed(2)).replace('.', ',') + '%';
-                finKpiResultPct.classList.toggle('text-rose-800', resAmt < 0);
-                finKpiResultPct.classList.toggle('text-emerald-800', resAmt >= 0);
+            const items = (data && Array.isArray(data.items)) ? data.items : [];
+            if (!items.length) {
+                lookupResults.innerHTML = '<div class="p-3 text-sm text-gray-500">Sin resultados.</div>';
+                return;
             }
-            if (finKpiResult) {
-                finKpiResult.classList.toggle('text-rose-900', resAmt < 0);
-                finKpiResult.classList.toggle('text-emerald-900', resAmt >= 0);
-            }
-
-            if (finKpiRatio) finKpiRatio.textContent = String((Number(k.expense_income_ratio || 0) * 100.0).toFixed(2)).replace('.', ',') + '%';
-
-            // Advanced block
-            if (finAdvResultAcc) finAdvResultAcc.textContent = formatMoneyARS(k.result_accumulated || 0);
-            if (finAdvNetMargin) finAdvNetMargin.textContent = String(Number(k.net_margin_pct || 0).toFixed(2)).replace('.', ',') + '%';
-
-            if (finAdvBreakeven) {
-                const be = k.break_even_income_estimate;
-                finAdvBreakeven.textContent = (be === null || typeof be === 'undefined') ? '—' : formatMoneyARS(be);
-            }
-
-            if (finAdvConcentration) {
-                const dc = (k && k.day_concentration) ? k.day_concentration : (data && data.kpis && data.kpis.day_concentration ? data.kpis.day_concentration : {});
-                const top3 = dc && (typeof dc.top3_share_pct !== 'undefined') ? Number(dc.top3_share_pct || 0) : 0;
-                finAdvConcentration.textContent = 'Top 3 días: ' + String(top3.toFixed(2)).replace('.', ',') + '%';
-            }
-
-            if (finAdvFixed) finAdvFixed.textContent = formatMoneyARS(k.fixed_cost_estimate || 0);
-            if (finAdvVariable) finAdvVariable.textContent = formatMoneyARS(k.variable_cost_estimate || 0);
-
-            if (finAdvGrossMargin) {
-                const gm = Number(k.gross_margin_total || 0);
-                const gmPct = Number(k.gross_margin_pct || 0);
-                finAdvGrossMargin.textContent = formatMoneyARS(gm) + ' (' + String(gmPct.toFixed(2)).replace('.', ',') + '%)';
-            }
-            if (finAdvCmv) finAdvCmv.textContent = formatMoneyARS(k.cmv_total || 0);
-
-            renderFinanceChart(data.series);
-            renderFinanceBreakdowns(data.breakdowns);
-            renderInsightsFinance(data.insights);
+            lookupResults.innerHTML = items.slice(0, 200).map(function (it) {
+                const id = (it && it.id) ? String(it.id) : '';
+                const label = (it && it.label) ? String(it.label) : id;
+                return (
+                    '<button type="button" class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100" data-lookup-id="' +
+                        escapeHtml(id) + '" data-lookup-label="' + escapeHtml(label) + '">' +
+                        '<div class="font-medium text-gray-900">' + escapeHtml(label) + '</div>' +
+                    '</button>'
+                );
+            }).join('');
         } catch (e) {
             const msg = (e && e.message) ? String(e.message) : 'Error desconocido';
-            try { console.error('loadFinance error:', e); } catch (err) {}
-            if (finChartEl) finChartEl.textContent = 'No se pudo cargar (ver detalle): ' + msg;
-            if (finInsightsWrap) finInsightsWrap.innerHTML = '<div class="p-3 rounded-lg bg-gray-50 text-sm text-gray-700">No se pudo cargar el reporte: ' + escapeHtml(msg) + '</div>';
+            lookupResults.innerHTML = '<div class="p-3 text-sm text-gray-700">No se pudo cargar: ' + escapeHtml(msg) + '</div>';
         }
+    }
+
+    function runActiveReportLoad() {
+        if (activeReport === 'ventas') loadSales();
+        else if (activeReport === 'inventario') loadInventory();
+        else if (activeReport === 'finanzas') loadFinance();
+        else loadEerr();
+    }
+
+    let _applyTimer = null;
+    function scheduleApply(ms) {
+        const delay = Math.max(120, parseInt(ms || 0, 10) || 0);
+        if (_applyTimer) clearTimeout(_applyTimer);
+        _applyTimer = setTimeout(function () {
+            runActiveReportLoad();
+        }, delay);
+    }
+
+    async function loadFinance() {
+        const p = getPeriod();
+        try {
+            const sub = document.getElementById('reports-finance-subtitle');
+            if (sub && p && p.from && p.to) sub.textContent = 'Período: ' + p.from + ' a ' + p.to + ' · Criterio caja (cobros/pagos reales).';
+        } catch (e) {}
+
+        if (finCashInitial) finCashInitial.textContent = '—';
+        if (finCashFinal) finCashFinal.textContent = '—';
+        if (finCashInflows) finCashInflows.textContent = '—';
+        if (finCashOutflows) finCashOutflows.textContent = '—';
+        if (finCashNet) finCashNet.textContent = '—';
+        if (finColSales) finColSales.textContent = '—';
+        if (finColCc) finColCc.textContent = '—';
+        if (finColCuotas) finColCuotas.textContent = '—';
+        if (finColOther) finColOther.textContent = '—';
+        if (finProjCcPending) finProjCcPending.textContent = '—';
+        if (finProjCcNext) finProjCcNext.textContent = '—';
+        if (finProjCcRanges) finProjCcRanges.textContent = '—';
+        if (finProjCcOverdue) finProjCcOverdue.textContent = '—';
+        if (finProjInstPending) finProjInstPending.textContent = '—';
+        if (finProjInstNext) finProjInstNext.textContent = '—';
+        if (finProjInstPeriod) finProjInstPeriod.textContent = '—';
+        if (finProjInstOverdue) finProjInstOverdue.textContent = '—';
+        if (finGapAccrued) finGapAccrued.textContent = '—';
+        if (finGapCash) finGapCash.textContent = '—';
+        if (finGapDiff) finGapDiff.textContent = '—';
+        if (finInsightsWrap) finInsightsWrap.innerHTML = '<div class="p-3 rounded-lg bg-gray-50 text-sm text-gray-700">Cargando…</div>';
+
+        const params = new URLSearchParams();
+        params.set('from', p.from);
+        params.set('to', p.to);
+        try {
+            const compare = (document.getElementById('reports-compare-mode') || {}).value || 'none';
+            if (compare && compare !== 'none') params.set('compare', compare);
+        } catch (e) {}
+
+        const url = FINANCE_API_BASE + '?' + params.toString();
+
+        let data = null;
+        try {
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            const ct = String(res.headers.get('content-type') || '').toLowerCase();
+            if (!res.ok) {
+                const txt = await res.text();
+                throw new Error('HTTP ' + res.status + ' ' + (txt ? txt.slice(0, 180) : ''));
+            }
+            if (!ct.includes('application/json')) {
+                const txt = await res.text();
+                throw new Error('Respuesta no JSON (posible redirect). ' + (txt ? txt.slice(0, 180) : ''));
+            }
+            data = await res.json();
+            if (!data || !data.ok) throw new Error((data && (data.message || data.error)) ? String(data.message || data.error) : 'No se pudo cargar el reporte de finanzas');
+        } catch (e) {
+            lastFinanceData = null;
+            const msg = (e && e.message) ? String(e.message) : 'Error desconocido';
+            if (finInsightsWrap) finInsightsWrap.innerHTML = '<div class="p-3 rounded-lg bg-gray-50 text-sm text-gray-700">No se pudo cargar el reporte: ' + escapeHtml(msg) + '</div>';
+            return;
+        }
+
+        lastFinanceData = data;
+        const k = data.kpis || {};
+        const d = data.deltas || {};
+        const cb = data.cash_balance || {};
+        const proj = data.projections || {};
+        const cc = proj.cc || {};
+        const inst = proj.installments || {};
+        const gap = data.gap || {};
+
+        if (finKpiIncome) finKpiIncome.textContent = formatMoneyARS(k.income_total || 0);
+        if (finKpiExpense) finKpiExpense.textContent = formatMoneyARS(k.expense_total || 0);
+        if (finKpiResult) finKpiResult.textContent = formatMoneyARS(k.result_total || 0);
+
+        if (finKpiIncomeVar && d.income_total && typeof d.income_total.pct !== 'undefined') {
+            finKpiIncomeVar.textContent = (Number(d.income_total.pct || 0) >= 0 ? '+' : '') + formatPct(d.income_total.pct || 0);
+        }
+        if (finKpiExpenseVar && d.expense_total && typeof d.expense_total.pct !== 'undefined') {
+            finKpiExpenseVar.textContent = (Number(d.expense_total.pct || 0) >= 0 ? '+' : '') + formatPct(d.expense_total.pct || 0);
+        }
+        if (finKpiResultVar && d.result_total && typeof d.result_total.pct !== 'undefined') {
+            finKpiResultVar.textContent = (Number(d.result_total.pct || 0) >= 0 ? '+' : '') + formatPct(d.result_total.pct || 0);
+        }
+
+        if (finKpiInstallments) {
+            const v = (k.income_installments !== undefined) ? (k.income_installments || 0) : 0;
+            finKpiInstallments.textContent = formatMoneyARS(v);
+            try {
+                const card = finKpiInstallments.closest('div');
+                if (card) card.classList.toggle('hidden', !(parseFloat(v || 0) > 0));
+            } catch (e) {}
+        }
+
+        if (finKpiRatio) finKpiRatio.textContent = String((Number(k.expense_income_ratio || 0) * 100.0).toFixed(2)).replace('.', ',') + '%';
+
+        if (finCashInitial) finCashInitial.textContent = (cb.initial === null || typeof cb.initial === 'undefined') ? '—' : formatMoneyARS(cb.initial || 0);
+        if (finCashFinal) finCashFinal.textContent = (cb.final === null || typeof cb.final === 'undefined') ? '—' : formatMoneyARS(cb.final || 0);
+        if (finCashInflows) finCashInflows.textContent = formatMoneyARS(k.income_total || 0);
+        if (finCashOutflows) finCashOutflows.textContent = formatMoneyARS(-Math.abs(Number(k.expense_total || 0)));
+        if (finCashNet) finCashNet.textContent = formatMoneyARS(k.result_total || 0);
+
+        if (finColSales) finColSales.textContent = formatMoneyARS(k.collections_sales_paid || k.income_sales || 0);
+        if (finColCc) finColCc.textContent = formatMoneyARS(k.collections_cc || 0);
+        if (finColCuotas) finColCuotas.textContent = formatMoneyARS(k.collections_installments || k.income_installments || 0);
+        if (finColOther) finColOther.textContent = formatMoneyARS(k.collections_other || 0);
+
+        if (finProjCcPending) finProjCcPending.textContent = formatMoneyARS(cc.pending_total || 0);
+        if (finProjCcNext) {
+            const nd = String(cc.next_due_date || '').trim();
+            const na = Number(cc.next_due_amount || 0);
+            finProjCcNext.textContent = nd ? (nd + ' · ' + formatMoneyARS(na)) : '—';
+        }
+        if (finProjCcRanges) finProjCcRanges.textContent = formatMoneyARS(cc.due_7 || 0) + ' / ' + formatMoneyARS(cc.due_15 || 0) + ' / ' + formatMoneyARS(cc.due_30 || 0);
+        if (finProjCcOverdue) finProjCcOverdue.textContent = formatMoneyARS(cc.overdue_total || 0) + ' / ' + formatMoneyARS(cc.critical_total || 0);
+
+        if (finProjInstPending) finProjInstPending.textContent = formatMoneyARS(inst.pending_total || 0);
+        if (finProjInstNext) {
+            const nd = String(inst.next_due_date || '').trim();
+            const na = Number(inst.next_due_amount || 0);
+            finProjInstNext.textContent = nd ? (nd + ' · ' + formatMoneyARS(na)) : '—';
+        }
+        if (finProjInstPeriod) finProjInstPeriod.textContent = formatMoneyARS(inst.due_in_period_total || 0);
+        if (finProjInstOverdue) finProjInstOverdue.textContent = formatMoneyARS(inst.overdue_total || 0);
+
+        if (finGapAccrued) finGapAccrued.textContent = formatMoneyARS(gap.accrued_sales_net || 0);
+        if (finGapCash) finGapCash.textContent = formatMoneyARS(gap.cash_collections_total || 0);
+        if (finGapDiff) finGapDiff.textContent = formatMoneyARS(gap.difference || 0);
+
+        renderInsightsFinance(data.insights);
     }
 
     function _statusBadge(st) {
@@ -1550,13 +1426,77 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
+    function normalizeReportKey(raw) {
+        const k = String(raw || '').trim().toLowerCase();
+        if (!k) return 'estado_resultados';
+        if (k === 'eerr') return 'estado_resultados';
+        if (k === 'sales') return 'ventas';
+        if (k === 'inventory') return 'inventario';
+        if (k === 'finance') return 'finanzas';
+        if (k === 'estado_resultados') return 'estado_resultados';
+        if (k === 'ventas') return 'ventas';
+        if (k === 'inventario') return 'inventario';
+        if (k === 'finanzas') return 'finanzas';
+        return 'estado_resultados';
+    }
+
+    let activeReport = 'estado_resultados';
+    try {
+        const saved = window.localStorage ? window.localStorage.getItem('reports.activeReport') : '';
+        activeReport = normalizeReportKey(saved);
+    } catch (e) {
+        activeReport = 'estado_resultados';
+    }
+
+    function setActiveReport(reportKey, opts) {
+        const k = normalizeReportKey(reportKey);
+        activeReport = k;
+        try {
+            if (window.localStorage) window.localStorage.setItem('reports.activeReport', k);
+        } catch (e) {}
+
+        const map = [
+            { k: 'estado_resultados', btnId: 'reports-nav-eerr', panelId: 'eerr-report' },
+            { k: 'ventas', btnId: 'reports-nav-sales', panelId: 'sales-report' },
+            { k: 'inventario', btnId: 'reports-nav-inventory', panelId: 'inventory-report' },
+            { k: 'finanzas', btnId: 'reports-nav-finance', panelId: 'finance-report' },
+        ];
+
+        map.forEach(function (it) {
+            const isOn = (it.k === k);
+            const btn = document.getElementById(it.btnId);
+            const panel = document.getElementById(it.panelId);
+
+            if (panel) panel.classList.toggle('hidden', !isOn);
+
+            if (btn) {
+                btn.classList.toggle('border-blue-300', isOn);
+                btn.classList.toggle('bg-blue-50', isOn);
+                btn.classList.toggle('ring-2', isOn);
+                btn.classList.toggle('ring-blue-200', isOn);
+                btn.classList.toggle('border-gray-200', !isOn);
+                btn.classList.toggle('bg-white', !isOn);
+            }
+        });
+
+        const o = opts && typeof opts === 'object' ? opts : {};
+        if (o.scroll) {
+            const el = document.getElementById(
+                (k === 'ventas') ? 'sales-report' : (k === 'inventario') ? 'inventory-report' : (k === 'finanzas') ? 'finance-report' : 'eerr-report'
+            );
+            if (el) {
+                try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+            }
+        }
+    }
+
     function openExport() {
         if (!modalExport) return;
         try {
             if (exportSubtitle) {
-                if (activeReport === 'sales') exportSubtitle.textContent = 'Se exporta el Análisis de Ventas del período seleccionado.';
-                else if (activeReport === 'inventory') exportSubtitle.textContent = 'Se exporta el Informe de Inventario del período seleccionado.';
-                else if (activeReport === 'finance') exportSubtitle.textContent = 'Se exporta el Reporte de Finanzas del período seleccionado.';
+                if (activeReport === 'ventas') exportSubtitle.textContent = 'Se exporta el Análisis de Ventas del período seleccionado.';
+                else if (activeReport === 'inventario') exportSubtitle.textContent = 'Se exporta el Informe de Inventario del período seleccionado.';
+                else if (activeReport === 'finanzas') exportSubtitle.textContent = 'Se exporta el Reporte de Finanzas del período seleccionado.';
                 else exportSubtitle.textContent = 'Se exporta el EERR del período seleccionado (con el detalle expandido si corresponde).';
             }
         } catch (e) {}
@@ -1569,7 +1509,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function buildExportRequest(format) {
         const fmt = String(format || '').toLowerCase();
-        if (activeReport === 'inventory') {
+        if (activeReport === 'inventario') {
             if (!lastInventoryData || !lastInventoryData.ok) {
                 return { ok: false, error: 'Primero generá el Reporte de Inventario (Aplicar) antes de exportar.' };
             }
@@ -1580,7 +1520,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 payload: { inventory: lastInventoryData },
             };
         }
-        if (activeReport === 'finance') {
+        if (activeReport === 'finanzas') {
             if (!lastFinanceData || !lastFinanceData.ok) {
                 return { ok: false, error: 'Primero generá el Reporte de Finanzas (Aplicar) antes de exportar.' };
             }
@@ -1591,7 +1531,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 payload: { finance: lastFinanceData },
             };
         }
-        if (activeReport === 'sales') {
+        if (activeReport === 'ventas') {
             if (!lastSalesData || !lastSalesData.ok) {
                 return { ok: false, error: 'Primero generá el Reporte de Ventas (Aplicar) antes de exportar.' };
             }
@@ -1765,8 +1705,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (v === 'custom') {
             const from = new Date(now.getFullYear(), now.getMonth(), 1);
             const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            if (inputFrom) inputFrom.value = iso(from);
-            if (inputTo) inputTo.value = iso(to);
+            if (inputFrom && !String(inputFrom.value || '').trim()) inputFrom.value = iso(from);
+            if (inputTo && !String(inputTo.value || '').trim()) inputTo.value = iso(to);
         }
     }
 
@@ -1792,6 +1732,11 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             const r = monthRange(inputMonth ? inputMonth.value : '');
             if (r) { from = r.from; to = r.to; }
+        }
+        if (from && to && String(from) > String(to)) {
+            const tmp = from;
+            from = to;
+            to = tmp;
         }
         if (!from || !to) {
             const now = new Date();
@@ -2755,15 +2700,42 @@ document.addEventListener('DOMContentLoaded', function () {
         setPresetUI(preset.value);
         preset.addEventListener('change', function () {
             setPresetUI(preset.value);
+            scheduleApply(220);
+        });
+    }
+
+    if (inputMonth) {
+        inputMonth.addEventListener('change', function () {
+            if (preset && preset.value === 'custom') return;
+            scheduleApply(220);
+        });
+    }
+    if (inputFrom) {
+        inputFrom.addEventListener('change', function () {
+            if (preset && preset.value !== 'custom') {
+                try { preset.value = 'custom'; setPresetUI('custom'); } catch (e) {}
+            }
+            scheduleApply(220);
+        });
+    }
+    if (inputTo) {
+        inputTo.addEventListener('change', function () {
+            if (preset && preset.value !== 'custom') {
+                try { preset.value = 'custom'; setPresetUI('custom'); } catch (e) {}
+            }
+            scheduleApply(220);
+        });
+    }
+    const cmp = document.getElementById('reports-compare-mode');
+    if (cmp) {
+        cmp.addEventListener('change', function () {
+            scheduleApply(220);
         });
     }
 
     if (btnApply) {
         btnApply.addEventListener('click', function () {
-            if (activeReport === 'sales') loadSales();
-            else if (activeReport === 'inventory') loadInventory();
-            else if (activeReport === 'finance') loadFinance();
-            else loadEerr();
+            runActiveReportLoad();
         });
     }
 
@@ -2819,28 +2791,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (btnNavEerr) {
         btnNavEerr.addEventListener('click', function () {
-            setActiveReport('eerr', { scroll: true });
+            setActiveReport('estado_resultados', { scroll: true });
             loadEerr();
         });
     }
 
     if (btnNavSales) {
         btnNavSales.addEventListener('click', function () {
-            setActiveReport('sales', { scroll: true });
+            setActiveReport('ventas', { scroll: true });
             loadSales();
         });
     }
 
     if (btnNavInv) {
         btnNavInv.addEventListener('click', function () {
-            setActiveReport('inventory', { scroll: true });
+            setActiveReport('inventario', { scroll: true });
             loadInventory();
         });
     }
 
     if (btnNavFin) {
         btnNavFin.addEventListener('click', function () {
-            setActiveReport('finance', { scroll: true });
+            setActiveReport('finanzas', { scroll: true });
             loadFinance();
         });
     }
@@ -2849,7 +2821,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (btnExport) btnExport.addEventListener('click', function () { openExport(); });
     if (btnEerrExport) btnEerrExport.addEventListener('click', function () {
-        setActiveReport('eerr');
+        setActiveReport('estado_resultados');
         openExport();
     });
     if (btnCloseExport) btnCloseExport.addEventListener('click', function () { closeExport(); });
@@ -2959,19 +2931,30 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnInv = document.getElementById('btn-eerr-link-inventory');
     const btnExp = document.getElementById('btn-eerr-link-expenses');
     if (btnSales) btnSales.addEventListener('click', function () {
-        const el = document.getElementById('reports-nav-sales');
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        try {
+            setActiveReport('ventas', { scroll: true });
+            loadSales();
+        } catch (e) {}
     });
     if (btnInv) btnInv.addEventListener('click', function () {
-        const el = document.getElementById('reports-nav-inventory');
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        try {
+            setActiveReport('inventario', { scroll: true });
+            loadInventory();
+        } catch (e) {}
     });
     if (btnExp) btnExp.addEventListener('click', function () {
-        try { window.location.href = '/expenses'; } catch (e) {}
+        try {
+            setActiveReport('estado_resultados', { scroll: true });
+            openExpandRow('eerr-expand-opex');
+            scrollToId('eerr-section-opex');
+        } catch (e) {}
     });
 
-    setActiveReport('eerr');
-    loadEerr();
+    setActiveReport(activeReport);
+    if (activeReport === 'ventas') loadSales();
+    else if (activeReport === 'inventario') loadInventory();
+    else if (activeReport === 'finanzas') loadFinance();
+    else loadEerr();
 });
 </script>
 {% endblock %}

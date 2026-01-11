@@ -125,7 +125,7 @@ def _apply_employee_payload(row: Employee, payload: dict):
 
 @bp.get('/api/employees')
 @login_required
-@module_required_any('employees', 'sales')
+@module_required_any('employees', 'sales', 'customers')
 def list_employees_api():
     q = (request.args.get('q') or '').strip().lower()
     limit = int(request.args.get('limit') or 2000)

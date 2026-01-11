@@ -8,16 +8,6 @@
             <i data-kpi-toggle-icon class="fas fa-chevron-down"></i>
         </button>
     </div>
-    <script>
-        const TENANT_PREFIX = ((window.location && window.location.pathname || '').match(/^\/c\/[^\/]+/) || [''])[0];
-        function apiPath(p) {
-            const s = String(p || '');
-            if (!s.startsWith('/')) return s;
-            if (s.startsWith('/c/')) return s;
-            if (!TENANT_PREFIX) return s;
-            return TENANT_PREFIX + s;
-        }
-    </script>
     <p class="mt-1 text-sm text-gray-600">Centraliza la información de tus {{ label_customers|lower }} para mejorar el seguimiento y la fidelización.</p>
 </div>
 
@@ -85,7 +75,8 @@
                 <th data-sort="clasificacion" class="w-40 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none"><span id="clientes-th-clas-label">Clasificación</span></th>
                 <th data-sort="cantidad_compras" class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">Compras</th>
                 <th data-sort="monto_total_comprado" class="w-32 px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">Monto</th>
-                <th data-sort="saldo_actual" class="w-44 px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase cursor-pointer select-none">Cuenta corriente</th>
+                <th data-sort="cc_status" class="w-40 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none">Cuenta corriente</th>
+                <th id="clientes-th-sc" data-sort="sc_status" class="w-40 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer select-none">Sistema de cuotas</th>
                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Notas</th>
                 <th class="w-14 px-4 py-3"></th>
             </tr>
@@ -111,13 +102,21 @@
                         </div>
                     </div>
                 </th>
+                <th id="clientes-th-sc-filter" class="px-4 py-1">
+                    <div class="relative">
+                        <button id="clientes-filter-sc-btn" type="button" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white text-left">Sistema de cuotas: todas</button>
+                        <div id="clientes-filter-sc-menu" class="hidden absolute left-0 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-lg z-20">
+                            <div id="clientes-filter-sc-items" class="max-h-56 overflow-auto py-1"></div>
+                        </div>
+                    </div>
+                </th>
                 <th class="px-4 py-1"></th>
                 <th class="px-4 py-1"></th>
             </tr>
         </thead>
         <tbody id="clientes-tbody" class="bg-white divide-y divide-gray-200">
             <tr>
-                <td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando...</td>
+                <td colspan="8" class="px-4 py-6 text-sm text-center text-gray-500">Cargando...</td>
             </tr>
         </tbody>
     </table>
@@ -211,18 +210,13 @@
                             <input id="crm-best-min" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="2">
                             <div class="mt-1 text-[11px] text-gray-500">Debe ser mayor que “Frecuente”.</div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Título (columna)</label>
-                            <input id="crm-label-clas-title" type="text" class="w-full px-3 py-2 text-sm border rounded-md" value="Clasificación">
-                            <div class="mt-1 text-[11px] text-gray-500">Se muestra como título en la tabla.</div>
-                        </div>
                     </div>
 
                     <div class="mt-3 p-3 border border-gray-200 rounded-lg bg-white">
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <div class="text-sm font-semibold text-gray-900">Vista previa</div>
-                                <div class="text-[11px] text-gray-500">Así se interpretan las reglas con tus valores actuales.</div>
+                                <div class="mt-1 text-[11px] text-gray-500">Así se interpretan las reglas con tus valores actuales.</div>
                             </div>
                             <div class="h-8 w-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center flex-shrink-0">
                                 <i class="fas fa-eye text-xs"></i>
@@ -233,34 +227,7 @@
                 </div>
 
                 <div class="pt-2 border-t border-gray-100">
-                    <div class="p-3 border border-gray-200 rounded-xl bg-gray-50">
-                        <div class="text-xs font-semibold text-gray-800">Nombres de clasificaciones</div>
-                        <div class="mt-1 text-[11px] text-gray-500">Estos nombres se ven en la tabla y en el filtro de clasificación.</div>
-                        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Mejor cliente</label>
-                                <input id="crm-label-best" type="text" class="w-full px-3 py-2 text-sm border rounded-md" value="Mejor cliente">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Frecuente</label>
-                                <input id="crm-label-freq" type="text" class="w-full px-3 py-2 text-sm border rounded-md" value="Frecuente">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1">Inactivo</label>
-                                <input id="crm-label-inactive" type="text" class="w-full px-3 py-2 text-sm border rounded-md" value="Inactivo">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1">CC Vencida</label>
-                                <input id="crm-label-debtor" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" value="CC Vencida" disabled>
-                                <div class="mt-1 text-[11px] text-gray-500">Nombre fijo.</div>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1">CC Vencida Crítica</label>
-                                <input id="crm-label-debtor-critical" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" value="CC Vencida Crítica" disabled>
-                                <div class="mt-1 text-[11px] text-gray-500">Nombre fijo.</div>
-                            </div>
-                        </div>
-                    </div>
+                    <div></div>
                 </div>
 
                 <div class="p-3 border border-gray-200 rounded-xl bg-gray-50">
@@ -284,6 +251,22 @@
                             <div class="mt-1 text-[11px] text-gray-500">Debe ser mayor que “vencida”.</div>
                         </div>
                     </div>
+                    <div id="crm-installments-thresholds" class="hidden mt-4 pt-4 border-t border-gray-200">
+                        <div class="text-xs font-semibold text-gray-800">Alertas de Sistema de cuotas</div>
+                        <div class="mt-1 text-[11px] text-gray-500">Se evalúa por cantidad de cuotas vencidas.</div>
+                        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Sistema de cuotas vencido (>=)</label>
+                                <input id="crm-installments-overdue-count" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="1">
+                                <div class="mt-1 text-[11px] text-gray-500">Cuotas vencidas para marcar “Vencido”.</div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Sistema de cuotas crítico (>=)</label>
+                                <input id="crm-installments-critical-count" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="3">
+                                <div class="mt-1 text-[11px] text-gray-500">Debe ser mayor que “Vencido”.</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="crm-config-error" class="hidden p-3 rounded-lg border border-red-200 bg-red-50 text-[11px] text-red-700"></div>
@@ -299,27 +282,24 @@
 <div id="modal-customer-legajo" class="hidden fixed inset-0 z-50" style="z-index:60;">
     <div class="absolute inset-0 bg-black/40"></div>
     <div class="relative h-full w-full flex items-center justify-center p-4">
-        <div class="w-full max-w-5xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="w-full max-w-5xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden max-h-[85vh]">
+            <div class="sticky top-0 z-30 bg-white px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                 <div class="min-w-0">
-                    <h3 id="legajo-title" class="text-base font-semibold text-gray-900 truncate">Legajo del cliente</h3>
-                    <p id="legajo-subtitle" class="text-xs text-gray-500 truncate">—</p>
+                    <h3 id="legajo-title" class="text-sm font-semibold text-gray-900 truncate">Legajo del cliente</h3>
+                    <p id="legajo-subtitle" class="text-[11px] text-gray-500 truncate">—</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="btn-edit-legajo" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
-                        <i class="fas fa-pen mr-2"></i> Editar
-                    </button>
-                    <button id="btn-close-legajo" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <button id="btn-close-legajo" type="button" class="h-8 w-8 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
 
-            <div class="p-5 space-y-4">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div class="p-4 border border-gray-200 rounded-xl bg-white">
+            <div class="p-4 space-y-3 overflow-y-auto" style="max-height: calc(85vh - 52px);">
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                    <div class="p-3 border border-gray-200 rounded-xl bg-white">
                         <div class="text-xs font-semibold text-gray-700">Datos</div>
-                        <div class="mt-2 space-y-1 text-sm text-gray-800">
+                        <div class="mt-2 space-y-0.5 text-[13px] text-gray-800">
                             <div><span class="text-gray-500">Nombre:</span> <span id="legajo-fullname">—</span></div>
                             <div><span class="text-gray-500">Teléfono:</span> <span id="legajo-phone">—</span></div>
                             <div><span class="text-gray-500">Email:</span> <span id="legajo-email">—</span></div>
@@ -329,9 +309,9 @@
                         </div>
                     </div>
 
-                    <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                    <div class="p-3 border border-gray-200 rounded-xl bg-white">
                         <div class="text-xs font-semibold text-gray-700">CRM</div>
-                        <div class="mt-2 space-y-1 text-sm text-gray-800">
+                        <div class="mt-2 space-y-0.5 text-[13px] text-gray-800">
                             <div><span class="text-gray-500">Clasificación:</span> <span id="legajo-clas">—</span></div>
                             <div><span class="text-gray-500">Compras:</span> <span id="legajo-compras">—</span></div>
                             <div><span class="text-gray-500">Monto total:</span> <span id="legajo-monto">—</span></div>
@@ -340,51 +320,127 @@
                         </div>
                     </div>
 
-                    <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                    <div class="p-3 border border-gray-200 rounded-xl bg-white">
                         <div class="text-xs font-semibold text-gray-700">Cuenta corriente</div>
-                        <div class="mt-2 space-y-1 text-sm text-gray-800">
-                            <div><span class="text-gray-500">Tiene CC:</span> <span id="legajo-cc">—</span></div>
-                            <div><span class="text-gray-500">Saldo actual:</span> <span id="legajo-saldo">—</span></div>
-                            <div><span class="text-gray-500">Días de deuda:</span> <span id="legajo-dias">—</span></div>
-                            <div><span class="text-gray-500">Alerta:</span> <span id="legajo-alerta">—</span></div>
+                        <div class="mt-2 space-y-0.5 text-[13px] text-gray-800">
+                            <div><span class="text-gray-500">Cuenta corriente:</span> <span id="legajo-cc">—</span></div>
+                            <div><span class="text-gray-500">Saldo CC:</span> <span id="legajo-saldo">—</span></div>
+                            <div><span class="text-gray-500">Próximo vencimiento:</span> <span id="legajo-cc-next-date">—</span> <span id="legajo-cc-next-days" class="text-[11px] text-gray-500">—</span></div>
+                            <div><span class="text-gray-500">Vencimiento crítico:</span> <span id="legajo-cc-critical-date">—</span> <span id="legajo-cc-critical-days" class="text-[11px] text-gray-500">—</span></div>
+                            <div><span class="text-gray-500">Estado:</span> <span id="legajo-cc-state">—</span></div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Sistema de cuotas</div>
+                        <div class="mt-2 space-y-0.5 text-[13px] text-gray-800">
+                            <div><span class="text-gray-500">Estado:</span> <span id="legajo-cuotas-state">—</span></div>
+                            <div><span class="text-gray-500">Saldo cuotas:</span> <span id="legajo-cuotas-balance">—</span></div>
+                            <div><span class="text-gray-500">Próximo vencimiento:</span> <span id="legajo-cuotas-next">—</span></div>
+                            <div><span class="text-gray-500">Cuotas restantes:</span> <span id="legajo-cuotas-remaining">—</span></div>
                         </div>
                     </div>
                 </div>
 
-                <div class="p-4 border border-gray-200 rounded-xl bg-white">
-                    <div class="flex items-center justify-between gap-2">
+                <div class="p-3 border border-gray-200 rounded-xl bg-white">
+                    <div class="sticky top-0 z-20 bg-white flex items-center justify-between gap-2 pb-2">
                         <div>
-                            <div class="text-xs font-semibold text-gray-700">Últimas compras</div>
-                            <div class="text-[11px] text-gray-500">Se muestran las últimas ventas asociadas al cliente.</div>
+                            <div class="text-xs font-semibold text-gray-700">Legajo</div>
+                            <div class="text-[10px] text-gray-500">Vista informativa: separa ventas y cobros.</div>
+                        </div>
+                        <div class="inline-flex rounded-lg border border-gray-200 bg-white overflow-hidden">
+                            <button id="legajo-tab-sales" type="button" class="px-3 py-2 text-xs font-semibold text-gray-900 bg-gray-100">Historial de ventas</button>
+                            <button id="legajo-tab-payments" type="button" class="px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">Historial de cobros</button>
                         </div>
                     </div>
-                    <div class="mt-3 overflow-hidden border border-gray-200 rounded-lg">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
-                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Pago</th>
-                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Total</th>
-                                    <th class="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Adeudado</th>
-                                </tr>
-                            </thead>
-                            <tbody id="legajo-sales" class="bg-white divide-y divide-gray-200">
-                                <tr>
-                                    <td colspan="4" class="px-3 py-4 text-sm text-gray-500 text-center">—</td>
-                                </tr>
-                            </tbody>
-                        </table>
+
+                    <div id="legajo-panel-sales" class="mt-2">
+                        <div class="text-[10px] text-gray-500">Muestra únicamente ventas realizadas (no incluye cobros).</div>
+                        <div class="mt-2 overflow-hidden border border-gray-200 rounded-lg">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Tipo</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Total vendido</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Total pagado</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Total adeudado</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="legajo-sales" class="bg-white divide-y divide-gray-200">
+                                    <tr>
+                                        <td colspan="6" class="px-3 py-4 text-sm text-gray-500 text-center">—</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="legajo-panel-payments" class="mt-2 hidden">
+                        <div class="text-[10px] text-gray-500">Muestra únicamente cobros registrados (no incluye ventas).</div>
+                        <div class="mt-2 overflow-hidden border border-gray-200 rounded-lg">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Tipo</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Referencia</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Medio</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="legajo-payments" class="bg-white divide-y divide-gray-200">
+                                    <tr>
+                                        <td colspan="5" class="px-3 py-4 text-sm text-gray-500 text-center">—</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                                <div class="text-xs font-semibold text-gray-800">Proyección · Cuenta corriente</div>
+                                <div class="mt-2 text-[11px] text-gray-500">Saldo pendiente</div>
+                                <div id="legajo-proj-cc-balance" class="text-sm font-semibold text-gray-900">—</div>
+                                <div class="mt-2 text-[11px] text-gray-500">Monto esperado</div>
+                                <div id="legajo-proj-cc-expected" class="text-sm font-semibold text-gray-900">—</div>
+                                <div class="mt-2 text-[11px] text-gray-500">Próximo vencimiento</div>
+                                <div id="legajo-proj-cc-next" class="text-sm font-semibold text-gray-900">—</div>
+                                <div class="mt-2 text-[11px] text-gray-500">Vencimiento crítico</div>
+                                <div id="legajo-proj-cc-critical" class="text-sm font-semibold text-gray-900">—</div>
+                                <div class="mt-2 text-[11px] text-gray-500">Estado proyectado</div>
+                                <div id="legajo-proj-cc-state" class="text-sm font-semibold text-gray-900">—</div>
+                            </div>
+                            <div class="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                                <div class="text-xs font-semibold text-gray-800">Proyección · Sistema de cuotas</div>
+                                <div class="mt-2 grid grid-cols-2 gap-2">
+                                    <div>
+                                        <div class="text-[11px] text-gray-500">Saldo pendiente</div>
+                                        <div id="legajo-proj-cuotas-balance" class="text-sm font-semibold text-gray-900">—</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-[11px] text-gray-500">Próximo vencimiento</div>
+                                        <div id="legajo-proj-cuotas-next" class="text-sm font-semibold text-gray-900">—</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-[11px] text-gray-500">Monto esperado</div>
+                                        <div id="legajo-proj-cuotas-expected" class="text-sm font-semibold text-gray-900">—</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-[11px] text-gray-500">Cuotas restantes</div>
+                                        <div id="legajo-proj-cuotas-remaining" class="text-sm font-semibold text-gray-900">—</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="p-4 border border-gray-200 rounded-xl bg-white">
+                <div class="p-3 border border-gray-200 rounded-xl bg-white">
                     <div class="text-xs font-semibold text-gray-700">Observaciones internas</div>
-                    <div id="legajo-notes" class="mt-2 text-sm text-gray-700 whitespace-pre-wrap">—</div>
+                    <div id="legajo-notes" class="mt-2 text-[13px] text-gray-700 whitespace-pre-wrap">—</div>
                 </div>
-            </div>
-
-            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
-                <button id="btn-close-legajo-2" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cerrar</button>
             </div>
         </div>
     </div>
@@ -396,7 +452,7 @@
         <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
-                    <h3 class="text-base font-semibold text-gray-900">Saldar deuda</h3>
+                    <h3 class="text-base font-semibold text-gray-900">Saldar Cuenta Corriente</h3>
                     <p id="settle-subtitle" class="text-xs text-gray-500">—</p>
                 </div>
                 <button id="btn-close-settle" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
@@ -437,10 +493,201 @@
         </div>
     </div>
 </div>
+
+<div id="modal-settle-type" class="hidden fixed inset-0 z-50" style="z-index:70;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="min-w-0">
+                    <h3 class="text-base font-semibold text-gray-900">Saldar deuda</h3>
+                    <p id="settle-type-subtitle" class="text-xs text-gray-500 truncate">—</p>
+                </div>
+                <button id="btn-close-settle-type" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-3">
+                <div class="text-xs text-gray-600">Elegí qué tipo de deuda querés saldar.</div>
+                <div class="space-y-2">
+                    <button id="btn-settle-type-cc" type="button" class="w-full px-4 py-3 text-sm font-medium text-amber-900 bg-amber-50 border border-amber-100 rounded-lg hover:bg-amber-100 flex items-center justify-between">
+                        <span class="inline-flex items-center gap-2"><i class="fas fa-file-invoice-dollar text-amber-700"></i>Cuenta corriente</span>
+                        <i class="fas fa-chevron-right text-amber-700"></i>
+                    </button>
+                    <button id="btn-settle-type-cuotas" type="button" class="w-full px-4 py-3 text-sm font-medium text-emerald-900 bg-emerald-50 border border-emerald-100 rounded-lg hover:bg-emerald-100 flex items-center justify-between">
+                        <span class="inline-flex items-center gap-2"><i class="fas fa-calendar-alt text-emerald-700"></i>Sistema de cuotas</span>
+                        <i class="fas fa-chevron-right text-emerald-700"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-cancel-settle-type" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-settle-installments" class="hidden fixed inset-0 z-50" style="z-index:70;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-5xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="min-w-0">
+                    <h3 class="text-base font-semibold text-gray-900">Saldar cuotas</h3>
+                    <p id="settle-cuotas-subtitle" class="text-xs text-gray-500 truncate">—</p>
+                </div>
+                <button id="btn-close-settle-cuotas" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-3">
+                <div id="cuotas-plan-select-wrap">
+                    <label class="block text-[11px] font-medium text-gray-600 mb-1">Plan de cuotas</label>
+                    <select id="cuotas-plan-select" class="w-full px-3 py-2 text-sm border rounded-md bg-white"></select>
+                    <div id="cuotas-plan-meta" class="mt-1 text-[10px] text-gray-400">—</div>
+                </div>
+
+                <div id="cuotas-plans-tabs-wrap" class="hidden">
+                    <div class="text-[11px] font-medium text-gray-600">Seleccioná el sistema de cuotas a saldar</div>
+                    <div id="cuotas-plans-tabs" class="mt-2 flex flex-wrap gap-2"></div>
+                    <div id="cuotas-plan-meta-tabs" class="mt-1 text-[10px] text-gray-400">—</div>
+                </div>
+
+                <div class="overflow-hidden border border-gray-200 rounded-lg">
+                    <div class="max-h-[520px] overflow-y-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="sticky top-0 z-10 bg-gray-50">
+                                <tr>
+                                    <th class="px-3 py-2 text-[10px] font-semibold tracking-wider text-left text-gray-500 uppercase">N°</th>
+                                    <th class="px-3 py-2 text-[10px] font-semibold tracking-wider text-left text-gray-500 uppercase">Venc.</th>
+                                    <th id="cuotas-th-producto" class="px-3 py-2 text-[10px] font-semibold tracking-wider text-left text-gray-500 uppercase">Producto</th>
+                                    <th class="px-3 py-2 text-[10px] font-semibold tracking-wider text-right text-gray-500 uppercase">Monto</th>
+                                    <th class="px-3 py-2 text-[10px] font-semibold tracking-wider text-center text-gray-500 uppercase">Estado</th>
+                                    <th class="px-3 py-2 text-[10px] font-semibold tracking-wider text-right text-gray-500 uppercase">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cuotas-table" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="6" class="px-3 py-4 text-sm text-gray-500 text-center">—</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="cuotas-error" class="text-[11px] text-red-600 hidden flex items-center gap-1"><i class="fas fa-exclamation-circle"></i><span>Error.</span></div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-between gap-2">
+                <button id="btn-cuotas-cancel-plan" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-100 rounded-md hover:bg-red-100">Cancelar plan</button>
+                <div class="flex justify-end gap-2">
+                    <button id="btn-cancel-settle-cuotas" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-cobro" class="hidden fixed inset-0 z-50" style="z-index:75;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="min-w-0">
+                    <h3 id="cobro-title" class="text-base font-semibold text-gray-900">Cobro</h3>
+                    <p id="cobro-subtitle" class="text-xs text-gray-500 truncate">—</p>
+                </div>
+                <button id="btn-close-cobro" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="p-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="lg:col-span-2 space-y-3">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Fecha del pago</label>
+                            <input id="cobro-date" type="date" class="w-full px-3 py-2 text-sm border rounded-md" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Medio de pago</label>
+                            <select id="cobro-method" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                                <option value="Efectivo">Efectivo</option>
+                                <option value="Transferencia">Transferencia</option>
+                                <option value="Débito">Débito</option>
+                                <option value="Crédito">Crédito</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Empleado responsable</label>
+                            <select id="cobro-employee" class="w-full px-3 py-2 text-sm border rounded-md bg-white"></select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Monto a cobrar</label>
+                            <input id="cobro-amount" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0" />
+                            <div id="cobro-amount-hint" class="mt-1 text-[11px] text-gray-500 hidden">El monto de la cuota finita no es editable.</div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Cliente</label>
+                            <input id="cobro-customer" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" disabled />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Producto/s</label>
+                        <div id="cobro-products" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50 text-gray-800">—</div>
+                    </div>
+
+                    <div id="cobro-cc-extra" class="hidden space-y-3">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div class="p-3 border border-gray-200 rounded-lg">
+                                <div class="text-[11px] text-gray-500">Monto original</div>
+                                <div id="cobro-cc-original" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                            </div>
+                            <div class="p-3 border border-gray-200 rounded-lg">
+                                <div class="text-[11px] text-gray-500">Fecha creación</div>
+                                <div id="cobro-cc-created" class="mt-1 text-sm font-semibold text-gray-900">—</div>
+                            </div>
+                            <div class="p-3 border border-gray-200 rounded-lg">
+                                <div class="text-[11px] text-gray-500">Deuda actual</div>
+                                <div id="cobro-cc-due" class="mt-1 text-sm font-semibold text-red-700">—</div>
+                            </div>
+                        </div>
+                        <div class="border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-600">Pagos previos (resumen)</div>
+                            <div id="cobro-cc-history" class="p-3 text-sm text-gray-700">—</div>
+                        </div>
+                    </div>
+
+                    <div id="cobro-error" class="text-[11px] text-red-600 hidden flex items-center gap-1"><i class="fas fa-exclamation-circle"></i><span>Error.</span></div>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="p-3 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Resumen</div>
+                        <div class="mt-2 text-sm text-gray-700 space-y-1">
+                            <div><span class="text-gray-500">Tipo:</span> <span id="cobro-kind" class="font-semibold">—</span></div>
+                            <div><span class="text-gray-500">Referencia:</span> <span id="cobro-ref" class="font-semibold">—</span></div>
+                            <div><span class="text-gray-500">Notas:</span> <span id="cobro-notes-preview" class="font-semibold">—</span></div>
+                        </div>
+                    </div>
+                    <div class="p-3 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Acción</div>
+                        <div class="mt-3 flex justify-end gap-2">
+                            <button id="btn-cancel-cobro" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                            <button id="btn-confirm-cobro" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">Confirmar pago</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
+<script id="installments-config" type="application/json">{"enabled": {{ 'true' if business and business.habilitar_sistema_cuotas else 'false' }} }</script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const KEY_CRM = 'clientes_crm_config';
@@ -459,6 +706,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const filterCcBtn = document.getElementById('clientes-filter-cc-btn');
     const filterCcMenu = document.getElementById('clientes-filter-cc-menu');
     const filterCcItems = document.getElementById('clientes-filter-cc-items');
+    const filterScBtn = document.getElementById('clientes-filter-sc-btn');
+    const filterScMenu = document.getElementById('clientes-filter-sc-menu');
+    const filterScItems = document.getElementById('clientes-filter-sc-items');
+    const thSc = document.getElementById('clientes-th-sc');
+    const thScFilter = document.getElementById('clientes-th-sc-filter');
     const tbody = document.getElementById('clientes-tbody');
     const btnNuevo = document.getElementById('btn-nuevo-cliente');
     const btnConfigAlertas = document.getElementById('btn-config-alertas');
@@ -487,11 +739,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const inputCrmFreqMin = document.getElementById('crm-freq-min');
     const inputCrmBestMin = document.getElementById('crm-best-min');
     const inputCrmLabelClasTitle = document.getElementById('crm-label-clas-title');
-    const inputCrmLabelBest = document.getElementById('crm-label-best');
-    const inputCrmLabelFreq = document.getElementById('crm-label-freq');
-    const inputCrmLabelInactive = document.getElementById('crm-label-inactive');
-    const inputCrmLabelDebtor = document.getElementById('crm-label-debtor');
-    const inputCrmLabelDebtorCritical = document.getElementById('crm-label-debtor-critical');
+    const crmInstallmentsThresholds = document.getElementById('crm-installments-thresholds');
+    const inputCrmInstallmentsOverdueCount = document.getElementById('crm-installments-overdue-count');
+    const inputCrmInstallmentsCriticalCount = document.getElementById('crm-installments-critical-count');
 
     const crmPreview = document.getElementById('crm-preview');
     const crmConfigError = document.getElementById('crm-config-error');
@@ -501,7 +751,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const modalLegajo = document.getElementById('modal-customer-legajo');
     const btnCloseLegajo = document.getElementById('btn-close-legajo');
     const btnCloseLegajo2 = document.getElementById('btn-close-legajo-2');
-    const btnEditLegajo = document.getElementById('btn-edit-legajo');
     const legajoTitle = document.getElementById('legajo-title');
     const legajoSubtitle = document.getElementById('legajo-subtitle');
     const legajoFullname = document.getElementById('legajo-fullname');
@@ -517,10 +766,33 @@ document.addEventListener('DOMContentLoaded', function () {
     const legajoFreq = document.getElementById('legajo-freq');
     const legajoCc = document.getElementById('legajo-cc');
     const legajoSaldo = document.getElementById('legajo-saldo');
-    const legajoDias = document.getElementById('legajo-dias');
-    const legajoAlerta = document.getElementById('legajo-alerta');
+    const legajoCcNextDate = document.getElementById('legajo-cc-next-date');
+    const legajoCcNextDays = document.getElementById('legajo-cc-next-days');
+    const legajoCcCriticalDate = document.getElementById('legajo-cc-critical-date');
+    const legajoCcCriticalDays = document.getElementById('legajo-cc-critical-days');
+    const legajoCcState = document.getElementById('legajo-cc-state');
+    const legajoCuotasState = document.getElementById('legajo-cuotas-state');
+    const legajoCuotasBalance = document.getElementById('legajo-cuotas-balance');
+    const legajoCuotasNext = document.getElementById('legajo-cuotas-next');
+    const legajoCuotasRemaining = document.getElementById('legajo-cuotas-remaining');
     const legajoSales = document.getElementById('legajo-sales');
+    const legajoPayments = document.getElementById('legajo-payments');
     const legajoNotes = document.getElementById('legajo-notes');
+
+    const legajoTabSales = document.getElementById('legajo-tab-sales');
+    const legajoTabPayments = document.getElementById('legajo-tab-payments');
+    const legajoPanelSales = document.getElementById('legajo-panel-sales');
+    const legajoPanelPayments = document.getElementById('legajo-panel-payments');
+
+    const legajoProjCcBalance = document.getElementById('legajo-proj-cc-balance');
+    const legajoProjCcExpected = document.getElementById('legajo-proj-cc-expected');
+    const legajoProjCcNext = document.getElementById('legajo-proj-cc-next');
+    const legajoProjCcCritical = document.getElementById('legajo-proj-cc-critical');
+    const legajoProjCcState = document.getElementById('legajo-proj-cc-state');
+    const legajoProjCuotasBalance = document.getElementById('legajo-proj-cuotas-balance');
+    const legajoProjCuotasNext = document.getElementById('legajo-proj-cuotas-next');
+    const legajoProjCuotasExpected = document.getElementById('legajo-proj-cuotas-expected');
+    const legajoProjCuotasRemaining = document.getElementById('legajo-proj-cuotas-remaining');
 
     const modalSettle = document.getElementById('modal-settle-debt');
     const btnCloseSettle = document.getElementById('btn-close-settle');
@@ -533,6 +805,51 @@ document.addEventListener('DOMContentLoaded', function () {
     const settlePayAmount = document.getElementById('settle-pay-amount');
     const settleError = document.getElementById('settle-error');
 
+    const modalCobro = document.getElementById('modal-cobro');
+    const cobroTitle = document.getElementById('cobro-title');
+    const cobroSubtitle = document.getElementById('cobro-subtitle');
+    const btnCloseCobro = document.getElementById('btn-close-cobro');
+    const btnCancelCobro = document.getElementById('btn-cancel-cobro');
+    const btnConfirmCobro = document.getElementById('btn-confirm-cobro');
+    const cobroDate = document.getElementById('cobro-date');
+    const cobroMethod = document.getElementById('cobro-method');
+    const cobroEmployee = document.getElementById('cobro-employee');
+    const cobroAmount = document.getElementById('cobro-amount');
+    const cobroAmountHint = document.getElementById('cobro-amount-hint');
+    const cobroCustomer = document.getElementById('cobro-customer');
+    const cobroProducts = document.getElementById('cobro-products');
+    const cobroKind = document.getElementById('cobro-kind');
+    const cobroRef = document.getElementById('cobro-ref');
+    const cobroNotesPreview = document.getElementById('cobro-notes-preview');
+    const cobroError = document.getElementById('cobro-error');
+    const cobroCcExtra = document.getElementById('cobro-cc-extra');
+    const cobroCcOriginal = document.getElementById('cobro-cc-original');
+    const cobroCcCreated = document.getElementById('cobro-cc-created');
+    const cobroCcDue = document.getElementById('cobro-cc-due');
+    const cobroCcHistory = document.getElementById('cobro-cc-history');
+    const cuotasThProducto = document.getElementById('cuotas-th-producto');
+
+    const modalSettleType = document.getElementById('modal-settle-type');
+    const settleTypeSubtitle = document.getElementById('settle-type-subtitle');
+    const btnCloseSettleType = document.getElementById('btn-close-settle-type');
+    const btnCancelSettleType = document.getElementById('btn-cancel-settle-type');
+    const btnSettleTypeCc = document.getElementById('btn-settle-type-cc');
+    const btnSettleTypeCuotas = document.getElementById('btn-settle-type-cuotas');
+
+    const modalSettleCuotas = document.getElementById('modal-settle-installments');
+    const btnCloseSettleCuotas = document.getElementById('btn-close-settle-cuotas');
+    const btnCancelSettleCuotas = document.getElementById('btn-cancel-settle-cuotas');
+    const settleCuotasSubtitle = document.getElementById('settle-cuotas-subtitle');
+    const cuotasPlanSelect = document.getElementById('cuotas-plan-select');
+    const cuotasPlanSelectWrap = document.getElementById('cuotas-plan-select-wrap');
+    const cuotasPlansTabsWrap = document.getElementById('cuotas-plans-tabs-wrap');
+    const cuotasPlansTabs = document.getElementById('cuotas-plans-tabs');
+    const cuotasPlanMetaTabs = document.getElementById('cuotas-plan-meta-tabs');
+    const cuotasPlanMeta = document.getElementById('cuotas-plan-meta');
+    const cuotasTable = document.getElementById('cuotas-table');
+    const btnCuotasCancelPlan = document.getElementById('btn-cuotas-cancel-plan');
+    const cuotasError = document.getElementById('cuotas-error');
+
     let cacheCustomers = [];
     let cacheSales = [];
     let editingCustomerId = null;
@@ -541,6 +858,238 @@ document.addEventListener('DOMContentLoaded', function () {
     let lastDerived = [];
     let legajoCustomerId = null;
     let settleCustomerId = null;
+    let settleCuotasCustomerId = null;
+    let settlePendingCustomerForType = null;
+    let settleCuotasPlansCache = [];
+    let settleCuotasActivePlanId = null;
+
+    let employeesCache = null;
+
+    let cobroCtx = null;
+
+    const TENANT_PREFIX = ((window.location && window.location.pathname || '').match(/^\/c\/[^\/]+/) || [''])[0];
+    function apiPath(p) {
+        const s = String(p || '');
+        if (!s.startsWith('/')) return s;
+        if (s.startsWith('/c/')) return s;
+        if (!TENANT_PREFIX) return s;
+        return TENANT_PREFIX + s;
+    }
+
+    function fmtIsoToday() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + dd;
+    }
+
+    function ensureEmployeesLoaded() {
+        if (employeesCache) return Promise.resolve(employeesCache);
+        return apiGetEmployees().then(function (res) {
+            if (!res || res.ok !== true) {
+                employeesCache = [];
+                return employeesCache;
+            }
+            employeesCache = ensureArray(res.items);
+            return employeesCache;
+        }).catch(function () {
+            employeesCache = [];
+            return employeesCache;
+        });
+    }
+
+    function employeeDisplayName(e) {
+        const nm = safeStr(e?.name || '').trim();
+        if (nm) return nm;
+        const full = (safeStr(e?.first_name || '').trim() + ' ' + safeStr(e?.last_name || '').trim()).trim();
+        return full || 'Empleado';
+    }
+
+    function fillEmployeeSelect() {
+        if (!cobroEmployee) return;
+        const list = ensureArray(employeesCache);
+        cobroEmployee.innerHTML = '';
+        const opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = '— Seleccionar —';
+        cobroEmployee.appendChild(opt0);
+        list
+            .slice()
+            .filter(e => {
+                try { return (e && typeof e === 'object') ? (e.active !== false) : false; } catch (err) { return false; }
+            })
+            .sort((a, b) => employeeDisplayName(a).localeCompare(employeeDisplayName(b), 'es'))
+            .forEach(function (e) {
+                const opt = document.createElement('option');
+                opt.value = safeStr(e.id);
+                opt.textContent = employeeDisplayName(e);
+                cobroEmployee.appendChild(opt);
+            });
+    }
+
+    function buildCcHistoryHtml(customerId, refTicket) {
+        const rows = ensureArray(cacheSales).filter(s => {
+            const t = safeStr(s?.type || s?.sale_type).trim();
+            if (t !== 'CobroCC') return false;
+            const cid = safeStr(s?.customer_id);
+            if (customerId && cid && cid === customerId) return true;
+            return false;
+        }).slice().sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0)).slice(0, 10);
+        if (!rows.length) return '<span class="text-gray-500">Sin pagos previos.</span>';
+        const lines = rows.map(r => {
+            const f = safeStr(r?.fecha || '') || '—';
+            const m = safeStr(r?.payment_method || '') || '—';
+            const tot = fmtMoney(parseFloat(r?.total || 0) || 0);
+            const note = truncateText(safeStr(r?.notes || ''), 80);
+            return '<div class="flex items-center justify-between gap-2"><div class="min-w-0 truncate">' + f + ' · ' + m + ' · ' + note + '</div><div class="font-semibold">' + tot + '</div></div>';
+        });
+        return '<div class="space-y-1">' + lines.join('') + '</div>';
+    }
+
+    function openCobroModal(ctx) {
+        cobroCtx = ctx && typeof ctx === 'object' ? ctx : null;
+        if (!cobroCtx) return;
+
+        if (cobroError) cobroError.classList.add('hidden');
+
+        const today = fmtIsoToday();
+        if (cobroDate) cobroDate.value = today;
+
+        if (cobroMethod) cobroMethod.value = safeStr(cobroCtx.payment_method || 'Efectivo') || 'Efectivo';
+        if (cobroCustomer) cobroCustomer.value = safeStr(cobroCtx.customer_name || 'Cliente');
+        if (cobroProducts) cobroProducts.textContent = safeStr(cobroCtx.products_label || '—');
+        if (cobroAmount) cobroAmount.value = String(parseFloat(cobroCtx.amount || 0) || 0);
+
+        const editableAmount = (safeStr(cobroCtx.kind) === 'installment') ? true : !!cobroCtx.amount_editable;
+        if (cobroAmount) cobroAmount.disabled = !editableAmount;
+        if (cobroAmountHint) cobroAmountHint.classList.add('hidden');
+
+        if (cobroKind) cobroKind.textContent = safeStr(cobroCtx.kind_label || 'Cobro');
+        if (cobroRef) cobroRef.textContent = safeStr(cobroCtx.ref_label || '—');
+        if (cobroNotesPreview) cobroNotesPreview.textContent = safeStr(cobroCtx.notes_preview || '—');
+        if (cobroTitle) cobroTitle.textContent = safeStr(cobroCtx.title || 'Cobro');
+        if (cobroSubtitle) cobroSubtitle.textContent = safeStr(cobroCtx.subtitle || '—');
+
+        if (cobroCcExtra) cobroCcExtra.classList.toggle('hidden', cobroCtx.kind !== 'cc');
+        if (cobroCtx.kind === 'cc') {
+            if (cobroCcOriginal) cobroCcOriginal.textContent = fmtMoney(parseFloat(cobroCtx.original_total || 0) || 0);
+            if (cobroCcCreated) cobroCcCreated.textContent = safeStr(cobroCtx.created_date || '—');
+            if (cobroCcDue) cobroCcDue.textContent = fmtMoney(parseFloat(cobroCtx.due_amount || 0) || 0);
+            if (cobroCcHistory) cobroCcHistory.innerHTML = buildCcHistoryHtml(safeStr(cobroCtx.customer_id), safeStr(cobroCtx.ref_ticket));
+        }
+
+        ensureEmployeesLoaded().then(function () {
+            fillEmployeeSelect();
+            if (cobroEmployee) cobroEmployee.value = safeStr(cobroCtx.employee_id || '');
+            openModal(modalCobro);
+        });
+    }
+
+    function confirmCobro() {
+        if (!cobroCtx) return;
+        if (cobroError) cobroError.classList.add('hidden');
+
+        const date = safeStr(cobroDate?.value || '').trim() || fmtIsoToday();
+        const method = safeStr(cobroMethod?.value || 'Efectivo') || 'Efectivo';
+        const employee_id = safeStr(cobroEmployee?.value || '').trim() || null;
+        const employee_name = (() => {
+            if (!employee_id) return null;
+            const e = ensureArray(employeesCache).find(x => safeStr(x?.id) === employee_id);
+            return e ? employeeDisplayName(e) : null;
+        })();
+
+        if (cobroCtx.kind === 'installment') {
+            const amt = parseFloat(cobroAmount?.value || 0) || 0;
+            if (!(amt > 0)) {
+                if (cobroError) {
+                    cobroError.querySelector('span').textContent = 'Ingresá un monto válido (mayor a 0).';
+                    cobroError.classList.remove('hidden');
+                }
+                return;
+            }
+            apiPayInstallment(cobroCtx.installment_id, {
+                date: date,
+                payment_method: method,
+                employee_id: employee_id,
+                employee_name: employee_name,
+                amount: amt,
+            }).then(function (res) {
+                if (!res || res.ok !== true) {
+                    if (cobroError) {
+                        cobroError.querySelector('span').textContent = 'No se pudo registrar el pago.';
+                        cobroError.classList.remove('hidden');
+                    }
+                    return;
+                }
+                const reload = readSales();
+                Promise.resolve(reload).then(function (sales) {
+                    cacheSales = ensureArray(sales);
+                    closeModal(modalCobro);
+                    render();
+                    if (settleCuotasActivePlanId) refreshCuotasPlan(settleCuotasActivePlanId);
+                    if (legajoCustomerId && legajoCustomerId === safeStr(cobroCtx.customer_id)) openLegajo(legajoCustomerId);
+                });
+            }).catch(function () {
+                if (cobroError) {
+                    cobroError.querySelector('span').textContent = 'No se pudo registrar el pago.';
+                    cobroError.classList.remove('hidden');
+                }
+            });
+            return;
+        }
+
+        if (cobroCtx.kind === 'cc') {
+            const amt = parseFloat(cobroAmount?.value || 0) || 0;
+            if (!(amt > 0) || amt - (parseFloat(cobroCtx.due_amount || 0) || 0) > 0.00001) {
+                if (cobroError) {
+                    cobroError.querySelector('span').textContent = 'Ingresá un monto válido (mayor a 0 y menor o igual a la deuda).';
+                    cobroError.classList.remove('hidden');
+                }
+                return;
+            }
+            apiSettleDebt({
+                sale_id: cobroCtx.sale_id,
+                payment_method: method,
+                amount: amt,
+                date: date,
+                employee_id: employee_id,
+                employee_name: employee_name,
+            }).then(function (data) {
+                if (!data || data.ok !== true) {
+                    if (cobroError) {
+                        cobroError.querySelector('span').textContent = 'No se pudo registrar el cobro.';
+                        cobroError.classList.remove('hidden');
+                    }
+                    return;
+                }
+                const reload = readSales();
+                Promise.resolve(reload).then(function (sales) {
+                    cacheSales = ensureArray(sales);
+                    closeModal(modalCobro);
+                    closeModal(modalSettle);
+                    render();
+                    if (legajoCustomerId && legajoCustomerId === safeStr(cobroCtx.customer_id)) openLegajo(legajoCustomerId);
+                });
+            }).catch(function () {
+                if (cobroError) {
+                    cobroError.querySelector('span').textContent = 'No se pudo registrar el cobro.';
+                    cobroError.classList.remove('hidden');
+                }
+            });
+        }
+    }
+
+    let installmentsSummaryByCustomerId = {};
+
+    let INSTALLMENTS_ENABLED = false;
+    try {
+        const rawCfg = document.getElementById('installments-config');
+        const parsed = rawCfg ? JSON.parse(String(rawCfg.textContent || '{}')) : {};
+        INSTALLMENTS_ENABLED = !!(parsed && parsed.enabled);
+    } catch (e) {
+        INSTALLMENTS_ENABLED = false;
+    }
 
     function isPromise(x) { return !!x && typeof x.then === 'function'; }
     function ensureArray(x) { return Array.isArray(x) ? x : []; }
@@ -557,10 +1106,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let clasTitle = 'Clasificación';
     let clasOpts = [
-        { k: 'deudor_critico', label: 'CC Vencida Crítica' },
-        { k: 'deudor', label: 'CC Vencida' },
+        { k: 'sc_critico', label: 'Sistema de Cuotas Crítico' },
+        { k: 'sc_vencido', label: 'Sistema de Cuotas Vencido' },
+        { k: 'cc_critica', label: 'CC Vencida Crítica' },
+        { k: 'cc_vencida', label: 'CC Vencida' },
         { k: 'mejor_cliente', label: 'Mejor cliente' },
         { k: 'frecuente', label: 'Frecuente' },
+        { k: 'ocasional', label: 'Ocasional' },
         { k: 'inactivo', label: 'Inactivo' },
     ];
     const ccOpts = [
@@ -570,11 +1122,20 @@ document.addEventListener('DOMContentLoaded', function () {
         { k: 'sin_cc', label: 'Sin cuenta corriente' },
     ];
 
+    const scOpts = [
+        { k: 'al_dia', label: 'Al día' },
+        { k: 'vencido', label: 'Sistema de cuotas vencido' },
+        { k: 'critico', label: 'Sistema de cuotas crítico' },
+        { k: 'sin_sc', label: 'Sin sistema de cuotas' },
+    ];
+
     let clasSelected = new Set();
     let ccSelected = new Set();
+    let scSelected = new Set();
 
     let clasAllMode = true;
     let ccAllMode = true;
+    let scAllMode = true;
 
     function formatMultiLabel(allText, opts, selectedSet, pluralWord, allMode) {
         const selCount = selectedSet.size;
@@ -614,6 +1175,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (filterCcBtn) {
             filterCcBtn.textContent = formatMultiLabel('Cuenta corriente: todas', ccOpts, ccSelected, 'seleccionadas', ccAllMode);
         }
+        if (filterScBtn) {
+            filterScBtn.textContent = formatMultiLabel('Sistema de cuotas: todas', scOpts, scSelected, 'seleccionadas', scAllMode);
+        }
     }
 
     function setCrmError(msg) {
@@ -634,13 +1198,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const criticalDays = Math.max(overdueDays, parseInt(inputCrmDebtCriticalDays?.value || 60, 10) || 60);
         const freqMin = Math.max(1, parseInt(inputCrmFreqMin?.value || 1, 10) || 1);
         const bestMin = Math.max(1, parseInt(inputCrmBestMin?.value || 2, 10) || 2);
+        const instOverdueCount = Math.max(1, parseInt(inputCrmInstallmentsOverdueCount?.value || 1, 10) || 1);
+        const instCriticalCount = Math.max(instOverdueCount + 1, parseInt(inputCrmInstallmentsCriticalCount?.value || 3, 10) || 3);
         const labels = {
             clas_title: safeStr(inputCrmLabelClasTitle?.value || 'Clasificación').trim() || 'Clasificación',
-            best: safeStr(inputCrmLabelBest?.value || 'Mejor cliente').trim() || 'Mejor cliente',
-            freq: safeStr(inputCrmLabelFreq?.value || 'Frecuente').trim() || 'Frecuente',
-            inactive: safeStr(inputCrmLabelInactive?.value || 'Inactivo').trim() || 'Inactivo',
-            debtor: safeStr(inputCrmLabelDebtor?.value || 'CC Vencida').trim() || 'CC Vencida',
-            debtor_critical: safeStr(inputCrmLabelDebtorCritical?.value || 'CC Vencida Crítica').trim() || 'CC Vencida Crítica',
         };
         return {
             recent_days: recentDays,
@@ -648,6 +1209,8 @@ document.addEventListener('DOMContentLoaded', function () {
             debt_critical_days: criticalDays,
             freq_min_purchases: freqMin,
             best_min_purchases: bestMin,
+            installments_overdue_count: instOverdueCount,
+            installments_critical_count: instCriticalCount,
             labels
         };
     }
@@ -660,11 +1223,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!(c.debt_critical_days > c.debt_overdue_days)) {
             return 'Para evitar solapamientos: "Vencida crítica" debe ser mayor que "Vencida".';
         }
+        if (INSTALLMENTS_ENABLED) {
+            if (!(parseInt(c.installments_critical_count || 0, 10) > parseInt(c.installments_overdue_count || 0, 10))) {
+                return 'Para evitar solapamientos: "Sistema de cuotas crítico" debe ser mayor que "Sistema de cuotas vencido".';
+            }
+        }
         if (!safeStr(c.labels?.clas_title).trim()) return 'El título de clasificación no puede estar vacío.';
-        if (!safeStr(c.labels?.best).trim()) return 'El nombre de "Mejor cliente" no puede estar vacío.';
-        if (!safeStr(c.labels?.freq).trim()) return 'El nombre de "Frecuente" no puede estar vacío.';
-        if (!safeStr(c.labels?.inactive).trim()) return 'El nombre de "Inactivo" no puede estar vacío.';
-        if (!safeStr(c.labels?.debtor).trim()) return 'El nombre de "CC Vencida" no puede estar vacío.';
         return '';
     }
 
@@ -672,19 +1236,26 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!crmPreview) return;
         const c = cfg && typeof cfg === 'object' ? cfg : readCrmFormValues();
         const title = safeStr(c.labels?.clas_title || 'Clasificación') || 'Clasificación';
-        const best = safeStr(c.labels?.best || 'Mejor cliente') || 'Mejor cliente';
-        const freq = safeStr(c.labels?.freq || 'Frecuente') || 'Frecuente';
-        const inactive = safeStr(c.labels?.inactive || 'Inactivo') || 'Inactivo';
-        const overdue = safeStr(c.labels?.debtor || 'CC Vencida') || 'CC Vencida';
-        const critical = safeStr(c.labels?.debtor_critical || 'CC Vencida Crítica') || 'CC Vencida Crítica';
+        const best = 'Mejor cliente';
+        const freq = 'Frecuente';
+        const ocasional = 'Ocasional';
+        const inactive = 'Inactivo';
+        const overdue = 'CC Vencida';
+        const critical = 'CC Vencida Crítica';
 
-        const rows = [
-            { k: critical, c1: 'Saldo > 0', c2: 'Días de deuda >= ' + safeStr(c.debt_critical_days) + ' (crítica)' },
-            { k: overdue, c1: 'Saldo > 0', c2: 'Días de deuda >= ' + safeStr(c.debt_overdue_days) + ' (vencida) y < ' + safeStr(c.debt_critical_days) },
-            { k: best, c1: '>= ' + safeStr(c.best_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'CC no vencida' },
-            { k: freq, c1: '>= ' + safeStr(c.freq_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'CC no vencida' },
-            { k: inactive, c1: 'No cumple Mejor/Frecuente', c2: 'CC no vencida y sin actividad reciente' },
-        ];
+        const rows = [];
+        if (INSTALLMENTS_ENABLED) {
+            const ov = 'Sistema de Cuotas Vencido';
+            const cr = 'Sistema de Cuotas Crítico';
+            rows.push({ k: cr, c1: 'Cuotas vencidas >= ' + safeStr(c.installments_critical_count || 3), c2: 'Prioridad absoluta' });
+            rows.push({ k: ov, c1: 'Cuotas vencidas >= ' + safeStr(c.installments_overdue_count || 1), c2: 'Prioridad absoluta' });
+        }
+        rows.push({ k: critical, c1: 'Saldo CC > 0', c2: 'Días de deuda >= ' + safeStr(c.debt_critical_days) + ' (crítica)' });
+        rows.push({ k: overdue, c1: 'Saldo CC > 0', c2: 'Días de deuda >= ' + safeStr(c.debt_overdue_days) + ' (vencida) y < ' + safeStr(c.debt_critical_days) });
+        rows.push({ k: best, c1: '>= ' + safeStr(c.best_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'Sin cuotas vencidas y CC no vencida' });
+        rows.push({ k: freq, c1: '>= ' + safeStr(c.freq_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'Sin cuotas vencidas y CC no vencida' });
+        rows.push({ k: ocasional, c1: '> 0 y < ' + safeStr(c.freq_min_purchases) + ' compras en ' + safeStr(c.recent_days) + ' días', c2: 'Sin cuotas vencidas y CC no vencida' });
+        rows.push({ k: inactive, c1: '0 compras en ' + safeStr(c.recent_days) + ' días', c2: 'Sin cuotas vencidas y CC no vencida' });
 
         const html = [];
         html.push('<div class="overflow-x-auto">');
@@ -724,19 +1295,18 @@ document.addEventListener('DOMContentLoaded', function () {
             if (parsed && typeof parsed === 'object') {
                 const overdue = Math.max(1, parseInt(parsed.debt_overdue_days || 30, 10) || 30);
                 const critical = Math.max(overdue, parseInt(parsed.debt_critical_days || 60, 10) || 60);
+                const instOv = Math.max(1, parseInt(parsed.installments_overdue_count || 1, 10) || 1);
+                const instCr = Math.max(instOv + 1, parseInt(parsed.installments_critical_count || 3, 10) || 3);
                 return {
                     recent_days: Math.max(1, parseInt(parsed.recent_days || 60, 10) || 60),
                     debt_overdue_days: overdue,
                     debt_critical_days: critical,
                     freq_min_purchases: Math.max(1, parseInt(parsed.freq_min_purchases || 1, 10) || 1),
                     best_min_purchases: Math.max(1, parseInt(parsed.best_min_purchases || 2, 10) || 2),
+                    installments_overdue_count: instOv,
+                    installments_critical_count: instCr,
                     labels: {
                         clas_title: safeStr(parsed.labels?.clas_title || 'Clasificación') || 'Clasificación',
-                        best: safeStr(parsed.labels?.best || 'Mejor cliente') || 'Mejor cliente',
-                        freq: safeStr(parsed.labels?.freq || 'Frecuente') || 'Frecuente',
-                        inactive: safeStr(parsed.labels?.inactive || 'Inactivo') || 'Inactivo',
-                        debtor: safeStr(parsed.labels?.debtor || 'CC Vencida') || 'CC Vencida',
-                        debtor_critical: safeStr(parsed.labels?.debtor_critical || 'CC Vencida Crítica') || 'CC Vencida Crítica'
                     }
                 };
             }
@@ -766,7 +1336,9 @@ document.addEventListener('DOMContentLoaded', function () {
             debt_critical_days: 60,
             freq_min_purchases: 1,
             best_min_purchases: 2,
-            labels: { clas_title: 'Clasificación', best: 'Mejor cliente', freq: 'Frecuente', inactive: 'Inactivo', debtor: 'CC Vencida', debtor_critical: 'CC Vencida Crítica' }
+            installments_overdue_count: 1,
+            installments_critical_count: 3,
+            labels: { clas_title: 'Clasificación' }
         };
     }
 
@@ -843,6 +1415,42 @@ document.addEventListener('DOMContentLoaded', function () {
         }).then(r => r.json());
     }
 
+    function apiGetInstallmentPlans(customerId) {
+        const qs = new URLSearchParams();
+        if (customerId) qs.set('customer_id', String(customerId));
+        qs.set('limit', '500');
+        return fetch(apiPath('/sales/api/installment-plans?' + qs.toString()), { method: 'GET', credentials: 'same-origin' })
+            .then(r => r.json());
+    }
+
+    function apiGetInstallmentPlan(planId) {
+        return fetch(apiPath('/sales/api/installment-plans/' + String(planId)), { method: 'GET', credentials: 'same-origin' })
+            .then(r => r.json());
+    }
+
+    function apiGetEmployees() {
+        return fetch(apiPath('/employees/api/employees?limit=2000'), { method: 'GET', credentials: 'same-origin' })
+            .then(r => r.json());
+    }
+
+    function apiPayInstallment(installmentId, payload) {
+        return fetch(apiPath('/sales/api/installments/' + String(installmentId) + '/pay'), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {})
+        }).then(r => r.json());
+    }
+
+    function apiCancelInstallmentPlan(planId) {
+        return fetch(apiPath('/sales/api/installment-plans/' + String(planId) + '/cancel'), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        }).then(r => r.json());
+    }
+
     function truncateText(s, max) {
         const txt = safeStr(s);
         const m = parseInt(max || 80, 10) || 80;
@@ -868,6 +1476,119 @@ document.addEventListener('DOMContentLoaded', function () {
             const ta = parseDateToTs(a?.fecha) || (parseInt(a?.created_at || 0, 10) || 0);
             const tb = parseDateToTs(b?.fecha) || (parseInt(b?.created_at || 0, 10) || 0);
             return (tb || 0) - (ta || 0);
+        });
+    }
+
+    function setLegajoTab(tab) {
+        const t = safeStr(tab || 'sales');
+        const isSales = (t === 'sales');
+        if (legajoPanelSales) legajoPanelSales.classList.toggle('hidden', !isSales);
+        if (legajoPanelPayments) legajoPanelPayments.classList.toggle('hidden', isSales);
+        if (legajoTabSales) {
+            legajoTabSales.classList.toggle('bg-gray-100', isSales);
+            legajoTabSales.classList.toggle('text-gray-900', isSales);
+            legajoTabSales.classList.toggle('text-gray-700', !isSales);
+        }
+        if (legajoTabPayments) {
+            legajoTabPayments.classList.toggle('bg-gray-100', !isSales);
+            legajoTabPayments.classList.toggle('text-gray-900', !isSales);
+            legajoTabPayments.classList.toggle('text-gray-700', isSales);
+        }
+    }
+
+    function labelSaleType(s) {
+        try {
+            if (s && s.is_installments === true) return 'Sistema de cuotas';
+        } catch (e) {}
+        const due = parseFloat(s?.due_amount || 0) || 0;
+        const onAcc = !!(s?.on_account) || (due > 0);
+        if (onAcc) return 'Cuenta corriente';
+        return 'Contado';
+    }
+
+    function labelSaleStatus(s) {
+        const due = parseFloat(s?.due_amount || 0) || 0;
+        const paid = parseFloat(s?.paid_amount || 0) || 0;
+        if (due <= 0.00001) return 'Pagada';
+        if (paid > 0.00001) return 'Parcial';
+        return 'Adeudada';
+    }
+
+    const MS_DAY = 24 * 60 * 60 * 1000;
+
+    function startOfDayTs(ts) {
+        const d = new Date(ts || Date.now());
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+    }
+
+    function addDaysTs(dayStartTs, days) {
+        return (parseInt(dayStartTs || 0, 10) || 0) + (parseInt(days || 0, 10) || 0) * MS_DAY;
+    }
+
+    function fmtRemainingDays(deltaDays) {
+        const n = parseInt(deltaDays, 10);
+        if (!isFinite(n)) return '—';
+        if (n === 0) return '(hoy)';
+        if (n > 0) return '(en ' + n + ' días)';
+        return '(hace ' + Math.abs(n) + ' días)';
+    }
+
+    function pill(text, cls) {
+        const t = safeStr(text || '').trim();
+        if (!t) return '<span class="text-gray-500">—</span>';
+        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ' + safeStr(cls || '') + '">' + t + '</span>';
+    }
+
+    function badgeCcState(stateKey) {
+        const k = safeStr(stateKey || '').trim().toLowerCase();
+        if (k === 'vencida_critica' || k === 'critica' || k === 'crítica') return pill('Vencida crítica', 'bg-red-100 text-red-800');
+        if (k === 'vencida' || k === 'overdue') return pill('Vencida', 'bg-amber-100 text-amber-800');
+        if (k === 'al_dia' || k === 'ok' || k === 'normal') return pill('Al día', 'bg-emerald-100 text-emerald-800');
+        return '<span class="text-gray-500">—</span>';
+    }
+
+    function badgeProjectedCcState(stateKey) {
+        const k = safeStr(stateKey || '').trim().toLowerCase();
+        if (k === 'critico' || k === 'crítico') return pill('Crítico', 'bg-red-100 text-red-800');
+        if (k === 'riesgo') return pill('Riesgo', 'bg-amber-100 text-amber-800');
+        if (k === 'normal') return pill('Normal', 'bg-emerald-100 text-emerald-800');
+        return '<span class="text-gray-500">—</span>';
+    }
+
+    function parsePaymentReference(noteText) {
+        const note = safeStr(noteText || '');
+        let refTicket = '';
+        let instN = '';
+        let instTotal = '';
+        try {
+            const mt = note.match(/Ticket\s+([^\)\n\r]+)/i);
+            if (mt && mt[1]) refTicket = safeStr(mt[1]).trim();
+        } catch (e) {}
+        try {
+            const mi = note.match(/Cobro\s+cuota\s+(\d+)(?:\/(\d+))?/i);
+            if (mi && mi[1]) instN = safeStr(mi[1]).trim();
+            if (mi && mi[2]) instTotal = safeStr(mi[2]).trim();
+        } catch (e) {}
+        return { refTicket, instN, instTotal };
+    }
+
+    function groupInstallmentPayments(rows) {
+        const map = new Map();
+        ensureArray(rows).forEach(r => {
+            const ts = parseDateToTs(r?.fecha) || (parseInt(r?.created_at || 0, 10) || 0);
+            const dateKey = ts ? new Date(ts).toISOString().slice(0, 10) : '—';
+            const ref = parsePaymentReference(r?.notes);
+            const key = dateKey + '|' + safeStr(r?.payment_method || '') + '|' + safeStr(ref.refTicket || '');
+            const cur = map.get(key) || { dateKey, payment_method: safeStr(r?.payment_method || ''), refTicket: ref.refTicket, items: [], total: 0 };
+            cur.items.push({ row: r, ref });
+            cur.total += (parseFloat(r?.total || 0) || 0);
+            map.set(key, cur);
+        });
+        return Array.from(map.values()).sort((a, b) => {
+            const ta = Date.parse(a.dateKey);
+            const tb = Date.parse(b.dateKey);
+            return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta);
         });
     }
 
@@ -898,17 +1619,99 @@ document.addEventListener('DOMContentLoaded', function () {
         if (legajoUltima) legajoUltima.textContent = safeStr(c.ultima_compra || '—');
         if (legajoFreq) legajoFreq.textContent = (isFinite(c.frecuencia_compra) ? c.frecuencia_compra.toFixed(2) : '0.00') + ' compras/mes';
 
+        const sc = parseFloat(c.saldo_cc || 0) || 0;
+        const sq = parseFloat(c.saldo_cuotas || 0) || 0;
+
         if (legajoCc) legajoCc.textContent = c.tiene_cuenta_corriente ? 'Sí' : 'No';
-        if (legajoSaldo) legajoSaldo.textContent = fmtMoney(parseFloat(c.saldo_actual || 0) || 0);
-        if (legajoDias) legajoDias.textContent = c.saldo_actual > 0 ? (safeStr(c.dias_deuda || 0) + ' días') : '—';
-        if (legajoAlerta) legajoAlerta.innerHTML = badgeAlerta(c) || '<span class="text-gray-500">—</span>';
+        if (legajoSaldo) legajoSaldo.textContent = fmtMoney(sc);
+
+        const all = salesForCustomer(c);
+        const crm = getCrmCfg();
+        const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
+        const criticalDays = Math.max(overdueDays + 1, parseInt(crm?.debt_critical_days || 60, 10) || 60);
+
+        const ccPending = ensureArray(all).filter(s => {
+            const t = safeStr(s?.type || s?.sale_type).trim();
+            if (t === 'CobroCC') return false;
+            if (t === 'CobroCuota') return false;
+            if (s && s.is_installments === true) return false;
+            const due = parseFloat(s?.due_amount || 0) || 0;
+            if (!(due > 0.00001)) return false;
+            const total = parseFloat(s?.total || 0) || 0;
+            return total > 0;
+        });
+
+        let baseTs = null;
+        ccPending.forEach(function (s) {
+            const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
+            if (!ts) return;
+            if (baseTs == null || ts < baseTs) baseTs = ts;
+        });
+
+        if (legajoCcNextDate) legajoCcNextDate.textContent = '—';
+        if (legajoCcNextDays) legajoCcNextDays.textContent = '—';
+        if (legajoCcCriticalDate) legajoCcCriticalDate.textContent = '—';
+        if (legajoCcCriticalDays) legajoCcCriticalDays.textContent = '—';
+        if (legajoCcState) legajoCcState.innerHTML = '<span class="text-gray-500">—</span>';
+
+        if (sc > 0.00001 && baseTs) {
+            const today = startOfDayTs(Date.now());
+            const baseDay = startOfDayTs(baseTs);
+            const daysDebt = Math.max(0, Math.floor((today - baseDay) / MS_DAY));
+
+            const nextTs = addDaysTs(baseDay, overdueDays);
+            const criticalTs = addDaysTs(baseDay, criticalDays);
+
+            const nextRaw = new Date(nextTs).toISOString().slice(0, 10);
+            const critRaw = new Date(criticalTs).toISOString().slice(0, 10);
+            const nextDisp = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') ? window.formatFechaDisplay(nextRaw) : nextRaw;
+            const critDisp = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') ? window.formatFechaDisplay(critRaw) : critRaw;
+
+            const nextRemain = Math.floor((startOfDayTs(nextTs) - today) / MS_DAY);
+            const critRemain = Math.floor((startOfDayTs(criticalTs) - today) / MS_DAY);
+
+            const stKey = (daysDebt >= criticalDays) ? 'vencida_critica' : ((daysDebt >= overdueDays) ? 'vencida' : 'al_dia');
+
+            if (legajoCcNextDate) legajoCcNextDate.textContent = nextDisp;
+            if (legajoCcNextDays) legajoCcNextDays.textContent = fmtRemainingDays(nextRemain);
+            if (legajoCcCriticalDate) legajoCcCriticalDate.textContent = critDisp;
+            if (legajoCcCriticalDays) legajoCcCriticalDays.textContent = fmtRemainingDays(critRemain);
+            if (legajoCcState) legajoCcState.innerHTML = badgeCcState(stKey);
+        }
+
+        if (legajoCuotasBalance) legajoCuotasBalance.textContent = fmtMoney(sq);
+        if (legajoCuotasNext) legajoCuotasNext.textContent = '—';
+        if (legajoCuotasRemaining) legajoCuotasRemaining.textContent = '—';
+        if (legajoCuotasState) {
+            const crm = getCrmCfg();
+            const instOverdueCount = Math.max(1, parseInt(crm?.installments_overdue_count || 1, 10) || 1);
+            const instCriticalCount = Math.max(instOverdueCount + 1, parseInt(crm?.installments_critical_count || 3, 10) || 3);
+            const instOverdue = parseInt(c.cuotas_overdue_count || 0, 10) || 0;
+            if (sq <= 0.00001) {
+                legajoCuotasState.textContent = '—';
+            } else if (instOverdue >= instCriticalCount) {
+                legajoCuotasState.textContent = 'Crítico';
+            } else if (instOverdue >= instOverdueCount) {
+                legajoCuotasState.textContent = 'Vencido';
+            } else {
+                legajoCuotasState.textContent = 'Al día';
+            }
+        }
 
         if (legajoNotes) legajoNotes.textContent = safeStr(c.notes || '—');
 
+        const salesOnly = ensureArray(all).filter(s => {
+            const t = safeStr(s?.type || s?.sale_type).trim();
+            if (t === 'CobroCC') return false;
+            if (t === 'CobroCuota') return false;
+            const total = parseFloat(s?.total || 0) || 0;
+            return total > 0;
+        });
+
         if (legajoSales) {
-            const list = salesForCustomer(c).slice(0, 10);
+            const list = salesOnly.slice(0, 20);
             if (!list.length) {
-                legajoSales.innerHTML = '<tr><td colspan="4" class="px-3 py-4 text-sm text-gray-500 text-center">Sin ventas asociadas.</td></tr>';
+                legajoSales.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-sm text-gray-500 text-center">Sin ventas asociadas.</td></tr>';
             } else {
                 legajoSales.innerHTML = '';
                 list.forEach(s => {
@@ -917,25 +1720,195 @@ document.addEventListener('DOMContentLoaded', function () {
                     const fecha = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function')
                         ? window.formatFechaDisplay(fechaRaw)
                         : fechaRaw;
-                    const pago = safeStr(s?.payment_method || s?.forma_pago || (s?.on_account ? 'Cuenta corriente' : '') || '—');
-                    const total = fmtMoney(parseFloat(s?.total || 0) || 0);
-                    const due = fmtMoney(parseFloat(s?.due_amount || 0) || 0);
-                    const dueClass = (parseFloat(s?.due_amount || 0) || 0) > 0 ? 'text-red-700 font-semibold' : 'text-gray-700';
+                    const tipo = labelSaleType(s);
+                    const totalNum = parseFloat(s?.total || 0) || 0;
+                    const total = fmtMoney(totalNum);
+                    const dueNum = (parseFloat(s?.due_amount || 0) || 0);
+                    const due = fmtMoney(dueNum);
+                    const paidNum = (parseFloat(s?.paid_amount || 0) || 0) > 0 ? (parseFloat(s?.paid_amount || 0) || 0) : Math.max(0, totalNum - dueNum);
+                    const paid = fmtMoney(paidNum);
+                    const dueClass = dueNum > 0 ? 'text-red-700 font-semibold' : 'text-gray-700';
+                    const st = labelSaleStatus(s);
+                    const stCls = (st === 'Pagada') ? 'text-emerald-700 font-semibold' : ((st === 'Parcial') ? 'text-amber-700 font-semibold' : 'text-red-700 font-semibold');
                     const tr = document.createElement('tr');
                     tr.innerHTML = ''
                         + '<td class="px-3 py-2 text-sm text-gray-700">' + fecha + '</td>'
-                        + '<td class="px-3 py-2 text-sm text-gray-700">' + pago + '</td>'
+                        + '<td class="px-3 py-2 text-sm text-gray-700">' + safeStr(tipo) + '</td>'
                         + '<td class="px-3 py-2 text-sm text-right text-gray-700">' + total + '</td>'
-                        + '<td class="px-3 py-2 text-sm text-right ' + dueClass + '">' + due + '</td>';
+                        + '<td class="px-3 py-2 text-sm text-right text-gray-700">' + paid + '</td>'
+                        + '<td class="px-3 py-2 text-sm text-right ' + dueClass + '">' + due + '</td>'
+                        + '<td class="px-3 py-2 text-xs text-center ' + stCls + '">' + safeStr(st) + '</td>';
                     legajoSales.appendChild(tr);
                 });
             }
         }
 
+        if (legajoPayments) {
+            const pays = ensureArray(all).filter(s => {
+                const t = safeStr(s?.type || s?.sale_type).trim();
+                if (t !== 'CobroCC' && t !== 'CobroCuota') return false;
+                const total = parseFloat(s?.total || 0) || 0;
+                return total > 0;
+            });
+
+            const ccPays = pays.filter(s => safeStr(s?.type || s?.sale_type).trim() === 'CobroCC');
+            const cuotaPays = pays.filter(s => safeStr(s?.type || s?.sale_type).trim() === 'CobroCuota');
+
+            const groupedCuotas = groupInstallmentPayments(cuotaPays);
+            const rows = [];
+
+            ccPays.forEach(s => {
+                const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
+                const fechaRaw = ts ? new Date(ts).toISOString().slice(0, 10) : '—';
+                rows.push({
+                    sortTs: ts || 0,
+                    dateRaw: fechaRaw,
+                    type: 'Cobro CC',
+                    reference: (() => {
+                        const ref = parsePaymentReference(s?.notes);
+                        const tk = safeStr(ref.refTicket || s?.ticket || '').trim();
+                        return tk ? ('Venta #' + tk) : '—';
+                    })(),
+                    method: safeStr(s?.payment_method || '—'),
+                    amount: parseFloat(s?.total || 0) || 0,
+                });
+            });
+
+            groupedCuotas.forEach(g => {
+                const sortTs = Date.parse(g.dateKey);
+                const isAdvance = (g.items.length > 1);
+                let refText = g.refTicket ? ('Ticket ' + g.refTicket) : '—';
+                if (isAdvance) {
+                    refText = refText + ' · ' + safeStr(g.items.length) + ' cuotas';
+                } else {
+                    const only = g.items[0];
+                    const n = safeStr(only?.ref?.instN || '');
+                    const tot = safeStr(only?.ref?.instTotal || '');
+                    if (n) {
+                        refText = refText + ' · Cuota ' + n + (tot ? (' de ' + tot) : '');
+                    }
+                }
+                rows.push({
+                    sortTs: isNaN(sortTs) ? 0 : sortTs,
+                    dateRaw: g.dateKey,
+                    type: 'Cuota',
+                    reference: refText,
+                    method: safeStr(g.payment_method || '—'),
+                    amount: parseFloat(g.total || 0) || 0,
+                });
+            });
+
+            rows.sort((a, b) => (b.sortTs || 0) - (a.sortTs || 0));
+            const list = rows.slice(0, 30);
+            if (!list.length) {
+                legajoPayments.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-sm text-gray-500 text-center">Sin cobros registrados.</td></tr>';
+            } else {
+                legajoPayments.innerHTML = '';
+                list.forEach(it => {
+                    const fecha = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function')
+                        ? window.formatFechaDisplay(safeStr(it.dateRaw || ''))
+                        : safeStr(it.dateRaw || '');
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = ''
+                        + '<td class="px-3 py-2 text-sm text-gray-700">' + fecha + '</td>'
+                        + '<td class="px-3 py-2 text-sm text-gray-700">' + safeStr(it.type) + '</td>'
+                        + '<td class="px-3 py-2 text-sm text-gray-700">' + safeStr(it.reference) + '</td>'
+                        + '<td class="px-3 py-2 text-sm text-gray-700">' + safeStr(it.method) + '</td>'
+                        + '<td class="px-3 py-2 text-sm text-right text-gray-700">' + fmtMoney(parseFloat(it.amount || 0) || 0) + '</td>';
+                    legajoPayments.appendChild(tr);
+                });
+            }
+        }
+
+        try {
+            const sc = parseFloat(c.saldo_cc || 0) || 0;
+            const sq = parseFloat(c.saldo_cuotas || 0) || 0;
+
+            const pendingCcSum = ccPending.reduce((acc, s) => acc + (parseFloat(s?.due_amount || 0) || 0), 0);
+            if (legajoProjCcBalance) legajoProjCcBalance.textContent = fmtMoney(pendingCcSum);
+            if (legajoProjCcExpected) legajoProjCcExpected.textContent = fmtMoney(pendingCcSum);
+
+            if (legajoProjCcNext) legajoProjCcNext.textContent = '—';
+            if (legajoProjCcCritical) legajoProjCcCritical.textContent = '—';
+            if (legajoProjCcState) legajoProjCcState.innerHTML = '<span class="text-gray-500">—</span>';
+
+            if (pendingCcSum > 0.00001 && baseTs) {
+                const today = startOfDayTs(Date.now());
+                const baseDay = startOfDayTs(baseTs);
+                const daysDebt = Math.max(0, Math.floor((today - baseDay) / MS_DAY));
+                const nextTs = addDaysTs(baseDay, overdueDays);
+                const criticalTs = addDaysTs(baseDay, criticalDays);
+
+                const nextRaw = new Date(nextTs).toISOString().slice(0, 10);
+                const critRaw = new Date(criticalTs).toISOString().slice(0, 10);
+                const nextDisp = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') ? window.formatFechaDisplay(nextRaw) : nextRaw;
+                const critDisp = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') ? window.formatFechaDisplay(critRaw) : critRaw;
+
+                const projected = (daysDebt >= criticalDays) ? 'Crítico' : ((daysDebt >= overdueDays) ? 'Riesgo' : 'Normal');
+
+                if (legajoProjCcNext) legajoProjCcNext.textContent = nextDisp;
+                if (legajoProjCcCritical) legajoProjCcCritical.textContent = critDisp;
+                if (legajoProjCcState) legajoProjCcState.innerHTML = badgeProjectedCcState(projected);
+            } else {
+                if (legajoProjCcState) legajoProjCcState.innerHTML = badgeProjectedCcState('Normal');
+            }
+
+            if (legajoProjCuotasBalance) legajoProjCuotasBalance.textContent = fmtMoney(sq);
+            if (legajoProjCuotasNext) legajoProjCuotasNext.textContent = '—';
+            if (legajoProjCuotasExpected) legajoProjCuotasExpected.textContent = '—';
+            if (legajoProjCuotasRemaining) legajoProjCuotasRemaining.textContent = '—';
+
+            if (INSTALLMENTS_ENABLED && sq > 0.00001) {
+                apiGetInstallmentPlans(safeStr(c.id)).then(function (res) {
+                    if (!res || res.ok !== true) return;
+                    const plans = ensureArray(res.items).filter(p => {
+                        const st = safeStr(p.status || '').trim().toLowerCase();
+                        return st === 'activo' || st === 'active' || st === 'activa';
+                    });
+
+                    let totalPending = 0;
+                    let remaining = 0;
+                    let nextDue = '';
+                    let expectedPlanInst = 0;
+                    plans.forEach(function (p) {
+                        const pend = parseFloat(p.pending_amount || 0) || 0;
+                        totalPending += pend;
+                        const instAmt = parseFloat(p.installment_amount || 0) || 0;
+                        if (instAmt > 0) {
+                            remaining += Math.max(0, Math.ceil(pend / instAmt));
+                        }
+                        const nd = safeStr(p.next_due_date || '').trim();
+                        if (nd) {
+                            if (!nextDue || Date.parse(nd) < Date.parse(nextDue)) {
+                                nextDue = nd;
+                                expectedPlanInst = instAmt;
+                            }
+                        }
+                    });
+                    const expected = totalPending;
+
+                    if (legajoProjCuotasBalance) legajoProjCuotasBalance.textContent = fmtMoney(totalPending);
+                    const nextDisp = nextDue ? ((window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') ? window.formatFechaDisplay(nextDue) : nextDue) : '—';
+                    if (legajoProjCuotasNext) legajoProjCuotasNext.textContent = nextDisp;
+                    if (legajoProjCuotasExpected) legajoProjCuotasExpected.textContent = expected > 0 ? fmtMoney(expected) : '—';
+                    if (legajoProjCuotasRemaining) legajoProjCuotasRemaining.textContent = remaining > 0 ? safeStr(remaining) : '—';
+
+                    if (legajoCuotasNext) legajoCuotasNext.textContent = nextDisp;
+                    if (legajoCuotasRemaining) legajoCuotasRemaining.textContent = remaining > 0 ? safeStr(remaining) : '—';
+                    if (legajoCuotasBalance) legajoCuotasBalance.textContent = fmtMoney(totalPending);
+                }).catch(function () {
+                });
+            }
+        } catch (e) {}
+
+        try {
+            setLegajoTab('sales');
+        } catch (e) {}
+
         openModal(modalLegajo);
     }
 
-    function openSettleDebt(id) {
+    function openSettleCcDebt(id) {
         const derived = ensureArray(lastDerived).length ? lastDerived : computeDerived(cacheCustomers, cacheSales);
         const c = ensureArray(derived).find(x => safeStr(x.id) === safeStr(id));
         if (!c) return;
@@ -947,7 +1920,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const outs = ensureArray(cacheSales)
             .filter(s => {
                 const sid = safeStr(s?.customer_id);
-                return sid && sid === settleCustomerId && (parseFloat(s?.due_amount || 0) || 0) > 0;
+                const due = (parseFloat(s?.due_amount || 0) || 0);
+                if (!(sid && sid === settleCustomerId)) return false;
+                if (!(due > 0)) return false;
+                if (s && s.is_installments === true) return false;
+                const t = safeStr(s?.type || s?.sale_type).trim();
+                if (t === 'CobroCuota') return false;
+                return true;
             })
             .sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
 
@@ -979,7 +1958,341 @@ document.addEventListener('DOMContentLoaded', function () {
         if (settleAmount) settleAmount.textContent = fmtMoney(firstDue);
         if (settlePayAmount) settlePayAmount.value = String(firstDue || 0);
 
+        if (outs.length === 1 && firstId) {
+            openCcCheckoutForSaleId(firstId);
+            return;
+        }
+
         openModal(modalSettle);
+    }
+
+    function openCcCheckoutForSaleId(saleId) {
+        const sid = safeStr(saleId);
+        const s = ensureArray(cacheSales).find(x => safeStr(x?.id) === sid);
+        if (!s) return;
+        const due = parseFloat(s?.due_amount || 0) || 0;
+        const total = parseFloat(s?.total || 0) || 0;
+        const fechaRaw = safeStr(s?.fecha || '');
+        const fecha = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') ? window.formatFechaDisplay(fechaRaw) : fechaRaw;
+        const productsLabel = (() => {
+            const items = ensureArray(s?.items);
+            const names = items.map(it => safeStr(it?.nombre || it?.product_name || '')).filter(Boolean);
+            if (!names.length) return '—';
+            if (names.length === 1) return names[0];
+            return names[0] + ' (+' + (names.length - 1) + ')';
+        })();
+        openCobroModal({
+            kind: 'cc',
+            title: 'Cobro de cuenta corriente',
+            subtitle: safeStr(s?.customer_name || settleSubtitle?.textContent || 'Cliente'),
+            kind_label: 'Cobro de cuenta corriente',
+            ref_label: 'Ticket #' + safeStr(s?.ticket || '—'),
+            ref_ticket: safeStr(s?.ticket || ''),
+            notes_preview: 'Cobro cuenta corriente – Ticket #' + safeStr(s?.ticket || '—') + ' – ' + productsLabel,
+            customer_id: safeStr(s?.customer_id || settleCustomerId),
+            customer_name: safeStr(s?.customer_name || settleSubtitle?.textContent || 'Cliente'),
+            products_label: productsLabel,
+            sale_id: sid,
+            due_amount: due,
+            original_total: total,
+            created_date: fecha || '—',
+            amount: due,
+            amount_editable: true,
+        });
+    }
+
+    function openSettleCuotas(id) {
+        if (!INSTALLMENTS_ENABLED) {
+            showAlertModal('El sistema de cuotas está deshabilitado en la configuración del negocio.', 'Atención', 'Validación requerida');
+            return;
+        }
+        const derived = ensureArray(lastDerived).length ? lastDerived : computeDerived(cacheCustomers, cacheSales);
+        const c = ensureArray(derived).find(x => safeStr(x.id) === safeStr(id));
+        if (!c) return;
+
+        settleCuotasCustomerId = safeStr(c.id);
+        if (settleCuotasSubtitle) settleCuotasSubtitle.textContent = safeStr(c.full_name || 'Cliente');
+        if (cuotasError) cuotasError.classList.add('hidden');
+
+        if (cuotasPlanSelect) cuotasPlanSelect.innerHTML = '<option value="">Cargando…</option>';
+        if (cuotasTable) cuotasTable.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-sm text-gray-500 text-center">Cargando…</td></tr>';
+
+        apiGetInstallmentPlans(settleCuotasCustomerId).then(function (res) {
+            if (!res || res.ok !== true) {
+                if (cuotasError) {
+                    cuotasError.querySelector('span').textContent = 'No se pudieron cargar planes de cuotas.';
+                    cuotasError.classList.remove('hidden');
+                }
+                return;
+            }
+            const items = ensureArray(res.items);
+            settleCuotasPlansCache = items.slice().sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
+
+            if (cuotasPlanSelect) {
+                cuotasPlanSelect.innerHTML = '';
+                if (!settleCuotasPlansCache.length) {
+                    cuotasPlanSelect.innerHTML = '<option value="">Sin planes.</option>';
+                } else {
+                    settleCuotasPlansCache.forEach(function (p) {
+                        const opt = document.createElement('option');
+                        opt.value = safeStr(p.id);
+                        opt.textContent = safeStr(p.sale_ticket || '—') + ' · ' + safeStr(p.status || '') + ' · Pendiente: ' + fmtMoney(parseFloat(p.pending_amount || 0) || 0);
+                        cuotasPlanSelect.appendChild(opt);
+                    });
+                }
+            }
+
+            const firstId = settleCuotasPlansCache.length ? safeStr(settleCuotasPlansCache[0].id) : '';
+            if (firstId && cuotasPlanSelect) cuotasPlanSelect.value = firstId;
+            settleCuotasActivePlanId = firstId || null;
+
+            const multiple = settleCuotasPlansCache.length > 1;
+            if (cuotasPlanSelectWrap) cuotasPlanSelectWrap.classList.toggle('hidden', multiple);
+            if (cuotasPlansTabsWrap) cuotasPlansTabsWrap.classList.toggle('hidden', !multiple);
+
+            if (multiple && cuotasPlansTabs) {
+                cuotasPlansTabs.innerHTML = '';
+                settleCuotasPlansCache.forEach(function (p) {
+                    const pid = safeStr(p.id);
+                    const st = safeStr(p.status || '').trim().toLowerCase();
+                    const isActive = (st === 'activo' || st === 'active' || st === 'activa');
+                    const isPaid = (st === 'pagado' || st === 'paid');
+                    const pending = parseFloat(p.pending_amount || 0) || 0;
+                    const startRaw = safeStr(p.start_date || '').trim();
+                    const startDisp = startRaw ? ((window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') ? window.formatFechaDisplay(startRaw) : startRaw) : '—';
+                    const title = safeStr(p.sale_ticket || '—') + ' – ' + safeStr(p.installments_count || 0) + ' cuotas – ' + (isPaid ? 'Finalizado' : (isActive ? 'Activo' : safeStr(p.status || '')));
+
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'text-left px-3 py-2 rounded-lg border text-sm hover:bg-gray-50';
+                    btn.setAttribute('data-plan-id', pid);
+                    btn.innerHTML = ''
+                        + '<div class="font-semibold text-gray-900">' + title + '</div>'
+                        + '<div class="mt-0.5 text-[11px] text-gray-500">' + startDisp + ' · Pendiente: ' + fmtMoney(pending) + '</div>';
+                    btn.addEventListener('click', function () {
+                        settleCuotasActivePlanId = pid;
+                        if (cuotasPlanSelect) cuotasPlanSelect.value = pid;
+                        renderCuotasPlanTabs();
+                        refreshCuotasPlan(pid);
+                    });
+                    cuotasPlansTabs.appendChild(btn);
+                });
+                renderCuotasPlanTabs();
+            }
+
+            if (firstId) refreshCuotasPlan(firstId);
+        });
+
+        openModal(modalSettleCuotas);
+    }
+
+    function renderCuotasPlanTabs() {
+        if (!cuotasPlansTabs) return;
+        const activeId = safeStr(settleCuotasActivePlanId);
+        cuotasPlansTabs.querySelectorAll('button[data-plan-id]').forEach(function (b) {
+            const pid = safeStr(b.getAttribute('data-plan-id'));
+            const on = pid && activeId && pid === activeId;
+            b.classList.toggle('border-blue-300', on);
+            b.classList.toggle('bg-blue-50', on);
+            b.classList.toggle('text-blue-900', on);
+            if (!on) {
+                b.classList.add('border-gray-200');
+                b.classList.remove('bg-blue-50');
+            }
+        });
+    }
+
+    function refreshCuotasPlan(planId) {
+        const pid = safeStr(planId);
+        if (!pid) return;
+        settleCuotasActivePlanId = pid;
+        if (cuotasError) cuotasError.classList.add('hidden');
+
+        function cleanProductLabel(raw) {
+            let s = safeStr(raw || '').trim();
+            if (!s || s === '—') return '—';
+            s = s.replace(/^producto\s*[:\-]?\s*/i, '');
+            s = s.replace(/^productos\s*[:\-]?\s*/i, '');
+            s = s.replace(/^producto\s+/i, '');
+            s = s.replace(/^productos\s+/i, '');
+            s = s.trim();
+            if (!s || s === '—') return '—';
+            return s;
+        }
+
+        apiGetInstallmentPlan(pid).then(function (res) {
+            if (!res || res.ok !== true || !res.item) {
+                if (cuotasError) {
+                    cuotasError.querySelector('span').textContent = 'No se pudo cargar el plan.';
+                    cuotasError.classList.remove('hidden');
+                }
+                return;
+            }
+            const p = res.item;
+            const meta = 'Ticket ' + safeStr(p.sale_ticket || '—') + ' · ' + safeStr(p.installments_count || 0) + ' cuotas · Intervalo ' + safeStr(p.interval_days || 0) + ' días · Estado ' + safeStr(p.status || '');
+            if (cuotasPlanMeta) cuotasPlanMeta.textContent = meta;
+            if (cuotasPlanMetaTabs) cuotasPlanMetaTabs.textContent = meta;
+
+            const planSt = safeStr(p.status || '').trim().toLowerCase();
+            const planActive = (planSt === 'activo' || planSt === 'active' || planSt === 'activa');
+            if (btnCuotasCancelPlan) {
+                btnCuotasCancelPlan.disabled = !planActive;
+                btnCuotasCancelPlan.classList.toggle('opacity-50', !planActive);
+                btnCuotasCancelPlan.classList.toggle('cursor-not-allowed', !planActive);
+            }
+
+            const isIndef = !!(p && (p.is_indefinite === true || safeStr(p.mode).trim().toLowerCase() === 'indefinite'));
+            if (cuotasThProducto) cuotasThProducto.classList.remove('hidden');
+
+            const insts = ensureArray(p.installments);
+            const now = new Date();
+            if (cuotasTable) {
+                if (!insts.length) {
+                    cuotasTable.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-sm text-gray-500 text-center">Sin cuotas.</td></tr>';
+                } else {
+                    cuotasTable.innerHTML = '';
+                    insts.forEach(function (it) {
+                        const n = parseInt(it.installment_number || 0, 10) || 0;
+                        const dueRaw = safeStr(it.due_date || '');
+                        const dueDate = dueRaw ? new Date(dueRaw + 'T00:00:00') : null;
+                        const amt = fmtMoney(parseFloat(it.amount || 0) || 0);
+                        const st = safeStr(it.status || '').toLowerCase();
+
+                        let stLabel = 'Pendiente';
+                        let stCls = 'bg-amber-100 text-amber-900 border-amber-200';
+                        if (st === 'pagada') {
+                            stLabel = 'Pagada';
+                            stCls = 'bg-emerald-100 text-emerald-900 border-emerald-200';
+                        } else if (dueDate && dueDate.getTime() < new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) {
+                            stLabel = 'Vencida';
+                            stCls = 'bg-rose-100 text-rose-900 border-rose-200';
+                        }
+
+                        const tr = document.createElement('tr');
+                        const dueDisp = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') ? window.formatFechaDisplay(dueRaw) : dueRaw;
+                        const prodTd = '<td class="px-3 py-2 text-sm text-gray-700">' + cleanProductLabel(p.products_label || '—') + '</td>';
+                        const actionHtml = (!planActive || st === 'pagada')
+                            ? '<span class="text-[11px] text-gray-400">—</span>'
+                            : '<button type="button" class="btn-pay-cuota inline-flex items-center px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-md hover:bg-indigo-100"'
+                                + ' data-id="' + safeStr(it.id) + '"'
+                                + ' data-plan="' + safeStr(p.id) + '"'
+                                + ' data-n="' + safeStr(n) + '"'
+                                + ' data-amount="' + safeStr(parseFloat(it.amount || 0) || 0) + '"'
+                                + '>Pagar</button>';
+                        tr.innerHTML = ''
+                            + '<td class="px-3 py-2 text-sm text-gray-800">' + safeStr(n) + '</td>'
+                            + '<td class="px-3 py-2 text-sm text-gray-700">' + safeStr(dueDisp || '—') + '</td>'
+                            + prodTd
+                            + '<td class="px-3 py-2 text-sm text-gray-800 text-right">' + amt + '</td>'
+                            + '<td class="px-3 py-2 text-sm text-center"><span class="inline-flex items-center px-2 py-1 rounded-full border text-[11px] font-medium ' + stCls + '">' + stLabel + '</span></td>'
+                            + '<td class="px-3 py-2 text-sm text-right">' + actionHtml + '</td>';
+                        cuotasTable.appendChild(tr);
+                    });
+
+                    try {
+                        cuotasTable.querySelectorAll('.btn-pay-cuota').forEach(function (btn) {
+                            btn.addEventListener('click', function () {
+                                const iid = btn.getAttribute('data-id') || '';
+                                const planId = btn.getAttribute('data-plan') || '';
+                                const instN = btn.getAttribute('data-n') || '';
+                                const instAmount = parseFloat(btn.getAttribute('data-amount') || 0) || 0;
+                                const plan = safeStr(planId) ? (ensureArray(settleCuotasPlansCache).find(x => safeStr(x?.id) === safeStr(planId)) || null) : null;
+                                const custName = safeStr(settleCuotasSubtitle?.textContent || 'Cliente');
+                                const productsLabel = safeStr(p.products_label || (plan && plan.products_label) || '—');
+                                const notesPreview = isIndef
+                                    ? ('Venta recurrente – Cuota indefinida – ' + productsLabel + ' – Intervalo ' + safeStr(p.interval_days || 30) + ' días')
+                                    : ('Cobro de cuota ' + safeStr(instN || '') + '/' + safeStr(p.installments_count || '') + ' – Ticket #' + safeStr(p.sale_ticket || '—') + ' – ' + productsLabel);
+                                openCobroModal({
+                                    kind: 'installment',
+                                    title: isIndef ? 'Venta recurrente' : 'Cobro de cuota',
+                                    subtitle: custName,
+                                    kind_label: isIndef ? 'Venta' : 'Cobro de cuota',
+                                    ref_label: 'Ticket #' + safeStr(p.sale_ticket || '—'),
+                                    notes_preview: notesPreview,
+                                    customer_id: safeStr(settleCuotasCustomerId),
+                                    customer_name: custName,
+                                    products_label: productsLabel,
+                                    installment_id: iid,
+                                    amount: instAmount,
+                                    amount_editable: true,
+                                });
+                            });
+                        });
+                    } catch (e) {}
+                }
+            }
+        });
+    }
+
+    function goToInstallmentPayment(installmentId) {
+        const iid = safeStr(installmentId);
+        if (!iid) return;
+        // mantenemos compatibilidad: ahora abre checkout en lugar de redirigir
+        try {
+            openCobroModal({
+                kind: 'installment',
+                title: 'Cobro',
+                subtitle: safeStr(settleCuotasSubtitle?.textContent || 'Cliente'),
+                kind_label: 'Cobro',
+                ref_label: '—',
+                notes_preview: '—',
+                customer_id: safeStr(settleCuotasCustomerId),
+                customer_name: safeStr(settleCuotasSubtitle?.textContent || 'Cliente'),
+                products_label: '—',
+                installment_id: iid,
+                amount: 0,
+                amount_editable: false,
+            });
+        } catch (e) {}
+    }
+
+    function cancelPlanCuotas() {
+        const pid = safeStr(settleCuotasActivePlanId);
+        if (!pid) return;
+        if (cuotasError) cuotasError.classList.add('hidden');
+        apiCancelInstallmentPlan(pid).then(function (res) {
+            if (!res || res.ok !== true) {
+                if (cuotasError) {
+                    cuotasError.querySelector('span').textContent = 'No se pudo cancelar el plan.';
+                    cuotasError.classList.remove('hidden');
+                }
+                return;
+            }
+            openSettleCuotas(settleCuotasCustomerId);
+        });
+    }
+
+    function openSettleDebt(id) {
+        const derived = ensureArray(lastDerived).length ? lastDerived : computeDerived(cacheCustomers, cacheSales);
+        const c = ensureArray(derived).find(x => safeStr(x.id) === safeStr(id));
+        if (!c) return;
+
+        const hasCc = (parseFloat(c.saldo_cc || 0) || 0) > 0;
+        const hasCuotas = INSTALLMENTS_ENABLED && ((parseFloat(c.saldo_cuotas || 0) || 0) > 0);
+        if (!(hasCc || hasCuotas)) {
+            showAlertModal('El cliente no tiene deudas pendientes.', 'Atención', 'Sin deuda');
+            return;
+        }
+
+        if (hasCuotas && !hasCc) {
+            openSettleCuotas(id);
+            return;
+        }
+
+        if (hasCc && !hasCuotas) {
+            openSettleCcDebt(id);
+            return;
+        }
+
+        settlePendingCustomerForType = id;
+        if (settleTypeSubtitle) settleTypeSubtitle.textContent = safeStr(c.full_name || 'Cliente');
+
+        try {
+            if (btnSettleTypeCc) btnSettleTypeCc.classList.toggle('hidden', !hasCc);
+            if (btnSettleTypeCuotas) btnSettleTypeCuotas.classList.toggle('hidden', !hasCuotas);
+        } catch (e) {}
+
+        openModal(modalSettleType);
     }
 
     function syncSettleAmount() {
@@ -1011,25 +2324,8 @@ document.addEventListener('DOMContentLoaded', function () {
             settleError.querySelector('span').textContent = 'Seleccioná una venta válida.';
             settleError.classList.add('hidden');
         }
-        apiSettleDebt({ sale_id: saleId, payment_method: method, amount: payAmount })
-            .then(function (data) {
-                if (!data || data.ok !== true) {
-                    if (settleError) settleError.classList.remove('hidden');
-                    return;
-                }
-                const reload = readSales();
-                Promise.resolve(reload).then(function (sales) {
-                    cacheSales = ensureArray(sales);
-                    closeModal(modalSettle);
-                    render();
-                    if (legajoCustomerId && legajoCustomerId === settleCustomerId) {
-                        openLegajo(legajoCustomerId);
-                    }
-                });
-            })
-            .catch(function () {
-                if (settleError) settleError.classList.remove('hidden');
-            });
+        closeModal(modalSettle);
+        openCcCheckoutForSaleId(saleId);
     }
 
     function applyCrmLabelsToUi(cfg) {
@@ -1037,13 +2333,20 @@ document.addEventListener('DOMContentLoaded', function () {
         setCrmCfg(c);
         const title = safeStr(c.labels?.clas_title || 'Clasificación') || 'Clasificación';
         clasTitle = title;
-        clasOpts = [
-            { k: 'deudor_critico', label: safeStr(c.labels?.debtor_critical || 'CC Vencida Crítica') || 'CC Vencida Crítica' },
-            { k: 'deudor', label: safeStr(c.labels?.debtor || 'CC Vencida') || 'CC Vencida' },
-            { k: 'mejor_cliente', label: safeStr(c.labels?.best || 'Mejor cliente') || 'Mejor cliente' },
-            { k: 'frecuente', label: safeStr(c.labels?.freq || 'Frecuente') || 'Frecuente' },
-            { k: 'inactivo', label: safeStr(c.labels?.inactive || 'Inactivo') || 'Inactivo' },
-        ];
+        clasOpts = [];
+        if (INSTALLMENTS_ENABLED) {
+            if (crmInstallmentsThresholds) crmInstallmentsThresholds.classList.remove('hidden');
+            clasOpts.push({ k: 'sc_critico', label: 'Sistema de Cuotas Crítico' });
+            clasOpts.push({ k: 'sc_vencido', label: 'Sistema de Cuotas Vencido' });
+        } else {
+            if (crmInstallmentsThresholds) crmInstallmentsThresholds.classList.add('hidden');
+        }
+        clasOpts.push({ k: 'cc_critica', label: 'CC Vencida Crítica' });
+        clasOpts.push({ k: 'cc_vencida', label: 'CC Vencida' });
+        clasOpts.push({ k: 'mejor_cliente', label: 'Mejor cliente' });
+        clasOpts.push({ k: 'frecuente', label: 'Frecuente' });
+        clasOpts.push({ k: 'ocasional', label: 'Ocasional' });
+        clasOpts.push({ k: 'inactivo', label: 'Inactivo' });
         try {
             const allowed = new Set(clasOpts.map(x => x.k));
             clasSelected = new Set(Array.from(clasSelected).filter(k => allowed.has(k)));
@@ -1242,6 +2545,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const bestMin = Math.max(1, parseInt(crm?.best_min_purchases || 2, 10) || 2);
         const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
         const criticalDays = Math.max(overdueDays, parseInt(crm?.debt_critical_days || 60, 10) || 60);
+        const instOverdueCount = Math.max(1, parseInt(crm?.installments_overdue_count || 1, 10) || 1);
+        const instCriticalCount = Math.max(instOverdueCount + 1, parseInt(crm?.installments_critical_count || 3, 10) || 3);
 
         const normName = function (v) {
             let s = safeStr(v)
@@ -1281,6 +2586,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const t = safeStr(s?.type || s?.sale_type).trim();
                 const total = parseFloat(s?.total || 0) || 0;
                 if (t === 'CobroCC') return false;
+                if (t === 'CobroCuota') return false;
                 return total > 0;
             });
 
@@ -1293,9 +2599,36 @@ document.addEventListener('DOMContentLoaded', function () {
             const meses = monthsBetween(c.created_at || Date.now(), Date.now());
             const freq = cantidad / meses;
 
-            const saldo = salesFor.reduce((acc, s) => acc + (parseFloat(s?.due_amount || 0) || 0), 0);
-            const tieneCc = saldo > 0 || salesFor.some(s => !!s?.on_account);
-            const oldestImpagoTs = salesFor.reduce((acc, s) => {
+            const instSummary = INSTALLMENTS_ENABLED && installmentsSummaryByCustomerId ? installmentsSummaryByCustomerId[safeStr(c.id)] : null;
+            const instOverdue = instSummary ? (parseInt(instSummary.overdue_count || 0, 10) || 0) : 0;
+            const instPending = instSummary ? (parseInt(instSummary.pending_count || 0, 10) || 0) : 0;
+            const saldoCuotas = instSummary ? (parseFloat(instSummary.pending_amount || 0) || 0) : 0;
+
+            const isPayment = function (s) {
+                const t = safeStr(s?.type || s?.sale_type).trim();
+                return (t === 'CobroCC' || t === 'CobroCuota');
+            };
+            const isInstallmentSale = function (s) {
+                try {
+                    return (s && s.is_installments === true);
+                } catch (e) {
+                    return false;
+                }
+            };
+            const isCcSale = function (s) {
+                if (!s) return false;
+                if (isPayment(s)) return false;
+                if (isInstallmentSale(s)) return false;
+                const due = parseFloat(s?.due_amount || 0) || 0;
+                return (!!s?.on_account) || (due > 0);
+            };
+
+            const ccSales = salesFor.filter(isCcSale);
+            const saldoCc = ccSales.reduce((acc, s) => acc + (parseFloat(s?.due_amount || 0) || 0), 0);
+            const saldo = saldoCc + saldoCuotas;
+            const tieneCc = ccSales.length > 0;
+
+            const oldestCcImpagoTs = ccSales.reduce((acc, s) => {
                 const due = parseFloat(s?.due_amount || 0) || 0;
                 if (due <= 0) return acc;
                 const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
@@ -1303,7 +2636,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!acc) return ts;
                 return Math.min(acc, ts);
             }, 0);
-            const diasDeuda = saldo > 0 ? (daysSince(oldestImpagoTs) ?? 0) : 0;
+            const diasDeuda = saldoCc > 0 ? (daysSince(oldestCcImpagoTs) ?? 0) : 0;
 
             const diasUltCompra = ultimaTs ? (daysSince(ultimaTs) ?? 0) : null;
             const recentPurchases = purchaseSales.filter(s => {
@@ -1312,20 +2645,38 @@ document.addEventListener('DOMContentLoaded', function () {
                 return (nowTs - ts) <= winMs;
             }).length;
 
-            let clas = 'inactivo';
-            if ((saldo > 0) && (diasDeuda >= criticalDays)) {
-                clas = 'deudor_critico';
-            } else if ((saldo > 0) && (diasDeuda >= overdueDays)) {
-                clas = 'deudor';
-            } else if (recentPurchases >= bestMin) {
-                clas = 'mejor_cliente';
-            } else if (recentPurchases >= freqMin) {
-                clas = 'frecuente';
-            } else {
-                clas = 'inactivo';
+            const hasSc = saldoCuotas > 0.00001;
+
+            const scStateKey = !hasSc
+                ? 'sin_sc'
+                : ((instOverdue >= instCriticalCount) ? 'critico' : ((instOverdue >= instOverdueCount) ? 'vencido' : 'al_dia'));
+            const scSeverity = (scStateKey === 'critico') ? 3 : ((scStateKey === 'vencido') ? 2 : ((scStateKey === 'al_dia') ? 1 : 0));
+
+            const ccStateKey = !tieneCc
+                ? 'sin_cc'
+                : ((saldoCc <= 0.00001 || diasDeuda < overdueDays) ? 'al_dia' : ((diasDeuda >= criticalDays) ? 'vencida_critica' : 'vencida'));
+            const ccSeverity = (ccStateKey === 'vencida_critica') ? 3 : ((ccStateKey === 'vencida') ? 2 : ((ccStateKey === 'al_dia') ? 1 : 0));
+
+            const tags = [];
+            if (INSTALLMENTS_ENABLED && hasSc) {
+                if (scStateKey === 'critico') tags.push('sc_critico');
+                else if (scStateKey === 'vencido') tags.push('sc_vencido');
             }
 
-            const alert = (saldo > 0 && diasDeuda >= criticalDays) ? 'vencida_critica' : ((saldo > 0 && diasDeuda >= overdueDays) ? 'vencida' : '');
+            if (ccStateKey === 'vencida_critica') tags.push('cc_critica');
+            else if (ccStateKey === 'vencida') tags.push('cc_vencida');
+
+            const hasDebtTag = tags.some(t => (t === 'sc_critico' || t === 'sc_vencido' || t === 'cc_critica' || t === 'cc_vencida'));
+            if (!hasDebtTag) {
+                if (recentPurchases >= bestMin) tags.push('mejor_cliente');
+                else if (recentPurchases >= freqMin) tags.push('frecuente');
+                else if (recentPurchases > 0) tags.push('ocasional');
+                else tags.push('inactivo');
+            }
+
+            const clas = tags.length ? tags[0] : 'inactivo';
+
+            const alert = (saldoCc > 0 && diasDeuda >= criticalDays) ? 'vencida_critica' : ((saldoCc > 0 && diasDeuda >= overdueDays) ? 'vencida' : '');
 
             const ultimaCompraRaw = ultimaTs ? new Date(ultimaTs).toISOString().slice(0, 10) : '';
             const ultimaCompra = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function')
@@ -1341,10 +2692,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 ultima_compra: ultimaCompra,
                 frecuencia_compra: freq,
                 saldo_actual: saldo,
+                saldo_cc: saldoCc,
+                saldo_cuotas: saldoCuotas,
+                cuotas_overdue_count: instOverdue,
                 tiene_cuenta_corriente: tieneCc,
+                tiene_sistema_cuotas: hasSc,
                 dias_deuda: diasDeuda,
                 clasificacion: clas,
+                clasificacion_tags: tags,
                 alerta_cc: alert
+                , cc_status_key: ccStateKey
+                , cc_status_sev: ccSeverity
+                , sc_status_key: scStateKey
+                , sc_status_sev: scSeverity
             };
         });
 
@@ -1355,11 +2715,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const q = safeStr(inputSearch?.value).trim().toLowerCase();
         const totalClas = clasOpts.length;
         const totalCc = ccOpts.length;
+        const totalSc = scOpts.length;
 
         return ensureArray(list).filter(c => {
-            const clKey = normKey(c.clasificacion);
+            const tags = ensureArray(c.clasificacion_tags).map(normKey).filter(Boolean);
+            const clKey = tags.length ? tags.join('|') : normKey(c.clasificacion);
             if (!clasAllMode && clasSelected.size) {
-                if (!clasSelected.has(clKey)) return false;
+                const ok = Array.from(clasSelected).some(k => tags.includes(normKey(k)) || normKey(c.clasificacion) === normKey(k));
+                if (!ok) return false;
             }
 
             if (!ccAllMode && ccSelected.size) {
@@ -1367,7 +2730,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
                 const criticalDays = Math.max(overdueDays, parseInt(crm?.debt_critical_days || 60, 10) || 60);
                 const has = function (k) {
-                    const saldo = (parseFloat(c.saldo_actual || 0) || 0);
+                    const saldo = (parseFloat(c.saldo_cc || 0) || 0);
                     const dias = (parseInt(c.dias_deuda || 0, 10) || 0);
                     const hasCc = !!c.tiene_cuenta_corriente;
                     if (k === 'sin_cc') return !hasCc;
@@ -1377,6 +2740,24 @@ document.addEventListener('DOMContentLoaded', function () {
                     return false;
                 };
                 const ok = Array.from(ccSelected).some(has);
+                if (!ok) return false;
+            }
+
+            if (!scAllMode && scSelected.size) {
+                const crm = getCrmCfg();
+                const instOverdueCount = Math.max(1, parseInt(crm?.installments_overdue_count || 1, 10) || 1);
+                const instCriticalCount = Math.max(instOverdueCount + 1, parseInt(crm?.installments_critical_count || 3, 10) || 3);
+                const pendingAmt = (parseFloat(c.saldo_cuotas || 0) || 0);
+                const overdue = (parseInt(c.cuotas_overdue_count || 0, 10) || 0);
+                const hasSc = pendingAmt > 0.00001;
+                const has = function (k) {
+                    if (k === 'sin_sc') return !hasSc;
+                    if (k === 'al_dia') return hasSc && (overdue < instOverdueCount);
+                    if (k === 'vencido') return hasSc && (overdue >= instOverdueCount) && (overdue < instCriticalCount);
+                    if (k === 'critico') return hasSc && (overdue >= instCriticalCount);
+                    return false;
+                };
+                const ok = Array.from(scSelected).some(has);
                 if (!ok) return false;
             }
 
@@ -1405,6 +2786,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (key === 'frecuencia_compra') return c.frecuencia_compra || 0;
             if (key === 'monto_total_comprado') return c.monto_total_comprado || 0;
             if (key === 'saldo_actual') return c.saldo_actual || 0;
+            if (key === 'cc_status') return (parseInt(c.cc_status_sev || 0, 10) || 0);
+            if (key === 'sc_status') return INSTALLMENTS_ENABLED ? (parseInt(c.sc_status_sev || 0, 10) || 0) : 0;
+            if (key === 'clasificacion') {
+                const tags = ensureArray(c.clasificacion_tags);
+                const first = tags.length ? tags[0] : safeStr(c.clasificacion);
+                return safeStr(first);
+            }
             return 0;
         };
 
@@ -1418,18 +2806,46 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function badgeClas(c) {
         const crm = getCrmCfg();
-        const cls = safeStr(c.clasificacion);
-        const lblBest = safeStr(crm?.labels?.best || 'Mejor cliente') || 'Mejor cliente';
-        const lblFreq = safeStr(crm?.labels?.freq || 'Frecuente') || 'Frecuente';
-        const lblInactive = safeStr(crm?.labels?.inactive || 'Inactivo') || 'Inactivo';
-        const lblDebtor = safeStr(crm?.labels?.debtor || 'CC Vencida') || 'CC Vencida';
-        const lblDebtorCrit = safeStr(crm?.labels?.debtor_critical || 'CC Vencida Crítica') || 'CC Vencida Crítica';
-        if (cls === 'deudor_critico') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-600 text-white text-[11px] font-medium">' + lblDebtorCrit + '</span>';
-        if (cls === 'deudor') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-medium">' + lblDebtor + '</span>';
-        if (cls === 'inactivo') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">' + lblInactive + '</span>';
-        if (cls === 'mejor_cliente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium">' + lblBest + '</span>';
-        if (cls === 'frecuente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">' + lblFreq + '</span>';
-        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">' + lblInactive + '</span>';
+        const tags = ensureArray(c.clasificacion_tags);
+        const cls = tags.length ? tags : [safeStr(c.clasificacion)];
+        const lblBest = 'Mejor cliente';
+        const lblFreq = 'Frecuente';
+        const lblOcasional = 'Ocasional';
+        const lblInactive = 'Inactivo';
+        const lblDebtor = 'CC Vencida';
+        const lblDebtorCrit = 'CC Vencida Crítica';
+        const lblCuotasOv = 'Sistema de Cuotas Vencido';
+        const lblCuotasCr = 'Sistema de Cuotas Crítico';
+
+        const badgeFor = function (k) {
+            const key = safeStr(k).trim();
+            if (key === 'sc_critico') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-600 text-white text-[11px] font-medium">' + lblCuotasCr + '</span>';
+            if (key === 'sc_vencido') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-medium">' + lblCuotasOv + '</span>';
+            if (key === 'cc_critica') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-600 text-white text-[11px] font-medium">' + lblDebtorCrit + '</span>';
+            if (key === 'cc_vencida') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-medium">' + lblDebtor + '</span>';
+            if (key === 'mejor_cliente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium">' + lblBest + '</span>';
+            if (key === 'frecuente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">' + lblFreq + '</span>';
+            if (key === 'ocasional') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 text-[11px] font-medium">' + lblOcasional + '</span>';
+            if (key === 'inactivo') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">' + lblInactive + '</span>';
+            return '';
+        };
+
+        const out = [];
+        cls.forEach(function (k) {
+            const b = badgeFor(k);
+            if (b) out.push(b);
+        });
+        if (!out.length) return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">' + lblInactive + '</span>';
+        return out.join('<span class="text-gray-400 mx-1">|</span>');
+    }
+
+    function apiGetInstallmentsSummary(customerIds) {
+        const ids = ensureArray(customerIds).map(x => safeStr(x).trim()).filter(Boolean);
+        if (!ids.length) return Promise.resolve({ ok: true, enabled: true, items: [] });
+        const qs = new URLSearchParams();
+        qs.set('customer_ids', ids.join(','));
+        return fetch(apiPath('/customers/api/installments/summary?' + qs.toString()), { method: 'GET', credentials: 'same-origin' })
+            .then(r => r.json());
     }
 
     function deleteCustomer(id) {
@@ -1468,7 +2884,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function badgeAlerta(c) {
-        if (!(c.saldo_actual > 0)) return '';
+        if (!((parseFloat(c.saldo_cc || 0) || 0) > 0)) return '';
         const crm = getCrmCfg();
         const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
         const criticalDays = Math.max(overdueDays, parseInt(crm?.debt_critical_days || 60, 10) || 60);
@@ -1480,6 +2896,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function render() {
         if (!tbody) return;
+
+        try {
+            if (thSc) thSc.classList.toggle('hidden', !INSTALLMENTS_ENABLED);
+            if (thScFilter) thScFilter.classList.toggle('hidden', !INSTALLMENTS_ENABLED);
+        } catch (e) {
+        }
 
         const derived = computeDerived(cacheCustomers, cacheSales);
         lastDerived = derived;
@@ -1493,8 +2915,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const crm = getCrmCfg();
         const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
-        const conSaldoNoVencido = derived.filter(x => (x.saldo_actual || 0) > 0 && ((parseInt(x.dias_deuda || 0, 10) || 0) < overdueDays)).length;
-        const ccVencidaCount = derived.filter(x => (x.saldo_actual || 0) > 0 && ((parseInt(x.dias_deuda || 0, 10) || 0) >= overdueDays)).length;
+        const conSaldoNoVencido = derived.filter(x => (parseFloat(x.saldo_cc || 0) || 0) > 0 && ((parseInt(x.dias_deuda || 0, 10) || 0) < overdueDays)).length;
+        const ccVencidaCount = derived.filter(x => (parseFloat(x.saldo_cc || 0) || 0) > 0 && ((parseInt(x.dias_deuda || 0, 10) || 0) >= overdueDays)).length;
         const deudaTotal = derived.reduce((acc, x) => acc + (parseFloat(x.saldo_actual || 0) || 0), 0);
 
         if (kpiTotal) kpiTotal.textContent = safeStr(totalClientes);
@@ -1506,7 +2928,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (!sorted.length) {
-            tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+            const colCount = INSTALLMENTS_ENABLED ? 8 : 7;
+            tbody.innerHTML = '<tr><td colspan="' + String(colCount) + '" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
             return;
         }
 
@@ -1517,12 +2940,51 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const comprasInt = parseInt(c.cantidad_compras || 0, 10) || 0;
             const monto = fmtMoney(parseFloat(c.monto_total_comprado || 0) || 0);
-            const saldo = parseFloat(c.saldo_actual || 0) || 0;
-            const ccText = saldo > 0 ? fmtMoney(saldo) : '—';
-            const ccClass = saldo > 0 ? 'text-red-700 font-semibold' : 'text-gray-600';
+            const crm = getCrmCfg();
+            const overdueDays = Math.max(1, parseInt(crm?.debt_overdue_days || 30, 10) || 30);
+            const criticalDays = Math.max(overdueDays, parseInt(crm?.debt_critical_days || 60, 10) || 60);
+            const instOverdueCount = Math.max(1, parseInt(crm?.installments_overdue_count || 1, 10) || 1);
+            const instCriticalCount = Math.max(instOverdueCount + 1, parseInt(crm?.installments_critical_count || 3, 10) || 3);
+
+            const ccSaldo = parseFloat(c.saldo_cc || 0) || 0;
+            const dias = parseInt(c.dias_deuda || 0, 10) || 0;
+            const hasCc = !!c.tiene_cuenta_corriente;
+            let ccStatusText = '—';
+            let ccClass = 'text-gray-600';
+            if (hasCc) {
+                if (ccSaldo <= 0.00001 || dias < overdueDays) {
+                    ccStatusText = 'Al día';
+                    ccClass = 'text-gray-700';
+                } else if (dias >= criticalDays) {
+                    ccStatusText = 'Vencida crítica';
+                    ccClass = 'text-red-700 font-semibold';
+                } else {
+                    ccStatusText = 'Vencida';
+                    ccClass = 'text-amber-800 font-semibold';
+                }
+            }
+
+            const scSaldo = parseFloat(c.saldo_cuotas || 0) || 0;
+            const scOver = parseInt(c.cuotas_overdue_count || 0, 10) || 0;
+            const hasSc = scSaldo > 0.00001;
+            let scStatusText = '—';
+            let scClass = 'text-gray-600';
+            if (hasSc) {
+                if (scOver >= instCriticalCount) {
+                    scStatusText = 'Crítico';
+                    scClass = 'text-rose-700 font-semibold';
+                } else if (scOver >= instOverdueCount) {
+                    scStatusText = 'Vencido';
+                    scClass = 'text-amber-800 font-semibold';
+                } else {
+                    scStatusText = 'Al día';
+                    scClass = 'text-gray-700';
+                }
+            }
+
             const notas = truncateText(c.notes || '', 60) || '—';
 
-            const isDebtor = saldo > 0;
+            const isDebtor = (ccSaldo > 0.00001) || (scSaldo > 0.00001);
 
             tr.innerHTML = ''
                 + '<td class="px-4 py-3 text-sm text-gray-900">'
@@ -1531,7 +2993,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '<td class="px-4 py-3 text-sm text-gray-700">' + badgeClas(c) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + String(comprasInt) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + monto + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right ' + ccClass + '">' + ccText + '</td>'
+                + '<td class="px-4 py-3 text-sm ' + ccClass + '">' + safeStr(ccStatusText) + '</td>'
+                + (INSTALLMENTS_ENABLED ? ('<td class="px-4 py-3 text-sm ' + scClass + '">' + safeStr(scStatusText) + '</td>') : '')
                 + '<td class="px-4 py-3 text-sm text-gray-700">' + safeStr(notas) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right">'
                 +   '<div class="relative inline-block text-left">'
@@ -1541,7 +3004,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 +     '<div class="menu-cliente-acciones hidden origin-top-right absolute right-0 mt-1 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">'
                 +       '<div class="py-1 text-[11px]">'
                 +         '<button type="button" class="w-full text-left px-3 py-2 text-blue-700 hover:bg-blue-50" data-action="legajo" data-id="' + safeStr(c.id) + '">Ver legajo</button>'
-                +         '<button type="button" class="w-full text-left px-3 py-2 text-blue-700 hover:bg-blue-50" data-action="edit" data-id="' + safeStr(c.id) + '">Editar</button>'
                 +         '<button type="button" class="w-full text-left px-3 py-2 text-blue-700 hover:bg-blue-50" data-action="delete" data-id="' + safeStr(c.id) + '">Eliminar</button>'
                 +         (isDebtor ? ('<button type="button" class="w-full text-left px-3 py-2 text-red-700 hover:bg-red-50" data-action="settle" data-id="' + safeStr(c.id) + '">Saldar deuda</button>') : '')
                 +       '</div>'
@@ -1556,7 +3018,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function loadAll() {
         try {
             if (tbody) {
-                tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando...</td></tr>';
+                const colCount = INSTALLMENTS_ENABLED ? 8 : 7;
+                tbody.innerHTML = '<tr><td colspan="' + String(colCount) + '" class="px-4 py-6 text-sm text-center text-gray-500">Cargando...</td></tr>';
             }
         } catch (e) {
         }
@@ -1568,6 +3031,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 return Promise.resolve(readSales())
                     .then(function (sales) {
                         cacheSales = ensureArray(sales);
+                        if (INSTALLMENTS_ENABLED) {
+                            try {
+                                const ids = ensureArray(cacheCustomers).map(c => safeStr(c.id)).filter(Boolean);
+                                apiGetInstallmentsSummary(ids).then(function (res) {
+                                    const map = {};
+                                    if (res && res.ok === true && res.enabled !== false) {
+                                        ensureArray(res.items).forEach(function (it) {
+                                            map[safeStr(it.customer_id)] = it;
+                                        });
+                                    }
+                                    installmentsSummaryByCustomerId = map;
+                                    render();
+                                }).catch(function () {
+                                    installmentsSummaryByCustomerId = {};
+                                    render();
+                                });
+                            } catch (e) {
+                                installmentsSummaryByCustomerId = {};
+                            }
+                        }
                         render();
                     })
                     .catch(function () {
@@ -1582,7 +3065,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 try {
                     if (tbody) {
-                        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">No se pudieron cargar los datos.</td></tr>';
+                        const colCount = INSTALLMENTS_ENABLED ? 8 : 7;
+                        tbody.innerHTML = '<tr><td colspan="' + String(colCount) + '" class="px-4 py-6 text-sm text-center text-gray-500">No se pudieron cargar los datos.</td></tr>';
                     }
                 } catch (e) {
                 }
@@ -1707,11 +3191,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (inputCrmFreqMin) inputCrmFreqMin.value = safeStr(cfg.freq_min_purchases);
                     if (inputCrmBestMin) inputCrmBestMin.value = safeStr(cfg.best_min_purchases);
                     if (inputCrmLabelClasTitle) inputCrmLabelClasTitle.value = safeStr(cfg.labels?.clas_title || 'Clasificación');
-                    if (inputCrmLabelBest) inputCrmLabelBest.value = safeStr(cfg.labels?.best || 'Mejor cliente');
-                    if (inputCrmLabelFreq) inputCrmLabelFreq.value = safeStr(cfg.labels?.freq || 'Frecuente');
-                    if (inputCrmLabelInactive) inputCrmLabelInactive.value = safeStr(cfg.labels?.inactive || 'Inactivo');
-                    if (inputCrmLabelDebtor) inputCrmLabelDebtor.value = safeStr(cfg.labels?.debtor || 'CC Vencida');
-                    if (inputCrmLabelDebtorCritical) inputCrmLabelDebtorCritical.value = safeStr(cfg.labels?.debtor_critical || 'CC Vencida Crítica');
+                    if (inputCrmInstallmentsOverdueCount) inputCrmInstallmentsOverdueCount.value = safeStr(cfg.installments_overdue_count || 1);
+                    if (inputCrmInstallmentsCriticalCount) inputCrmInstallmentsCriticalCount.value = safeStr(cfg.installments_critical_count || 3);
                     try { renderCrmPreview(readCrmFormValues()); } catch (e) { }
                     openModal(modalAlerts);
                 });
@@ -1748,13 +3229,11 @@ document.addEventListener('DOMContentLoaded', function () {
             inputCrmRecentDays,
             inputCrmDebtOverdueDays,
             inputCrmDebtCriticalDays,
+            inputCrmInstallmentsOverdueCount,
+            inputCrmInstallmentsCriticalCount,
             inputCrmFreqMin,
             inputCrmBestMin,
             inputCrmLabelClasTitle,
-            inputCrmLabelBest,
-            inputCrmLabelFreq,
-            inputCrmLabelInactive,
-            inputCrmLabelDebtor,
         ].forEach(function (el) {
             if (el) el.addEventListener('input', onCrmInput);
             if (el) el.addEventListener('change', onCrmInput);
@@ -1768,7 +3247,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (btnCloseLegajo) btnCloseLegajo.addEventListener('click', function () { closeModal(modalLegajo); });
         if (btnCloseLegajo2) btnCloseLegajo2.addEventListener('click', function () { closeModal(modalLegajo); });
-        if (btnEditLegajo) btnEditLegajo.addEventListener('click', function () { if (legajoCustomerId) openEditCustomer(legajoCustomerId); });
+        if (legajoTabSales) legajoTabSales.addEventListener('click', function () { setLegajoTab('sales'); });
+        if (legajoTabPayments) legajoTabPayments.addEventListener('click', function () { setLegajoTab('payments'); });
         if (modalLegajo) {
             modalLegajo.addEventListener('click', function (e) {
                 const target = e.target;
@@ -1787,6 +3267,34 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
+        if (btnCloseSettleType) btnCloseSettleType.addEventListener('click', function () { closeModal(modalSettleType); });
+        if (btnCancelSettleType) btnCancelSettleType.addEventListener('click', function () { closeModal(modalSettleType); });
+        if (btnSettleTypeCc) btnSettleTypeCc.addEventListener('click', function () {
+            const id = settlePendingCustomerForType;
+            closeModal(modalSettleType);
+            if (id) openSettleCcDebt(id);
+        });
+        if (btnSettleTypeCuotas) btnSettleTypeCuotas.addEventListener('click', function () {
+            const id = settlePendingCustomerForType;
+            closeModal(modalSettleType);
+            if (id) openSettleCuotas(id);
+        });
+
+        if (btnCloseSettleCuotas) btnCloseSettleCuotas.addEventListener('click', function () { closeModal(modalSettleCuotas); });
+        if (btnCancelSettleCuotas) btnCancelSettleCuotas.addEventListener('click', function () { closeModal(modalSettleCuotas); });
+        if (cuotasPlanSelect) cuotasPlanSelect.addEventListener('change', function () { refreshCuotasPlan(cuotasPlanSelect.value); });
+        if (btnCuotasCancelPlan) btnCuotasCancelPlan.addEventListener('click', function () { cancelPlanCuotas(); });
+
+        if (btnCloseCobro) btnCloseCobro.addEventListener('click', function () { closeModal(modalCobro); });
+        if (btnCancelCobro) btnCancelCobro.addEventListener('click', function () { closeModal(modalCobro); });
+        if (btnConfirmCobro) btnConfirmCobro.addEventListener('click', function () { confirmCobro(); });
+        if (modalCobro) {
+            modalCobro.addEventListener('click', function (e) {
+                const target = e.target;
+                if (target && target === modalCobro.firstElementChild) closeModal(modalCobro);
+            });
+        }
+
         if (inputSearch) inputSearch.addEventListener('input', function () { render(); });
 
         if (filterClasItems) {
@@ -1794,6 +3302,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (filterCcItems) {
             renderMultiselectItems(filterCcItems, 'Todas', ccOpts, ccSelected, 'cust-cc-all', 'cust-cc-opt', ccAllMode);
+        }
+        if (filterScItems) {
+            renderMultiselectItems(filterScItems, 'Todas', scOpts, scSelected, 'cust-sc-all', 'cust-sc-opt', scAllMode);
         }
         syncCustomersFilterButtons();
 
@@ -1803,6 +3314,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 setDropdownOpen(filterClasMenu, open);
                 if (open) {
                     try { setDropdownOpen(filterCcMenu, false); } catch (e) { }
+                    try { setDropdownOpen(filterScMenu, false); } catch (e) { }
                 }
             });
         }
@@ -1812,6 +3324,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 setDropdownOpen(filterCcMenu, open);
                 if (open) {
                     try { setDropdownOpen(filterClasMenu, false); } catch (e) { }
+                    try { setDropdownOpen(filterScMenu, false); } catch (e) { }
+                }
+            });
+        }
+        if (filterScBtn && filterScMenu) {
+            filterScBtn.addEventListener('click', function () {
+                const open = filterScMenu.classList.contains('hidden');
+                setDropdownOpen(filterScMenu, open);
+                if (open) {
+                    try { setDropdownOpen(filterClasMenu, false); } catch (e) { }
+                    try { setDropdownOpen(filterCcMenu, false); } catch (e) { }
                 }
             });
         }
@@ -1843,9 +3366,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (filterCcItems) {
-            filterCcItems.addEventListener('change', function (ev) {
-                const t = ev && ev.target ? ev.target : null;
-                if (!t) return;
+            filterCcItems.addEventListener('change', function (e) {
+                const t = e.target;
+                if (!t || t.tagName !== 'INPUT') return;
+
                 if (t.classList.contains('cust-cc-all')) {
                     if (ccAllMode) {
                         ccAllMode = false;
@@ -1863,6 +3387,33 @@ document.addEventListener('DOMContentLoaded', function () {
                     else ccSelected.delete(k);
                 }
                 renderMultiselectItems(filterCcItems, 'Todas', ccOpts, ccSelected, 'cust-cc-all', 'cust-cc-opt', ccAllMode);
+                syncCustomersFilterButtons();
+                render();
+            });
+        }
+
+        if (filterScItems) {
+            filterScItems.addEventListener('change', function (e) {
+                const t = e.target;
+                if (!t || t.tagName !== 'INPUT') return;
+
+                if (t.classList.contains('cust-sc-all')) {
+                    if (scAllMode) {
+                        scAllMode = false;
+                        scSelected = new Set();
+                    } else {
+                        scAllMode = true;
+                        scSelected = new Set();
+                    }
+                }
+                if (t.classList.contains('cust-sc-opt')) {
+                    const k = String(t.getAttribute('data-k') || '').trim();
+                    if (!k) return;
+                    scAllMode = false;
+                    if (t.checked) scSelected.add(k);
+                    else scSelected.delete(k);
+                }
+                renderMultiselectItems(filterScItems, 'Todas', scOpts, scSelected, 'cust-sc-all', 'cust-sc-opt', scAllMode);
                 syncCustomersFilterButtons();
                 render();
             });
@@ -1912,6 +3463,13 @@ document.addEventListener('DOMContentLoaded', function () {
             try {
                 if (filterCcMenu && !filterCcMenu.classList.contains('hidden')) {
                     if (!filterCcMenu.contains(t) && !filterCcBtn.contains(t)) setDropdownOpen(filterCcMenu, false);
+                }
+            } catch (e) {
+            }
+
+            try {
+                if (filterScMenu && !filterScMenu.classList.contains('hidden')) {
+                    if (!filterScMenu.contains(t) && !filterScBtn.contains(t)) setDropdownOpen(filterScMenu, false);
                 }
             } catch (e) {
             }

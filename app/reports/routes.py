@@ -9,7 +9,7 @@ from flask_login import login_required
 from sqlalchemy import and_
 
 from app import db
-from app.models import BusinessSettings, Category, Customer, Employee, Expense, InventoryLot, InventoryMovement, Product, Sale, SaleItem
+from app.models import BusinessSettings, CashCount, Category, Employee, Expense, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem
 from app.permissions import module_required
 from app.reports import bp
 
@@ -36,6 +36,17 @@ def _company_id() -> str:
         return str(getattr(g, 'company_id', '') or '').strip()
     except Exception:
         return ''
+
+
+def _load_crm_config(company_id: str) -> dict:
+    try:
+        from app.customers.routes import _load_crm_config as _load
+        return _load(company_id)
+    except Exception:
+        return {
+            'debt_overdue_days': 30,
+            'debt_critical_days': 60,
+        }
 
 
 def _load_meta(row: Expense) -> dict:
@@ -172,6 +183,28 @@ def eerr_api():
 
     net_sales = gross_sales + exchange_total
 
+    # Desglose informativo de ventas (devengado)
+    sales_contado = 0.0
+    sales_cc = 0.0
+    sales_cuotas = 0.0
+    try:
+        for r in (sales_rows or []):
+            amt = _num(getattr(r, 'total', 0.0))
+            if amt <= 0:
+                continue
+            is_inst = bool(getattr(r, 'is_installments', False))
+            on_acc = bool(getattr(r, 'on_account', False))
+            if is_inst:
+                sales_cuotas += amt
+            elif on_acc:
+                sales_cc += amt
+            else:
+                sales_contado += amt
+    except Exception:
+        sales_contado = 0.0
+        sales_cc = 0.0
+        sales_cuotas = 0.0
+
     # 3) CMV: desde movimientos de inventario (FIFO congelado)
     valid_tickets = [str(r.ticket) for r in sales_rows if str(getattr(r, 'ticket', '') or '').strip()]
     cmv = 0.0
@@ -228,6 +261,9 @@ def eerr_api():
         'sales_net': round(net_sales, 2),
         'discounts': round(discounts, 2),
         'exchanges_total': round(exchange_total, 2),
+        'sales_contado': round(sales_contado, 2),
+        'sales_cc': round(sales_cc, 2),
+        'sales_cuotas': round(sales_cuotas, 2),
         'cmv': round(cmv, 2),
         'gross_margin': round(gross_margin, 2),
         'gross_margin_pct': round(_safe_pct(gross_margin, net_sales) * 100.0, 2),
@@ -1408,6 +1444,13 @@ def finance_api():
     if not cid:
         return jsonify({'ok': True, 'period': {'from': '', 'to': ''}, 'compare_mode': 'none', 'kpis': {}, 'kpis_prev': None, 'deltas': {}, 'series': [], 'trends': {}, 'months_summary': {}, 'breakdowns': {}, 'insights': []})
 
+    installments_enabled = False
+    try:
+        bs = BusinessSettings.get_for_company(cid)
+        installments_enabled = bool(bs and bool(getattr(bs, 'habilitar_sistema_cuotas', False)))
+    except Exception:
+        installments_enabled = False
+
     d_from = _parse_date_iso(raw_from, None)
     d_to = _parse_date_iso(raw_to, None)
     if not d_from or not d_to:
@@ -1448,24 +1491,48 @@ def finance_api():
         return dt_date(y, m, dd)
 
     def _compute_period(p_from: dt_date, p_to: dt_date):
-        income_sales = 0.0
-        income_exchanges = 0.0
+        # Cash-flow only: collections are real cash movements.
+        # - Venta: only the collected part (paid_amount)
+        # - Cambio: affects cash (typically negative)
+        # - CobroCC / CobroCuota: explicit cash collections
+        sales_paid = 0.0
+        sales_cash_only = 0.0
+        sales_paid_cc_or_partial = 0.0
+        sales_paid_installment_down = 0.0
+        collections_cc = 0.0
+        collections_installments = 0.0
+        collections_other = 0.0
+        collections_exchanges = 0.0
+
         try:
-            income_sales = (
-                db.session.query(db.func.coalesce(db.func.sum(Sale.total), 0.0))
+            rows = (
+                db.session.query(Sale)
                 .filter(Sale.company_id == cid)
                 .filter(Sale.sale_date >= p_from)
                 .filter(Sale.sale_date <= p_to)
                 .filter(Sale.sale_type == 'Venta')
                 .filter(db.func.lower(Sale.status).like('completad%'))
-                .scalar()
+                .all()
             )
-            income_sales = _num(income_sales)
+            for r in (rows or []):
+                paid = _num(getattr(r, 'paid_amount', 0.0))
+                if paid <= 0:
+                    continue
+                sales_paid += paid
+                if bool(getattr(r, 'is_installments', False)):
+                    sales_paid_installment_down += paid
+                elif bool(getattr(r, 'on_account', False)):
+                    sales_paid_cc_or_partial += paid
+                else:
+                    sales_cash_only += paid
         except Exception:
-            income_sales = 0.0
+            sales_paid = 0.0
+            sales_cash_only = 0.0
+            sales_paid_cc_or_partial = 0.0
+            sales_paid_installment_down = 0.0
 
         try:
-            income_exchanges = (
+            collections_exchanges = (
                 db.session.query(db.func.coalesce(db.func.sum(Sale.total), 0.0))
                 .filter(Sale.company_id == cid)
                 .filter(Sale.sale_date >= p_from)
@@ -1473,13 +1540,55 @@ def finance_api():
                 .filter(Sale.sale_type == 'Cambio')
                 .scalar()
             )
-            income_exchanges = _num(income_exchanges)
+            collections_exchanges = _num(collections_exchanges)
         except Exception:
-            income_exchanges = 0.0
+            collections_exchanges = 0.0
 
-        income_total = income_sales + income_exchanges
+        try:
+            collections_cc = (
+                db.session.query(db.func.coalesce(db.func.sum(Sale.total), 0.0))
+                .filter(Sale.company_id == cid)
+                .filter(Sale.sale_date >= p_from)
+                .filter(Sale.sale_date <= p_to)
+                .filter(Sale.sale_type == 'CobroCC')
+                .filter(db.func.lower(Sale.status).like('completad%'))
+                .scalar()
+            )
+            collections_cc = _num(collections_cc)
+        except Exception:
+            collections_cc = 0.0
 
-        payroll_expenses = 0.0
+        if installments_enabled:
+            try:
+                collections_installments = (
+                    db.session.query(db.func.coalesce(db.func.sum(Sale.total), 0.0))
+                    .filter(Sale.company_id == cid)
+                    .filter(Sale.sale_date >= p_from)
+                    .filter(Sale.sale_date <= p_to)
+                    .filter(Sale.sale_type == 'CobroCuota')
+                    .filter(db.func.lower(Sale.status).like('completad%'))
+                    .scalar()
+                )
+                collections_installments = _num(collections_installments)
+            except Exception:
+                collections_installments = 0.0
+
+        try:
+            collections_other = (
+                db.session.query(db.func.coalesce(db.func.sum(Sale.total), 0.0))
+                .filter(Sale.company_id == cid)
+                .filter(Sale.sale_date >= p_from)
+                .filter(Sale.sale_date <= p_to)
+                .filter(Sale.sale_type.in_(['IngresoAjusteInv']))
+                .scalar()
+            )
+            collections_other = _num(collections_other)
+        except Exception:
+            collections_other = 0.0
+
+        income_total = sales_paid + collections_cc + (collections_installments if installments_enabled else 0.0) + collections_other + collections_exchanges
+
+        payroll_paid = 0.0
         opex_paid = 0.0
         opex_pending = 0.0
 
@@ -1496,40 +1605,260 @@ def finance_api():
             exp_rows = []
 
         for e in (exp_rows or []):
-            if _is_supplier_cc_payment(e):
-                continue
             amt = _num(getattr(e, 'amount', 0.0))
             if amt <= 0:
                 continue
-            if _is_payroll_expense(e):
-                payroll_expenses += amt
-                continue
             if _is_supplier_cc_pending(e):
                 opex_pending += amt
+                continue
+            if _is_payroll_expense(e):
+                payroll_paid += amt
             else:
                 opex_paid += amt
 
-        operating_expenses = opex_paid + opex_pending
-        expense_total = operating_expenses + payroll_expenses
+        expense_total = opex_paid + payroll_paid
         result_total = income_total - expense_total
         ratio = _safe_pct(expense_total, income_total)
 
         return {
             'period': {'from': p_from.isoformat(), 'to': p_to.isoformat()},
             'income_total': round(income_total, 2),
-            'income_sales': round(income_sales, 2),
-            'income_exchanges': round(income_exchanges, 2),
+            # Legacy-ish keys (still useful)
+            'income_sales': round(sales_paid, 2),
+            'income_exchanges': round(collections_exchanges, 2),
+            'income_installments': round(collections_installments, 2),
             'expense_total': round(expense_total, 2),
-            'operating_expenses': round(operating_expenses, 2),
+            'operating_expenses': round(opex_paid, 2),
             'operating_expenses_paid': round(opex_paid, 2),
             'operating_expenses_pending': round(opex_pending, 2),
-            'payroll_expenses': round(payroll_expenses, 2),
+            'payroll_expenses': round(payroll_paid, 2),
             'result_total': round(result_total, 2),
             'result_pct': round(_safe_pct(result_total, income_total) * 100.0, 2),
             'expense_income_ratio': round(ratio, 4),
+            # Cash breakdown for the new UI
+            'collections_sales_paid': round(sales_paid, 2),
+            'collections_sales_cash_only': round(sales_cash_only, 2),
+            'collections_sales_paid_cc_or_partial': round(sales_paid_cc_or_partial, 2),
+            'collections_sales_paid_installment_down': round(sales_paid_installment_down, 2),
+            'collections_cc': round(collections_cc, 2),
+            'collections_installments': round(collections_installments, 2),
+            'collections_other': round(collections_other, 2),
         }
 
     cur = _compute_period(d_from, d_to)
+
+    # Cash balance from CashCount (best-effort)
+    cash_initial = None
+    cash_final = None
+    try:
+        row = db.session.query(CashCount).filter(CashCount.company_id == cid, CashCount.count_date == d_from).first()
+        if row:
+            cash_initial = _num(getattr(row, 'opening_amount', 0.0))
+        else:
+            prev_row = (
+                db.session.query(CashCount)
+                .filter(CashCount.company_id == cid)
+                .filter(CashCount.count_date < d_from)
+                .order_by(CashCount.count_date.desc())
+                .first()
+            )
+            if prev_row:
+                cash_initial = _num(getattr(prev_row, 'closing_amount', 0.0))
+    except Exception:
+        cash_initial = None
+
+    try:
+        row = db.session.query(CashCount).filter(CashCount.company_id == cid, CashCount.count_date == d_to).first()
+        if row:
+            cash_final = _num(getattr(row, 'closing_amount', 0.0))
+        else:
+            prev_row = (
+                db.session.query(CashCount)
+                .filter(CashCount.company_id == cid)
+                .filter(CashCount.count_date <= d_to)
+                .order_by(CashCount.count_date.desc())
+                .first()
+            )
+            if prev_row:
+                cash_final = _num(getattr(prev_row, 'closing_amount', 0.0))
+    except Exception:
+        cash_final = None
+
+    cash_balance = {
+        'initial': round(_num(cash_initial), 2) if cash_initial is not None else None,
+        'final': round(_num(cash_final), 2) if cash_final is not None else None,
+        'initial_source': 'cash_count' if cash_initial is not None else None,
+        'final_source': 'cash_count' if cash_final is not None else None,
+    }
+
+    # Projections as-of end date (best-effort)
+    crm_cfg = _load_crm_config(cid)
+    overdue_days = int(_num(crm_cfg.get('debt_overdue_days') or 30) or 30)
+    critical_days = int(_num(crm_cfg.get('debt_critical_days') or 60) or 60)
+    if overdue_days <= 0:
+        overdue_days = 30
+    if critical_days <= overdue_days:
+        critical_days = overdue_days + 30
+
+    cc_pending_total = 0.0
+    cc_overdue_total = 0.0
+    cc_critical_total = 0.0
+    cc_due_7 = 0.0
+    cc_due_15 = 0.0
+    cc_due_30 = 0.0
+    cc_next_due_date = None
+    cc_next_due_amount = 0.0
+    try:
+        rows = (
+            db.session.query(Sale)
+            .filter(Sale.company_id == cid)
+            .filter(Sale.sale_type == 'Venta')
+            .filter(db.func.lower(Sale.status).like('completad%'))
+            .filter(Sale.due_amount > 0)
+            .all()
+        )
+        for r in (rows or []):
+            if bool(getattr(r, 'is_installments', False)):
+                continue
+            due_amt = _num(getattr(r, 'due_amount', 0.0))
+            if due_amt <= 0:
+                continue
+            sd = getattr(r, 'sale_date', None)
+            if not sd:
+                continue
+            cc_pending_total += due_amt
+            age = int((d_to - sd).days)
+            if age >= critical_days:
+                cc_critical_total += due_amt
+                cc_overdue_total += due_amt
+            elif age >= overdue_days:
+                cc_overdue_total += due_amt
+            due_date = sd + timedelta(days=overdue_days)
+            days_until = int((due_date - d_to).days)
+            if days_until > 0:
+                if cc_next_due_date is None or due_date < cc_next_due_date:
+                    cc_next_due_date = due_date
+                    cc_next_due_amount = due_amt
+                if days_until <= 7:
+                    cc_due_7 += due_amt
+                if days_until <= 15:
+                    cc_due_15 += due_amt
+                if days_until <= 30:
+                    cc_due_30 += due_amt
+    except Exception:
+        cc_pending_total = 0.0
+        cc_overdue_total = 0.0
+        cc_critical_total = 0.0
+        cc_due_7 = 0.0
+        cc_due_15 = 0.0
+        cc_due_30 = 0.0
+        cc_next_due_date = None
+        cc_next_due_amount = 0.0
+
+    inst_pending_total = 0.0
+    inst_overdue_total = 0.0
+    inst_due_7 = 0.0
+    inst_due_15 = 0.0
+    inst_due_30 = 0.0
+    inst_next_due_date = None
+    inst_next_due_amount = 0.0
+    inst_due_in_period = 0.0
+    if installments_enabled:
+        try:
+            rows = (
+                db.session.query(Installment)
+                .filter(Installment.company_id == cid)
+                .all()
+            )
+            for it in (rows or []):
+                amt = _num(getattr(it, 'amount', 0.0))
+                if amt <= 0:
+                    continue
+                st = str(getattr(it, 'status', '') or '').strip().lower()
+                dd = getattr(it, 'due_date', None)
+                if dd and d_from <= dd <= d_to:
+                    inst_due_in_period += amt
+                if st == 'pagada':
+                    continue
+                inst_pending_total += amt
+                if dd:
+                    days_until = int((dd - d_to).days)
+                    if dd < d_to:
+                        inst_overdue_total += amt
+                    if days_until > 0:
+                        if inst_next_due_date is None or dd < inst_next_due_date:
+                            inst_next_due_date = dd
+                            inst_next_due_amount = amt
+                        if days_until <= 7:
+                            inst_due_7 += amt
+                        if days_until <= 15:
+                            inst_due_15 += amt
+                        if days_until <= 30:
+                            inst_due_30 += amt
+        except Exception:
+            inst_pending_total = 0.0
+            inst_overdue_total = 0.0
+            inst_due_7 = 0.0
+            inst_due_15 = 0.0
+            inst_due_30 = 0.0
+            inst_next_due_date = None
+            inst_next_due_amount = 0.0
+            inst_due_in_period = 0.0
+
+    projections = {
+        'cc': {
+            'pending_total': round(cc_pending_total, 2),
+            'next_due_date': cc_next_due_date.isoformat() if cc_next_due_date else None,
+            'next_due_amount': round(_num(cc_next_due_amount), 2),
+            'due_7': round(cc_due_7, 2),
+            'due_15': round(cc_due_15, 2),
+            'due_30': round(cc_due_30, 2),
+            'overdue_total': round(cc_overdue_total, 2),
+            'critical_total': round(cc_critical_total, 2),
+            'overdue_days': overdue_days,
+            'critical_days': critical_days,
+        },
+        'installments': {
+            'pending_total': round(inst_pending_total, 2),
+            'next_due_date': inst_next_due_date.isoformat() if inst_next_due_date else None,
+            'next_due_amount': round(_num(inst_next_due_amount), 2),
+            'due_7': round(inst_due_7, 2),
+            'due_15': round(inst_due_15, 2),
+            'due_30': round(inst_due_30, 2),
+            'overdue_total': round(inst_overdue_total, 2),
+            'due_in_period_total': round(inst_due_in_period, 2),
+        },
+    }
+
+    # Gap devengado vs caja (financiación a clientes)
+    accrued_sales_net = 0.0
+    try:
+        gross = (
+            db.session.query(db.func.coalesce(db.func.sum(Sale.total), 0.0))
+            .filter(Sale.company_id == cid)
+            .filter(Sale.sale_date >= d_from)
+            .filter(Sale.sale_date <= d_to)
+            .filter(Sale.sale_type == 'Venta')
+            .filter(db.func.lower(Sale.status).like('completad%'))
+            .scalar()
+        )
+        exch = (
+            db.session.query(db.func.coalesce(db.func.sum(Sale.total), 0.0))
+            .filter(Sale.company_id == cid)
+            .filter(Sale.sale_date >= d_from)
+            .filter(Sale.sale_date <= d_to)
+            .filter(Sale.sale_type == 'Cambio')
+            .scalar()
+        )
+        accrued_sales_net = _num(gross) + _num(exch)
+    except Exception:
+        accrued_sales_net = 0.0
+
+    gap = {
+        'accrued_sales_net': round(accrued_sales_net, 2),
+        'cash_collections_total': round(_num(cur.get('income_total')), 2),
+        'difference': round(accrued_sales_net - _num(cur.get('income_total')), 2),
+    }
 
     prev = None
     if raw_compare in ('prev', 'yoy'):
@@ -1879,6 +2208,9 @@ def finance_api():
             'net_sales_by_payment_method': _top_n(net_sales_by_payment, 10),
             'expenses_by_category': exp_cat_items,
         },
+        'cash_balance': cash_balance,
+        'projections': projections,
+        'gap': gap,
         'insights': insights,
     })
 

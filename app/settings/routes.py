@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from app.files.storage import upload_to_r2_and_create_asset
-from app.models import BusinessSettings
+from app.models import BusinessSettings, Installment, InstallmentPlan
 from app.permissions import module_required
 from app.settings import bp
 
@@ -21,6 +21,7 @@ def business_settings():
         action = (request.form.get('action') or '').strip()
         if action == 'save_business':
             bs = BusinessSettings.get_for_company(g.company_id)
+            prev_installments_enabled = bool(getattr(bs, 'habilitar_sistema_cuotas', False))
             bs.name = (request.form.get('business_name') or '').strip() or bs.name
             ind = (request.form.get('business_industry') or '').strip() or None
             if ind == 'Otro':
@@ -54,6 +55,32 @@ def business_settings():
 
             bs.background_brightness = _f_range('background_brightness', default=1.0)
             bs.background_contrast = _f_range('background_contrast', default=1.0)
+
+            installments_enabled = prev_installments_enabled
+            try:
+                installments_enabled = str(request.form.get('habilitar_sistema_cuotas') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+            except Exception:
+                installments_enabled = prev_installments_enabled
+
+            if prev_installments_enabled and (not installments_enabled):
+                try:
+                    row = (
+                        db.session.query(Installment.id)
+                        .join(InstallmentPlan, Installment.plan_id == InstallmentPlan.id)
+                        .filter(Installment.company_id == g.company_id)
+                        .filter(InstallmentPlan.company_id == g.company_id)
+                        .filter(db.func.lower(InstallmentPlan.status) == 'activo')
+                        .filter(db.func.lower(Installment.status) != 'pagada')
+                        .limit(1)
+                        .first()
+                    )
+                    if row is not None:
+                        installments_enabled = True
+                        flash('No se puede deshabilitar el sistema de cuotas porque existen cuotas activas pendientes.', 'error')
+                except Exception:
+                    installments_enabled = prev_installments_enabled
+
+            bs.habilitar_sistema_cuotas = bool(installments_enabled)
 
             f = request.files.get('business_logo')
             if f and getattr(f, 'filename', ''):

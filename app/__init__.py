@@ -30,6 +30,9 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    argv_l = [str(a or '').strip().lower() for a in (sys.argv or [])]
+    is_flask_db_command = 'db' in argv_l
+
     try:
         class _TenantPrefixMiddleware:
             def __init__(self, wsgi_app):
@@ -97,18 +100,16 @@ def create_app(config_class=Config):
     try:
         with app.app_context():
             if not str(db.engine.url.drivername).startswith('sqlite'):
-                auto_bootstrap_raw = str(os.environ.get('AUTO_BOOTSTRAP_DB') or '').strip().lower()
-                if auto_bootstrap_raw:
-                    auto_bootstrap = auto_bootstrap_raw in ('1', 'true', 'yes', 'on')
-                else:
-                    auto_bootstrap = bool(os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_PROJECT_ID') or os.environ.get('RAILWAY_SERVICE_ID'))
-                if auto_bootstrap:
-                    from app.rls import bootstrap_schema
+                if not is_flask_db_command:
+                    auto_bootstrap_raw = str(os.environ.get('AUTO_BOOTSTRAP_DB') or '').strip().lower()
+                    if auto_bootstrap_raw:
+                        auto_bootstrap = auto_bootstrap_raw in ('1', 'true', 'yes', 'on')
+                    else:
+                        auto_bootstrap = True
+                    if auto_bootstrap:
+                        from app.rls import bootstrap_schema
 
-                    # Never reset Postgres schema automatically at startup.
-                    # Schema resets are destructive (DROP SCHEMA public CASCADE) and must be
-                    # performed only via the explicit CLI command guarded by confirmation.
-                    bootstrap_schema(reset=False)
+                        bootstrap_schema(reset=False)
     except Exception:
         app.logger.exception('Failed to bootstrap Postgres schema')
 
@@ -175,6 +176,12 @@ def create_app(config_class=Config):
             return False
         return False
 
+    @login_manager.unauthorized_handler
+    def _unauthorized_handler():
+        if _wants_json():
+            return jsonify({'ok': False, 'error': 'unauthorized'}), 401
+        return redirect(url_for(str(login_manager.login_view or 'auth.login')))
+
     @app.errorhandler(401)
     def _err_401(err):
         if _wants_json():
@@ -205,6 +212,12 @@ def create_app(config_class=Config):
                 payload['detail'] = detail
             return jsonify(payload), 400
         return render_template('errors/http_error.html', title='Solicitud inválida', code=400), 400
+
+    @app.errorhandler(500)
+    def _err_500(err):
+        if _wants_json():
+            return jsonify({'ok': False, 'error': 'internal_server_error'}), 500
+        return render_template('errors/http_error.html', title='Error interno', code=500), 500
 
     @app.before_request
     def _request_logging_context():

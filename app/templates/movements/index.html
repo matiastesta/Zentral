@@ -28,6 +28,7 @@
                             <th class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Ticket</th>
                             <th class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
                             <th class="w-40 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Tipo</th>
+                            <th class="w-56 px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Cliente</th>
                             <th class="w-28 px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Total</th>
                             <th class="w-32 px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">Pago</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Notas</th>
@@ -44,11 +45,14 @@
                                 <select id="mov-ventas-tipo" multiple size="1" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
                                     <option value="" selected>Tipo (todos)</option>
                                     <option value="Venta">Venta</option>
-                                    <option value="Cobro">Cobro</option>
+                                    <option value="CobroCuota">Cobro de cuota</option>
                                     <option value="CuentaCorriente">Cuenta corriente</option>
                                     <option value="Cambio">Cambio</option>
                                     <option value="IngresoAjusteInv">Ingreso por ajuste</option>
                                 </select>
+                            </th>
+                            <th class="px-4 py-1">
+                                <input id="mov-ventas-cliente" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="Cliente">
                             </th>
                             <th class="px-4 py-1"></th>
                             <th class="px-4 py-1">
@@ -61,10 +65,11 @@
                                 </select>
                             </th>
                             <th class="px-4 py-1"></th>
+                            <th class="px-4 py-1"></th>
                         </tr>
                     </thead>
                     <tbody id="mov-ventas-tbody" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
+                        <tr><td colspan="8" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -207,6 +212,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const fVentasRange = document.getElementById('mov-ventas-range');
     const fVentasPago = document.getElementById('mov-ventas-pago');
     const fVentasTipo = document.getElementById('mov-ventas-tipo');
+    const fVentasCliente = document.getElementById('mov-ventas-cliente');
     const fEgresosRange = document.getElementById('mov-egresos-range');
     const fEgresosPago = document.getElementById('mov-egresos-pago');
     const fEgresosCatBtn = document.getElementById('mov-egresos-cat-btn');
@@ -380,7 +386,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const pm = normKey(s?.payment_method || '');
         const onAcc = !!(s && (s.on_account === true || s.on_account === 1 || s.on_account === '1'));
 
-        if (st === 'CobroCC') return 'Cobro';
+        if (st === 'CobroCuota') return 'CobroCuota';
+        if (st === 'CobroCC') return 'CuentaCorriente';
         if (st === 'Cambio') return 'Cambio';
         if (st === 'IngresoAjusteInv') return 'IngresoAjusteInv';
         if (onAcc || pm.includes('cuenta corriente') || pm === 'cuenta corriente') return 'CuentaCorriente';
@@ -389,7 +396,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function labelTipo(s) {
         const k = saleKind(s);
-        if (k === 'Cobro') return 'Cobro';
+        if (k === 'CobroCuota') return 'Cobro de cuota';
         if (k === 'CuentaCorriente') return 'Cuenta corriente';
         if (k === 'Cambio') return 'Cambio';
         if (k === 'IngresoAjusteInv') return 'Ingreso por ajuste';
@@ -737,11 +744,12 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderVentas() {
         if (!tbodyVentas) return;
         const q = String(fVentasQ?.value || '').trim().toLowerCase();
+        const qCliente = String(fVentasCliente?.value || '').trim().toLowerCase();
         const rango = parseRangoFechas(fVentasRange?.value);
         const pagosState = getSelectFilterState(fVentasPago);
         const tiposState = getSelectFilterState(fVentasTipo);
 
-        tbodyVentas.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
+        tbodyVentas.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
         getSalesFromApi(rango, function (sales) {
             const fromIso = (rango && rango.from) ? isoFromDate(rango.from) : '';
             const toIso = (rango && rango.to) ? isoFromDate(rango.to) : '';
@@ -777,6 +785,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 list = list.filter(s => {
                     const txt = (String(s?.ticket || '') + ' ' + String(s?.notes_display || s?.notes || '')).toLowerCase();
                     if (q && !txt.includes(q)) return false;
+
+                    const cust = String(s?.customer_name || '').trim().toLowerCase();
+                    if (qCliente && !cust.includes(qCliente)) return false;
+
                     const pm = String(s?.payment_method || '').trim();
                     if (pagosState.mode === 'none') return false;
                     if (pagosState.mode === 'some' && pagosState.values.indexOf(pm) < 0) return false;
@@ -789,7 +801,20 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (rango && dt && !(dt >= rango.from && dt <= rango.to)) return false;
                     return true;
                 });
-                list.sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
+
+                const sortKey = function (s) {
+                    const dt = parseFecha(s?.fecha || s?.date || '');
+                    const ts = dt ? dt.getTime() : 0;
+                    const created = (parseInt(s?.created_at || 0, 10) || 0);
+                    return { ts: ts || 0, created: created || 0 };
+                };
+
+                list.sort((a, b) => {
+                    const ka = sortKey(a);
+                    const kb = sortKey(b);
+                    if ((kb.ts || 0) !== (ka.ts || 0)) return (kb.ts || 0) - (ka.ts || 0);
+                    return (kb.created || 0) - (ka.created || 0);
+                });
 
             const buildNotes = function (s) {
                 const base = String(s?.notes_display || s?.notes || '').trim();
@@ -803,6 +828,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     Ticket: s?.ticket || '',
                     Fecha: fmtFecha(s?.fecha || s?.date || ''),
                     Tipo: (String(s?.type || '') === 'IngresoAjusteInv') ? 'Ingreso por ajuste' : labelTipo(s),
+                    Cliente: String(s?.customer_name || ''),
                     Total: formatearMoneda(parseFloat(s?.total || 0) || 0),
                     Pago: s?.payment_method || '',
                     Notas: buildNotes(s)
@@ -810,7 +836,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 tbodyVentas.innerHTML = '';
                 if (!list.length) {
-                    tbodyVentas.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+                    tbodyVentas.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
                     return;
                 }
                 list.forEach(s => {
@@ -823,6 +849,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         + '<td class="px-4 py-3 text-sm text-gray-900">' + String(s?.ticket || '') + '</td>'
                         + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(s?.fecha || s?.date || '') + '</td>'
                         + '<td class="px-4 py-3 text-sm text-gray-500">' + (String(s?.type || '') === 'IngresoAjusteInv' ? 'Ingreso por ajuste' : labelTipo(s)) + '</td>'
+                        + '<td class="px-4 py-3 text-sm text-gray-700">' + String(s?.customer_name || '—') + '</td>'
                         + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>'
                         + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(s?.payment_method || '') + '</td>'
                         + '<td class="px-4 py-3 text-sm text-gray-500">' + noteHtml + '</td>'
@@ -1025,7 +1052,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initTodosMultiSelect(fVentasTipo);
     initTodosMultiSelect(fEgresosPago);
 
-    [fVentasQ, fVentasPago, fVentasTipo].forEach(el => { if (el) el.addEventListener('input', renderVentas); if (el) el.addEventListener('change', renderVentas); });
+    [fVentasQ, fVentasCliente, fVentasPago, fVentasTipo].forEach(el => { if (el) el.addEventListener('input', renderVentas); if (el) el.addEventListener('change', renderVentas); });
     if (fEgresosPago) fEgresosPago.addEventListener('change', function () { try { renderEgresos(); } catch (e) { } });
 
     document.addEventListener('click', function (ev) {

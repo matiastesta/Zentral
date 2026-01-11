@@ -17,4 +17,4 @@ COPY . .
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["sh", "-c", "PORT_RAW=\"${PORT:-8080}\"; PORT_NUM=$(echo \"$PORT_RAW\" | tr -cd '0-9'); if [ -z \"$PORT_NUM\" ]; then PORT_NUM=8080; fi; gunicorn wsgi:app --bind 0.0.0.0:${PORT_NUM}"]
+CMD ["sh", "-c", "PORT_RAW=\"${PORT:-8080}\"; PORT_NUM=$(echo \"$PORT_RAW\" | tr -cd '0-9'); if [ -z \"$PORT_NUM\" ]; then PORT_NUM=8080; fi; python -m flask --app app.py db upgrade && gunicorn wsgi:app --bind 0.0.0.0:${PORT_NUM}"]

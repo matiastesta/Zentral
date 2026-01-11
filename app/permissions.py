@@ -1,6 +1,6 @@
 from functools import wraps
 
-from flask import abort, redirect, url_for
+from flask import abort, redirect, request, url_for
 from flask_login import current_user
 
 from app.tenancy import is_impersonating
@@ -15,6 +15,12 @@ def module_required(module_name: str):
             if getattr(current_user, 'role', '') == 'zentral_admin':
                 if is_impersonating():
                     return fn(*args, **kwargs)
+                try:
+                    path = str(request.path or '')
+                except Exception:
+                    path = ''
+                if path.startswith('/api/') or '/api/' in path:
+                    abort(403)
                 return redirect(url_for('superadmin.index'))
             if not getattr(current_user, 'can', None):
                 abort(403)
@@ -38,6 +44,12 @@ def module_required_any(*module_names: str):
             if getattr(current_user, 'role', '') == 'zentral_admin':
                 if is_impersonating():
                     return fn(*args, **kwargs)
+                try:
+                    path = str(request.path or '')
+                except Exception:
+                    path = ''
+                if path.startswith('/api/') or '/api/' in path:
+                    abort(403)
                 return redirect(url_for('superadmin.index'))
             if not getattr(current_user, 'can', None):
                 abort(403)

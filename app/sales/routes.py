@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload, joinedload
 
 from app import db
-from app.models import CashCount, Category, Employee, InventoryLot, InventoryMovement, Product, Sale, SaleItem
+from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem, User
 from app.permissions import module_required, module_required_any
 from app.sales import bp
 
@@ -28,6 +28,142 @@ def _dt_to_ms(dt):
     except Exception:
         current_app.logger.exception('Failed to convert datetime to milliseconds')
         return 0
+
+
+def _resolve_customer_display_name(cid: str, customer_id: str = None, customer_name: str = None) -> str:
+    name = str(customer_name or '').strip()
+    if name:
+        return name
+    cust_id = str(customer_id or '').strip()
+    if not cust_id:
+        return ''
+    try:
+        row = db.session.query(Customer).filter(Customer.company_id == cid, Customer.id == cust_id).first()
+        if row:
+            full = (str(getattr(row, 'first_name', '') or '') + ' ' + str(getattr(row, 'last_name', '') or '')).strip()
+            if not full:
+                full = str(getattr(row, 'name', '') or '').strip()
+            return full or cust_id
+    except Exception:
+        current_app.logger.exception('Failed to resolve customer display name')
+    return cust_id
+
+
+def _products_label_from_sale(sale: Sale) -> str:
+    try:
+        names = []
+        for it in (getattr(sale, 'items', None) or []):
+            nm = str(getattr(it, 'product_name', '') or '').strip()
+            if nm:
+                names.append(nm)
+        names = [n for n in names if n]
+        if not names:
+            return 'Producto —'
+        if len(names) == 1:
+            return f"Producto {names[0]}"
+        return f"Productos {names[0]} (+{len(names) - 1})"
+    except Exception:
+        return 'Producto —'
+
+
+def _resolve_unlimited_plan_price(cid: str, plan: InstallmentPlan):
+    try:
+        is_indef = bool(getattr(plan, 'is_indefinite', False)) or (str(getattr(plan, 'mode', '') or '').strip().lower() == 'indefinite')
+    except Exception:
+        is_indef = False
+    if not is_indef:
+        return None
+
+    pid = None
+    try:
+        sale = getattr(plan, 'sale', None)
+        for it in (getattr(sale, 'items', None) or []):
+            raw = str(getattr(it, 'product_id', '') or '').strip()
+            if raw:
+                pid = raw
+                break
+    except Exception:
+        pid = None
+
+    if not pid:
+        return None
+
+    try:
+        pid_int = int(pid)
+    except Exception:
+        return None
+
+    try:
+        prod = db.session.query(Product).filter(Product.company_id == cid, Product.id == pid_int).first()
+    except Exception:
+        prod = None
+    if not prod:
+        return None
+    try:
+        price = float(getattr(prod, 'sale_price', 0.0) or 0.0)
+    except Exception:
+        price = 0.0
+    if price > 0:
+        return float(price)
+    return None
+
+
+def _format_installment_payment_note(plan: InstallmentPlan, inst_row: Installment) -> str:
+    try:
+        customer = _resolve_customer_display_name(
+            cid=str(getattr(plan, 'company_id', '') or '').strip(),
+            customer_id=str(getattr(plan, 'customer_id', '') or '').strip() or None,
+            customer_name=str(getattr(plan, 'customer_name', '') or '').strip() or None,
+        )
+    except Exception:
+        customer = str(getattr(plan, 'customer_name', '') or '').strip() or str(getattr(plan, 'customer_id', '') or '').strip()
+
+    ticket_origen = str(getattr(plan, 'sale_ticket', '') or '').strip()
+    if not ticket_origen:
+        try:
+            ticket_origen = str(getattr(plan, 'sale_id', '') or '').strip()
+        except Exception:
+            ticket_origen = ''
+
+    customer_txt = customer or '—'
+    ticket_txt = ticket_origen or '—'
+
+    note_products = 'Producto —'
+    try:
+        sale_id = int(getattr(plan, 'sale_id', 0) or 0)
+    except Exception:
+        sale_id = 0
+    if sale_id > 0:
+        try:
+            src_sale = db.session.query(Sale).options(selectinload(Sale.items)).filter(Sale.company_id == str(getattr(plan, 'company_id', '') or '').strip(), Sale.id == sale_id).first()
+            if src_sale:
+                note_products = _products_label_from_sale(src_sale)
+        except Exception:
+            note_products = 'Producto —'
+
+    is_indef = bool(getattr(plan, 'is_indefinite', False)) or (str(getattr(plan, 'mode', '') or '').strip().lower() == 'indefinite')
+    if is_indef:
+        try:
+            interval_days = int(getattr(plan, 'interval_days', 30) or 30)
+        except Exception:
+            interval_days = 30
+        return f"Venta recurrente – Cuota indefinida – {note_products} – Intervalo {interval_days} días"
+
+    try:
+        n = int(getattr(inst_row, 'installment_number', 0) or 0)
+    except Exception:
+        n = 0
+    try:
+        pid = int(getattr(plan, 'id', 0) or 0)
+    except Exception:
+        pid = 0
+    try:
+        plan_count = int(getattr(plan, 'installments_count', 0) or 0)
+    except Exception:
+        plan_count = 0
+    if plan_count > 0:
+        return f"Cobro de cuota {n}/{plan_count} – Ticket #{ticket_txt} – {note_products}"
+    return f"Cobro de cuota {n} – Ticket #{ticket_txt} – {note_products}"
 
 
 def _parse_date_iso(raw, fallback=None):
@@ -69,6 +205,8 @@ def _ensure_sale_employee_columns() -> None:
             stmts.append('ALTER TABLE sale ADD COLUMN IF NOT EXISTS employee_id VARCHAR(64)')
         if 'employee_name' not in cols:
             stmts.append('ALTER TABLE sale ADD COLUMN IF NOT EXISTS employee_name VARCHAR(255)')
+        if 'is_installments' not in cols:
+            stmts.append('ALTER TABLE sale ADD COLUMN IF NOT EXISTS is_installments BOOLEAN NOT NULL DEFAULT FALSE')
         if not stmts:
             return
 
@@ -78,6 +216,38 @@ def _ensure_sale_employee_columns() -> None:
                 conn.execute(text(sql))
     except Exception:
         current_app.logger.exception('Failed to ensure sale employee columns')
+
+
+def _ensure_installment_plan_columns() -> None:
+    """Failsafe para asegurar columnas de modo indefinido en installment_plan."""
+    try:
+        engine = db.engine
+        insp = inspect(engine)
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('installment_plan') or [])}
+        stmts = []
+        if 'is_indefinite' not in cols:
+            if str(engine.url.drivername).startswith('sqlite'):
+                stmts.append('ALTER TABLE installment_plan ADD COLUMN is_indefinite BOOLEAN')
+            else:
+                stmts.append('ALTER TABLE installment_plan ADD COLUMN IF NOT EXISTS is_indefinite BOOLEAN')
+        if 'amount_per_period' not in cols:
+            if str(engine.url.drivername).startswith('sqlite'):
+                stmts.append('ALTER TABLE installment_plan ADD COLUMN amount_per_period FLOAT')
+            else:
+                stmts.append('ALTER TABLE installment_plan ADD COLUMN IF NOT EXISTS amount_per_period FLOAT')
+        if 'mode' not in cols:
+            if str(engine.url.drivername).startswith('sqlite'):
+                stmts.append('ALTER TABLE installment_plan ADD COLUMN mode VARCHAR(16)')
+            else:
+                stmts.append('ALTER TABLE installment_plan ADD COLUMN IF NOT EXISTS mode VARCHAR(16)')
+        if not stmts:
+            return
+
+        with engine.begin() as conn:
+            for s in stmts:
+                conn.exec_driver_sql(s)
+    except Exception:
+        current_app.logger.exception('Failed to ensure installment_plan columns')
 
 
 def _ensure_sale_ticket_numbering() -> None:
@@ -418,7 +588,7 @@ def index():
     return render_template('sales/list.html', title='Ventas')
 
 
-def _serialize_sale(row: Sale, related: dict = None):
+def _serialize_sale(row: Sale, related: dict = None, users_map: dict | None = None):
     has_venta_libre = False
     venta_libre_count = 0
     try:
@@ -434,6 +604,35 @@ def _serialize_sale(row: Sale, related: dict = None):
         venta_libre_count = 0
 
     rel = related if isinstance(related, dict) else {}
+
+    emp_id = str(getattr(row, 'employee_id', None) or '').strip()
+    emp_name = str(getattr(row, 'employee_name', None) or '').strip()
+    try:
+        created_by_user_id = int(getattr(row, 'created_by_user_id', 0) or 0) or None
+    except Exception:
+        created_by_user_id = None
+
+    responsible_id = ''
+    responsible_name = ''
+    if emp_id:
+        responsible_id = 'e:' + emp_id
+        responsible_name = emp_name or 'Empleado'
+    elif created_by_user_id is not None:
+        responsible_id = 'u:' + str(int(created_by_user_id))
+        try:
+            if isinstance(users_map, dict):
+                responsible_name = str(users_map.get(int(created_by_user_id)) or '').strip()
+        except Exception:
+            responsible_name = ''
+        if not responsible_name:
+            try:
+                from flask_login import current_user
+
+                if getattr(current_user, 'is_authenticated', False) and int(getattr(current_user, 'id', 0) or 0) == int(created_by_user_id):
+                    responsible_name = str(getattr(current_user, 'display_name', '') or getattr(current_user, 'username', '') or '').strip()
+            except Exception:
+                responsible_name = ''
+        responsible_name = responsible_name or ('Usuario #' + str(int(created_by_user_id)))
 
     return {
         'id': row.id,
@@ -460,11 +659,14 @@ def _serialize_sale(row: Sale, related: dict = None):
         'discount_general_amount': row.discount_general_amount,
         'customer_id': row.customer_id or '',
         'customer_name': row.customer_name or '',
-        'employee_id': getattr(row, 'employee_id', None) or '',
-        'employee_name': getattr(row, 'employee_name', None) or '',
+        'employee_id': emp_id,
+        'employee_name': emp_name,
+        'responsible_id': responsible_id,
+        'responsible_name': responsible_name,
         'on_account': bool(row.on_account),
         'paid_amount': row.paid_amount,
         'due_amount': row.due_amount,
+        'is_installments': bool(getattr(row, 'is_installments', False)),
         'exchange_return_total': row.exchange_return_total,
         'exchange_new_total': row.exchange_new_total,
         'created_at': _dt_to_ms(row.created_at),
@@ -697,6 +899,31 @@ def list_sales():
     q = q.order_by(Sale.sale_date.desc(), Sale.id.desc()).limit(limit)
     rows = q.all()
 
+    users_map: dict[int, str] = {}
+    try:
+        uids = set()
+        for r in rows:
+            try:
+                uid = int(getattr(r, 'created_by_user_id', 0) or 0) or 0
+            except Exception:
+                uid = 0
+            if uid:
+                uids.add(int(uid))
+        if uids:
+            uq = db.session.query(User).filter(User.id.in_(sorted(uids)))
+            try:
+                uq = uq.filter((User.company_id == cid) | (User.company_id.is_(None)))
+            except Exception:
+                pass
+            for u in (uq.all() or []):
+                try:
+                    name = str(getattr(u, 'display_name', '') or getattr(u, 'username', '') or getattr(u, 'email', '') or '').strip()
+                    users_map[int(getattr(u, 'id', 0) or 0)] = name or ('Usuario #' + str(int(getattr(u, 'id', 0) or 0)))
+                except Exception:
+                    continue
+    except Exception:
+        users_map = {}
+
     by_ticket = {}
     for r in rows:
         try:
@@ -808,7 +1035,7 @@ def list_sales():
                 'url': '',
             }
 
-    return jsonify({'ok': True, 'items': [_serialize_sale(r, related=related_map.get(int(r.id))) for r in rows]})
+    return jsonify({'ok': True, 'items': [_serialize_sale(r, related=related_map.get(int(r.id)), users_map=users_map) for r in rows]})
 
 
 @bp.get('/api/sales/<ticket>')
@@ -1072,6 +1299,12 @@ def settle_cc_sale():
     if str(getattr(row, 'company_id', '') or '') != cid:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
+    try:
+        if bool(getattr(row, 'is_installments', False)):
+            return jsonify({'ok': False, 'error': 'installments_not_cc'}), 400
+    except Exception:
+        pass
+
     due = float(row.due_amount or 0.0)
     if due <= 0:
         return jsonify({'ok': False, 'error': 'no_due'}), 400
@@ -1090,10 +1323,18 @@ def settle_cc_sale():
     if pay_amount - abs(due) > 0.00001:
         return jsonify({'ok': False, 'error': 'amount_exceeds_due'}), 400
 
-    settle_date = dt_date.today()
+    settle_date = _parse_date_iso(payload.get('date') or payload.get('fecha'), dt_date.today())
     base_n = _next_ticket_number(cid)
     ref = str(row.ticket or '').strip()
-    note = f"Cobro cuenta corriente (Ticket {ref})"
+    try:
+        note_products = _products_label_from_sale(row)
+    except Exception:
+        note_products = 'Producto —'
+    cust_txt = str(getattr(row, 'customer_name', '') or '').strip() or '—'
+    if ref:
+        note = f"Cobro cuenta corriente – Ticket #{ref} – {note_products} – Cliente {cust_txt}"
+    else:
+        note = f"Cobro cuenta corriente – {note_products} – Cliente {cust_txt}"
 
     attempts = 0
     while attempts < 10:
@@ -1122,6 +1363,21 @@ def settle_cc_sale():
             exchange_return_total=None,
             exchange_new_total=None,
         )
+        try:
+            for it in (row.items or []):
+                db.session.add(SaleItem(
+                    company_id=cid,
+                    sale=payment_sale,
+                    direction=str(getattr(it, 'direction', '') or 'out'),
+                    product_id=str(getattr(it, 'product_id', '') or '').strip() or None,
+                    product_name=str(getattr(it, 'product_name', '') or 'Producto'),
+                    qty=float(getattr(it, 'qty', 0.0) or 0.0),
+                    unit_price=float(getattr(it, 'unit_price', 0.0) or 0.0),
+                    discount_pct=float(getattr(it, 'discount_pct', 0.0) or 0.0),
+                    subtotal=float(getattr(it, 'subtotal', 0.0) or 0.0),
+                ))
+        except Exception:
+            current_app.logger.exception('Failed to copy items to CobroCC payment sale')
         try:
             from flask_login import current_user
             uid = int(getattr(current_user, 'id', 0) or 0) or None
@@ -1534,6 +1790,187 @@ def _revert_inventory_for_ticket(ticket: str):
         db.session.delete(m)
 
 
+def _revert_installment_payment_by_sale_id(*, cid: str, paid_sale_id: int):
+    try:
+        sid = int(paid_sale_id or 0)
+    except Exception:
+        sid = 0
+    if sid <= 0:
+        return
+
+    rows = (
+        db.session.query(Installment)
+        .filter(Installment.company_id == cid)
+        .filter(Installment.paid_sale_id == sid)
+        .with_for_update()
+        .all()
+    )
+    for it in (rows or []):
+        try:
+            it.status = 'pendiente'
+        except Exception:
+            pass
+        try:
+            it.paid_at = None
+        except Exception:
+            pass
+        try:
+            it.paid_payment_method = None
+        except Exception:
+            pass
+        try:
+            it.paid_sale_id = None
+        except Exception:
+            pass
+
+
+def _delete_sale_full(*, cid: str, ticket: str, visited: set[str]):
+    t = str(ticket or '').strip()
+    if not t:
+        return
+    if t in visited:
+        return
+    visited.add(t)
+
+    row = (
+        db.session.query(Sale)
+        .filter(Sale.company_id == cid, Sale.ticket == t)
+        .with_for_update()
+        .first()
+    )
+    if not row:
+        return
+
+    try:
+        st = str(getattr(row, 'sale_type', '') or '').strip()
+        notes = str(getattr(row, 'notes', '') or '')
+        if st in ('AjusteInvCosto', 'IngresoAjusteInv') or ('AdjustmentId:' in notes):
+            return
+    except Exception:
+        return
+
+    related_ticket = ''
+    try:
+        note_rel = str(getattr(row, 'notes', '') or '').strip()
+        if note_rel:
+            mrel = re.search(r"Relacionado\s+a\s+(?:venta|cambio)\s+([^\n\r]+)", note_rel, re.IGNORECASE)
+            if mrel and mrel.group(1):
+                related_ticket = str(mrel.group(1)).strip()
+    except Exception:
+        current_app.logger.exception('Failed to parse related ticket from notes')
+        related_ticket = ''
+
+    try:
+        if str(getattr(row, 'sale_type', '') or '').strip() == 'CobroCC':
+            note = str(getattr(row, 'notes', '') or '').strip()
+            ref = ''
+            m = re.search(r"Ticket\s+([^\)\n\r]+)", note)
+            if m and m.group(1):
+                ref = str(m.group(1)).strip()
+            if ref:
+                orig = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == ref).with_for_update().first()
+                if orig:
+                    amt = abs(float(getattr(row, 'total', 0.0) or 0.0))
+                    orig.paid_amount = max(0.0, float(orig.paid_amount or 0.0) - amt)
+                    orig.due_amount = max(0.0, float(orig.due_amount or 0.0) + amt)
+                    orig.on_account = bool(orig.due_amount and float(orig.due_amount or 0.0) > 0)
+                    prev = str(orig.notes or '').strip()
+                    extra = f"Cobro CC revertido por eliminación de {t}".strip()
+                    orig.notes = (prev + ('\n' if prev else '') + extra) if extra else (prev or None)
+    except Exception:
+        current_app.logger.exception('Failed to revert CobroCC side-effects')
+
+    try:
+        _revert_installment_payment_by_sale_id(cid=cid, paid_sale_id=int(getattr(row, 'id', 0) or 0))
+    except Exception:
+        current_app.logger.exception('Failed to revert CobroCuota side-effects')
+
+    paid_sale_ids: set[int] = set()
+    try:
+        plans = (
+            db.session.query(InstallmentPlan)
+            .filter(InstallmentPlan.company_id == cid)
+            .filter(or_(InstallmentPlan.sale_id == row.id, InstallmentPlan.sale_ticket == t))
+            .with_for_update()
+            .all()
+        )
+    except Exception:
+        plans = []
+
+    for plan in (plans or []):
+        insts = (
+            db.session.query(Installment)
+            .filter(Installment.company_id == cid)
+            .filter(Installment.plan_id == plan.id)
+            .with_for_update()
+            .all()
+        )
+        for it in (insts or []):
+            try:
+                psid = int(getattr(it, 'paid_sale_id', 0) or 0)
+            except Exception:
+                psid = 0
+            if psid > 0:
+                paid_sale_ids.add(psid)
+            db.session.delete(it)
+        db.session.delete(plan)
+
+    # Si esta venta tiene cobros de cuenta corriente asociados (tickets CobroCC), eliminarlos también.
+    # El vínculo es por nota: "Cobro cuenta corriente (Ticket <ref>)".
+    try:
+        if str(getattr(row, 'sale_type', '') or '').strip() != 'CobroCC':
+            needle = f"Ticket {t}"
+            cc_payments = (
+                db.session.query(Sale)
+                .filter(Sale.company_id == cid)
+                .filter(Sale.sale_type == 'CobroCC')
+                .filter(Sale.notes.isnot(None))
+                .filter(Sale.notes.ilike(f"%{needle}%"))
+                .with_for_update()
+                .all()
+            )
+            for pay in (cc_payments or []):
+                pt = str(getattr(pay, 'ticket', '') or '').strip()
+                if pt and pt != t:
+                    visited.add(pt)
+                db.session.delete(pay)
+    except Exception:
+        current_app.logger.exception('Failed to delete associated CobroCC tickets')
+
+    if related_ticket and related_ticket != t:
+        try:
+            _delete_sale_full(cid=cid, ticket=related_ticket, visited=visited)
+        except Exception:
+            current_app.logger.exception('Failed to delete related ticket')
+
+    try:
+        _revert_inventory_for_ticket(t)
+    except Exception:
+        current_app.logger.exception('Failed to revert inventory for ticket')
+
+    for psid in sorted(paid_sale_ids):
+        if psid <= 0:
+            continue
+        if int(getattr(row, 'id', 0) or 0) == psid:
+            continue
+        pay_row = db.session.get(Sale, psid)
+        if not pay_row:
+            continue
+        if str(getattr(pay_row, 'company_id', '') or '') != cid:
+            continue
+        try:
+            _revert_installment_payment_by_sale_id(cid=cid, paid_sale_id=psid)
+        except Exception:
+            pass
+        try:
+            _revert_inventory_for_ticket(str(getattr(pay_row, 'ticket', '') or '').strip())
+        except Exception:
+            pass
+        db.session.delete(pay_row)
+
+    db.session.delete(row)
+
+
 def _mark_sale_replaced(*, ticket: str, replaced_by: str):
     t = str(ticket or '').strip()
     if not t:
@@ -1581,11 +2018,17 @@ def _next_exchange_ticket() -> str:
 @module_required('sales')
 def create_sale():
     _ensure_sale_employee_columns()
+    _ensure_installment_plan_columns()
     payload = request.get_json(silent=True) or {}
     sale_date = _parse_date_iso(payload.get('fecha') or payload.get('date'), dt_date.today())
     sale_type = str(payload.get('type') or 'Venta').strip() or 'Venta'
     status = str(payload.get('status') or ('Cambio' if sale_type == 'Cambio' else 'Completada')).strip() or 'Completada'
     payment_method = str(payload.get('payment_method') or 'Efectivo').strip() or 'Efectivo'
+
+    inst_raw = payload.get('installments')
+    inst = inst_raw if isinstance(inst_raw, dict) else {}
+    inst_enabled = bool(inst.get('enabled'))
+    inst_mode = str(inst.get('mode') or inst.get('installments_mode') or inst.get('installmentsMode') or 'fixed').strip().lower() or 'fixed'
 
     cid = _company_id()
     if not cid:
@@ -1597,13 +2040,100 @@ def create_sale():
     raw_emp_name = str(payload.get('employee_name') or '').strip() or None
     emp_id, emp_name = _resolve_employee_fields(cid=cid, employee_id=raw_emp_id, employee_name=raw_emp_name)
 
-    attempts = 0
+    items = payload.get('items')
+    items_list = items if isinstance(items, list) else []
+
+    is_gift = bool(payload.get('is_gift'))
+    gift_code_raw = str(payload.get('gift_code') or '').strip() or None
+
+    total_amount = _num(payload.get('total'))
+    discount_general_pct = _num(payload.get('discount_general_pct'))
+    discount_general_amount = _num(payload.get('discount_general_amount'))
+
+    customer_id = str(payload.get('customer_id') or '').strip() or None
+    customer_name = str(payload.get('customer_name') or '').strip() or None
+
+    exchange_return_total = (None if payload.get('exchange_return_total') is None else _num(payload.get('exchange_return_total')))
+    exchange_new_total = (None if payload.get('exchange_new_total') is None else _num(payload.get('exchange_new_total')))
+
+    on_account = bool(payload.get('on_account'))
+    paid_amount = _num(payload.get('paid_amount'))
+    due_amount = _num(payload.get('due_amount'))
+
+    start_date = None
+    interval_days = 30
+    inst_count = 1
+    first_payment_method = payment_method
+    amounts: list[float] = []
+    base_each = 0.0
+    amount_per_period = 0.0
+
+    if inst_enabled:
+        bs = BusinessSettings.get_for_company(cid)
+        if not bs or not bool(getattr(bs, 'habilitar_sistema_cuotas', False)):
+            return jsonify({'ok': False, 'error': 'installments_disabled'}), 400
+
+        if inst_mode != 'indefinite':
+            try:
+                inst_count = int(inst.get('installments_count') or inst.get('installmentsCount') or inst.get('count') or 1)
+            except Exception:
+                inst_count = 1
+            if inst_count < 1:
+                inst_count = 1
+            if inst_count > 24:
+                return jsonify({'ok': False, 'error': 'installments_invalid', 'message': 'Máximo 24 cuotas.'}), 400
+
+        try:
+            interval_days = int(inst.get('interval_days') or inst.get('intervalDays') or 30)
+        except Exception:
+            interval_days = 30
+        # Regla de negocio: intervalo válido 1..60 (default 30)
+        if interval_days < 1:
+            interval_days = 1
+        if interval_days > 60:
+            interval_days = 60
+
+        start_date = _parse_date_iso(inst.get('start_date') or inst.get('startDate') or payload.get('fecha') or payload.get('date'), sale_date)
+        first_payment_method = str(inst.get('first_payment_method') or inst.get('firstPaymentMethod') or payment_method).strip() or payment_method
+
+        if inst_mode == 'indefinite':
+            # Cuotas indefinidas = cobros recurrentes del total del carrito (sin división en cuotas).
+            # El monto por período no se toma del frontend.
+            amount_per_period = float(total_amount)
+            base_each = float(amount_per_period)
+            amounts = [float(amount_per_period)]
+
+            on_account = True
+            paid_amount = float(amount_per_period)
+            due_amount = 0.0
+        else:
+            try:
+                total_cents = int(round(float(total_amount or 0.0) * 100))
+            except Exception:
+                total_cents = 0
+            base = total_cents // int(inst_count or 1)
+            rem = total_cents - base * int(inst_count or 1)
+            for i in range(int(inst_count or 1)):
+                cents = base + (1 if i < rem else 0)
+                amounts.append(float(cents) / 100.0)
+            base_each = float(amounts[0] if amounts else 0.0)
+
+            on_account = True
+            paid_amount = float(amounts[0] if amounts else 0.0)
+            due_amount = float(max(0.0, float(total_amount or 0.0) - float(paid_amount or 0.0)))
+
+        if not customer_id and not customer_name:
+            return jsonify({'ok': False, 'error': 'customer_required'}), 400
+
     row = None
+    payment_sale = None
+    attempts = 0
     base_n = _next_ticket_number(cid)
-    while attempts < 5:
+    while attempts < 10:
         n = base_n + attempts
         attempts += 1
         tk = _format_ticket_number(n)
+
         row = Sale(
             ticket=tk,
             ticket_number=n,
@@ -1613,38 +2143,40 @@ def create_sale():
             status=status,
             payment_method=payment_method,
             notes=str(payload.get('notes') or '').strip() or None,
-            total=_num(payload.get('total')),
-            discount_general_pct=_num(payload.get('discount_general_pct')),
-            discount_general_amount=_num(payload.get('discount_general_amount')),
-            on_account=bool(payload.get('on_account')),
-            paid_amount=_num(payload.get('paid_amount')),
-            due_amount=_num(payload.get('due_amount')),
-            customer_id=str(payload.get('customer_id') or '').strip() or None,
-            customer_name=str(payload.get('customer_name') or '').strip() or None,
+            total=total_amount,
+            discount_general_pct=discount_general_pct,
+            discount_general_amount=discount_general_amount,
+            on_account=bool(on_account),
+            paid_amount=paid_amount,
+            due_amount=due_amount,
+            customer_id=customer_id,
+            customer_name=customer_name,
             employee_id=emp_id,
             employee_name=emp_name,
-            exchange_return_total=(None if payload.get('exchange_return_total') is None else _num(payload.get('exchange_return_total'))),
-            exchange_new_total=(None if payload.get('exchange_new_total') is None else _num(payload.get('exchange_new_total'))),
+            exchange_return_total=exchange_return_total,
+            exchange_new_total=exchange_new_total,
         )
+        if inst_enabled:
+            try:
+                row.is_installments = True
+            except Exception:
+                pass
+
+        try:
+            row.is_gift = is_gift
+            gift_code = gift_code_raw
+            if is_gift and not gift_code:
+                gift_code = _make_gift_code(row.ticket, items_list)
+            row.gift_code = gift_code
+        except Exception:
+            current_app.logger.exception('Failed to apply gift_code for sale')
+
         try:
             from flask_login import current_user
             row.created_by_user_id = int(getattr(current_user, 'id', 0) or 0) or None
         except Exception:
             current_app.logger.exception('Failed to set created_by_user_id for sale')
             row.created_by_user_id = None
-
-        items = payload.get('items')
-        items_list = items if isinstance(items, list) else []
-
-        is_gift = bool(payload.get('is_gift'))
-        gift_code = str(payload.get('gift_code') or '').strip() or None
-        try:
-            row.is_gift = is_gift
-            if is_gift and not gift_code:
-                gift_code = _make_gift_code(row.ticket, items_list)
-            row.gift_code = gift_code
-        except Exception:
-            current_app.logger.exception('Failed to apply gift_code for sale')
 
         for it in items_list:
             d = it if isinstance(it, dict) else {}
@@ -1661,22 +2193,707 @@ def create_sale():
         db.session.add(row)
         try:
             db.session.flush()
-            try:
-                _apply_inventory_for_sale(sale_ticket=row.ticket, sale_date=sale_date, items=items_list)
-            except ValueError as e:
-                db.session.rollback()
-                return jsonify({'ok': False, 'error': 'stock_insufficient', 'message': str(e)}), 400
-            db.session.commit()
-            return jsonify({'ok': True, 'item': _serialize_sale(row)})
         except IntegrityError:
             db.session.rollback()
             continue
+        except Exception as e:
+            current_app.logger.exception('Failed to flush sale')
+            db.session.rollback()
+            return jsonify({'ok': False, 'error': 'db_error', 'message': str(e)}), 400
 
-    return jsonify({
-        'ok': False,
-        'error': 'ticket_duplicate',
-        'message': 'No se pudo registrar la venta: ticket duplicado.',
-    }), 400
+        if inst_enabled:
+            plan = InstallmentPlan(
+                company_id=cid,
+                sale_id=row.id,
+                sale_ticket=row.ticket,
+                customer_id=str(customer_id or customer_name or '').strip(),
+                customer_name=str(customer_name or '').strip() or None,
+                start_date=start_date or sale_date,
+                interval_days=int(interval_days),
+                installments_count=int(inst_count),
+                is_indefinite=bool(inst_mode == 'indefinite'),
+                amount_per_period=float(amount_per_period or 0.0),
+                mode=('indefinite' if inst_mode == 'indefinite' else 'fixed'),
+                total_amount=float(total_amount or 0.0),
+                installment_amount=float(base_each or 0.0),
+                first_payment_method=str(first_payment_method or '').strip() or None,
+                status='activo',
+            )
+            db.session.add(plan)
+            try:
+                db.session.flush()
+            except Exception as e:
+                current_app.logger.exception('Failed to create installment plan')
+                db.session.rollback()
+                return jsonify({'ok': False, 'error': 'installments_plan_failed', 'message': str(e)}), 400
+
+            inst_rows = []
+            if inst_mode == 'indefinite':
+                # Solo generamos el primer cobro y un próximo vencimiento a futuro.
+                first_due = (start_date or sale_date)
+                next_due = first_due + timedelta(days=int(interval_days))
+                first_inst = Installment(
+                    company_id=cid,
+                    plan_id=plan.id,
+                    installment_number=1,
+                    due_date=first_due,
+                    amount=float(amount_per_period or 0.0),
+                    status='pagada',
+                )
+                first_inst.paid_at = datetime.utcnow()
+                first_inst.paid_payment_method = str(first_payment_method)
+                db.session.add(first_inst)
+                inst_rows.append(first_inst)
+
+                next_inst = Installment(
+                    company_id=cid,
+                    plan_id=plan.id,
+                    installment_number=2,
+                    due_date=next_due,
+                    amount=float(amount_per_period or 0.0),
+                    status='pendiente',
+                )
+                db.session.add(next_inst)
+                inst_rows.append(next_inst)
+            else:
+                for i in range(1, int(inst_count) + 1):
+                    due_d = (start_date or sale_date) + timedelta(days=(i - 1) * int(interval_days))
+                    ir = Installment(
+                        company_id=cid,
+                        plan_id=plan.id,
+                        installment_number=i,
+                        due_date=due_d,
+                        amount=float(amounts[i - 1] if i - 1 < len(amounts) else 0.0),
+                        status=('pagada' if i == 1 else 'pendiente'),
+                    )
+                    if i == 1:
+                        ir.paid_at = datetime.utcnow()
+                        ir.paid_payment_method = str(first_payment_method)
+                    db.session.add(ir)
+                    inst_rows.append(ir)
+            try:
+                db.session.flush()
+            except Exception as e:
+                current_app.logger.exception('Failed to create installments')
+                db.session.rollback()
+                return jsonify({'ok': False, 'error': 'installments_create_failed', 'message': str(e)}), 400
+
+            # Create payment ticket for first installment (cash impact)
+            pay_base = _next_ticket_number(cid)
+            pay_attempts = 0
+            payment_sale = None
+            while pay_attempts < 10 and payment_sale is None:
+                pay_n = int(pay_base) + int(pay_attempts)
+                pay_attempts += 1
+                pay_ticket = _format_ticket_number(pay_n)
+
+                try:
+                    note = _format_installment_payment_note(plan, inst_rows[0] if inst_rows else None)
+                except Exception:
+                    note = f"Cobro cuota N° 1 – Plan #{int(getattr(plan, 'id', 0) or 0)} – Cliente {str(getattr(row, 'customer_name', '') or '').strip() or '—'} – Ticket original #{row.ticket}"
+
+                payment_sale = Sale(
+                    ticket=pay_ticket,
+                    ticket_number=pay_n,
+                    company_id=cid,
+                    sale_date=sale_date,
+                    sale_type='CobroCuota',
+                    status='Completada',
+                    payment_method=first_payment_method,
+                    notes=note,
+                    total=float(amounts[0] if amounts else 0.0),
+                    discount_general_pct=0.0,
+                    discount_general_amount=0.0,
+                    on_account=False,
+                    paid_amount=float(amounts[0] if amounts else 0.0),
+                    due_amount=0.0,
+                    customer_id=row.customer_id,
+                    customer_name=_resolve_customer_display_name(cid, str(getattr(row, 'customer_id', '') or '').strip() or None, str(getattr(row, 'customer_name', '') or '').strip() or None),
+                    employee_id=emp_id,
+                    employee_name=emp_name,
+                    exchange_return_total=None,
+                    exchange_new_total=None,
+                )
+                try:
+                    from flask_login import current_user
+                    payment_sale.created_by_user_id = int(getattr(current_user, 'id', 0) or 0) or None
+                except Exception:
+                    payment_sale.created_by_user_id = None
+
+                nested = None
+                try:
+                    nested = db.session.begin_nested()
+                except Exception:
+                    nested = None
+                db.session.add(payment_sale)
+                try:
+                    db.session.flush()
+                    if nested:
+                        try:
+                            nested.commit()
+                        except Exception:
+                            pass
+                    break
+                except IntegrityError:
+                    try:
+                        if nested:
+                            nested.rollback()
+                    except Exception:
+                        pass
+                    payment_sale = None
+                    continue
+
+            if not payment_sale:
+                db.session.rollback()
+                return jsonify({'ok': False, 'error': 'installments_payment_failed'}), 400
+
+            try:
+                inst_rows[0].paid_sale_id = int(payment_sale.id)
+            except Exception:
+                pass
+
+        try:
+            _apply_inventory_for_sale(sale_ticket=row.ticket, sale_date=sale_date, items=items_list)
+        except ValueError as e:
+            db.session.rollback()
+            return jsonify({'ok': False, 'error': 'stock_insufficient', 'message': str(e)}), 400
+        except Exception as e:
+            current_app.logger.exception('Failed to apply inventory for sale')
+            db.session.rollback()
+            return jsonify({'ok': False, 'error': 'inventory_apply_failed', 'message': str(e)}), 400
+
+        try:
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.exception('Failed to commit sale')
+            db.session.rollback()
+            return jsonify({'ok': False, 'error': 'db_error', 'message': str(e)}), 400
+
+        if inst_enabled:
+            return jsonify({'ok': True, 'item': _serialize_sale(row), 'payment': _serialize_sale(payment_sale)})
+        return jsonify({'ok': True, 'item': _serialize_sale(row)})
+
+    return jsonify({'ok': False, 'error': 'ticket_duplicate', 'message': 'No se pudo registrar la venta: ticket duplicado.'}), 400
+
+
+@bp.get('/api/installment-plans')
+@login_required
+@module_required_any('sales', 'customers')
+def list_installment_plans():
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    bs = BusinessSettings.get_for_company(cid)
+    if not bs or not bool(getattr(bs, 'habilitar_sistema_cuotas', False)):
+        return jsonify({'ok': False, 'error': 'installments_disabled'}), 400
+    try:
+        limit = int(request.args.get('limit') or 300)
+    except Exception:
+        limit = 300
+    if limit <= 0 or limit > 20000:
+        limit = 300
+    status = str(request.args.get('status') or '').strip().lower()
+    customer_id = str(request.args.get('customer_id') or '').strip()
+    q = (
+        db.session.query(InstallmentPlan)
+        .options(selectinload(InstallmentPlan.sale).selectinload(Sale.items))
+        .filter(InstallmentPlan.company_id == cid)
+    )
+    if status:
+        q = q.filter(func.lower(InstallmentPlan.status) == status)
+    if customer_id:
+        q = q.filter(InstallmentPlan.customer_id == customer_id)
+    q = q.order_by(InstallmentPlan.id.desc()).limit(limit)
+    rows = q.all()
+    items = []
+    for p in (rows or []):
+        try:
+            is_indef = bool(getattr(p, 'is_indefinite', False)) or (str(getattr(p, 'mode', '') or '').strip().lower() == 'indefinite')
+        except Exception:
+            is_indef = False
+        unlimited_price = None
+        if is_indef:
+            try:
+                unlimited_price = _resolve_unlimited_plan_price(cid=cid, plan=p)
+            except Exception:
+                unlimited_price = None
+        try:
+            paid = 0.0
+            pending = 0.0
+            next_due = None
+            for it in (getattr(p, 'installments', None) or []):
+                st = str(getattr(it, 'status', '') or '').strip().lower()
+                amt = float(getattr(it, 'amount', 0.0) or 0.0)
+                if unlimited_price is not None and st != 'pagada':
+                    amt = float(unlimited_price)
+                if st == 'pagada':
+                    paid += amt
+                else:
+                    pending += amt
+                    dd = getattr(it, 'due_date', None)
+                    if dd and (next_due is None or dd < next_due):
+                        next_due = dd
+        except Exception:
+            paid = 0.0
+            pending = 0.0
+            next_due = None
+        try:
+            products_label = _products_label_from_sale(getattr(p, 'sale', None))
+        except Exception:
+            products_label = 'Producto —'
+
+        items.append({
+            'id': p.id,
+            'sale_id': p.sale_id,
+            'sale_ticket': p.sale_ticket or '',
+            'customer_id': p.customer_id or '',
+            'customer_name': p.customer_name or '',
+            'products_label': products_label,
+            'start_date': p.start_date.isoformat() if p.start_date else None,
+            'interval_days': p.interval_days,
+            'installments_count': p.installments_count,
+            'is_indefinite': bool(getattr(p, 'is_indefinite', False)),
+            'amount_per_period': float(unlimited_price if unlimited_price is not None else (getattr(p, 'amount_per_period', 0.0) or 0.0)),
+            'mode': str(getattr(p, 'mode', '') or 'fixed'),
+            'total_amount': p.total_amount,
+            'installment_amount': float(unlimited_price if unlimited_price is not None else (getattr(p, 'installment_amount', 0.0) or 0.0)),
+            'first_payment_method': p.first_payment_method or '',
+            'status': p.status,
+            'paid_amount': paid,
+            'pending_amount': pending,
+            'next_due_date': next_due.isoformat() if next_due else None,
+            'created_at': _dt_to_ms(p.created_at),
+            'updated_at': _dt_to_ms(p.updated_at),
+        })
+    return jsonify({'ok': True, 'items': items})
+
+
+def _ensure_installments_enabled(cid: str) -> bool:
+    try:
+        bs = BusinessSettings.get_for_company(cid)
+        return bool(bs and bool(getattr(bs, 'habilitar_sistema_cuotas', False)))
+    except Exception:
+        return False
+
+
+def _pay_installment_row(cid: str, inst_row: Installment, pay_date: dt_date, payment_method: str, emp_id: str = None, emp_name: str = None):
+    if not inst_row:
+        return None, 'not_found'
+    if str(getattr(inst_row, 'company_id', '') or '') != cid:
+        return None, 'not_found'
+    if str(getattr(inst_row, 'status', '') or '').strip().lower() == 'pagada':
+        return None, 'already_paid'
+
+    plan = db.session.query(InstallmentPlan).filter(InstallmentPlan.company_id == cid, InstallmentPlan.id == inst_row.plan_id).first()
+    if not plan:
+        return None, 'plan_not_found'
+    if str(getattr(plan, 'status', '') or '').strip().lower() not in ('activo', 'active', 'activa'):
+        return None, 'plan_inactive'
+
+    is_indef = False
+    try:
+        is_indef = bool(getattr(plan, 'is_indefinite', False)) or (str(getattr(plan, 'mode', '') or '').strip().lower() == 'indefinite')
+    except Exception:
+        is_indef = False
+
+    # Cuotas ilimitadas: el monto se deriva del precio vigente del producto.
+    if is_indef:
+        try:
+            price = _resolve_unlimited_plan_price(cid=cid, plan=plan)
+        except Exception:
+            price = None
+        if price is not None and float(price) > 0:
+            try:
+                inst_row.amount = float(price)
+            except Exception:
+                pass
+
+    _ensure_sale_ticket_numbering()
+    base_n = _next_ticket_number(cid)
+    attempts = 0
+    payment_sale = None
+    while attempts < 10 and payment_sale is None:
+        n = base_n + attempts
+        attempts += 1
+        tk = _format_ticket_number(n)
+        note = _format_installment_payment_note(plan, inst_row)
+
+        cust_id = str(getattr(plan, 'customer_id', None) or '').strip() or None
+        cust_name = _resolve_customer_display_name(cid, cust_id, str(getattr(plan, 'customer_name', None) or '').strip() or None)
+
+        amount = float(getattr(inst_row, 'amount', 0.0) or 0.0)
+        payment_type = 'CobroCuota'
+        if is_indef:
+            payment_type = 'Venta'
+
+        payment_sale = Sale(
+            ticket=tk,
+            ticket_number=n,
+            company_id=cid,
+            sale_date=pay_date,
+            sale_type=payment_type,
+            status='Completada',
+            payment_method=payment_method,
+            notes=note,
+            total=float(amount or 0.0),
+            discount_general_pct=0.0,
+            discount_general_amount=0.0,
+            on_account=False,
+            paid_amount=float(amount or 0.0),
+            due_amount=0.0,
+            customer_id=cust_id,
+            customer_name=cust_name,
+            employee_id=emp_id,
+            employee_name=emp_name,
+            exchange_return_total=None,
+            exchange_new_total=None,
+        )
+        try:
+            from flask_login import current_user
+            payment_sale.created_by_user_id = int(getattr(current_user, 'id', 0) or 0) or None
+        except Exception:
+            payment_sale.created_by_user_id = None
+
+        db.session.add(payment_sale)
+        try:
+            src_sale = None
+            try:
+                sid = int(getattr(plan, 'sale_id', 0) or 0)
+            except Exception:
+                sid = 0
+            if sid > 0:
+                src_sale = db.session.query(Sale).options(selectinload(Sale.items)).filter(Sale.company_id == cid, Sale.id == sid).first()
+            if src_sale:
+                for it in (src_sale.items or []):
+                    db.session.add(SaleItem(
+                        company_id=cid,
+                        sale=payment_sale,
+                        direction=str(getattr(it, 'direction', '') or 'out'),
+                        product_id=str(getattr(it, 'product_id', '') or '').strip() or None,
+                        product_name=str(getattr(it, 'product_name', '') or 'Producto'),
+                        qty=float(getattr(it, 'qty', 0.0) or 0.0),
+                        unit_price=float(getattr(it, 'unit_price', 0.0) or 0.0),
+                        discount_pct=float(getattr(it, 'discount_pct', 0.0) or 0.0),
+                        subtotal=float(getattr(it, 'subtotal', 0.0) or 0.0),
+                    ))
+        except Exception:
+            current_app.logger.exception('Failed to copy items to installment payment sale')
+        try:
+            db.session.flush()
+        except IntegrityError:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            payment_sale = None
+            continue
+
+    if not payment_sale:
+        return None, 'ticket_duplicate'
+
+    inst_row.status = 'pagada'
+    inst_row.paid_at = datetime.utcnow()
+    inst_row.paid_payment_method = payment_method
+    try:
+        inst_row.paid_sale_id = int(payment_sale.id)
+    except Exception:
+        inst_row.paid_sale_id = None
+
+    try:
+        all_paid = True
+        for it in (plan.installments or []):
+            if str(getattr(it, 'status', '') or '').strip().lower() != 'pagada':
+                all_paid = False
+                break
+        if all_paid and not (bool(getattr(plan, 'is_indefinite', False)) or (str(getattr(plan, 'mode', '') or '').strip().lower() == 'indefinite')):
+            plan.status = 'pagado'
+    except Exception:
+        pass
+
+    # En modo indefinido, aseguramos que exista el próximo vencimiento.
+    try:
+        is_indef = bool(getattr(plan, 'is_indefinite', False)) or (str(getattr(plan, 'mode', '') or '').strip().lower() == 'indefinite')
+        if is_indef:
+            interval_days = int(getattr(plan, 'interval_days', 30) or 30)
+            if interval_days < 1:
+                interval_days = 1
+            last_n = 0
+            last_due = None
+            pending_exists = False
+            for it in (plan.installments or []):
+                n = int(getattr(it, 'installment_number', 0) or 0)
+                if n > last_n:
+                    last_n = n
+                    last_due = getattr(it, 'due_date', None)
+                if str(getattr(it, 'status', '') or '').strip().lower() != 'pagada':
+                    pending_exists = True
+
+            if not pending_exists and last_due:
+                next_due = last_due + timedelta(days=interval_days)
+                try:
+                    amt = _resolve_unlimited_plan_price(cid=cid, plan=plan)
+                except Exception:
+                    amt = None
+                if amt is None:
+                    amt = float(getattr(plan, 'amount_per_period', 0.0) or getattr(plan, 'installment_amount', 0.0) or 0.0)
+                if amt > 0:
+                    db.session.add(Installment(
+                        company_id=cid,
+                        plan_id=plan.id,
+                        installment_number=int(last_n + 1),
+                        due_date=next_due,
+                        amount=amt,
+                        status='pendiente',
+                    ))
+    except Exception:
+        pass
+
+    return payment_sale, None
+
+
+@bp.get('/api/installment-plans/<int:plan_id>')
+@login_required
+@module_required_any('sales', 'customers')
+def get_installment_plan(plan_id: int):
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    pid = int(plan_id or 0)
+    if pid <= 0:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    row = (
+        db.session.query(InstallmentPlan)
+        .options(selectinload(InstallmentPlan.sale).selectinload(Sale.items))
+        .filter(InstallmentPlan.company_id == cid, InstallmentPlan.id == pid)
+        .first()
+    )
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    try:
+        products_label = _products_label_from_sale(getattr(row, 'sale', None))
+    except Exception:
+        products_label = 'Producto —'
+
+    unlimited_price = None
+    try:
+        is_indef = bool(getattr(row, 'is_indefinite', False)) or (str(getattr(row, 'mode', '') or '').strip().lower() == 'indefinite')
+    except Exception:
+        is_indef = False
+    if is_indef:
+        try:
+            unlimited_price = _resolve_unlimited_plan_price(cid=cid, plan=row)
+        except Exception:
+            unlimited_price = None
+    insts = []
+    for it in sorted((row.installments or []), key=lambda x: int(getattr(x, 'installment_number', 0) or 0)):
+        st = str(getattr(it, 'status', '') or '').strip().lower()
+        amt = getattr(it, 'amount', None)
+        if unlimited_price is not None and st != 'pagada':
+            amt = float(unlimited_price)
+        insts.append({
+            'id': it.id,
+            'installment_number': it.installment_number,
+            'due_date': it.due_date.isoformat() if it.due_date else None,
+            'amount': amt,
+            'status': it.status,
+            'paid_at': it.paid_at.isoformat() if it.paid_at else None,
+            'paid_payment_method': it.paid_payment_method or '',
+            'paid_sale_id': it.paid_sale_id,
+        })
+    item = {
+        'id': row.id,
+        'sale_id': row.sale_id,
+        'sale_ticket': row.sale_ticket or '',
+        'customer_id': row.customer_id or '',
+        'customer_name': row.customer_name or '',
+        'products_label': products_label,
+        'start_date': row.start_date.isoformat() if row.start_date else None,
+        'interval_days': row.interval_days,
+        'installments_count': row.installments_count,
+        'is_indefinite': bool(getattr(row, 'is_indefinite', False)),
+        'amount_per_period': float(unlimited_price if unlimited_price is not None else (getattr(row, 'amount_per_period', 0.0) or 0.0)),
+        'mode': str(getattr(row, 'mode', '') or 'fixed'),
+        'total_amount': row.total_amount,
+        'installment_amount': float(unlimited_price if unlimited_price is not None else (getattr(row, 'installment_amount', 0.0) or 0.0)),
+        'first_payment_method': row.first_payment_method or '',
+        'status': row.status,
+        'created_at': _dt_to_ms(row.created_at),
+        'updated_at': _dt_to_ms(row.updated_at),
+        'installments': insts,
+    }
+    return jsonify({'ok': True, 'item': item})
+
+
+@bp.post('/api/installments/<int:installment_id>/pay')
+@login_required
+@module_required_any('sales', 'customers')
+def pay_installment(installment_id: int):
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    if not _ensure_installments_enabled(cid):
+        return jsonify({'ok': False, 'error': 'installments_disabled'}), 400
+
+    iid = int(installment_id or 0)
+    if iid <= 0:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    inst_row = db.session.query(Installment).filter(Installment.company_id == cid, Installment.id == iid).first()
+    if not inst_row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    payload = request.get_json(silent=True) or {}
+    pay_date = _parse_date_iso(payload.get('date') or payload.get('fecha'), dt_date.today())
+    payment_method = str(payload.get('payment_method') or payload.get('forma_pago') or 'Efectivo').strip() or 'Efectivo'
+
+    plan = None
+    try:
+        plan = (
+            db.session.query(InstallmentPlan)
+            .options(selectinload(InstallmentPlan.sale).selectinload(Sale.items))
+            .filter(InstallmentPlan.company_id == cid, InstallmentPlan.id == inst_row.plan_id)
+            .first()
+        )
+    except Exception:
+        plan = None
+
+    is_indef = False
+    try:
+        is_indef = bool(plan and (bool(getattr(plan, 'is_indefinite', False)) or (str(getattr(plan, 'mode', '') or '').strip().lower() == 'indefinite')))
+    except Exception:
+        is_indef = False
+
+    if is_indef and plan:
+        try:
+            price = _resolve_unlimited_plan_price(cid=cid, plan=plan)
+        except Exception:
+            price = None
+        if price is not None and float(price) > 0:
+            inst_row.amount = float(price)
+    elif (payload.get('amount') is not None and str(payload.get('amount')).strip() != ''):
+        try:
+            amt = float(payload.get('amount'))
+        except Exception:
+            amt = None
+        if amt is not None and amt > 0:
+            inst_row.amount = float(amt)
+
+    _ensure_sale_ticket_numbering()
+    raw_emp_id = str(payload.get('employee_id') or '').strip() or None
+    raw_emp_name = str(payload.get('employee_name') or '').strip() or None
+    emp_id, emp_name = _resolve_employee_fields(cid=cid, employee_id=raw_emp_id, employee_name=raw_emp_name)
+
+    payment_sale, err = _pay_installment_row(cid=cid, inst_row=inst_row, pay_date=pay_date, payment_method=payment_method, emp_id=emp_id, emp_name=emp_name)
+    if err:
+        return jsonify({'ok': False, 'error': err}), 400
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.exception('Failed to commit installment payment')
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error', 'message': str(e)}), 400
+
+    return jsonify({'ok': True, 'payment': _serialize_sale(payment_sale)})
+
+
+@bp.post('/api/installment-plans/<int:plan_id>/pay')
+@login_required
+@module_required_any('sales', 'customers')
+def pay_installment_plan(plan_id: int):
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    if not _ensure_installments_enabled(cid):
+        return jsonify({'ok': False, 'error': 'installments_disabled'}), 400
+
+    pid = int(plan_id or 0)
+    if pid <= 0:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    plan = db.session.query(InstallmentPlan).filter(InstallmentPlan.company_id == cid, InstallmentPlan.id == pid).first()
+    if not plan:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    if str(getattr(plan, 'status', '') or '').strip().lower() not in ('activo', 'active', 'activa'):
+        return jsonify({'ok': False, 'error': 'plan_inactive'}), 400
+
+    payload = request.get_json(silent=True) or {}
+    pay_date = _parse_date_iso(payload.get('date') or payload.get('fecha'), dt_date.today())
+    payment_method = str(payload.get('payment_method') or payload.get('forma_pago') or plan.first_payment_method or 'Efectivo').strip() or 'Efectivo'
+    try:
+        count = int(payload.get('count') or 1)
+    except Exception:
+        count = 1
+    if count < 1:
+        count = 1
+    if count > 24:
+        count = 24
+
+    raw_emp_id = str(payload.get('employee_id') or '').strip() or None
+    raw_emp_name = str(payload.get('employee_name') or '').strip() or None
+    emp_id, emp_name = _resolve_employee_fields(cid=cid, employee_id=raw_emp_id, employee_name=raw_emp_name)
+
+    pending = [it for it in sorted((plan.installments or []), key=lambda x: int(getattr(x, 'installment_number', 0) or 0))
+               if str(getattr(it, 'status', '') or '').strip().lower() != 'pagada']
+    if not pending:
+        return jsonify({'ok': False, 'error': 'no_pending'}), 400
+
+    paid_sales = []
+    pay_n = 0
+    for it in pending:
+        if pay_n >= count:
+            break
+        sale, err = _pay_installment_row(cid=cid, inst_row=it, pay_date=pay_date, payment_method=payment_method, emp_id=emp_id, emp_name=emp_name)
+        if err:
+            db.session.rollback()
+            return jsonify({'ok': False, 'error': err}), 400
+        paid_sales.append(_serialize_sale(sale))
+        pay_n += 1
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.exception('Failed to commit installment plan payment')
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error', 'message': str(e)}), 400
+
+    return jsonify({'ok': True, 'payments': paid_sales})
+
+
+@bp.post('/api/installment-plans/<int:plan_id>/cancel')
+@login_required
+@module_required_any('sales', 'customers')
+def cancel_installment_plan(plan_id: int):
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    if not _ensure_installments_enabled(cid):
+        return jsonify({'ok': False, 'error': 'installments_disabled'}), 400
+
+    pid = int(plan_id or 0)
+    if pid <= 0:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    plan = db.session.query(InstallmentPlan).filter(InstallmentPlan.company_id == cid, InstallmentPlan.id == pid).first()
+    if not plan:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    st = str(getattr(plan, 'status', '') or '').strip().lower()
+    if st in ('cancelado', 'cancelada'):
+        return jsonify({'ok': True, 'item': {'id': plan.id, 'status': plan.status}})
+    if st in ('pagado', 'paid'):
+        return jsonify({'ok': False, 'error': 'plan_paid'}), 400
+
+    plan.status = 'cancelado'
+    try:
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.exception('Failed to cancel installment plan')
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error', 'message': str(e)}), 400
+
+    return jsonify({'ok': True, 'item': {'id': plan.id, 'status': plan.status}})
 
 
 @bp.put('/api/sales/<ticket>')
@@ -1799,55 +3016,8 @@ def delete_sale(ticket):
     except Exception:
         pass
     try:
-        related_ticket = ''
-        try:
-            note_rel = str(getattr(row, 'notes', '') or '').strip()
-            if note_rel:
-                import re
-                mrel = re.search(r"Relacionado\s+a\s+(?:venta|cambio)\s+([^\n\r]+)", note_rel, re.IGNORECASE)
-                if mrel and mrel.group(1):
-                    related_ticket = str(mrel.group(1)).strip()
-        except Exception:
-            current_app.logger.exception('Failed to parse related ticket from notes')
-            related_ticket = ''
-
-        # If this is a CC payment ticket, revert the settlement on the referenced original sale.
-        try:
-            if str(getattr(row, 'sale_type', '') or '').strip() == 'CobroCC':
-                note = str(getattr(row, 'notes', '') or '').strip()
-                ref = ''
-                import re
-                m = re.search(r"Ticket\s+([^\)\n\r]+)", note)
-                if m and m.group(1):
-                    ref = str(m.group(1)).strip()
-                if ref:
-                    orig = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == ref).first()
-                    if orig:
-                        amt = abs(float(getattr(row, 'total', 0.0) or 0.0))
-                        orig.paid_amount = max(0.0, float(orig.paid_amount or 0.0) - amt)
-                        orig.due_amount = max(0.0, float(orig.due_amount or 0.0) + amt)
-                        orig.on_account = bool(orig.due_amount and float(orig.due_amount or 0.0) > 0)
-                        prev = str(orig.notes or '').strip()
-                        extra = f"Cobro CC revertido por eliminación de {t}".strip()
-                        orig.notes = (prev + ('\n' if prev else '') + extra) if extra else (prev or None)
-        except Exception:
-            current_app.logger.exception('Failed to revert CobroCC side-effects')
-
-        # Revert inventory impacts for both tickets (if this sale is part of an exchange flow).
-        if related_ticket and related_ticket != t:
-            rel_row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == related_ticket).first()
-            if rel_row:
-                try:
-                    _revert_inventory_for_ticket(related_ticket)
-                except Exception:
-                    current_app.logger.exception('Failed to revert inventory for related ticket')
-                try:
-                    db.session.delete(rel_row)
-                except Exception:
-                    current_app.logger.exception('Failed to delete related sale row')
-
-        _revert_inventory_for_ticket(t)
-        db.session.delete(row)
+        visited: set[str] = set()
+        _delete_sale_full(cid=cid, ticket=t, visited=visited)
         db.session.commit()
     except Exception:
         db.session.rollback()

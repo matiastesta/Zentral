@@ -98,10 +98,62 @@
                 </div>
             </div>
 
-            <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color: var(--brand-color);">
+            <div class="p-4 rounded-lg border border-gray-200 bg-white">
+                <div class="text-sm font-semibold text-gray-900">Sistema de cuotas</div>
+                <div class="mt-1 text-xs text-gray-500">Habilita ventas financiadas en cuotas. Máximo 24 cuotas (límite fijo).</div>
+                <div class="mt-3">
+                    <label class="inline-flex items-start gap-3 cursor-pointer select-none">
+                        <input id="habilitar-sistema-cuotas" name="habilitar_sistema_cuotas" type="checkbox" class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600" {% if business and business.habilitar_sistema_cuotas %}checked{% endif %}>
+                        <div>
+                            <div class="text-sm font-medium text-gray-800">Habilitar sistema de cuotas</div>
+                            <div class="text-xs text-gray-500">Al activarlo se agrega una nueva forma de pago y se impactan ventas, caja, clientes, calendario y reportes.</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <button id="btn-submit-business" type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color: var(--brand-color);">
                 Guardar cambios
             </button>
         </form>
+    </div>
+</div>
+
+<div id="modal-confirm-cuotas" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Confirmar activación del sistema de cuotas</h3>
+                    <p class="text-xs text-gray-500">Esta acción cambia el flujo de ventas y la forma de registrar ingresos.</p>
+                </div>
+                <button id="btn-close-confirm-cuotas" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600" aria-label="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-3">
+                <div class="p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 text-[12px]">
+                    Al habilitar cuotas:
+                    <div class="mt-2">
+                        - Las ventas podrán registrarse como financiadas.
+                    </div>
+                    <div>
+                        - En caja/arqueo se registrarán ingresos por cuota cobrada (no por el total).
+                    </div>
+                    <div>
+                        - Se agregan vencimientos de cuotas en calendario y reglas CRM/reportes asociadas.
+                    </div>
+                </div>
+                <div class="text-xs text-gray-600">
+                    No hay configuración parcial. Límite máximo de cuotas: <span class="font-semibold">24</span>.
+                </div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-cancel-confirm-cuotas" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-accept-confirm-cuotas" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color: var(--brand-color);">Entiendo, activar y guardar</button>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -113,6 +165,32 @@ document.addEventListener('DOMContentLoaded', function () {
     const selIndustry = document.getElementById('business-industry');
     const wrapOther = document.getElementById('industry-other-wrap');
     const inputOther = document.getElementById('business-industry-other');
+
+    const cuotasToggle = document.getElementById('habilitar-sistema-cuotas');
+    const submitBtn = document.getElementById('btn-submit-business');
+    const modalCuotas = document.getElementById('modal-confirm-cuotas');
+    const btnCloseCuotas = document.getElementById('btn-close-confirm-cuotas');
+    const btnCancelCuotas = document.getElementById('btn-cancel-confirm-cuotas');
+    const btnAcceptCuotas = document.getElementById('btn-accept-confirm-cuotas');
+
+    const cuotasInicial = (cuotasToggle && cuotasToggle.checked) ? true : false;
+    let cuotasConfirmadas = false;
+    let cuotasDisableConfirmadas = false;
+
+    const TENANT_PREFIX = ((window.location && window.location.pathname || '').match(/^\/c\/[^\/]+/) || [''])[0];
+    function apiPath(p) {
+        const s = String(p || '');
+        if (!s.startsWith('/')) return s;
+        if (s.startsWith('/c/')) return s;
+        if (!TENANT_PREFIX) return s;
+        return TENANT_PREFIX + s;
+    }
+
+    function apiHasActiveInstallments() {
+        return fetch(apiPath('/api/customers/has_active_installments'), { method: 'GET', credentials: 'same-origin' })
+            .then(r => r.json())
+            .catch(function () { return { has_active_installments: false }; });
+    }
 
     function syncIndustryOther() {
         if (!selIndustry || !wrapOther) return;
@@ -139,6 +217,106 @@ document.addEventListener('DOMContentLoaded', function () {
     function syncRangeLabels() {
         if (brightnessLabel && brightness) brightnessLabel.textContent = fmtRange(brightness.value);
         if (contrastLabel && contrast) contrastLabel.textContent = fmtRange(contrast.value);
+    }
+
+    function openModalCuotas() {
+        if (!modalCuotas) return;
+        modalCuotas.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+
+    function closeModalCuotas() {
+        if (!modalCuotas) return;
+        modalCuotas.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    function shouldConfirmCuotasEnable() {
+        if (!cuotasToggle) return false;
+        const nowOn = !!cuotasToggle.checked;
+        if (cuotasInicial) return false;
+        if (!nowOn) return false;
+        if (cuotasConfirmadas) return false;
+        return true;
+    }
+
+    function shouldConfirmCuotasDisable() {
+        if (!cuotasToggle) return false;
+        const nowOn = !!cuotasToggle.checked;
+        if (!cuotasInicial) return false;
+        if (nowOn) return false;
+        if (cuotasDisableConfirmadas) return false;
+        return true;
+    }
+
+    if (submitBtn) {
+        submitBtn.addEventListener('click', function (e) {
+            if (shouldConfirmCuotasEnable()) {
+                try { e.preventDefault(); } catch (ex) {}
+                openModalCuotas();
+                return;
+            }
+            if (!shouldConfirmCuotasDisable()) return;
+            try { e.preventDefault(); } catch (ex) {}
+            apiHasActiveInstallments().then(function (res) {
+                const hasActive = !!(res && res.has_active_installments);
+                if (hasActive) {
+                    try { cuotasToggle.checked = true; } catch (err) {}
+                    if (window.showAlertModal && typeof window.showAlertModal === 'function') {
+                        window.showAlertModal(
+                            'No se puede deshabilitar el sistema de cuotas porque existen cuotas activas pendientes.',
+                            'No se puede deshabilitar',
+                            'Validación requerida'
+                        );
+                    } else {
+                        alert('No se puede deshabilitar el sistema de cuotas porque existen cuotas activas pendientes.');
+                    }
+                    return;
+                }
+
+                const doConfirm = function () {
+                    if (window.confirmModal && typeof window.confirmModal === 'function') {
+                        return window.confirmModal(
+                            'Vas a ocultar la funcionalidad de cuotas en ventas y clientes. Los datos existentes no se borran.',
+                            'Deshabilitar sistema de cuotas',
+                            'Confirmación obligatoria',
+                            { okText: 'Deshabilitar y guardar', cancelText: 'Cancelar' }
+                        );
+                    }
+                    return Promise.resolve(window.confirm('¿Deshabilitar sistema de cuotas y guardar cambios?'));
+                };
+
+                doConfirm().then(function (ok) {
+                    if (!ok) return;
+                    cuotasDisableConfirmadas = true;
+                    try {
+                        const form = submitBtn ? submitBtn.closest('form') : null;
+                        if (form) form.submit();
+                    } catch (err) {
+                    }
+                });
+            });
+        });
+    }
+
+    if (btnCloseCuotas) btnCloseCuotas.addEventListener('click', closeModalCuotas);
+    if (btnCancelCuotas) btnCancelCuotas.addEventListener('click', closeModalCuotas);
+    if (modalCuotas) {
+        modalCuotas.addEventListener('click', function (e) {
+            const target = e.target;
+            if (target && target === modalCuotas.firstElementChild) closeModalCuotas();
+        });
+    }
+    if (btnAcceptCuotas) {
+        btnAcceptCuotas.addEventListener('click', function () {
+            cuotasConfirmadas = true;
+            closeModalCuotas();
+            try {
+                const form = submitBtn ? submitBtn.closest('form') : null;
+                if (form) form.submit();
+            } catch (e) {
+            }
+        });
     }
 
     if (selIndustry) selIndustry.addEventListener('change', syncIndustryOther);

@@ -436,6 +436,24 @@
                 els.modal.classList.add('hidden');
             };
 
+            const cashflowChannel = (function () {
+                try {
+                    if (typeof window.BroadcastChannel === 'function') return new window.BroadcastChannel('zentral-cashflow');
+                } catch (e) {
+                }
+                return null;
+            })();
+
+            if (typeof window.emitCashflowChanged !== 'function') {
+                window.emitCashflowChanged = function (evt) {
+                    const payload = { ...(evt || {}), __ts: Date.now() };
+                    try {
+                        if (cashflowChannel) cashflowChannel.postMessage(payload);
+                    } catch (e) {
+                    }
+                };
+            }
+
             window.showAlertModal = function (message, title, subtitle) {
                 const els = getAlertEls();
                 const msg = String(message || '').trim();

@@ -961,8 +961,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function getRangeOrDefault() {
-        const r = parseRangoFechas(dashRange?.value);
+        const raw = String(dashRange?.value || '').trim();
+        const r = parseRangoFechas(raw);
         if (r) return r;
+
+        const single = parseFecha(raw);
+        if (single) {
+            const from = toStartOfDay(single);
+            const to = toEndOfDay(single);
+            return { from, to };
+        }
         const now = new Date();
         const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -1095,7 +1103,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const today = new Date();
         const todayFrom = toStartOfDay(today);
         const todayTo = toEndOfDay(today);
-        const todayFromIso = fmtDateYmd(todayFrom);
         const todayToIso = fmtDateYmd(todayTo);
 
         const cashFrom = new Date(todayFrom.getTime() - (1000 * 60 * 60 * 24 * 30));
@@ -1104,9 +1111,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const s = (typeof window.StorageService.getSales === 'function')
             ? window.StorageService.getSales({ from: fromIso, to: toIso, limit: 20000, include_replaced: 1, exclude_cc: 0 })
-            : [];
-        const sToday = (typeof window.StorageService.getSales === 'function')
-            ? window.StorageService.getSales({ from: todayFromIso, to: todayToIso, limit: 20000, include_replaced: 0, exclude_cc: 1 })
             : [];
 
         const e = (typeof window.StorageService.getExpenses === 'function')
@@ -1139,7 +1143,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         return Promise.all([
             safe(s, []),
-            safe(sToday, []),
             safe(e, []),
             safe(p, []),
             safe(l, []),
@@ -1151,15 +1154,15 @@ document.addEventListener('DOMContentLoaded', function() {
         ]).then(function (vals) {
             return {
                 sales: Array.isArray(vals[0]) ? vals[0] : [],
-                salesToday: Array.isArray(vals[1]) ? vals[1] : [],
-                expenses: Array.isArray(vals[2]) ? vals[2] : [],
-                products: Array.isArray(vals[3]) ? vals[3] : [],
-                lots: Array.isArray(vals[4]) ? vals[4] : [],
-                customers: Array.isArray(vals[5]) ? vals[5] : [],
-                suppliers: Array.isArray(vals[6]) ? vals[6] : [],
-                movements: Array.isArray(vals[7]) ? vals[7] : [],
-                cashCounts: Array.isArray(vals[8]) ? vals[8] : [],
-                overdueCustomersCount: (typeof vals[9] === 'number' && isFinite(vals[9])) ? vals[9] : 0
+                salesToday: [],
+                expenses: Array.isArray(vals[1]) ? vals[1] : [],
+                products: Array.isArray(vals[2]) ? vals[2] : [],
+                lots: Array.isArray(vals[3]) ? vals[3] : [],
+                customers: Array.isArray(vals[4]) ? vals[4] : [],
+                suppliers: Array.isArray(vals[5]) ? vals[5] : [],
+                movements: Array.isArray(vals[6]) ? vals[6] : [],
+                cashCounts: Array.isArray(vals[7]) ? vals[7] : [],
+                overdueCustomersCount: (typeof vals[8] === 'number' && isFinite(vals[8])) ? vals[8] : 0
             };
         });
     }
@@ -1420,8 +1423,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (String(s?.type || '').trim() !== 'Venta') return;
                 const due = safeNum(s?.due_amount);
                 if (due <= 0) return;
-                const createdAtMs = safeNum(s?.created_at);
-                const days = createdAtMs ? Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24)) : 0;
+                const dt = normalizeSalesDate(s);
+                if (!dt) return;
+                dt.setHours(0, 0, 0, 0);
+                const days = Math.floor((Date.now() - dt.getTime()) / (1000 * 60 * 60 * 24));
                 if (days >= 30) {
                     const cid = String(s?.customer_id || '').trim() || String(s?.customer_name || '').trim();
                     if (cid) ccMap.set(cid, true);
@@ -1675,7 +1680,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function calculateDashboardKPIs(payload, range) {
         const salesAll = Array.isArray(payload?.sales) ? payload.sales : [];
-        const salesTodayPayload = Array.isArray(payload?.salesToday) ? payload.salesToday : [];
+        const salesDay = salesInRange(salesAll, range);
         const expensesAll = Array.isArray(payload?.expenses) ? payload.expenses : [];
         const products = Array.isArray(payload?.products) ? payload.products : [];
         const lots = Array.isArray(payload?.lots) ? payload.lots : [];
@@ -1716,14 +1721,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const expensesOutOfRange = computeOutOfRangeExpenses(expensesAll, range);
         const overdue = computeOverdueCounts(payload);
 
-        const salesTodayTotal = sumNetSalesDevengadas(salesTodayPayload);
-        const salesTodayCount = (Array.isArray(salesTodayPayload) ? salesTodayPayload : []).filter(s => isCompletedSale(s) && isRealSale(s)).length;
+        const salesTodayTotal = sumNetSalesDevengadas(salesDay);
+        const salesTodayCount = (Array.isArray(salesDay) ? salesDay : []).filter(s => isCompletedSale(s) && isRealSale(s)).length;
         const customersServed = computeCustomersServed(salesRange);
         const salesDailyPace = computeSalesDailyPace(totalSales, range);
         const salesAccum = totalSales;
         const salesVsPrev = computeSalesVsPrevPeriodDay(salesAll, range);
 
-        const avgTicket = salesRange.length > 0 ? (totalSales / salesRange.length) : 0;
+        const realSalesCount = (Array.isArray(salesRange) ? salesRange : []).filter(s => isCompletedSale(s) && isRealSale(s)).length;
+        const avgTicket = realSalesCount > 0 ? (totalSales / realSalesCount) : 0;
 
         const bestMap = new Map();
         salesRange.forEach(s => {
@@ -2177,10 +2183,10 @@ document.addEventListener('DOMContentLoaded', function() {
             locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es',
             allowInput: false,
             onChange: function (selectedDates) {
-                if (Array.isArray(selectedDates) && selectedDates.length === 2) calcAndRender();
+                if (Array.isArray(selectedDates) && selectedDates.length >= 1) calcAndRender();
             },
             onClose: function (selectedDates) {
-                if (Array.isArray(selectedDates) && selectedDates.length === 2) calcAndRender();
+                if (Array.isArray(selectedDates) && selectedDates.length >= 1) calcAndRender();
             }
         });
         dashRange.addEventListener('change', calcAndRender);

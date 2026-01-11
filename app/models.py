@@ -10,6 +10,8 @@ import uuid
 from datetime import datetime
 
 from flask_login import UserMixin
+from flask import current_app
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -23,6 +25,33 @@ def _default_company_id():
         return str(getattr(g, 'company_id', '') or '').strip() or None
     except Exception:
         return None
+
+
+def _ensure_business_settings_columns() -> None:
+    try:
+        engine = db.engine
+        if str(engine.url.drivername).startswith('sqlite'):
+            return
+
+        insp = inspect(engine)
+        if 'business_settings' not in set(insp.get_table_names() or []):
+            return
+
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('business_settings') or [])}
+        if 'habilitar_sistema_cuotas' in cols:
+            return
+
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    'ALTER TABLE business_settings ADD COLUMN IF NOT EXISTS habilitar_sistema_cuotas BOOLEAN NOT NULL DEFAULT FALSE'
+                )
+            )
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to ensure business_settings columns')
+        except Exception:
+            pass
 
 
 class SystemMeta(db.Model):
@@ -171,6 +200,8 @@ class BusinessSettings(db.Model):
     background_brightness = db.Column(db.Float, nullable=True)
     background_contrast = db.Column(db.Float, nullable=True)
 
+    habilitar_sistema_cuotas = db.Column(db.Boolean, nullable=False, default=False)
+
     insight_margin_delta_pp = db.Column(db.Float, nullable=True)
     insight_profitability_delta_pp = db.Column(db.Float, nullable=True)
     insight_expenses_ratio_pct = db.Column(db.Float, nullable=True)
@@ -180,6 +211,7 @@ class BusinessSettings(db.Model):
         cid = str(company_id or '').strip()
         if not cid:
             return None
+        _ensure_business_settings_columns()
         bs = db.session.query(BusinessSettings).filter(BusinessSettings.company_id == cid).first()
         if bs:
             return bs
@@ -329,6 +361,8 @@ class Sale(db.Model):
     paid_amount = db.Column(db.Float, nullable=False, default=0.0)
     due_amount = db.Column(db.Float, nullable=False, default=0.0)
 
+    is_installments = db.Column(db.Boolean, nullable=False, default=False)
+
     customer_id = db.Column(db.String(64), nullable=True)
     customer_name = db.Column(db.String(255), nullable=True)
 
@@ -364,6 +398,57 @@ class SaleItem(db.Model):
     unit_price = db.Column(db.Float, nullable=False, default=0.0)
     discount_pct = db.Column(db.Float, nullable=False, default=0.0)
     subtotal = db.Column(db.Float, nullable=False, default=0.0)
+
+
+class InstallmentPlan(db.Model):
+    __tablename__ = 'installment_plan'
+
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
+
+    sale_id = db.Column(db.Integer, db.ForeignKey('sale.id'), nullable=False, index=True)
+    sale_ticket = db.Column(db.String(32), nullable=True, index=True)
+
+    customer_id = db.Column(db.String(64), nullable=False, index=True)
+    customer_name = db.Column(db.String(255), nullable=True)
+
+    start_date = db.Column(db.Date, nullable=False, index=True)
+    interval_days = db.Column(db.Integer, nullable=False, default=30)
+    installments_count = db.Column(db.Integer, nullable=False, default=1)
+
+    is_indefinite = db.Column(db.Boolean, nullable=False, default=False)
+    amount_per_period = db.Column(db.Float, nullable=False, default=0.0)
+    mode = db.Column(db.String(16), nullable=False, default='fixed')
+
+    total_amount = db.Column(db.Float, nullable=False, default=0.0)
+    installment_amount = db.Column(db.Float, nullable=False, default=0.0)
+    first_payment_method = db.Column(db.String(32), nullable=True)
+
+    status = db.Column(db.String(16), nullable=False, default='activo')
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    sale = db.relationship('Sale', backref='installment_plan', lazy=True)
+
+
+class Installment(db.Model):
+    __tablename__ = 'installment'
+
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
+
+    plan_id = db.Column(db.Integer, db.ForeignKey('installment_plan.id'), nullable=False, index=True)
+    installment_number = db.Column(db.Integer, nullable=False)
+
+    due_date = db.Column(db.Date, nullable=False, index=True)
+    amount = db.Column(db.Float, nullable=False, default=0.0)
+    status = db.Column(db.String(16), nullable=False, default='pendiente')
+
+    paid_at = db.Column(db.DateTime, nullable=True)
+    paid_payment_method = db.Column(db.String(32), nullable=True)
+    paid_sale_id = db.Column(db.Integer, db.ForeignKey('sale.id'), nullable=True, index=True)
+
+    plan = db.relationship('InstallmentPlan', backref='installments', lazy=True)
 
 
 class CalendarUserConfig(db.Model):
