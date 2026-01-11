@@ -1505,26 +1505,19 @@ def finance_api():
         collections_exchanges = 0.0
 
         try:
-            rows = (
-                db.session.query(Sale)
+            sales_paid = (
+                db.session.query(db.func.coalesce(db.func.sum(Sale.total), 0.0))
                 .filter(Sale.company_id == cid)
                 .filter(Sale.sale_date >= p_from)
                 .filter(Sale.sale_date <= p_to)
-                .filter(Sale.sale_type == 'Venta')
+                .filter(Sale.sale_type == 'CobroVenta')
                 .filter(db.func.lower(Sale.status).like('completad%'))
-                .all()
+                .scalar()
             )
-            for r in (rows or []):
-                paid = _num(getattr(r, 'paid_amount', 0.0))
-                if paid <= 0:
-                    continue
-                sales_paid += paid
-                if bool(getattr(r, 'is_installments', False)):
-                    sales_paid_installment_down += paid
-                elif bool(getattr(r, 'on_account', False)):
-                    sales_paid_cc_or_partial += paid
-                else:
-                    sales_cash_only += paid
+            sales_paid = _num(sales_paid)
+            sales_cash_only = float(sales_paid)
+            sales_paid_cc_or_partial = 0.0
+            sales_paid_installment_down = 0.0
         except Exception:
             sales_paid = 0.0
             sales_cash_only = 0.0

@@ -44,10 +44,9 @@
                             <th class="px-4 py-1">
                                 <select id="mov-ventas-tipo" multiple size="1" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
                                     <option value="" selected>Tipo (todos)</option>
-                                    <option value="Venta">Venta</option>
-                                    <option value="CobroCuota">Cobro de cuota</option>
-                                    <option value="CuentaCorriente">Cuenta corriente</option>
-                                    <option value="Cambio">Cambio</option>
+                                    <option value="CobroVenta">Cobro venta completa</option>
+                                    <option value="CobroCC">Cobro CC</option>
+                                    <option value="CobroCuota">Cobro cuota</option>
                                     <option value="IngresoAjusteInv">Ingreso por ajuste</option>
                                 </select>
                             </th>
@@ -383,24 +382,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function saleKind(s) {
         const st = String(s?.type || s?.sale_type || '').trim();
-        const pm = normKey(s?.payment_method || '');
-        const onAcc = !!(s && (s.on_account === true || s.on_account === 1 || s.on_account === '1'));
-
+        if (st === 'CobroVenta') return 'CobroVenta';
+        if (st === 'CobroCC') return 'CobroCC';
         if (st === 'CobroCuota') return 'CobroCuota';
-        if (st === 'CobroCC') return 'CuentaCorriente';
-        if (st === 'Cambio') return 'Cambio';
         if (st === 'IngresoAjusteInv') return 'IngresoAjusteInv';
-        if (onAcc || pm.includes('cuenta corriente') || pm === 'cuenta corriente') return 'CuentaCorriente';
-        return 'Venta';
+        return '';
     }
 
     function labelTipo(s) {
         const k = saleKind(s);
-        if (k === 'CobroCuota') return 'Cobro de cuota';
-        if (k === 'CuentaCorriente') return 'Cuenta corriente';
-        if (k === 'Cambio') return 'Cambio';
+        if (k === 'CobroVenta') return 'Cobro venta completa';
+        if (k === 'CobroCC') return 'Cobro CC';
+        if (k === 'CobroCuota') return 'Cobro cuota';
         if (k === 'IngresoAjusteInv') return 'Ingreso por ajuste';
-        return 'Venta';
+        return '';
     }
 
     function buildTicketDetail(s) {
@@ -782,6 +777,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
 
                 list = list.concat(adjIngresos);
+
+                list = list.filter(s => {
+                    const st = String(s?.type || s?.sale_type || '').trim();
+                    if (st === 'IngresoAjusteInv') return true;
+                    return !!labelTipo(s);
+                });
+
                 list = list.filter(s => {
                     const txt = (String(s?.ticket || '') + ' ' + String(s?.notes_display || s?.notes || '')).toLowerCase();
                     if (q && !txt.includes(q)) return false;

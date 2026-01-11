@@ -223,6 +223,13 @@ def _ensure_installment_plan_columns() -> None:
     try:
         engine = db.engine
         insp = inspect(engine)
+        try:
+            tables = set(insp.get_table_names() or [])
+        except Exception:
+            tables = set()
+        if 'installment_plan' not in tables:
+            return
+
         cols = {str(c.get('name') or '') for c in (insp.get_columns('installment_plan') or [])}
         stmts = []
         if 'is_indefinite' not in cols:
@@ -248,6 +255,27 @@ def _ensure_installment_plan_columns() -> None:
                 conn.exec_driver_sql(s)
     except Exception:
         current_app.logger.exception('Failed to ensure installment_plan columns')
+
+
+def _ensure_installments_tables() -> None:
+    try:
+        engine = db.engine
+        if str(engine.url.drivername).startswith('sqlite'):
+            return
+        insp = inspect(engine)
+        try:
+            tables = set(insp.get_table_names() or [])
+        except Exception:
+            tables = set()
+        if 'installment_plan' in tables and 'installment' in tables:
+            return
+        try:
+            from app.models import Installment, InstallmentPlan
+            db.metadata.create_all(bind=engine, tables=[InstallmentPlan.__table__, Installment.__table__])
+        except Exception:
+            current_app.logger.exception('Failed to ensure installments tables')
+    except Exception:
+        current_app.logger.exception('Failed to ensure installments tables')
 
 
 def _ensure_sale_ticket_numbering() -> None:
@@ -2069,6 +2097,7 @@ def create_sale():
     amount_per_period = 0.0
 
     if inst_enabled:
+        _ensure_installments_tables()
         bs = BusinessSettings.get_for_company(cid)
         if not bs or not bool(getattr(bs, 'habilitar_sistema_cuotas', False)):
             return jsonify({'ok': False, 'error': 'installments_disabled'}), 400
@@ -2127,6 +2156,7 @@ def create_sale():
 
     row = None
     payment_sale = None
+    cash_payment_sale = None
     attempts = 0
     base_n = _next_ticket_number(cid)
     while attempts < 10:
@@ -2369,9 +2399,173 @@ def create_sale():
             db.session.rollback()
             return jsonify({'ok': False, 'error': 'db_error', 'message': str(e)}), 400
 
+        try:
+            if str(getattr(row, 'sale_type', '') or '').strip() == 'Venta':
+                is_inst = bool(getattr(row, 'is_installments', False))
+                is_cc = bool(getattr(row, 'on_account', False)) or float(getattr(row, 'due_amount', 0.0) or 0.0) > 0
+                paid_now = float(getattr(row, 'paid_amount', 0.0) or 0.0)
+                if paid_now > 1e-9:
+                    if is_cc and (not is_inst):
+                        settle_date = row.sale_date or dt_date.today()
+                        base_n2 = _next_ticket_number(cid)
+                        ref = str(row.ticket or '').strip()
+                        try:
+                            note_products = _products_label_from_sale(row)
+                        except Exception:
+                            note_products = 'Producto —'
+                        cust_txt = str(getattr(row, 'customer_name', '') or '').strip() or '—'
+                        if ref:
+                            note = f"Cobro cuenta corriente – Ticket #{ref} – {note_products} – Cliente {cust_txt}"
+                        else:
+                            note = f"Cobro cuenta corriente – {note_products} – Cliente {cust_txt}"
+                        pay_attempts = 0
+                        while pay_attempts < 10 and cash_payment_sale is None:
+                            pn = int(base_n2) + int(pay_attempts)
+                            pay_attempts += 1
+                            pay_ticket = _format_ticket_number(pn)
+                            ps = Sale(
+                                ticket=pay_ticket,
+                                ticket_number=pn,
+                                company_id=cid,
+                                sale_date=settle_date,
+                                sale_type='CobroCC',
+                                status='Completada',
+                                payment_method=str(getattr(row, 'payment_method', '') or 'Efectivo'),
+                                notes=note,
+                                total=abs(paid_now),
+                                discount_general_pct=0.0,
+                                discount_general_amount=0.0,
+                                on_account=False,
+                                paid_amount=abs(paid_now),
+                                due_amount=0.0,
+                                customer_id=row.customer_id,
+                                customer_name=row.customer_name,
+                                employee_id=getattr(row, 'employee_id', None),
+                                employee_name=getattr(row, 'employee_name', None),
+                                exchange_return_total=None,
+                                exchange_new_total=None,
+                            )
+                            try:
+                                for it in (row.items or []):
+                                    db.session.add(SaleItem(
+                                        company_id=cid,
+                                        sale=ps,
+                                        direction=str(getattr(it, 'direction', '') or 'out'),
+                                        product_id=str(getattr(it, 'product_id', '') or '').strip() or None,
+                                        product_name=str(getattr(it, 'product_name', '') or 'Producto'),
+                                        qty=float(getattr(it, 'qty', 0.0) or 0.0),
+                                        unit_price=float(getattr(it, 'unit_price', 0.0) or 0.0),
+                                        discount_pct=float(getattr(it, 'discount_pct', 0.0) or 0.0),
+                                        subtotal=float(getattr(it, 'subtotal', 0.0) or 0.0),
+                                    ))
+                            except Exception:
+                                current_app.logger.exception('Failed to copy items to initial CobroCC')
+                            try:
+                                ps.created_by_user_id = int(getattr(row, 'created_by_user_id', 0) or 0) or None
+                            except Exception:
+                                ps.created_by_user_id = None
+                            db.session.add(ps)
+                            try:
+                                db.session.commit()
+                                cash_payment_sale = ps
+                                break
+                            except IntegrityError:
+                                db.session.rollback()
+                                continue
+                            except Exception:
+                                db.session.rollback()
+                                current_app.logger.exception('Failed to commit initial CobroCC')
+                                cash_payment_sale = None
+                                break
+
+                    if (not is_inst) and (not is_cc):
+                        settle_date = row.sale_date or dt_date.today()
+                        base_n2 = _next_ticket_number(cid)
+                        ref = str(row.ticket or '').strip()
+                        try:
+                            note_products = _products_label_from_sale(row)
+                        except Exception:
+                            note_products = 'Producto —'
+                        cust_txt = str(getattr(row, 'customer_name', '') or '').strip() or '—'
+                        if ref:
+                            note = f"Cobro venta completa – Ticket #{ref} – {note_products} – Cliente {cust_txt}"
+                        else:
+                            note = f"Cobro venta completa – {note_products} – Cliente {cust_txt}"
+                        pay_attempts = 0
+                        while pay_attempts < 10 and cash_payment_sale is None:
+                            pn = int(base_n2) + int(pay_attempts)
+                            pay_attempts += 1
+                            pay_ticket = _format_ticket_number(pn)
+                            ps = Sale(
+                                ticket=pay_ticket,
+                                ticket_number=pn,
+                                company_id=cid,
+                                sale_date=settle_date,
+                                sale_type='CobroVenta',
+                                status='Completada',
+                                payment_method=str(getattr(row, 'payment_method', '') or 'Efectivo'),
+                                notes=note,
+                                total=abs(paid_now),
+                                discount_general_pct=0.0,
+                                discount_general_amount=0.0,
+                                on_account=False,
+                                paid_amount=abs(paid_now),
+                                due_amount=0.0,
+                                customer_id=row.customer_id,
+                                customer_name=row.customer_name,
+                                employee_id=getattr(row, 'employee_id', None),
+                                employee_name=getattr(row, 'employee_name', None),
+                                exchange_return_total=None,
+                                exchange_new_total=None,
+                            )
+                            try:
+                                for it in (row.items or []):
+                                    db.session.add(SaleItem(
+                                        company_id=cid,
+                                        sale=ps,
+                                        direction=str(getattr(it, 'direction', '') or 'out'),
+                                        product_id=str(getattr(it, 'product_id', '') or '').strip() or None,
+                                        product_name=str(getattr(it, 'product_name', '') or 'Producto'),
+                                        qty=float(getattr(it, 'qty', 0.0) or 0.0),
+                                        unit_price=float(getattr(it, 'unit_price', 0.0) or 0.0),
+                                        discount_pct=float(getattr(it, 'discount_pct', 0.0) or 0.0),
+                                        subtotal=float(getattr(it, 'subtotal', 0.0) or 0.0),
+                                    ))
+                            except Exception:
+                                current_app.logger.exception('Failed to copy items to CobroVenta')
+                            try:
+                                ps.created_by_user_id = int(getattr(row, 'created_by_user_id', 0) or 0) or None
+                            except Exception:
+                                ps.created_by_user_id = None
+                            db.session.add(ps)
+                            try:
+                                db.session.commit()
+                                cash_payment_sale = ps
+                                break
+                            except IntegrityError:
+                                db.session.rollback()
+                                continue
+                            except Exception:
+                                db.session.rollback()
+                                current_app.logger.exception('Failed to commit CobroVenta')
+                                cash_payment_sale = None
+                                break
+        except Exception:
+            current_app.logger.exception('Failed to create cash payment sale for created sale')
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+
         if inst_enabled:
-            return jsonify({'ok': True, 'item': _serialize_sale(row), 'payment': _serialize_sale(payment_sale)})
-        return jsonify({'ok': True, 'item': _serialize_sale(row)})
+            payload_out = {'ok': True, 'item': _serialize_sale(row), 'payment': _serialize_sale(payment_sale)}
+            if cash_payment_sale is not None:
+                payload_out['cash_payment'] = _serialize_sale(cash_payment_sale)
+            return jsonify(payload_out)
+        payload_out = {'ok': True, 'item': _serialize_sale(row)}
+        if cash_payment_sale is not None:
+            payload_out['cash_payment'] = _serialize_sale(cash_payment_sale)
+        return jsonify(payload_out)
 
     return jsonify({'ok': False, 'error': 'ticket_duplicate', 'message': 'No se pudo registrar la venta: ticket duplicado.'}), 400
 

@@ -283,12 +283,12 @@
                         </div>
                     </th>
                     <th class="px-3 py-1 text-center text-gray-400">
-                        <select id="ventas-filter-estado" class="hidden w-full px-2 py-0.5 border rounded-md text-xs text-gray-600">
+                        <select id="ventas-filter-tipo" class="hidden w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
                             <option value="">Todas</option>
-                            <option>Venta</option>
+                            <option>Venta completa</option>
+                            <option>Venta CC</option>
+                            <option>Venta SC</option>
                             <option>Cambio</option>
-                            <option>Cobro CC</option>
-                            <option>Cobro Cuota</option>
                         </select>
                         <div class="relative">
                             <button id="ventas-filter-tipo-btn" type="button" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white text-left inline-flex items-center justify-between">
@@ -2910,9 +2910,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function apiDeleteSale(ticket) {
-        return fetchJsonSafe(apiPath('/sales/api/sales/' + encodeURIComponent(String(ticket || '').trim())), {
+        const url = apiPath('/sales/api/sales/' + encodeURIComponent(String(ticket || '').trim()));
+        return fetch(url, {
             method: 'DELETE',
             credentials: 'same-origin',
+        }).then(function (r) {
+            if (!r) return { ok: false, error: 'network' };
+            if (r.status === 204) return { ok: true };
+            return fetchJsonSafe(url, { method: 'DELETE', credentials: 'same-origin' });
+        }).catch(function () {
+            return { ok: false, error: 'network' };
         });
     }
 
@@ -2973,20 +2980,25 @@ document.addEventListener('DOMContentLoaded', function() {
     function historialTipoLabelFromSale(s) {
         const tp = String(s?.type || s?.sale_type || 'Venta').trim() || 'Venta';
         if (tp === 'Cambio') return 'Cambio';
-        if (tp === 'CobroCC') return 'Cobro CC';
-        if (tp === 'CobroCuota') {
-            const notes = String(s?.notes_display || s?.notes || '').toLowerCase();
-            if (notes.includes('sistema de cuotas indefinidas') || notes.includes('cuota recurrente')) return 'Venta';
-            return 'Cobro Cuota';
-        }
-        return 'Venta';
+        if (tp === 'CobroCC' || tp === 'CobroCuota' || tp === 'CobroVenta') return '';
+
+        // Hechos comerciales (Venta)
+        if (tp !== 'Venta') return '';
+        const isInst = !!(s && (s.is_installments === true || s.is_installments === 1 || s.is_installments === '1'));
+        if (isInst) return 'Venta SC';
+
+        const due = parseFloat(s?.due_amount || 0) || 0;
+        const onAcc = !!(s && (s.on_account === true || s.on_account === 1 || s.on_account === '1'));
+        if (onAcc || due > 0) return 'Venta CC';
+        return 'Venta completa';
     }
 
     function statusBadgeHtml(tipoLabel) {
         const tp = String(tipoLabel || '').trim() || 'Venta';
-        if (tp === 'Cobro CC') return '<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[11px]">Cobro CC</span>';
-        if (tp === 'Cobro Cuota') return '<span class="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px]">Cobro Cuota</span>';
         if (tp === 'Cambio') return '<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px]">Cambio</span>';
+        if (tp === 'Venta SC') return '<span class="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px]">Venta SC</span>';
+        if (tp === 'Venta CC') return '<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[11px]">Venta CC</span>';
+        if (tp === 'Venta completa') return '<span class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[11px]">Venta completa</span>';
         return '<span class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[11px]">Venta</span>';
     }
 
@@ -3041,6 +3053,15 @@ document.addEventListener('DOMContentLoaded', function() {
         return noAcc;
     }
 
+    function displayPaymentMethod(v) {
+        const k = normPaymentMethodKey(v);
+        if (k === 'efectivo') return 'Efectivo';
+        if (k === 'debito') return 'Débito';
+        if (k === 'credito') return 'Crédito';
+        if (k === 'transferencia') return 'Transferencia';
+        return String(v || '').trim() || 'Efectivo';
+    }
+
     function renderVentasMultiMenu(filterKey, itemsEl, labelEl) {
         const f = ventasMultiFilters[filterKey];
         if (!f || !itemsEl) return;
@@ -3085,24 +3106,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function initVentasMultiFiltersStatic() {
         setVentasMultiOptions('tipo', [
-            { value: 'Venta', label: 'Venta' },
+            { value: 'Venta completa', label: 'Venta completa' },
+            { value: 'Venta CC', label: 'Venta CC' },
+            { value: 'Venta SC', label: 'Venta SC' },
             { value: 'Cambio', label: 'Cambio' },
-            { value: 'Cobro CC', label: 'Cobro CC' },
-            { value: 'Cobro Cuota', label: 'Cobro Cuota' },
         ]);
         renderVentasMultiMenu('tipo', itemsVentasFilterTipo, labelVentasFilterTipo);
     }
 
     function initVentasMultiPagoFromSales(sales) {
-        const items = Array.isArray(sales) ? sales : [];
-        const set = new Set();
-        items.forEach(s => {
-            const k = normPaymentMethodKey(s?.payment_method || '');
-            if (k) set.add(k);
-        });
         const preferred = ['efectivo', 'transferencia', 'debito', 'credito'];
-        const values = preferred.filter(v => set.has(v));
-        const opts = (values.length ? values : preferred).map(v => {
+        const opts = preferred.map(v => {
             const label = (v === 'efectivo') ? 'Efectivo'
                 : (v === 'transferencia') ? 'Transferencia'
                 : (v === 'debito') ? 'Débito'
@@ -3174,7 +3188,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderHistorialFromCache() {
         if (!historialTbody) return;
 
-        const list = Array.isArray(salesCache) ? salesCache.slice() : [];
+        const list = (Array.isArray(salesCache) ? salesCache.slice() : [])
+            .filter(s => {
+                const tipoLabel = historialTipoLabelFromSale(s);
+                return !!(tipoLabel && tipoLabel.trim());
+            });
         const sortKey = function (s) {
             const iso = String(s?.fecha || '').trim();
             let ts = 0;
@@ -3223,6 +3241,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (e) {}
 
             const tipoLabel = historialTipoLabelFromSale(s);
+            if (!tipoLabel) return;
             tr.setAttribute('data-type', tipoLabel);
 
             let relatedText = '';
@@ -3278,7 +3297,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 + '<td class="px-3 py-2 text-gray-500">' + String(s?.customer_name || '—') + '</td>'
                 + '<td class="px-3 py-2 text-gray-500">' + String(s?.responsible_name || s?.employee_name || '—') + '</td>'
                 + '<td class="px-3 py-2 text-right text-gray-500">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>'
-                + '<td class="px-3 py-2 text-center text-gray-500">' + String(s?.payment_method || 'Efectivo') + '</td>'
+                + '<td class="px-3 py-2 text-center text-gray-500">' + displayPaymentMethod(s?.payment_method) + '</td>'
                 + '<td class="px-3 py-2 text-center">' + statusHtml + '</td>'
                 + '<td class="px-3 py-2 text-center">' + historialAccionesHtml(ticket) + '</td>';
             historialTbody.appendChild(tr);
@@ -3430,7 +3449,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             function isSaleForSalesKpis(s) {
                 const tpLabel = historialTipoLabelFromSale(s);
-                if (tpLabel !== 'Venta') return false;
+                if (!tpLabel || !String(tpLabel).startsWith('Venta')) return false;
 
                 const cust = String(s?.customer_name || '').trim().toLowerCase();
                 if (cust === 'sistema / ajuste interno') return false;
@@ -4266,12 +4285,21 @@ document.addEventListener('DOMContentLoaded', function() {
             const paid = parseFloat(s?.paid_amount || 0) || 0;
 
             if (tipo === 'Venta') {
-                total += Math.max(0, paid);
+                return;
+            }
+
+            if (tipo === 'CobroVenta') {
+                total += Math.max(0, totalVenta);
                 return;
             }
 
             // Cobro de cuenta corriente: es ingreso de caja real
             if (tipo === 'CobroCC' || tipo === 'Cobro CC') {
+                total += Math.max(0, totalVenta);
+                return;
+            }
+
+            if (tipo === 'CobroCuota' || tipo === 'Cobro Cuota') {
                 total += Math.max(0, totalVenta);
                 return;
             }
@@ -6219,7 +6247,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             apiDeleteSale(t).then(function (res) {
                 if (!res || res.ok !== true) {
-                    showAlertModal('No se pudo eliminar el ticket.', 'Error', 'Operación fallida');
+                    const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo eliminar el ticket.';
+                    showAlertModal(msg, 'Error', 'Operación fallida');
                     return;
                 }
                 salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => String(s?.ticket || '').trim() !== t);

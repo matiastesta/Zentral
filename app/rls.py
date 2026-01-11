@@ -35,7 +35,16 @@ def reset_public_schema() -> None:
 
 
 def apply_rls_policies() -> None:
+    try:
+        engine = db.engine
+        insp = inspect(engine)
+        existing = set(insp.get_table_names() or [])
+    except Exception:
+        existing = None
+
     for table in TENANT_TABLES:
+        if existing is not None and table not in existing:
+            continue
         ident = '"user"' if table == 'user' else table
         db.session.execute(text(f'ALTER TABLE {ident} ENABLE ROW LEVEL SECURITY'))
         db.session.execute(text(f'ALTER TABLE {ident} FORCE ROW LEVEL SECURITY'))
@@ -306,6 +315,21 @@ def bootstrap_schema(reset: bool) -> None:
             _upgrade_db_to_head()
         except Exception:
             db.session.rollback()
+
+        try:
+            insp = inspect(engine)
+            tables = set(insp.get_table_names() or [])
+        except Exception:
+            tables = set()
+
+        try:
+            if 'installment_plan' not in tables or 'installment' not in tables:
+                from app.models import Installment, InstallmentPlan
+
+                db.metadata.create_all(bind=engine, tables=[InstallmentPlan.__table__, Installment.__table__])
+        except Exception:
+            db.session.rollback()
+
         try:
             _postgres_ensure_sale_employee_columns()
             db.session.commit()
