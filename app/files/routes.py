@@ -320,6 +320,14 @@ def download_file_api(file_id: str):
         expires = 120
     expires = max(30, min(expires, 3600))
 
+    # Para imágenes (ej: fondo/logo), conviene un TTL mayor para evitar parpadeos al navegar.
+    try:
+        ctype = str(getattr(row, 'content_type', '') or '').strip().lower()
+    except Exception:
+        ctype = ''
+    if ctype.startswith('image/'):
+        expires = max(expires, 3600)
+
     try:
         url = _r2_client().generate_presigned_url(
             'get_object',
@@ -339,4 +347,12 @@ def download_file_api(file_id: str):
     if wants_json:
         return jsonify({'ok': True, 'url': url, 'expires_seconds': expires})
 
-    return redirect(url, code=302)
+    resp = redirect(url, code=302)
+    # Cachear el redirect un rato para que el browser no vuelva a resolver el file_id en cada navegación.
+    # (es cache privada por usuario/tenant)
+    try:
+        resp.headers['Cache-Control'] = f'private, max-age={expires}'
+        resp.headers['Expires'] = str(int(time.time()) + int(expires))
+    except Exception:
+        pass
+    return resp
