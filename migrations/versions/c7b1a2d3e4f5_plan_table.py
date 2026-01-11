@@ -1,5 +1,6 @@
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 revision = 'c7b1a2d3e4f5'
 down_revision = 'f6a1d2c3b4e5'
@@ -8,6 +9,12 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    insp = inspect(bind)
+    tables = set(insp.get_table_names() or [])
+    if 'plan' in tables:
+        return
+
     op.create_table(
         'plan',
         sa.Column('code', sa.String(length=64), nullable=False),
@@ -18,4 +25,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    insp = inspect(bind)
+    tables = set(insp.get_table_names() or [])
+    if 'plan' not in tables:
+        return
     op.drop_table('plan')
