@@ -316,21 +316,62 @@ def _ensure_sale_ticket_numbering() -> None:
                 .all()
             )
             touched = False
+            touched_payments = False
             for r in (invalid or []):
                 r.ticket_number = None
                 touched = True
 
-            # Backfill SOLO para tickets de venta/cobro con formato '#0001' (no '#C0001').
+            # Los cobros (CobroVenta/CobroCC/CobroCuota) NO deben ocupar ticket_number
+            # porque harían que la secuencia de ventas salte de 2 en 2.
+            payments = (
+                db.session.query(Sale)
+                .filter(Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota']))
+                .limit(10000)
+                .all()
+            )
+            for r in (payments or []):
+                if getattr(r, 'ticket_number', None) is not None:
+                    r.ticket_number = None
+                    touched = True
+                    touched_payments = True
+
+                tk = str(getattr(r, 'ticket', '') or '').strip()
+                # Migrar cobros viejos que tienen ticket numérico '#0054' a '#P0054'
+                # para no consumir números de venta.
+                if tk.startswith('#P'):
+                    continue
+                if re.match(r'^#\d+$', tk):
+                    digits = ''.join([ch for ch in tk[1:] if ch.isdigit()])
+                    if digits:
+                        candidate = '#P' + str(int(digits)).zfill(4)
+                        exists = (
+                            db.session.query(Sale.id)
+                            .filter(Sale.company_id == getattr(r, 'company_id', None))
+                            .filter(Sale.ticket == candidate)
+                            .first()
+                        )
+                        if exists is not None:
+                            candidate = candidate + '-' + str(int(getattr(r, 'id', 0) or 0))
+                        r.ticket = candidate
+                        touched = True
+                        touched_payments = True
+
+            if touched_payments:
+                db.session.commit()
+                touched = False
+
+            # Backfill SOLO para tickets de VENTA con formato estrictamente '#0001' (no '#C0001', no '#P0001').
             missing = (
                 db.session.query(Sale)
                 .filter(Sale.ticket_number.is_(None))
                 .filter(Sale.ticket.like('#%'))
+                .filter(~Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota']))
                 .limit(5000)
                 .all()
             )
             for r in (missing or []):
                 tk = str(getattr(r, 'ticket', '') or '').strip()
-                if not tk.startswith('#') or tk.startswith('#C'):
+                if not re.match(r'^#\d+$', tk):
                     continue
                 digits = ''.join([ch for ch in tk[1:] if ch.isdigit()])
                 if not digits:
@@ -360,6 +401,7 @@ def _next_ticket_number(cid: str) -> int:
         mx = (
             db.session.query(func.max(Sale.ticket_number))
             .filter(Sale.company_id == company_id)
+            .filter(~Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota']))
             .scalar()
         )
         n = int(mx or 0)
@@ -369,17 +411,50 @@ def _next_ticket_number(cid: str) -> int:
         pass
 
     try:
-        rows = db.session.query(Sale.ticket).filter(Sale.company_id == company_id).filter(Sale.ticket.like('#%')).all()
+        rows = (
+            db.session.query(Sale.ticket)
+            .filter(Sale.company_id == company_id)
+            .filter(~Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota']))
+            .filter(Sale.ticket.like('#%'))
+            .all()
+        )
         max_n = 0
         for (t,) in (rows or []):
             s = str(t or '').strip()
-            if not s.startswith('#') or s.startswith('#C'):
+            if not re.match(r'^#\d+$', s):
                 continue
             digits = ''.join([ch for ch in s[1:] if ch.isdigit()])
             if not digits:
                 continue
             try:
                 max_n = max(max_n, int(digits))
+            except Exception:
+                continue
+        return max_n + 1 if max_n > 0 else 1
+    except Exception:
+        return 1
+
+
+def _next_payment_number(cid: str) -> int:
+    company_id = str(cid or '').strip()
+    if not company_id:
+        return 1
+    try:
+        rows = (
+            db.session.query(Sale.ticket)
+            .filter(Sale.company_id == company_id)
+            .filter(Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota']))
+            .filter(Sale.ticket.like('#P%'))
+            .all()
+        )
+        max_n = 0
+        for (t,) in (rows or []):
+            s = str(t or '').strip()
+            m = re.match(r'^#P(\d+)', s)
+            if not m:
+                continue
+            try:
+                max_n = max(max_n, int(m.group(1)))
             except Exception:
                 continue
         return max_n + 1 if max_n > 0 else 1
@@ -662,9 +737,29 @@ def _serialize_sale(row: Sale, related: dict = None, users_map: dict | None = No
                 responsible_name = ''
         responsible_name = responsible_name or ('Usuario #' + str(int(created_by_user_id)))
 
+    cust_id = str(getattr(row, 'customer_id', '') or '').strip() or None
+    cust_name_raw = str(getattr(row, 'customer_name', '') or '').strip() or None
+    cust_name = _resolve_customer_display_name(str(getattr(row, 'company_id', '') or '').strip(), cust_id, cust_name_raw)
+
+    display_ticket = str(getattr(row, 'ticket', '') or '').strip()
+    try:
+        st = str(getattr(row, 'sale_type', '') or '').strip()
+        if st in ('CobroVenta', 'CobroCC', 'CobroCuota'):
+            txt = str(getattr(row, 'notes', '') or '')
+            m = re.search(r"Ticket\s*(?:original\s*)?#\s*(#?\w+)", txt, re.IGNORECASE)
+            if m and m.group(1):
+                tok = str(m.group(1) or '').strip()
+                if tok.startswith('#'):
+                    tok = tok[1:]
+                if tok:
+                    display_ticket = '#' + tok
+    except Exception:
+        display_ticket = str(getattr(row, 'ticket', '') or '').strip()
+
     return {
         'id': row.id,
         'ticket': row.ticket,
+        'display_ticket': display_ticket,
         'ticket_number': getattr(row, 'ticket_number', None) or None,
         'fecha': row.sale_date.isoformat() if row.sale_date else '',
         'type': row.sale_type,
@@ -685,8 +780,8 @@ def _serialize_sale(row: Sale, related: dict = None, users_map: dict | None = No
         'total': row.total,
         'discount_general_pct': row.discount_general_pct,
         'discount_general_amount': row.discount_general_amount,
-        'customer_id': row.customer_id or '',
-        'customer_name': row.customer_name or '',
+        'customer_id': cust_id or '',
+        'customer_name': cust_name or '',
         'employee_id': emp_id,
         'employee_name': emp_name,
         'responsible_id': responsible_id,
@@ -894,7 +989,7 @@ def _serialize_lot_for_sales(l: InventoryLot):
 
 @bp.get('/api/sales')
 @login_required
-@module_required_any('sales', 'customers')
+@module_required_any('sales', 'customers', 'movements')
 def list_sales():
     _ensure_sale_employee_columns()
     raw_from = (request.args.get('from') or '').strip()
@@ -911,6 +1006,28 @@ def list_sales():
     cid = _company_id()
     if not cid:
         return jsonify({'ok': True, 'items': []})
+
+    try:
+        # Auto-heal: cobros viejos (Cobro*) con ticket '#0001' o ticket_number seteado
+        # pueden hacer que la secuencia de ventas salte de 2 en 2.
+        needs_fix = (
+            db.session.query(Sale.id)
+            .filter(Sale.company_id == cid)
+            .filter(Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota']))
+            .filter(
+                or_(
+                    Sale.ticket_number.isnot(None),
+                    and_(Sale.ticket.like('#%'), ~Sale.ticket.like('#P%')),
+                )
+            )
+            .limit(1)
+            .first()
+        )
+        if needs_fix is not None:
+            _ensure_sale_ticket_numbering()
+    except Exception:
+        # No interrumpir el listado si la auto-corrección falla.
+        pass
     q = (
         db.session.query(Sale)
         .options(selectinload(Sale.items))
@@ -1352,7 +1469,7 @@ def settle_cc_sale():
         return jsonify({'ok': False, 'error': 'amount_exceeds_due'}), 400
 
     settle_date = _parse_date_iso(payload.get('date') or payload.get('fecha'), dt_date.today())
-    base_n = _next_ticket_number(cid)
+    base_n = _next_payment_number(cid)
     ref = str(row.ticket or '').strip()
     try:
         note_products = _products_label_from_sale(row)
@@ -1368,10 +1485,10 @@ def settle_cc_sale():
     while attempts < 10:
         n = base_n + attempts
         attempts += 1
-        payment_ticket = _format_ticket_number(n)
-        payment_sale = Sale(
+        payment_ticket = _format_ticket_number(n, prefix='P')
+        pay_row = Sale(
             ticket=payment_ticket,
-            ticket_number=n,
+            ticket_number=None,
             company_id=cid,
             sale_date=settle_date,
             sale_type='CobroCC',
@@ -1391,37 +1508,32 @@ def settle_cc_sale():
             exchange_return_total=None,
             exchange_new_total=None,
         )
-        try:
-            for it in (row.items or []):
-                db.session.add(SaleItem(
-                    company_id=cid,
-                    sale=payment_sale,
-                    direction=str(getattr(it, 'direction', '') or 'out'),
-                    product_id=str(getattr(it, 'product_id', '') or '').strip() or None,
-                    product_name=str(getattr(it, 'product_name', '') or 'Producto'),
-                    qty=float(getattr(it, 'qty', 0.0) or 0.0),
-                    unit_price=float(getattr(it, 'unit_price', 0.0) or 0.0),
-                    discount_pct=float(getattr(it, 'discount_pct', 0.0) or 0.0),
-                    subtotal=float(getattr(it, 'subtotal', 0.0) or 0.0),
-                ))
-        except Exception:
-            current_app.logger.exception('Failed to copy items to CobroCC payment sale')
+        for it in (row.items or []):
+            pay_row.items.append(SaleItem(
+                direction=str(getattr(it, 'direction', '') or 'out'),
+                product_id=str(getattr(it, 'product_id', '') or '').strip() or None,
+                product_name=str(getattr(it, 'product_name', '') or 'Producto'),
+                qty=float(getattr(it, 'qty', 0.0) or 0.0),
+                unit_price=float(getattr(it, 'unit_price', 0.0) or 0.0),
+                discount_pct=float(getattr(it, 'discount_pct', 0.0) or 0.0),
+                subtotal=float(getattr(it, 'subtotal', 0.0) or 0.0),
+            ))
         try:
             from flask_login import current_user
             uid = int(getattr(current_user, 'id', 0) or 0) or None
-            payment_sale.created_by_user_id = uid
+            pay_row.created_by_user_id = uid
         except Exception:
             current_app.logger.exception('Failed to set created_by_user_id for payment sale')
-            payment_sale.created_by_user_id = None
+            pay_row.created_by_user_id = None
 
         row.paid_amount = float(row.paid_amount or 0.0) + abs(pay_amount)
         remaining = abs(due) - abs(pay_amount)
         row.due_amount = float(remaining if remaining > 0.00001 else 0.0)
         row.on_account = bool(row.due_amount > 0)
-        db.session.add(payment_sale)
+        db.session.add(pay_row)
         try:
             db.session.commit()
-            return jsonify({'ok': True, 'item': _serialize_sale(row), 'payment': _serialize_sale(payment_sale)})
+            return jsonify({'ok': True, 'item': _serialize_sale(pay_row)})
         except IntegrityError:
             db.session.rollback()
             continue
@@ -2309,13 +2421,13 @@ def create_sale():
                 return jsonify({'ok': False, 'error': 'installments_create_failed', 'message': str(e)}), 400
 
             # Create payment ticket for first installment (cash impact)
-            pay_base = _next_ticket_number(cid)
+            pay_base = _next_payment_number(cid)
             pay_attempts = 0
             payment_sale = None
             while pay_attempts < 10 and payment_sale is None:
                 pay_n = int(pay_base) + int(pay_attempts)
                 pay_attempts += 1
-                pay_ticket = _format_ticket_number(pay_n)
+                pay_ticket = _format_ticket_number(pay_n, prefix='P')
 
                 try:
                     note = _format_installment_payment_note(plan, inst_rows[0] if inst_rows else None)
@@ -2324,7 +2436,7 @@ def create_sale():
 
                 payment_sale = Sale(
                     ticket=pay_ticket,
-                    ticket_number=pay_n,
+                    ticket_number=None,
                     company_id=cid,
                     sale_date=sale_date,
                     sale_type='CobroCuota',
@@ -2407,7 +2519,7 @@ def create_sale():
                 if paid_now > 1e-9:
                     if is_cc and (not is_inst):
                         settle_date = row.sale_date or dt_date.today()
-                        base_n2 = _next_ticket_number(cid)
+                        base_n2 = _next_payment_number(cid)
                         ref = str(row.ticket or '').strip()
                         try:
                             note_products = _products_label_from_sale(row)
@@ -2422,10 +2534,10 @@ def create_sale():
                         while pay_attempts < 10 and cash_payment_sale is None:
                             pn = int(base_n2) + int(pay_attempts)
                             pay_attempts += 1
-                            pay_ticket = _format_ticket_number(pn)
+                            pay_ticket = _format_ticket_number(pn, prefix='P')
                             ps = Sale(
                                 ticket=pay_ticket,
-                                ticket_number=pn,
+                                ticket_number=None,
                                 company_id=cid,
                                 sale_date=settle_date,
                                 sale_type='CobroCC',
@@ -2480,7 +2592,7 @@ def create_sale():
 
                     if (not is_inst) and (not is_cc):
                         settle_date = row.sale_date or dt_date.today()
-                        base_n2 = _next_ticket_number(cid)
+                        base_n2 = _next_payment_number(cid)
                         ref = str(row.ticket or '').strip()
                         try:
                             note_products = _products_label_from_sale(row)
@@ -2495,10 +2607,10 @@ def create_sale():
                         while pay_attempts < 10 and cash_payment_sale is None:
                             pn = int(base_n2) + int(pay_attempts)
                             pay_attempts += 1
-                            pay_ticket = _format_ticket_number(pn)
+                            pay_ticket = _format_ticket_number(pn, prefix='P')
                             ps = Sale(
                                 ticket=pay_ticket,
-                                ticket_number=pn,
+                                ticket_number=None,
                                 company_id=cid,
                                 sale_date=settle_date,
                                 sale_type='CobroVenta',

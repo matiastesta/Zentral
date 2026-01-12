@@ -744,6 +744,32 @@ document.addEventListener('DOMContentLoaded', function () {
         const pagosState = getSelectFilterState(fVentasPago);
         const tiposState = getSelectFilterState(fVentasTipo);
 
+        const extractReferencedTicket = function (notesText) {
+            const txt = String(notesText || '');
+            if (!txt) return '';
+            // Examples:
+            // "Cobro venta completa – Ticket ##0001 – ..."
+            // "Cobro cuota N° 1 – ... – Ticket original ##0001"
+            const m = txt.match(/Ticket\s*(?:original\s*)?#\s*(#?\w+)/i);
+            if (!m || !m[1]) return '';
+            let tok = String(m[1] || '').trim();
+            if (!tok) return '';
+            if (tok.startsWith('#')) tok = tok.slice(1);
+            return tok ? ('#' + tok) : '';
+        };
+
+        const displayTicketForRow = function (s) {
+            const kind = saleKind(s);
+            const direct = String(s?.display_ticket || '').trim();
+            if (direct) return direct;
+            const t = String(s?.ticket || '').trim();
+            if (kind === 'CobroVenta' || kind === 'CobroCC' || kind === 'CobroCuota') {
+                const ref = extractReferencedTicket(s?.notes_display || s?.notes || '');
+                if (ref) return ref;
+            }
+            return t;
+        };
+
         tbodyVentas.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
         getSalesFromApi(rango, function (sales) {
             const fromIso = (rango && rango.from) ? isoFromDate(rango.from) : '';
@@ -827,7 +853,7 @@ document.addEventListener('DOMContentLoaded', function () {
             };
 
                 lastRendered = list.map(s => ({
-                    Ticket: s?.ticket || '',
+                    Ticket: displayTicketForRow(s) || (s?.ticket || ''),
                     Fecha: fmtFecha(s?.fecha || s?.date || ''),
                     Tipo: (String(s?.type || '') === 'IngresoAjusteInv') ? 'Ingreso por ajuste' : labelTipo(s),
                     Cliente: String(s?.customer_name || ''),
@@ -845,10 +871,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     const tr = document.createElement('tr');
                     tr.className = 'hover:bg-gray-50';
                     const ticket = String(s?.ticket || '').trim();
+                    const ticketDisplay = displayTicketForRow(s) || String(s?.ticket || '').trim();
                     const locked = isLockedSale(s);
                     const noteHtml = buildNoteCellHtml(buildNotes(s), ticket || (s?.created_at || ''));
                     tr.innerHTML = ''
-                        + '<td class="px-4 py-3 text-sm text-gray-900">' + String(s?.ticket || '') + '</td>'
+                        + '<td class="px-4 py-3 text-sm text-gray-900">' + String(ticketDisplay || '') + '</td>'
                         + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(s?.fecha || s?.date || '') + '</td>'
                         + '<td class="px-4 py-3 text-sm text-gray-500">' + (String(s?.type || '') === 'IngresoAjusteInv' ? 'Ingreso por ajuste' : labelTipo(s)) + '</td>'
                         + '<td class="px-4 py-3 text-sm text-gray-700">' + String(s?.customer_name || '—') + '</td>'

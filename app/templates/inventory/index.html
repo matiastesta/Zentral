@@ -3742,17 +3742,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '<td class="px-4 py-3 text-sm text-right text-gray-600">' + fmtMoneda(m.total) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(codigoInterno || '—') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + statusBadgeHtml(m.status) + '</td>'
-                + '<td class="px-4 py-3 text-right relative">'
-                + '  <button type="button" class="btn-actions-toggle h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-600">'
-                + '    <i class="fas fa-ellipsis-v"></i>'
-                + '  </button>'
-                + '  <div class="row-actions-menu hidden absolute right-2 mt-1 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[9999]">'
+                + '<td class="px-4 py-3 text-right">'
+                + '  <div class="relative inline-flex">'
+                + '    <button type="button" class="btn-actions-toggle h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-600">'
+                + '      <i class="fas fa-ellipsis-v"></i>'
+                + '    </button>'
+                + '    <div class="row-actions-menu hidden absolute right-0 mt-2 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-30">'
                 + '    <div class="py-1 text-[11px]">'
                 + '      <button type="button" class="btn-view-file w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Ver legajo</button>'
                 + '      <button type="button" class="btn-add-lot-product w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Agregar lote</button>'
                 + '      <button type="button" class="btn-toggle-active-product w-full text-left px-3 py-2 text-xs ' + toggleCls + ' hover:bg-gray-50" data-product-id="' + String(p.id) + '" data-active="' + (isInactive ? '0' : '1') + '">' + toggleText + '</button>'
                 + '      <button type="button" class="btn-hard-delete-product w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Eliminar</button>'
                 + '    </div>'
+                + '  </div>'
                 + '  </div>'
                 + '</td>';
 
@@ -3764,6 +3766,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 m.classList.add('hidden');
             });
         };
+
+        if (!window.__invRowActionsDocBound) {
+            document.addEventListener('click', function (ev) {
+                if (ev && ev.target && (ev.target.closest('.row-actions-menu') || ev.target.closest('.btn-actions-toggle'))) return;
+                closeAllMenus();
+            });
+            window.__invRowActionsDocBound = true;
+        }
 
         Array.from(tbodyCurrent.querySelectorAll('.btn-actions-toggle')).forEach(btn => {
             btn.addEventListener('click', function (ev) {
@@ -3779,7 +3789,11 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
 
-        document.addEventListener('click', closeAllMenus, { once: true });
+        Array.from(tbodyCurrent.querySelectorAll('.row-actions-menu')).forEach(menu => {
+            menu.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+            });
+        });
 
         Array.from(tbodyCurrent.querySelectorAll('.btn-view-file')).forEach(btn => {
             btn.addEventListener('click', function () {
