@@ -799,6 +799,8 @@
                     </tbody>
                 </table>
             </div>
+
+            <input id="scanner-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="absolute -left-[9999px] -top-[9999px] opacity-0 pointer-events-none" aria-hidden="true">
         </div>
 
         <!-- Carrito lateral -->
@@ -1659,6 +1661,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let customersLoaded = false;
     let customersLoadPromise = null;
     let lastSelectCustomerFetchToken = 0;
+
+    const scannerInput = document.getElementById('scanner-input');
+    let scannerBuffer = '';
+    let scannerLastTs = 0;
+    let scannerEnabled = true;
 
     function openModal(el) {
         if (!el) return;
@@ -3942,6 +3949,94 @@ document.addEventListener('DOMContentLoaded', function() {
         return (Array.isArray(lots) ? lots : [])
             .filter(l => String(l?.product_id) === String(productId))
             .reduce((acc, l) => acc + (parseFloat(l?.qty_available || '0') || 0), 0);
+    }
+
+    function normalizeScanCode(raw) {
+        const s = String(raw || '').trim();
+        if (!s) return '';
+        return s.replace(/\s+/g, '').toUpperCase();
+    }
+
+    function isInVentaPasoProductos() {
+        try {
+            if (!flujo || flujo.classList.contains('hidden')) return false;
+            if (!pasoProductos || pasoProductos.classList.contains('hidden')) return false;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function focusScannerInput() {
+        if (!scannerEnabled) return;
+        if (!scannerInput) return;
+        if (!isInVentaPasoProductos()) return;
+        try {
+            const ae = document.activeElement;
+            if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) {
+                // No robar foco si el usuario está escribiendo.
+                return;
+            }
+        } catch (e) {
+        }
+        try { scannerInput.focus(); } catch (e) {}
+    }
+
+    function findProductByScan(code) {
+        const c = normalizeScanCode(code);
+        if (!c) return null;
+        const products = Array.isArray(ventaInvData?.products) ? ventaInvData.products : [];
+        if (!products.length) return null;
+        const direct = products.find(p => normalizeScanCode(p?.barcode) === c) || null;
+        if (direct) return direct;
+        const byInternal = products.find(p => normalizeScanCode(p?.codigo_interno || p?.internal_code) === c) || null;
+        if (byInternal) return byInternal;
+        return null;
+    }
+
+    function tryAddScannedProduct(code) {
+        const c = normalizeScanCode(code);
+        if (!c) return;
+
+        const p = findProductByScan(c);
+        if (!p) {
+            const msg = 'No existe un producto con el código "' + c + '".\n\nAcción sugerida: crearlo en Inventario y volver a escanear.';
+            if (window.showAlertModal) window.showAlertModal(msg, 'Producto inexistente', 'Código de barras');
+            else alert(msg);
+            return;
+        }
+
+        const productId = String(p?.id || '').trim();
+        const nombre = String(p?.name || 'Producto').trim() || 'Producto';
+        const precio = (function () {
+            const pr = parseFloat(p?.sale_price ?? p?.price ?? 0) || 0;
+            return String(pr.toFixed(2));
+        })();
+
+        try {
+            const allowOutOfStock = !!(toggleVentaLibre?.checked || toggleVentaLibreTicket?.checked);
+            if (!allowOutOfStock && productId) {
+                const lots = Array.isArray(ventaInvData?.lots) ? ventaInvData.lots : [];
+                const avail = stockDisponiblePorProducto(lots, productId);
+                if ((parseFloat(avail || 0) || 0) <= 0) {
+                    const msg = 'Stock insuficiente para "' + nombre + '".\n\nPodés activar “Venta libre” para vender sin stock.';
+                    if (window.showAlertModal) window.showAlertModal(msg, 'Stock insuficiente', 'Inventario');
+                    else alert(msg);
+                    return;
+                }
+            }
+        } catch (e) {
+        }
+
+        try {
+            agregarProductoAlCarrito(nombre, precio, { productId: productId });
+        } catch (e) {
+            try { console.error(e); } catch (err) {}
+            const msg = 'No se pudo agregar el producto al carrito.';
+            if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Scanner');
+            else alert(msg);
+            return;
+        }
     }
 
     function renderProductosDesdeInventario() {
@@ -6805,6 +6900,51 @@ td.num,th.num{text-align:right}
     renderProductosDesdeInventario();
     renderProductosCambioDesdeInventario();
     renderProductosCambioVentaDesdeInventario();
+
+    if (scannerInput) {
+        try {
+            scannerInput.addEventListener('keydown', function (e) {
+                const now = Date.now();
+                const dt = now - (scannerLastTs || 0);
+                scannerLastTs = now;
+
+                // Si pasó mucho tiempo entre teclas, consideramos que empieza un nuevo scan.
+                if (dt > 250) scannerBuffer = '';
+
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const code = String(scannerBuffer || scannerInput.value || '').trim();
+                    scannerBuffer = '';
+                    scannerInput.value = '';
+                    if (code) tryAddScannedProduct(code);
+                    window.setTimeout(focusScannerInput, 0);
+                    return;
+                }
+
+                if (e.key === 'Shift' || e.key === 'Alt' || e.key === 'Control' || e.key === 'Meta') return;
+                if (e.key === 'Backspace') {
+                    scannerBuffer = scannerBuffer.slice(0, -1);
+                    return;
+                }
+                if (e.key && e.key.length === 1) {
+                    scannerBuffer += e.key;
+                    return;
+                }
+            });
+
+            // Mantener foco cuando el usuario hace click en el área de productos/carrito.
+            document.addEventListener('click', function () {
+                window.setTimeout(focusScannerInput, 0);
+            });
+
+            window.setInterval(function () {
+                focusScannerInput();
+            }, 800);
+
+            window.setTimeout(focusScannerInput, 300);
+        } catch (e) {
+        }
+    }
 
     // Init customers + autocomplete
     initCustomers();

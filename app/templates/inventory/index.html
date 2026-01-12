@@ -254,6 +254,7 @@
                                 <div><span class="text-gray-500">Nombre:</span> <span id="file-v-name" class="text-gray-800"></span></div>
                                 <div><span class="text-gray-500">Categoría:</span> <span id="file-v-category" class="text-gray-800"></span></div>
                                 <div><span class="text-gray-500">Código interno:</span> <span id="file-v-codigo-interno" class="text-gray-800"></span></div>
+                                <div><span class="text-gray-500">Código de barras:</span> <span id="file-v-barcode" class="text-gray-800"></span></div>
                                 <div><span class="text-gray-500">Estado:</span> <span id="file-v-active" class="text-gray-800"></span></div>
                                 <div><span class="text-gray-500">Proveedor:</span> <span id="file-v-supplier" class="text-gray-800"></span></div>
                                 <div><span class="text-gray-500">Descripción:</span> <span id="file-v-desc" class="text-gray-800"></span></div>
@@ -302,6 +303,12 @@
                                 <div id="file-sku" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
                                 <input id="file-codigo-interno" type="text" maxlength="8" class="hidden w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
                                 <div id="file-codigo-interno-hint" class="hidden mt-1 text-[11px] text-gray-500">0/8 · A-Z y 0-9</div>
+                            </div>
+                            <div class="md:col-span-3">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Código de barras</label>
+                                <div id="file-barcode-view" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
+                                <input id="file-barcode" type="text" maxlength="64" class="hidden w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
+                                <div id="file-barcode-hint" class="hidden mt-1 text-[11px] text-gray-500">0/64 · A-Z y 0-9</div>
                             </div>
                             <div class="md:col-span-3">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>
@@ -500,6 +507,17 @@
                     <span>Exportar</span>
                     <i class="fas fa-file-export text-[10px]"></i>
                 </button>
+                <div id="inv-danger-wrap" class="relative inline-flex">
+                    <button id="btn-inv-danger" type="button" class="px-3 py-1 rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 inline-flex items-center gap-2" aria-haspopup="menu" aria-expanded="false">
+                        <span>Acciones</span>
+                        <i class="fas fa-exclamation-triangle text-[10px]"></i>
+                        <i class="fas fa-chevron-down text-[10px]"></i>
+                    </button>
+                    <div id="inv-danger-menu" class="hidden absolute right-0 mt-2 w-56 rounded-md border border-gray-200 bg-white shadow-lg z-30 overflow-hidden">
+                        <button id="btn-inv-danger-empty" type="button" class="w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-gray-50">Vaciar inventario</button>
+                        <button id="btn-inv-danger-delete" type="button" class="w-full text-left px-3 py-2 text-xs text-red-700 hover:bg-gray-50">Borrar inventario</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -552,7 +570,7 @@
             </thead>
             <tbody id="inv-tbody-current" class="bg-white divide-y divide-gray-200">
                 <tr>
-                    <td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay productos. Usá “Crear ítem” para comenzar.</td>
+                    <td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">Cargando inventario…</td>
                 </tr>
             </tbody>
         </table>
@@ -590,7 +608,7 @@
             </thead>
             <tbody id="inv-tbody-lots" class="bg-white divide-y divide-gray-200">
                 <tr>
-                    <td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay lotes cargados.</td>
+                    <td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">Cargando inventario…</td>
                 </tr>
             </tbody>
         </table>
@@ -713,6 +731,11 @@
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Código interno</label>
                                 <input id="prod-codigo-interno" type="text" maxlength="8" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
                                 <div id="prod-codigo-interno-hint" class="mt-1 text-[11px] text-gray-500">0/8 · A-Z y 0-9</div>
+                            </div>
+                            <div class="md:col-span-3">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Código de barras</label>
+                                <input id="prod-barcode" type="text" maxlength="64" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
+                                <div id="prod-barcode-hint" class="mt-1 text-[11px] text-gray-500">0/64 · A-Z y 0-9</div>
                             </div>
                             <div class="md:col-span-5">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Descripción</label>
@@ -1094,6 +1117,33 @@
     </div>
 </div>
 
+<div id="modal-empty-inv" class="hidden fixed inset-0 z-50" style="z-index: 80;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 id="empty-inv-title" class="text-base font-semibold text-gray-900">Vaciar inventario</h3>
+                    <p id="empty-inv-subtitle" class="text-xs text-gray-500">Acción peligrosa: elimina lotes y movimientos. No se puede deshacer.</p>
+                </div>
+                <button id="btn-close-empty-inv" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-5 space-y-3">
+                <div class="text-sm text-gray-700">
+                    Para confirmar, escribí exactamente:
+                    <span id="empty-inv-phrase" class="font-mono font-semibold">vaciar inventario</span>
+                </div>
+                <input id="empty-inv-confirm" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="vaciar inventario" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                <div id="empty-inv-msg" class="text-[11px] text-gray-600"></div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-cancel-empty-inv" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-ok-empty-inv" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md opacity-50 cursor-not-allowed" disabled>Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script id="inv-permissions" type="application/json">{{ {
     'lot_adjust': (current_user.is_authenticated),
 } | tojson }}</script>
@@ -1104,6 +1154,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnAddLot = document.getElementById('btn-add-lot');
     const btnPrecios = document.getElementById('btn-precios-inv');
     const btnExport = document.getElementById('btn-export-inv');
+    const invDangerWrap = document.getElementById('inv-danger-wrap');
+    const btnInvDanger = document.getElementById('btn-inv-danger');
+    const invDangerMenu = document.getElementById('inv-danger-menu');
+    const btnInvDangerEmpty = document.getElementById('btn-inv-danger-empty');
+    const btnInvDangerDelete = document.getElementById('btn-inv-danger-delete');
     const tabCurrent = document.getElementById('tab-current');
     const tabLots = document.getElementById('tab-lots');
     const panelCurrent = document.getElementById('panel-current');
@@ -1325,6 +1380,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const fileSku = document.getElementById('file-sku');
     const fileCodigoInterno = document.getElementById('file-codigo-interno');
     const fileCodigoInternoHint = document.getElementById('file-codigo-interno-hint');
+    const fileVBarcode = document.getElementById('file-v-barcode');
+    const fileBarcodeView = document.getElementById('file-barcode-view');
+    const fileBarcode = document.getElementById('file-barcode');
+    const fileBarcodeHint = document.getElementById('file-barcode-hint');
     const fileActiveView = document.getElementById('file-active-view');
     const fileActiveEditWrap = document.getElementById('file-active-edit-wrap');
     const fileActive = document.getElementById('file-active');
@@ -1398,6 +1457,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const prodCatId = document.getElementById('prod-cat-id');
     const prodCodigoInterno = document.getElementById('prod-codigo-interno');
     const prodCodigoInternoHint = document.getElementById('prod-codigo-interno-hint');
+    const prodBarcode = document.getElementById('prod-barcode');
+    const prodBarcodeHint = document.getElementById('prod-barcode-hint');
     const prodActive = document.getElementById('prod-active');
     const prodActiveLabel = document.getElementById('prod-active-label');
     const prodImage = document.getElementById('prod-image');
@@ -1448,6 +1509,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnExportPdf = document.getElementById('btn-export-inv-pdf');
     const btnExportXls = document.getElementById('btn-export-inv-xls');
 
+    const modalEmptyInv = document.getElementById('modal-empty-inv');
+    const emptyInvTitle = document.getElementById('empty-inv-title');
+    const emptyInvSubtitle = document.getElementById('empty-inv-subtitle');
+    const emptyInvPhrase = document.getElementById('empty-inv-phrase');
+    const btnCloseEmptyInv = document.getElementById('btn-close-empty-inv');
+    const btnCancelEmptyInv = document.getElementById('btn-cancel-empty-inv');
+    const btnOkEmptyInv = document.getElementById('btn-ok-empty-inv');
+    const inputEmptyInvConfirm = document.getElementById('empty-inv-confirm');
+    const emptyInvMsg = document.getElementById('empty-inv-msg');
+
+    let inventoryDangerAction = 'empty';
+
     const modalPrecios = document.getElementById('modal-precios-inv');
     const btnClosePrecios = document.getElementById('btn-close-precios-inv');
     const btnCancelPrecios = document.getElementById('btn-cancel-precios-inv');
@@ -1466,6 +1539,9 @@ document.addEventListener('DOMContentLoaded', function () {
     let cacheCategories = [];
     let didLoadCategories = false;
     let suppliersCache = null;
+
+    let inventoryHasLoaded = false;
+    let inventoryLoading = false;
     let currentSupplierTarget = '';
     let suppressSupplierInputClear = false;
 
@@ -1475,10 +1551,12 @@ document.addEventListener('DOMContentLoaded', function () {
      function saveProductDraft() {
          try {
              const codigoInterno = String(prodCodigoInterno?.value || '').trim();
+             const barcode = String(prodBarcode?.value || '').trim();
              const payload = {
                  name: String(prodName?.value || ''),
                  category_id: String(prodCatId?.value || ''),
                  codigo_interno: codigoInterno,
+                 barcode: barcode,
                  active: true,
                  description: String(prodDesc?.value || ''),
                  uses_lots: true,
@@ -1502,6 +1580,7 @@ document.addEventListener('DOMContentLoaded', function () {
              if (prodName && d.name != null) prodName.value = String(d.name || '');
              if (prodCatId && d.category_id != null) prodCatId.value = String(d.category_id || '');
              if (prodCodigoInterno && d.codigo_interno != null) prodCodigoInterno.value = String(d.codigo_interno || '');
+             if (prodBarcode && d.barcode != null) prodBarcode.value = String(d.barcode || '');
 
              if (prodDesc && d.description != null) prodDesc.value = String(d.description || '');
              if (prodMin && d.min_stock != null) prodMin.value = String(d.min_stock ?? '');
@@ -2207,7 +2286,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function apiListProducts() {
-        return fetch('/inventory/api/products?limit=5000', { credentials: 'same-origin' })
+        return fetch('/inventory/api/products?limit=5000&active=1', { credentials: 'same-origin' })
             .then(function (r) {
                 if (!r || !r.ok) return [];
                 return r.json().then(
@@ -2369,10 +2448,30 @@ document.addEventListener('DOMContentLoaded', function () {
         }).then(r => r.json());
     }
 
-    function loadProductsLots(cb) {
+    function apiEmptyInventory(confirmText) {
+        return fetch('/inventory/api/empty', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm: String(confirmText || '') })
+        }).then(r => r.json());
+    }
+
+    function apiClearInventory(confirmText) {
+        return fetch('/inventory/api/clear', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm: String(confirmText || '') })
+        }).then(r => r.json());
+    }
+
+    function loadProductsLots(cb, opts) {
+        const o = (opts && typeof opts === 'object') ? opts : {};
+        const shouldLoadMovements = !!o.movements;
         const pRes = apiListProducts();
         const lRes = apiListLots();
-        const mRes = apiListMovements('');
+        const mRes = shouldLoadMovements ? apiListMovements('') : Promise.resolve([]);
         return Promise.allSettled([Promise.resolve(pRes), Promise.resolve(lRes), Promise.resolve(mRes)]).then(function (results) {
             const getArr = function (idx) {
                 try {
@@ -2523,6 +2622,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (fileSku) fileSku.classList.toggle('hidden', fileEditMode);
         if (fileCodigoInterno) fileCodigoInterno.classList.toggle('hidden', !fileEditMode);
         if (fileCodigoInternoHint) fileCodigoInternoHint.classList.toggle('hidden', !fileEditMode);
+
+        if (fileBarcodeView) fileBarcodeView.classList.toggle('hidden', fileEditMode);
+        if (fileBarcode) fileBarcode.classList.toggle('hidden', !fileEditMode);
+        if (fileBarcodeHint) fileBarcodeHint.classList.toggle('hidden', !fileEditMode);
 
         if (fileActiveView) fileActiveView.classList.toggle('hidden', fileEditMode);
         if (fileActiveEditWrap) fileActiveEditWrap.classList.toggle('hidden', !fileEditMode);
@@ -2707,6 +2810,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (fileVName) fileVName.textContent = '—';
         if (fileVCategory) fileVCategory.textContent = '—';
         if (fileVCodigoInterno) fileVCodigoInterno.textContent = '—';
+        if (fileVBarcode) fileVBarcode.textContent = '—';
         if (fileVActive) fileVActive.textContent = '—';
         if (fileVSupplier) fileVSupplier.textContent = '—';
         if (fileVDesc) fileVDesc.textContent = '—';
@@ -2744,6 +2848,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const supplierName = String(prod?.primary_supplier_name || '').trim();
                 const supplierId = String(prod?.primary_supplier_id || '').trim();
                 const internalCode = String(prod?.codigo_interno || prod?.internal_code || '').trim();
+                const barcode = String(prod?.barcode || '').trim();
 
                 if (fileNameView) fileNameView.textContent = String(prod?.name || '');
                 if (fileName) fileName.value = String(prod?.name || '');
@@ -2751,6 +2856,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (fileVName) fileVName.textContent = String(prod?.name || '—');
                 if (fileVCategory) fileVCategory.textContent = catName || '—';
                 if (fileVCodigoInterno) fileVCodigoInterno.textContent = internalCode || '—';
+                if (fileVBarcode) fileVBarcode.textContent = barcode || '—';
                 if (fileVActive) fileVActive.textContent = (prod?.active !== false) ? 'Activo' : 'Inactivo';
                 if (fileVSupplier) fileVSupplier.textContent = supplierName || '—';
                 if (fileVDesc) fileVDesc.textContent = (String(prod?.description || '').trim() || '—');
@@ -2773,6 +2879,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 if (fileSku) fileSku.textContent = internalCode || '—';
                 if (fileCodigoInterno) fileCodigoInterno.value = internalCode;
+                if (fileBarcodeView) fileBarcodeView.textContent = barcode || '—';
+                if (fileBarcode) fileBarcode.value = barcode;
 
                 if (fileSupplierView) fileSupplierView.textContent = supplierName || '—';
                 if (filePrimarySupplier) filePrimarySupplier.value = supplierName;
@@ -2855,6 +2963,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const name = String(fileName?.value || '').trim();
         const categoryId = String(fileCat?.value || '').trim();
         const codigoInterno = String(fileCodigoInterno?.value || '').trim();
+        const barcode = String(fileBarcode?.value || '').trim();
         const desc = String(fileDesc?.value || '').trim();
         const primarySupplierName = String(filePrimarySupplier?.value || '').trim();
         const primarySupplierId = String(filePrimarySupplierId?.value || '').trim();
@@ -2867,11 +2976,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!categoryId) { if (window.showAlertModal) window.showAlertModal('Seleccioná la categoría del producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná la categoría del producto.'); return; }
         if (codigoInterno && codigoInterno.length !== 8) { if (window.showAlertModal) window.showAlertModal('El código interno debe tener 8 caracteres.', 'Atención', 'Validación requerida'); else alert('El código interno debe tener 8 caracteres.'); return; }
         if (codigoInterno && !/^[A-Za-z0-9]+$/.test(codigoInterno)) { if (window.showAlertModal) window.showAlertModal('El código interno solo admite letras y números.', 'Atención', 'Validación requerida'); else alert('El código interno solo admite letras y números.'); return; }
+        if (barcode && barcode.length > 64) { if (window.showAlertModal) window.showAlertModal('El código de barras admite hasta 64 caracteres.', 'Atención', 'Validación requerida'); else alert('El código de barras admite hasta 64 caracteres.'); return; }
+        if (barcode && !/^[A-Za-z0-9]+$/.test(barcode)) { if (window.showAlertModal) window.showAlertModal('El código de barras solo admite letras y números.', 'Atención', 'Validación requerida'); else alert('El código de barras solo admite letras y números.'); return; }
 
         const payload = {
             name,
             category_id: parseInt(categoryId, 10),
             codigo_interno: codigoInterno,
+            barcode: barcode,
             description: desc,
             primary_supplier_id: primarySupplierId,
             primary_supplier_name: primarySupplierName,
@@ -2932,6 +3044,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (prodName) prodName.value = '';
         if (prodCatId) prodCatId.value = '';
         if (prodCodigoInterno) prodCodigoInterno.value = '';
+        if (prodBarcode) prodBarcode.value = '';
         if (prodActive) prodActive.checked = true;
         if (prodReorder) prodReorder.value = '';
         if (prodLots) prodLots.checked = true;
@@ -3036,6 +3149,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (prodName) prodName.value = String(prod?.name || '');
         if (prodCatId) prodCatId.value = String(prod?.category_id || prod?.category?.id || '');
         if (prodCodigoInterno) prodCodigoInterno.value = String(prod?.codigo_interno || prod?.internal_code || '');
+        if (prodBarcode) prodBarcode.value = String(prod?.barcode || '');
         if (prodLots) prodLots.checked = !!prod?.uses_lots;
         if (prodMethod) prodMethod.value = String(prod?.method || 'FIFO');
         if (prodMin) prodMin.value = String(prod?.min_stock ?? '');
@@ -3546,6 +3660,59 @@ document.addEventListener('DOMContentLoaded', function () {
         abrirModal(modalExport, false);
     }
 
+    function closeDangerMenu() {
+        if (!invDangerMenu) return;
+        invDangerMenu.classList.add('hidden');
+        try {
+            if (btnInvDanger) btnInvDanger.setAttribute('aria-expanded', 'false');
+        } catch (e) {
+        }
+    }
+
+    function toggleDangerMenu() {
+        if (!invDangerMenu) return;
+        const willOpen = invDangerMenu.classList.contains('hidden');
+        invDangerMenu.classList.toggle('hidden', !willOpen);
+        try {
+            if (btnInvDanger) btnInvDanger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        } catch (e) {
+        }
+    }
+
+    function syncEmptyInvConfirmUi() {
+        const v = String(inputEmptyInvConfirm?.value || '').trim().toLowerCase();
+        const wanted = (inventoryDangerAction === 'clear') ? 'borrar inventario' : 'vaciar inventario';
+        const ok = (v === wanted);
+        if (btnOkEmptyInv) {
+            btnOkEmptyInv.disabled = !ok;
+            btnOkEmptyInv.classList.toggle('opacity-50', !ok);
+            btnOkEmptyInv.classList.toggle('cursor-not-allowed', !ok);
+        }
+    }
+
+    function openEmptyInv(action) {
+        inventoryDangerAction = (action === 'clear') ? 'clear' : 'empty';
+        const title = (inventoryDangerAction === 'clear') ? 'Borrar inventario' : 'Vaciar inventario';
+        const subtitle = (inventoryDangerAction === 'clear')
+            ? 'Acción peligrosa: borra inventario y elimina productos del módulo (se desactivan). No borra movimientos. No se puede deshacer.'
+            : 'Acción peligrosa: elimina el inventario actual (lotes). No borra movimientos. No se puede deshacer.';
+        const phrase = (inventoryDangerAction === 'clear') ? 'borrar inventario' : 'vaciar inventario';
+
+        if (emptyInvTitle) emptyInvTitle.textContent = title;
+        if (emptyInvSubtitle) emptyInvSubtitle.textContent = subtitle;
+        if (emptyInvPhrase) emptyInvPhrase.textContent = phrase;
+        if (emptyInvMsg) emptyInvMsg.textContent = '';
+        if (inputEmptyInvConfirm) inputEmptyInvConfirm.value = '';
+        try { if (inputEmptyInvConfirm) inputEmptyInvConfirm.setAttribute('placeholder', phrase); } catch (e) {}
+        syncEmptyInvConfirmUi();
+        abrirModal(modalEmptyInv, true);
+        try { inputEmptyInvConfirm?.focus(); } catch (e) {}
+    }
+
+    function closeEmptyInv() {
+        abrirModal(modalEmptyInv, false);
+    }
+
     function switchTab(tab) {
         activeTab = tab;
         if (panelCurrent) panelCurrent.classList.toggle('hidden', tab !== 'current');
@@ -4044,23 +4211,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (editLotNote) editLotNote.value = String(lot?.note || '');
         if (editLotMsg) editLotMsg.textContent = '';
 
-        try {
-            const movs = Array.isArray(cacheMovements) ? cacheMovements : [];
-            const consumed = movs
-                .filter(m => String(m?.type || '').trim() === 'sale')
-                .filter(m => String(m?.lot_id || '') === String(id))
-                .reduce((acc, m) => acc + Math.max(0, -parseNumeroSeguro(m?.qty_delta)), 0);
-            editingLotConsumedQty = consumed;
-        } catch (e) {
-            editingLotConsumedQty = 0;
-        }
-
-        const hasSales = (editingLotConsumedQty > 1e-9);
-        if (editLotQty) editLotQty.disabled = hasSales;
-        if (editLotCu) editLotCu.disabled = hasSales;
-        if (hasSales) {
-            if (editLotMsg) editLotMsg.textContent = 'Este lote ya tiene consumos. Para corregir cantidad/costo, usá “Ajustar lote”.';
-        }
+        editingLotConsumedQty = 0;
+        if (editLotQty) editLotQty.disabled = false;
+        if (editLotCu) editLotCu.disabled = false;
         if (btnOpenAdjustLot) {
             const show = !!canAdjustLot;
             btnOpenAdjustLot.classList.toggle('hidden', !show);
@@ -4070,6 +4223,36 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         abrirModal(modalEditLot, true);
+
+        try {
+            const pid = String(lot?.product_id || '').trim();
+            if (!pid) return;
+            apiListMovements(pid).then(function (movs) {
+                const safe = Array.isArray(movs) ? movs : [];
+                try {
+                    const existing = Array.isArray(cacheMovements) ? cacheMovements : [];
+                    const rest = existing.filter(m => String(m?.product_id || '') !== pid);
+                    cacheMovements = rest.concat(safe);
+                } catch (e) {
+                    cacheMovements = safe;
+                }
+
+                const consumed = safe
+                    .filter(m => String(m?.type || '').trim() === 'sale')
+                    .filter(m => String(m?.lot_id || '') === String(id))
+                    .reduce((acc, m) => acc + Math.max(0, -parseNumeroSeguro(m?.qty_delta)), 0);
+                editingLotConsumedQty = consumed;
+                const hasSales = (editingLotConsumedQty > 1e-9);
+                if (editLotQty) editLotQty.disabled = hasSales;
+                if (editLotCu) editLotCu.disabled = hasSales;
+                if (hasSales) {
+                    if (editLotMsg) editLotMsg.textContent = 'Este lote ya tiene consumos. Para corregir cantidad/costo, usá “Ajustar lote”.';
+                }
+            }).catch(function () {
+                editingLotConsumedQty = 0;
+            });
+        } catch (e) {
+        }
     }
 
     function closeAdjustLot() {
@@ -4254,19 +4437,35 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderAll() {
+        if (inventoryLoading) return;
+        if (!inventoryHasLoaded) {
+            if (tbodyCurrent) tbodyCurrent.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">Cargando inventario…</td></tr>';
+            if (tbodyLots) tbodyLots.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">Cargando inventario…</td></tr>';
+        }
         if (!didLoadCategories) {
             didLoadCategories = true;
             loadCategories(function () {
                 refreshCategorySelect(prodCatId?.value || '');
             });
         }
+        inventoryLoading = true;
         loadProductsLots(function (products, lots, movements) {
+            inventoryLoading = false;
+            inventoryHasLoaded = true;
             updateFilterOptions(products, lots);
             renderKPIs(products, lots);
+
+            const allP = Array.isArray(products) ? products : [];
+            if (!allP.length) {
+                if (tbodyCurrent) tbodyCurrent.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay productos. Usá “Crear ítem” para comenzar.</td></tr>';
+                if (tbodyLots) tbodyLots.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">Todavía no hay lotes cargados.</td></tr>';
+                return;
+            }
+
             const vis = getVisibleRowsData();
             if (activeTab === 'current') renderCurrent(vis.filteredProducts);
             if (activeTab === 'lots') renderLots(vis.filteredLots);
-        });
+        }, { movements: false });
     }
 
     function poblarProductosSelect() {
@@ -4673,6 +4872,95 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btnExportXls) btnExportXls.addEventListener('click', function () { exportCsv(); closeExport(); });
     if (btnExportPdf) btnExportPdf.addEventListener('click', function () { exportPdfPrint(); closeExport(); });
 
+    if (btnInvDanger) btnInvDanger.addEventListener('click', function (ev) { ev.preventDefault(); ev.stopPropagation(); toggleDangerMenu(); });
+    if (btnInvDangerEmpty) {
+        btnInvDangerEmpty.addEventListener('click', async function (ev) {
+            ev.preventDefault();
+            closeDangerMenu();
+            const ok = await (window.confirmModal
+                ? window.confirmModal(
+                    'Vas a eliminar TODO el inventario actual (lotes).',
+                    'Vaciar inventario',
+                    'No borra productos ni movimientos. Esta acción no se puede deshacer.',
+                    { okText: 'Continuar', cancelText: 'Cancelar' }
+                )
+                : Promise.resolve(window.confirm('¿Continuar y vaciar inventario?')));
+            if (!ok) return;
+            openEmptyInv('empty');
+        });
+    }
+    if (btnInvDangerDelete) {
+        btnInvDangerDelete.addEventListener('click', async function (ev) {
+            ev.preventDefault();
+            closeDangerMenu();
+            const ok = await (window.confirmModal
+                ? window.confirmModal(
+                    'Vas a borrar TODO el inventario y eliminar los productos.',
+                    'Borrar inventario',
+                    'No borra movimientos/historial. Esta acción no se puede deshacer.',
+                    { okText: 'Continuar', cancelText: 'Cancelar' }
+                )
+                : Promise.resolve(window.confirm('¿Continuar y borrar inventario?')));
+            if (!ok) return;
+            openEmptyInv('clear');
+        });
+    }
+    if (invDangerWrap) {
+        document.addEventListener('click', function (ev) {
+            try {
+                if (!invDangerMenu || invDangerMenu.classList.contains('hidden')) return;
+                const t = ev.target;
+                if (invDangerWrap.contains(t)) return;
+                closeDangerMenu();
+            } catch (e) {
+            }
+        });
+        document.addEventListener('keydown', function (ev) {
+            try {
+                if (ev.key !== 'Escape') return;
+                closeDangerMenu();
+            } catch (e) {
+            }
+        });
+    }
+    if (btnCloseEmptyInv) btnCloseEmptyInv.addEventListener('click', closeEmptyInv);
+    if (btnCancelEmptyInv) btnCancelEmptyInv.addEventListener('click', closeEmptyInv);
+    if (inputEmptyInvConfirm) inputEmptyInvConfirm.addEventListener('input', syncEmptyInvConfirmUi);
+
+    if (btnOkEmptyInv) {
+        btnOkEmptyInv.addEventListener('click', function () {
+            const v = String(inputEmptyInvConfirm?.value || '').trim();
+            if (emptyInvMsg) emptyInvMsg.textContent = 'Vaciando inventario…';
+            const action = inventoryDangerAction;
+            const callApi = (action === 'clear') ? apiClearInventory : apiEmptyInventory;
+            const loadingLabel = (action === 'clear') ? 'Borrando inventario…' : 'Vaciando inventario…';
+            if (emptyInvMsg) emptyInvMsg.textContent = loadingLabel;
+
+            callApi(v).then(function (res) {
+                if (!res || res.ok !== true) {
+                    const err = String(res?.error || '').trim();
+                    const msg = (err === 'confirm_required')
+                        ? 'Confirmación inválida.'
+                        : (action === 'clear' ? 'No se pudo borrar el inventario.' : 'No se pudo vaciar el inventario.');
+                    if (emptyInvMsg) emptyInvMsg.textContent = msg;
+                    else if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Operación fallida');
+                    return;
+                }
+                closeEmptyInv();
+                const doneMsg = (action === 'clear') ? 'Inventario borrado correctamente.' : 'Inventario vaciado correctamente.';
+                if (window.showAlertModal) window.showAlertModal(doneMsg, 'Listo', 'Inventario');
+                cacheProducts = [];
+                cacheLots = [];
+                cacheMovements = [];
+                inventoryHasLoaded = false;
+                inventoryLoading = false;
+                renderAll();
+            }).catch(function () {
+                if (emptyInvMsg) emptyInvMsg.textContent = 'No se pudo completar la operación.';
+            });
+        });
+    }
+
     if (tabCurrent) tabCurrent.addEventListener('click', function () { switchTab('current'); });
     if (tabLots) tabLots.addEventListener('click', function () { switchTab('lots'); });
 
@@ -4693,14 +4981,9 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    if (btnRunImport) {
-        btnRunImport.addEventListener('click', function () {
-            const f = (importFile && importFile.files && importFile.files.length) ? importFile.files[0] : null;
-            if (!f) {
-                if (window.showAlertModal) window.showAlertModal('Seleccioná un archivo .xlsx para importar.', 'Atención', 'Validación requerida');
-                else alert('Seleccioná un archivo .xlsx para importar.');
-                return;
-            }
+    if (btnExport) {
+        btnExport.addEventListener('click', function () {
+            openExport();
             if (!String(f.name || '').toLowerCase().endsWith('.xlsx')) {
                 if (window.showAlertModal) window.showAlertModal('El archivo debe ser .xlsx.', 'Atención', 'Validación requerida');
                 else alert('El archivo debe ser .xlsx.');
@@ -4983,6 +5266,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const name = String(prodName?.value || '').trim();
             const categoryId = String(prodCatId?.value || '').trim();
             const codigoInterno = String(prodCodigoInterno?.value || '').trim();
+            const barcode = String(prodBarcode?.value || '').trim();
             const manageLots = !!prodLots?.checked;
             const method = String(prodMethod?.value || 'FIFO').trim();
             const min = parseNumeroSeguro(prodMin?.value);
@@ -4998,11 +5282,14 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!categoryId) { if (window.showAlertModal) window.showAlertModal('Seleccioná la categoría del producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná la categoría del producto.'); return; }
             if (codigoInterno && codigoInterno.length !== 8) { if (window.showAlertModal) window.showAlertModal('El código interno debe tener 8 caracteres.', 'Atención', 'Validación requerida'); else alert('El código interno debe tener 8 caracteres.'); return; }
             if (codigoInterno && !/^[A-Za-z0-9]+$/.test(codigoInterno)) { if (window.showAlertModal) window.showAlertModal('El código interno solo admite letras y números.', 'Atención', 'Validación requerida'); else alert('El código interno solo admite letras y números.'); return; }
+            if (barcode && barcode.length > 64) { if (window.showAlertModal) window.showAlertModal('El código de barras admite hasta 64 caracteres.', 'Atención', 'Validación requerida'); else alert('El código de barras admite hasta 64 caracteres.'); return; }
+            if (barcode && !/^[A-Za-z0-9]+$/.test(barcode)) { if (window.showAlertModal) window.showAlertModal('El código de barras solo admite letras y números.', 'Atención', 'Validación requerida'); else alert('El código de barras solo admite letras y números.'); return; }
 
             const payload = {
                 name,
                 category_id: parseInt(categoryId, 10),
                 codigo_interno: codigoInterno,
+                barcode: barcode,
                 uses_lots: true,
                 method: 'FIFO',
                 min_stock: min,

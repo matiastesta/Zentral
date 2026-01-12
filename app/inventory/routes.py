@@ -1720,6 +1720,109 @@ def bulk_update_product_prices():
     return jsonify({'ok': True, 'items': [_serialize_product(r) for r in updated], 'errors': errors})
 
 
+@bp.post('/api/empty')
+@login_required
+@module_required('inventory')
+def empty_inventory():
+    """Dangerous operation: clears current inventory (stock) for the current company.
+
+    - Deletes ALL InventoryLot rows for the company (current stock)
+    - Keeps InventoryMovement rows (history), but detaches them from lots by setting lot_id=NULL
+    - Products are intentionally NOT deleted.
+    """
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    payload = request.get_json(silent=True) or {}
+    confirm_raw = str(payload.get('confirm') or '').strip().lower()
+    if confirm_raw != 'vaciar inventario':
+        return jsonify({'ok': False, 'error': 'confirm_required'}), 400
+
+    try:
+        detached = (
+            db.session.query(InventoryMovement)
+            .filter(InventoryMovement.company_id == cid)
+            .filter(InventoryMovement.lot_id.isnot(None))
+            .update({InventoryMovement.lot_id: None}, synchronize_session=False)
+        )
+        deleted_lots = (
+            db.session.query(InventoryLot)
+            .filter(InventoryLot.company_id == cid)
+            .delete(synchronize_session=False)
+        )
+        db.session.commit()
+        return jsonify({'ok': True, 'detached_movements': int(detached or 0), 'deleted_lots': int(deleted_lots or 0)})
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+
+
+@bp.post('/api/clear')
+@login_required
+@module_required('inventory')
+def clear_inventory():
+    """Dangerous operation: clears inventory and removes products from Inventory module.
+
+    - Deletes ALL InventoryLot rows for the company (current stock)
+    - Keeps InventoryMovement rows (history), but detaches them from lots by setting lot_id=NULL
+    - Products are NOT physically deleted to preserve history integrity (InventoryMovement.product_id FK),
+      but are deactivated (active=False) so they disappear from normal inventory listings.
+    """
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    payload = request.get_json(silent=True) or {}
+    confirm_raw = str(payload.get('confirm') or '').strip().lower()
+    if confirm_raw != 'borrar inventario':
+        return jsonify({'ok': False, 'error': 'confirm_required'}), 400
+
+    try:
+        detached = (
+            db.session.query(InventoryMovement)
+            .filter(InventoryMovement.company_id == cid)
+            .filter(InventoryMovement.lot_id.isnot(None))
+            .update({InventoryMovement.lot_id: None}, synchronize_session=False)
+        )
+        deleted_lots = (
+            db.session.query(InventoryLot)
+            .filter(InventoryLot.company_id == cid)
+            .delete(synchronize_session=False)
+        )
+        deactivated_products = (
+            db.session.query(Product)
+            .filter(Product.company_id == cid)
+            .update({Product.active: False}, synchronize_session=False)
+        )
+        db.session.commit()
+        return jsonify({
+            'ok': True,
+            'detached_movements': int(detached or 0),
+            'deleted_lots': int(deleted_lots or 0),
+            'deactivated_products': int(deactivated_products or 0),
+        })
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+
+
 @bp.get('/api/lots')
 @login_required
 @module_required('inventory')
@@ -1728,7 +1831,20 @@ def list_lots():
     if limit <= 0 or limit > 20000:
         limit = 5000
     product_id = (request.args.get('product_id') or '').strip()
-    q = db.session.query(InventoryLot).join(Product)
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+
+    q = (
+        db.session.query(InventoryLot)
+        .join(Product)
+        .filter(InventoryLot.company_id == cid)
+        .filter(Product.company_id == cid)
+    )
     if product_id:
         try:
             q = q.filter(InventoryLot.product_id == int(product_id))
@@ -2248,9 +2364,17 @@ def list_inventory_movements():
     if limit <= 0 or limit > 5000:
         limit = 500
 
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+
     d_from = _parse_date_iso(raw_from, None)
     d_to = _parse_date_iso(raw_to, None)
-    q = db.session.query(InventoryMovement)
+    q = db.session.query(InventoryMovement).filter(InventoryMovement.company_id == cid)
     if d_from:
         q = q.filter(InventoryMovement.movement_date >= d_from)
     if d_to:

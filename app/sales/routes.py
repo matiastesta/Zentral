@@ -967,6 +967,7 @@ def _serialize_product_for_sales(p: Product):
         'name': p.name,
         'codigo_interno': (p.internal_code or ''),
         'internal_code': (p.internal_code or ''),
+        'barcode': (getattr(p, 'barcode', None) or ''),
         'description': (p.description or ''),
         'sale_price': p.sale_price,
         'category_id': p.category_id,
@@ -1289,7 +1290,7 @@ def list_products_for_sales():
     )
     if qraw:
         like = f"%{qraw}%"
-        q = q.filter(or_(Product.name.ilike(like), Product.internal_code.ilike(like)))
+        q = q.filter(or_(Product.name.ilike(like), Product.internal_code.ilike(like), Product.barcode.ilike(like)))
     q = q.order_by(Product.name.asc(), Product.id.asc())
 
     rows = q.offset(offset).limit(limit + 1).all()
