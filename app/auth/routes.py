@@ -1,3 +1,5 @@
+from datetime import date, datetime
+
 from flask import render_template, redirect, url_for, flash, request, session, current_app
 from flask_login import login_user, logout_user, current_user
 from sqlalchemy import func
@@ -71,6 +73,21 @@ def login():
             if not c:
                 flash('Empresa inválida.', 'error')
                 return render_template('auth/login.html', title='Iniciar Sesión', form=form)
+            try:
+                scheduled = getattr(c, 'pause_scheduled_for', None)
+            except Exception:
+                scheduled = None
+            if scheduled and str(getattr(c, 'status', '') or 'active') == 'active' and scheduled <= date.today():
+                try:
+                    c.status = 'paused'
+                    c.paused_at = datetime.utcnow()
+                    c.pause_reason = 'scheduled'
+                    db.session.commit()
+                except Exception:
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        pass
             if str(getattr(c, 'status', '') or 'active') != 'active':
                 flash('Empresa pausada. Contactá soporte.', 'error')
                 return render_template('auth/login.html', title='Iniciar Sesión', form=form)

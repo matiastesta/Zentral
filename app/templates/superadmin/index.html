@@ -38,24 +38,38 @@
                             <span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">active</span>
                         {% endif %}
                     </td>
-                    <td class="px-3 py-2 text-right space-x-2 whitespace-nowrap">
-                        <a href="{{ url_for('superadmin.company_overview', company_id=c.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Editar</a>
-                        <form method="post" action="{{ url_for('superadmin.impersonate_company', company_id=c.id) }}" class="inline">
-                            <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Soporte</button>
-                        </form>
-                        {% if c.status == 'paused' %}
-                            <form method="post" action="{{ url_for('superadmin.reactivate_company', company_id=c.id) }}" class="inline">
-                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700">Reactivar</button>
+                    <td class="px-3 py-2 text-right">
+                        <div class="inline-flex flex-wrap items-center gap-2 whitespace-nowrap">
+                            <a href="{{ url_for('superadmin.company_overview', company_id=c.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Editar</a>
+                            <form method="post" action="{{ url_for('superadmin.impersonate_company', company_id=c.id) }}" class="inline">
+                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Soporte</button>
                             </form>
-                        {% else %}
-                            <form method="post" action="{{ url_for('superadmin.pause_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Pausar empresa" data-confirm-message="¿Querés pausar {{ c.name }}?" data-confirm-ok="Pausar" data-confirm-cancel="Cancelar">
-                                <input type="hidden" name="reason" value="">
-                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700">Pausar</button>
+
+                            <form method="post" action="{{ url_for('superadmin.schedule_pause_company', company_id=c.id) }}" class="inline">
+                                <div class="inline-flex items-center gap-2">
+                                    <input type="text" name="pause_scheduled_for" value="{{ c.pause_scheduled_for.isoformat() if c.pause_scheduled_for else '' }}" class="js-flatpickr-date h-8 w-32 px-2 text-xs border rounded-md bg-white text-gray-800" placeholder="dd/mm/aaaa" autocomplete="off">
+                                    <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-yellow-600 text-white hover:bg-yellow-700">Programar</button>
+                                </div>
                             </form>
-                        {% endif %}
-                        <form method="post" action="{{ url_for('superadmin.delete_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar empresa" data-confirm-message="Vas a eliminar {{ c.name }} y TODA su información. Esta acción no se puede deshacer." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
-                            <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
-                        </form>
+                            {% if c.pause_scheduled_for %}
+                                <form method="post" action="{{ url_for('superadmin.cancel_schedule_pause_company', company_id=c.id) }}" class="inline">
+                                    <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-yellow-50 text-yellow-700 hover:bg-yellow-100">Cancelar</button>
+                                </form>
+                            {% endif %}
+                            {% if c.status == 'paused' %}
+                                <form method="post" action="{{ url_for('superadmin.reactivate_company', company_id=c.id) }}" class="inline">
+                                    <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700">Reactivar</button>
+                                </form>
+                            {% else %}
+                                <form method="post" action="{{ url_for('superadmin.pause_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Pausar empresa" data-confirm-message="¿Querés pausar {{ c.name }}?" data-confirm-ok="Pausar" data-confirm-cancel="Cancelar">
+                                    <input type="hidden" name="reason" value="">
+                                    <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700">Pausar</button>
+                                </form>
+                            {% endif %}
+                            <form method="post" action="{{ url_for('superadmin.delete_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar empresa" data-confirm-message="Vas a eliminar {{ c.name }} y TODA su información. Esta acción no se puede deshacer." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
+                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 {% else %}
@@ -220,6 +234,29 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     if (planSelect) planSelect.addEventListener('change', syncPlanNew);
     syncPlanNew();
+
+    try {
+        if (typeof flatpickr === 'function') {
+            if (flatpickr && flatpickr.l10ns && flatpickr.l10ns.es) {
+                try { flatpickr.localize(flatpickr.l10ns.es); } catch (e) { }
+            }
+            document.querySelectorAll('.js-flatpickr-date').forEach(function (el) {
+                try {
+                    flatpickr(el, {
+                        dateFormat: 'Y-m-d',
+                        altInput: true,
+                        altFormat: 'd/m/Y',
+                        allowInput: false,
+                        appendTo: document.body,
+                        disableMobile: true,
+                        locale: (flatpickr && flatpickr.l10ns && flatpickr.l10ns.es) ? flatpickr.l10ns.es : undefined,
+                    });
+                } catch (e) {
+                }
+            });
+        }
+    } catch (e) {
+    }
 });
 </script>
 {% endblock %}

@@ -2,9 +2,9 @@ import os
 import sys
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 import re
-from flask import Flask, g, jsonify, render_template, request, redirect, session, url_for
+from flask import Flask, g, jsonify, render_template, request, redirect, session, url_for, flash
 from flask_login import LoginManager
 from flask_babel import Babel
 from flask_sqlalchemy import SQLAlchemy
@@ -466,6 +466,80 @@ def create_app(config_class=Config):
             except Exception:
                 pass
             app.logger.exception('Failed to apply tenant context')
+
+    @app.before_request
+    def _apply_scheduled_company_pause():
+        try:
+            # Never block zentral admin or superadmin routes.
+            if str(session.get('auth_is_zentral_admin') or '') == '1':
+                return None
+            path = str(getattr(request, 'path', '') or '')
+            if path.startswith('/superadmin'):
+                return None
+            # Allow auth routes so the user can reach login/logout.
+            if path.startswith('/auth'):
+                return None
+            # Allow static and health-like endpoints.
+            if path.startswith('/static'):
+                return None
+
+            from app.tenancy import ensure_request_context
+
+            ensure_request_context()
+            c = getattr(g, 'company', None)
+            if not c:
+                return None
+
+            today = date.today()
+            try:
+                scheduled = getattr(c, 'pause_scheduled_for', None)
+            except Exception:
+                scheduled = None
+
+            if scheduled and getattr(c, 'status', 'active') == 'active' and scheduled <= today:
+                try:
+                    c.status = 'paused'
+                    c.paused_at = datetime.utcnow()
+                    c.pause_reason = 'scheduled'
+                    db.session.commit()
+                except Exception:
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        pass
+
+            if str(getattr(c, 'status', '') or 'active') != 'active':
+                accept = request.headers.get('Accept') or ''
+                wants_json = ('application/json' in accept) or path.startswith('/api/') or ('/api/' in path)
+                if wants_json:
+                    return jsonify({'ok': False, 'error': 'company_paused'}), 403
+
+                try:
+                    from flask_login import logout_user, current_user
+
+                    if getattr(current_user, 'is_authenticated', False):
+                        logout_user()
+                except Exception:
+                    pass
+                try:
+                    session.pop('auth_company_id', None)
+                    session.pop('auth_company_slug', None)
+                    session.pop('auth_is_zentral_admin', None)
+                    session.pop('impersonate_company_id', None)
+                except Exception:
+                    pass
+                try:
+                    flash('Empresa pausada. Contactá soporte.', 'error')
+                except Exception:
+                    pass
+                return redirect('/auth/login')
+        except Exception:
+            # Never take down the app due to pause enforcement issues.
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return None
 
     @app.before_request
     def _guard_broken_login_state():

@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, date
 import secrets
 import string
 
@@ -566,8 +566,65 @@ def pause_company(company_id: str):
     c.status = 'paused'
     c.paused_at = datetime.utcnow()
     c.pause_reason = reason
+    try:
+        c.pause_scheduled_for = None
+    except Exception:
+        pass
     db.session.commit()
     flash(f'Empresa {c.name} pausada.', 'success')
+    return redirect(url_for('superadmin.index'))
+
+
+@bp.post('/companies/<company_id>/schedule-pause')
+@login_required
+def schedule_pause_company(company_id: str):
+    _require_zentral_admin()
+    raw = (request.form.get('pause_scheduled_for') or request.form.get('pause_date') or '').strip()
+    c = db.session.get(Company, str(company_id))
+    if not c:
+        flash('Empresa inválida.', 'error')
+        return redirect(url_for('superadmin.index'))
+    if not raw:
+        try:
+            c.pause_scheduled_for = None
+        except Exception:
+            pass
+        db.session.commit()
+        flash('Programación de pausa eliminada.', 'success')
+        return redirect(url_for('superadmin.index'))
+    try:
+        d = date.fromisoformat(raw)
+    except Exception:
+        flash('Fecha inválida. Usá el selector de fecha.', 'error')
+        return redirect(url_for('superadmin.index'))
+    c.pause_scheduled_for = d
+    # If the selected date is today (or in the past), pause immediately.
+    try:
+        if d <= date.today() and str(getattr(c, 'status', '') or 'active') == 'active':
+            c.status = 'paused'
+            c.paused_at = datetime.utcnow()
+            c.pause_reason = 'scheduled'
+    except Exception:
+        pass
+    db.session.commit()
+    flash(f'Pausa programada para {c.name}: {d.isoformat()}', 'success')
+    return redirect(url_for('superadmin.index'))
+
+
+@bp.post('/companies/<company_id>/schedule-pause/cancel')
+@login_required
+def cancel_schedule_pause_company(company_id: str):
+    _require_zentral_admin()
+    c = db.session.get(Company, str(company_id))
+    if not c:
+        flash('Empresa inválida.', 'error')
+        return redirect(url_for('superadmin.index'))
+    try:
+        c.pause_scheduled_for = None
+    except Exception:
+        pass
+    db.session.commit()
+    flash('Programación de pausa eliminada.', 'success')
     return redirect(url_for('superadmin.index'))
 
 
@@ -622,6 +679,10 @@ def reactivate_company(company_id: str):
     c.status = 'active'
     c.paused_at = None
     c.pause_reason = None
+    try:
+        c.pause_scheduled_for = None
+    except Exception:
+        pass
     db.session.commit()
     flash('Empresa reactivada.', 'success')
     return redirect(url_for('superadmin.index'))

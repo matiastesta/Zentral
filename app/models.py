@@ -82,6 +82,7 @@ class Company(db.Model):
     status = db.Column(db.String(16), nullable=False, default='active')
     paused_at = db.Column(db.DateTime, nullable=True)
     pause_reason = db.Column(db.String(255), nullable=True)
+    pause_scheduled_for = db.Column(db.Date, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 

@@ -239,6 +239,7 @@ def _sanitize_source_module(v: str | None) -> str:
     allowed = {
         'manual',
         'clientes',
+        'cuotas',
         'proveedores',
         'inventario',
         'movimientos',
@@ -266,6 +267,12 @@ def _is_source_enabled(cfg_data: dict, source_module: str, event_type: str) -> b
         sources = _default_calendar_config().get('event_sources')
     src = sources.get(sm)
     if not isinstance(src, dict):
+        try:
+            src = (_default_calendar_config().get('event_sources') or {}).get(sm)
+        except Exception:
+            src = None
+    if not isinstance(src, dict):
+        # Unknown module: default to disabled.
         return False
     if sm == 'manual':
         return bool(src.get('notas_avisos', True))
@@ -995,13 +1002,8 @@ def index():
         if _is_source_enabled(cfg_data, ev.source_module, ev.event_type):
             events.append(ev)
 
-    filtered_events = []
-    for ev in events:
-        d = getattr(ev, 'event_date', None)
-        if d and d < today:
-            continue
-        filtered_events.append(ev)
-    events = filtered_events
+    # Keep past events within the requested range.
+    # The UI already marks overdue items where appropriate.
 
     def _bucket_for(ev: CalendarEvent) -> str:
         try:
