@@ -4981,9 +4981,14 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    if (btnExport) {
-        btnExport.addEventListener('click', function () {
-            openExport();
+    if (btnRunImport) {
+        btnRunImport.addEventListener('click', function () {
+            const f = (importFile && importFile.files && importFile.files.length) ? importFile.files[0] : null;
+            if (!f) {
+                if (window.showAlertModal) window.showAlertModal('Seleccioná un archivo .xlsx.', 'Atención', 'Validación requerida');
+                else alert('Seleccioná un archivo .xlsx.');
+                return;
+            }
             if (!String(f.name || '').toLowerCase().endsWith('.xlsx')) {
                 if (window.showAlertModal) window.showAlertModal('El archivo debe ser .xlsx.', 'Atención', 'Validación requerida');
                 else alert('El archivo debe ser .xlsx.');

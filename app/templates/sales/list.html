@@ -1988,6 +1988,33 @@ document.addEventListener('DOMContentLoaded', function() {
     let ventaPaidAmount = 0;
     let ventaUseInstallments = false;
 
+    function resetVentaPaymentState() {
+        ventaOnAccount = false;
+        ventaPaidAmount = 0;
+        ventaUseInstallments = false;
+        try {
+            if (panelCuentaCorriente) panelCuentaCorriente.classList.add('hidden');
+            if (panelSistemaCuotas) panelSistemaCuotas.classList.add('hidden');
+        } catch (e) {
+        }
+        try {
+            if (ccInlinePaid) ccInlinePaid.value = '$0';
+        } catch (e) {
+        }
+        try {
+            if (cuotasCount) cuotasCount.value = '1';
+            if (cuotasInterval) cuotasInterval.value = '30';
+            if (cuotasModeFixed) cuotasModeFixed.checked = true;
+            if (cuotasModeIndefinite) cuotasModeIndefinite.checked = false;
+        } catch (e) {
+        }
+        try { applyCuotasModeUi(); } catch (e) {}
+        try { updatePaymentButtonsVisual(); } catch (e) {}
+        try { syncCuentaCorrienteInlinePreview(); } catch (e) {}
+        try { syncCuotasPreview(); } catch (e) {}
+        try { computeTicketTotals(); } catch (e) {}
+    }
+
     function updatePaymentButtonsVisual() {
         const full = (!ventaOnAccount && !ventaUseInstallments);
         const cc = (!!ventaOnAccount);
@@ -6080,8 +6107,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (ticketNotas) ticketNotas.value = '';
         if (ticketDiasCambio) ticketDiasCambio.value = '14';
         selectedCustomer = null;
-        ventaOnAccount = false;
-        ventaPaidAmount = 0;
+        resetVentaPaymentState();
         ventaIsGift = false;
         ventaGiftCode = '';
         renderGiftUi();
@@ -6849,9 +6875,7 @@ td.num,th.num{text-align:right}
                 if (inputClienteBusqueda) inputClienteBusqueda.value = '';
                 if (ticketNotas) ticketNotas.value = '';
                 selectedCustomer = null;
-                ventaOnAccount = false;
-                ventaPaidAmount = 0;
-                ventaUseInstallments = false;
+                resetVentaPaymentState();
                 ventaIsGift = false;
                 ventaGiftCode = '';
                 renderGiftUi();
