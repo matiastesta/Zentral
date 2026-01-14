@@ -7358,8 +7358,8 @@ td.num,th.num{text-align:right}
                     if (tr.id === 'carrito-cambio-empty-row') return;
                     const inputSubtotal = tr.querySelector('.input-subtotal-cambio');
                     if (!inputSubtotal) return;
-                    const subtotal = parseFloat(inputSubtotal.value || '0');
-                    if (!isNaN(subtotal)) totalCambio += subtotal;
+                    const subtotal = parseNumeroFlexible(inputSubtotal.value || '0');
+                    if (isFinite(subtotal)) totalCambio += subtotal;
                 });
             }
 

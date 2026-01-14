@@ -34,9 +34,12 @@
                 <select id="egreso-categoria" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
                     <option value="Servicios públicos">Servicios públicos</option>
                     <option value="Gastos operativos">Gastos operativos</option>
+                    <option value="Compra de productos e insumos">Compra de productos e insumos</option>
+                    <option value="Inventario">Inventario</option>
                     <option value="Arriendo">Arriendo</option>
                     <option value="Nómina">Nómina</option>
                     <option value="Transportes">Transportes</option>
+                    <option value="Domicilios y logística">Domicilios y logística</option>
                     <option value="Mantenimiento y reparaciones">Mantenimiento y reparaciones</option>
                     <option value="Muebles, equipos o maquinarias">Muebles, equipos o maquinarias</option>
                     <option value="Otro">Otro</option>
@@ -593,12 +596,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const map = {
             'Servicios públicos': 'Luz, agua, gas, internet, impuestos y servicios esenciales.',
             'Gastos operativos': 'Insumos, compras menores y gastos del día a día del negocio.',
-            'Arriendo': 'Alquiler del local, depósito u otros espacios de trabajo.',
-            'Nómina': 'Pagos de sueldos, adelantos, bonos y horas extra del personal.',
-            'Transportes': 'Fletes, envíos, movilidad y traslados relacionados al negocio.',
-            'Mantenimiento y reparaciones': 'Arreglos, mantenimiento de equipos/instalaciones y repuestos.',
-            'Muebles, equipos o maquinarias': 'Compra de equipamiento, maquinaria, herramientas o muebles.',
-            'Otro': 'Categoría personalizada para gastos no contemplados.'
+            'Compra de productos e insumos': 'Compras a proveedores de productos o insumos para el negocio.',
+            'Inventario': 'Movimientos o costos relacionados a mercadería/stock (si corresponde).',
+            'Arriendo': 'Alquiler del local, bodega u oficina.',
+            'Nómina': 'Sueldos, adelantos, bonos y pagos relacionados a empleados.',
+            'Transportes': 'Fletes, combustibles, peajes y traslados.',
+            'Domicilios y logística': 'Envíos, mensajería y logística de entregas.',
+            'Mantenimiento y reparaciones': 'Arreglos, mantenimiento preventivo y repuestos.',
+            'Muebles, equipos o maquinarias': 'Compras o gastos vinculados a mobiliario y equipamiento.',
+            'Otro': 'Categorías personalizadas o no contempladas en la lista.'
         };
         categoriaDesc.textContent = map[c] || '';
     }
@@ -933,9 +939,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const base = [
             'Servicios públicos',
             'Gastos operativos',
+            'Compra de productos e insumos',
+            'Inventario',
             'Arriendo',
             'Nómina',
             'Transportes',
+            'Domicilios y logística',
             'Mantenimiento y reparaciones',
             'Muebles, equipos o maquinarias',
             'Otro'
@@ -1041,7 +1050,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const found = data && data.item ? data.item : null;
                 if (!found) return;
 
-                const categoriaRaw = (found.categoria === 'Compra de productos e insumos') ? 'Gastos operativos' : found.categoria;
+                const categoriaRaw = found.categoria;
 
                 if (titulo) titulo.textContent = 'Editar gasto';
                 if (inputId) inputId.value = String(found.id || '');
@@ -1049,7 +1058,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 if (selectCategoria) {
                     const categoriasBase = [
-                        'Servicios públicos','Gastos operativos','Arriendo','Nómina','Transportes','Mantenimiento y reparaciones','Muebles, equipos o maquinarias','Otro'
+                        'Servicios públicos','Gastos operativos','Compra de productos e insumos','Inventario','Arriendo','Nómina','Transportes','Domicilios y logística','Mantenimiento y reparaciones','Muebles, equipos o maquinarias','Otro'
                     ];
                     const esOtro = !categoriasBase.includes(categoriaRaw);
                     if (esOtro) {
@@ -1113,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const found = data && data.item ? data.item : null;
                 if (!found) return;
 
-                const categoriaRaw = (found.categoria === 'Compra de productos e insumos') ? 'Gastos operativos' : found.categoria;
+                const categoriaRaw = found.categoria;
 
                 if (titulo) titulo.textContent = 'Nuevo gasto (duplicado)';
                 if (inputId) inputId.value = '';
@@ -1121,7 +1130,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 if (selectCategoria) {
                     const categoriasBase = [
-                        'Servicios públicos','Gastos operativos','Arriendo','Nómina','Transportes','Mantenimiento y reparaciones','Muebles, equipos o maquinarias','Otro'
+                        'Servicios públicos','Gastos operativos','Compra de productos e insumos','Inventario','Arriendo','Nómina','Transportes','Domicilios y logística','Mantenimiento y reparaciones','Muebles, equipos o maquinarias','Otro'
                     ];
                     const esOtro = !categoriasBase.includes(categoriaRaw);
                     if (esOtro) {
