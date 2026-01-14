@@ -3364,6 +3364,19 @@ def get_cash_count():
         }
     })
 
+
+@bp.post('/api/cash-count')
+@login_required
+@module_required('sales')
+def save_cash_count():
+    payload = request.get_json(silent=True) or {}
+
+    raw = str(payload.get('date') or payload.get('fecha') or '').strip()
+    try:
+        d = dt_date.fromisoformat(raw) if raw else dt_date.today()
+    except Exception:
+        d = dt_date.today()
+
     cid = _company_id()
     if not cid:
         return jsonify({'ok': False, 'error': 'no_company'}), 400

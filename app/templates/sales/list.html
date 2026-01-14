@@ -4357,6 +4357,28 @@ document.addEventListener('DOMContentLoaded', function() {
         return isNaN(n) ? 0 : n;
     }
 
+    // Compat: arqueo y otros módulos históricos usan estos helpers.
+    // En algunos deploys pueden no venir desde helpers globales, así que definimos fallback local.
+    function parseMonedaARSInput(valor) {
+        try {
+            return parseMoneyInputARS(valor);
+        } catch (e) {
+            try { return parseNumeroFlexible(valor); } catch (err) { return 0; }
+        }
+    }
+
+    function setMonedaARSInput(el, valor) {
+        if (!el) return;
+        const raw = (valor === null || valor === undefined) ? '' : valor;
+        const s = String(raw).trim();
+        if (!s) {
+            try { el.value = ''; } catch (e) {}
+            return;
+        }
+        const n = parseMonedaARSInput(s);
+        try { el.value = formatearMoneda(n); } catch (e) { try { el.value = String(n); } catch (err) {} }
+    }
+
     function mostrarMensajesArqueo({ ok, detalle }) {
         if (msgArqueoOk) msgArqueoOk.classList.toggle('hidden', !ok);
         if (msgArqueoError) msgArqueoError.classList.toggle('hidden', ok);
