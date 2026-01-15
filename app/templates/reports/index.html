@@ -1259,6 +1259,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }).join('');
     }
 
+    let _invRowsState = [];
+    let _invSortKey = 'stock_value';
+    let _invSortDir = 'desc';
+
     function renderInventoryTable(rows) {
         if (!invTableEl) return;
         const list = Array.isArray(rows) ? rows : [];

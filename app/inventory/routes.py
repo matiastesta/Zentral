@@ -760,33 +760,56 @@ def inventory_import_excel():
                 supplier_id = str(getattr(srow, 'id', '') or '').strip() or None
                 supplier_name = str(getattr(srow, 'name', '') or '').strip() or None
 
-            internal_code = ''
-            if codigo_interno_raw:
+            prod = None
+            matched_product_id = d.get('matched_product_id')
+            if matched_product_id is not None and str(matched_product_id).strip() != '':
+                try:
+                    prod = db.session.query(Product).filter(Product.company_id == cid, Product.id == int(matched_product_id)).first()
+                except Exception:
+                    prod = None
+
+            if not prod and codigo_interno_raw:
                 internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
-                exists = db.session.query(Product.id).filter(Product.internal_code == internal_code).first() is not None
-                if exists:
-                    raise ValueError('codigo_interno_already_exists')
-            if not internal_code:
-                internal_code = _generate_codigo_interno(cid, nombre, categoria or 'GEN')
-            prod = Product(
-                company_id=cid,
-                name=nombre,
-                description=descripcion,
-                category_id=cat_row.id,
-                sale_price=precio_lista,
-                internal_code=internal_code,
-                unit_name='Unidad',
-                uses_lots=True,
-                method='FIFO',
-                min_stock=stock_minimo,
-                reorder_point=punto_pedido,
-                primary_supplier_id=supplier_id,
-                primary_supplier_name=supplier_name,
-                active=True,
-            )
-            db.session.add(prod)
-            db.session.flush()
-            created_products += 1
+                prod = db.session.query(Product).filter(Product.company_id == cid, Product.internal_code == internal_code).first()
+
+            if not prod:
+                prod = (
+                    db.session.query(Product)
+                    .filter(Product.company_id == cid)
+                    .filter(Product.category_id == cat_row.id)
+                    .filter(func.lower(func.trim(Product.name)) == nombre.lower())
+                    .first()
+                )
+
+            if not prod:
+                internal_code = ''
+                if codigo_interno_raw:
+                    internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
+                    exists = db.session.query(Product.id).filter(Product.company_id == cid, Product.internal_code == internal_code).first() is not None
+                    if exists:
+                        raise ValueError('codigo_interno_already_exists')
+                if not internal_code:
+                    internal_code = _generate_codigo_interno(cid, nombre, categoria or 'GEN')
+
+                prod = Product(
+                    company_id=cid,
+                    name=nombre,
+                    description=descripcion,
+                    category_id=cat_row.id,
+                    sale_price=precio_lista,
+                    internal_code=internal_code,
+                    unit_name='Unidad',
+                    uses_lots=True,
+                    method='FIFO',
+                    min_stock=stock_minimo,
+                    reorder_point=punto_pedido,
+                    primary_supplier_id=supplier_id,
+                    primary_supplier_name=supplier_name,
+                    active=True,
+                )
+                db.session.add(prod)
+                db.session.flush()
+                created_products += 1
 
             if cantidad > 0:
                 lot = InventoryLot(
@@ -799,7 +822,7 @@ def inventory_import_excel():
                     supplier_name=supplier_name,
                     expiration_date=exp_dt,
                     lot_code=_generate_lot_code(),
-                    note=nota_lote or 'Ingreso por inventario (importación Excel)',
+                    note=nota_lote or ('Ingreso por inventario (importación Excel)' + (' - producto existente' if (d.get('product_exists') is True) else '')),
                 )
                 if not supplier_id and not supplier_name:
                     lot.supplier_id = None
@@ -820,36 +843,6 @@ def inventory_import_excel():
                     total_cost=cantidad * costo_unitario,
                 )
                 db.session.add(mv)
-
-                exp_amount = round(float(cantidad * costo_unitario), 2)
-                exp_supplier_name = supplier_name or (lot.supplier_name or '')
-                exp = Expense(
-                    id=uuid4().hex,
-                    company_id=cid,
-                    expense_date=today,
-                    payment_method='Ajuste interno',
-                    amount=exp_amount,
-                    category='Inventario',
-                    supplier_id=supplier_id,
-                    supplier_name=exp_supplier_name,
-                    note=('Ingreso por inventario (importación Excel) - ' + str(nombre) + ' (' + str(lot.lot_code or '') + ')'),
-                    description=None,
-                    expense_type='Variable',
-                    frequency='Único',
-                    origin='inventory',
-                )
-                try:
-                    exp.meta_json = json.dumps({
-                        'origin_ref': {
-                            'kind': 'inventory_import_excel',
-                            'product_id': int(prod.id),
-                            'lot_id': int(lot.id),
-                            'lot_code': str(lot.lot_code or ''),
-                        }
-                    }, ensure_ascii=False)
-                except Exception:
-                    exp.meta_json = None
-                db.session.add(exp)
                 created_lots += 1
 
             nested.commit()
@@ -953,6 +946,7 @@ def inventory_import_excel_preview():
     existing_cat = set()
     existing_sup = set()
     existing_prod = set()
+    existing_by_ci = {}
     try:
         cats = (
             db.session.query(Category)
@@ -960,22 +954,36 @@ def inventory_import_excel_preview():
             .limit(10000)
             .all()
         )
-        for c in (cats or []):
-            existing_cat.add(_normalize_name(getattr(c, 'name', '') or ''))
+        existing_cat = set(_normalize_name(c.name) for c in (cats or []) if _normalize_name(c.name))
     except Exception:
         existing_cat = set()
+
     try:
-        sups = db.session.query(Supplier).filter(Supplier.company_id == cid).limit(10000).all()
-        for s in (sups or []):
-            existing_sup.add(_normalize_name(getattr(s, 'name', '') or ''))
+        sups = (
+            db.session.query(Supplier)
+            .filter(Supplier.company_id == cid)
+            .limit(10000)
+            .all()
+        )
+        existing_sup = set(_normalize_name(s.name) for s in (sups or []) if _normalize_name(s.name))
     except Exception:
         existing_sup = set()
+
     try:
-        prods = db.session.query(Product).filter(Product.company_id == cid).limit(100000).all()
+        prods = (
+            db.session.query(Product)
+            .filter(Product.company_id == cid)
+            .limit(20000)
+            .all()
+        )
+        existing_prod = set(_normalize_name(p.name) for p in (prods or []) if _normalize_name(p.name))
         for p in (prods or []):
-            existing_prod.add(_normalize_name(getattr(p, 'name', '') or ''))
+            ci = str(getattr(p, 'internal_code', '') or '').strip()
+            if ci:
+                existing_by_ci[ci] = p
     except Exception:
         existing_prod = set()
+        existing_by_ci = {}
 
     out_rows = []
     new_cats = set()
@@ -1012,7 +1020,15 @@ def inventory_import_excel_preview():
 
         will_create_category = bool(cat_norm) and (cat_norm not in existing_cat)
         will_create_supplier = bool(sup_norm) and (sup_norm not in existing_sup)
-        product_exists = bool(prod_norm) and (prod_norm in existing_prod)
+        matched_product_id = None
+        if codigo_interno and codigo_interno in existing_by_ci:
+            product_exists = True
+            try:
+                matched_product_id = int(getattr(existing_by_ci[codigo_interno], 'id', None))
+            except Exception:
+                matched_product_id = None
+        else:
+            product_exists = bool(prod_norm) and (prod_norm in existing_prod)
 
         if will_create_category:
             new_cats.add(cat_norm)
@@ -1036,6 +1052,7 @@ def inventory_import_excel_preview():
             'will_create_category': will_create_category,
             'will_create_supplier': will_create_supplier,
             'product_exists': product_exists,
+            'matched_product_id': matched_product_id,
         })
 
     return jsonify({
@@ -1140,33 +1157,61 @@ def inventory_import_excel_commit():
                 supplier_id = str(getattr(srow, 'id', '') or '').strip() or None
                 supplier_name = str(getattr(srow, 'name', '') or '').strip() or None
 
-            internal_code = ''
-            if codigo_interno_raw:
+            prod = None
+            matched_product_id = d.get('matched_product_id')
+            if matched_product_id is not None and str(matched_product_id).strip() != '':
+                try:
+                    prod = db.session.query(Product).filter(Product.company_id == cid, Product.id == int(matched_product_id)).first()
+                except Exception:
+                    prod = None
+
+            if not prod and codigo_interno_raw:
                 internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
-                exists = db.session.query(Product.id).filter(Product.internal_code == internal_code).first() is not None
-                if exists:
-                    raise ValueError('codigo_interno_already_exists')
-            if not internal_code:
-                internal_code = _generate_codigo_interno(cid, nombre, categoria or 'GEN')
-            prod = Product(
-                company_id=cid,
-                name=nombre,
-                description=descripcion,
-                category_id=cat_row.id,
-                sale_price=precio_lista,
-                internal_code=internal_code,
-                unit_name='Unidad',
-                uses_lots=True,
-                method='FIFO',
-                min_stock=stock_minimo,
-                reorder_point=punto_pedido,
-                primary_supplier_id=supplier_id,
-                primary_supplier_name=supplier_name,
-                active=True,
-            )
-            db.session.add(prod)
-            db.session.flush()
-            created_products += 1
+                prod = db.session.query(Product).filter(Product.company_id == cid, Product.internal_code == internal_code).first()
+
+            if not prod:
+                prod = (
+                    db.session.query(Product)
+                    .filter(Product.company_id == cid)
+                    .filter(Product.category_id == cat_row.id)
+                    .filter(func.lower(func.trim(Product.name)) == nombre.lower())
+                    .first()
+                )
+
+            if not prod:
+                internal_code = ''
+                if codigo_interno_raw:
+                    internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
+                    exists = (
+                        db.session.query(Product.id)
+                        .filter(Product.company_id == cid, Product.internal_code == internal_code)
+                        .first()
+                        is not None
+                    )
+                    if exists:
+                        raise ValueError('codigo_interno_already_exists')
+                if not internal_code:
+                    internal_code = _generate_codigo_interno(cid, nombre, categoria or 'GEN')
+
+                prod = Product(
+                    company_id=cid,
+                    name=nombre,
+                    description=descripcion,
+                    category_id=cat_row.id,
+                    sale_price=precio_lista,
+                    internal_code=internal_code,
+                    unit_name='Unidad',
+                    uses_lots=True,
+                    method='FIFO',
+                    min_stock=stock_minimo,
+                    reorder_point=punto_pedido,
+                    primary_supplier_id=supplier_id,
+                    primary_supplier_name=supplier_name,
+                    active=True,
+                )
+                db.session.add(prod)
+                db.session.flush()
+                created_products += 1
 
             if cantidad > 0:
                 lot = InventoryLot(
@@ -1200,36 +1245,6 @@ def inventory_import_excel_commit():
                     total_cost=cantidad * costo_unitario,
                 )
                 db.session.add(mv)
-
-                exp_amount = round(float(cantidad * costo_unitario), 2)
-                exp_supplier_name = supplier_name or (lot.supplier_name or '')
-                exp = Expense(
-                    id=uuid4().hex,
-                    company_id=cid,
-                    expense_date=today,
-                    payment_method='Ajuste interno',
-                    amount=exp_amount,
-                    category='Inventario',
-                    supplier_id=supplier_id,
-                    supplier_name=exp_supplier_name,
-                    note=('Ingreso por inventario (importación Excel) - ' + str(nombre) + ' (' + str(lot.lot_code or '') + ')'),
-                    description=None,
-                    expense_type='Variable',
-                    frequency='Único',
-                    origin='inventory',
-                )
-                try:
-                    exp.meta_json = json.dumps({
-                        'origin_ref': {
-                            'kind': 'inventory_import_excel',
-                            'product_id': int(prod.id),
-                            'lot_id': int(lot.id),
-                            'lot_code': str(lot.lot_code or ''),
-                        }
-                    }, ensure_ascii=False)
-                except Exception:
-                    exp.meta_json = None
-                db.session.add(exp)
                 created_lots += 1
 
             nested.commit()
@@ -1286,7 +1301,11 @@ def delete_category_api(category_id: int):
     if child:
         return jsonify({'ok': False, 'error': 'has_children'}), 400
 
-    used = db.session.query(Product.id).filter(Product.company_id == cid, Product.category_id == row.id).first()
+    used = db.session.query(Product.id).filter(
+        Product.company_id == cid,
+        Product.category_id == row.id,
+        Product.active == True,
+    ).first()
     if used:
         return jsonify({'ok': False, 'error': 'in_use'}), 400
 
@@ -1925,6 +1944,15 @@ def list_lots():
 @login_required
 @module_required('inventory')
 def create_lot():
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     payload = request.get_json(silent=True) or {}
     try:
         product_id = int(payload.get('product_id'))
@@ -1934,6 +1962,9 @@ def create_lot():
     prod = db.session.get(Product, product_id)
     if not prod:
         return jsonify({'ok': False, 'error': 'product_not_found'}), 404
+
+    if str(getattr(prod, 'company_id', '') or '').strip() != cid:
+        return jsonify({'ok': False, 'error': 'forbidden'}), 403
 
     qty = _num(payload.get('qty'))
     if qty <= 0:
@@ -1983,6 +2014,7 @@ def create_lot():
                 received_at = datetime.utcnow()
 
             mv = InventoryMovement(
+                company_id=cid,
                 movement_date=movement_date,
                 type='purchase',
                 sale_ticket=None,
@@ -1997,6 +2029,7 @@ def create_lot():
             db.session.commit()
             return jsonify({'ok': True, 'item': _serialize_lot(existing)})
     row = InventoryLot(
+        company_id=cid,
         product_id=product_id,
         qty_initial=qty,
         qty_available=qty,
@@ -2017,6 +2050,7 @@ def create_lot():
         received_at = datetime.utcnow()
 
     mv = InventoryMovement(
+        company_id=cid,
         movement_date=movement_date,
         type='purchase',
         sale_ticket=None,
@@ -2320,56 +2354,6 @@ def adjust_lot(lot_id: int):
             'expenses': [],
             'difference_valor': round(neto, 4),
         }
-
-        if amount_abs > 1e-9:
-            mv_notes = '\n'.join(base_note_lines)
-            mv_origin_ref = {
-                'kind': 'lot_adjustment',
-                'adjustment_id': adjustment_id,
-                'product_id': lot.product_id,
-                'lot_id': lot.id,
-            }
-            mv_meta = {
-                'origin_ref': mv_origin_ref,
-                'inventory_adjustment': {
-                    'provider_attribution': {
-                        'supplier_id': supplier_id,
-                        'supplier_name': supplier_name,
-                    },
-                    'calculation': {
-                        'old_qty': float(old_qty_initial or 0.0),
-                        'new_qty': float(new_qty_initial or 0.0),
-                        'old_unit_cost': float(old_unit_cost or 0.0),
-                        'new_unit_cost': float(new_unit_cost or 0.0),
-                        'delta_qty': float(delta_qty or 0.0),
-                        'delta_cost': float(delta_cost or 0.0),
-                        'stock_base': float(stock_base or 0.0),
-                        'impact_cost': float(impact_cost or 0.0),
-                        'impact_qty': float(impact_qty or 0.0),
-                        'ingreso': float(ingreso or 0.0),
-                        'gasto': float(gasto or 0.0),
-                        'neto': float(neto or 0.0),
-                    },
-                },
-            }
-
-            mv_eid = uuid4().hex
-            mv_amount = -amount_abs if neto > 0 else amount_abs
-            db.session.add(Expense(
-                id=mv_eid,
-                company_id=cid,
-                expense_date=date_adj,
-                payment_method='Ajuste interno',
-                amount=mv_amount,
-                category='Inventario',
-                supplier_id=supplier_id,
-                supplier_name=supplier_name,
-                note=mv_notes,
-                expense_type='AjusteInventario',
-                origin='inventory',
-                meta_json=json.dumps(mv_meta, ensure_ascii=False),
-            ))
-            created['expenses'] = [mv_eid]
 
         db.session.commit()
         return jsonify({

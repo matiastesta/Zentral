@@ -2951,7 +2951,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }).then(function (r) {
             if (!r) return { ok: false, error: 'network' };
             if (r.status === 204) return { ok: true };
-            return fetchJsonSafe(url, { method: 'DELETE', credentials: 'same-origin' });
+            return r.json().catch(function () {
+                return { ok: (r && r.ok) ? true : false };
+            });
         }).catch(function () {
             return { ok: false, error: 'network' };
         });

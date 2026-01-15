@@ -6,7 +6,7 @@ from flask_login import login_required
 from sqlalchemy import and_, func, or_
 
 from app import db
-from app.models import Employee, Expense
+from app.models import CashCount, Employee, Expense, Sale
 from app.permissions import module_required, module_required_any
 from app.employees import bp
 
@@ -299,6 +299,30 @@ def create_employee_api():
     return jsonify({'ok': True, 'item': _serialize_employee(row)})
 
 
+@bp.put('/api/employees/<employee_id>/activate')
+@login_required
+@module_required('employees')
+def activate_employee_api(employee_id):
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    eid = str(employee_id or '').strip()
+    row = db.session.query(Employee).filter(Employee.company_id == company_id, Employee.id == eid).first()
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    row.active = True
+    row.status = 'Active'
+    if getattr(row, 'inactive_date', None):
+        row.inactive_date = None
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+    return jsonify({'ok': True, 'item': _serialize_employee(row)})
+
+
 @bp.put('/api/employees/<employee_id>')
 @login_required
 @module_required('employees')
@@ -333,6 +357,34 @@ def delete_employee_api(employee_id):
     row = db.session.query(Employee).filter(Employee.company_id == company_id, Employee.id == eid).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    has_sales = db.session.query(Sale.id).filter(Sale.company_id == company_id, Sale.employee_id == eid).first()
+    has_expenses = db.session.query(Expense.id).filter(Expense.company_id == company_id, Expense.employee_id == eid).first()
+    has_cash_counts = db.session.query(CashCount.id).filter(CashCount.company_id == company_id, CashCount.employee_id == eid).first()
+    if has_sales or has_expenses or has_cash_counts:
+        return jsonify({'ok': False, 'error': 'has_dependencies'}), 400
+
+    db.session.delete(row)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+    return jsonify({'ok': True})
+
+
+@bp.put('/api/employees/<employee_id>/deactivate')
+@login_required
+@module_required('employees')
+def deactivate_employee_api(employee_id):
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    eid = str(employee_id or '').strip()
+    row = db.session.query(Employee).filter(Employee.company_id == company_id, Employee.id == eid).first()
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
     row.active = False
     row.status = 'Inactive'
     if not getattr(row, 'inactive_date', None):

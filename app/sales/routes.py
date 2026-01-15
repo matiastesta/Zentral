@@ -3192,15 +3192,86 @@ def cancel_installment_plan(plan_id: int):
     if st in ('pagado', 'paid'):
         return jsonify({'ok': False, 'error': 'plan_paid'}), 400
 
-    plan.status = 'cancelado'
+    # Registrar en legajo: hoy el legajo muestra "Observaciones internas" desde Customer.notes.
     try:
+        cust_id = str(getattr(plan, 'customer_id', '') or '').strip()
+    except Exception:
+        cust_id = ''
+
+    try:
+        cust_name = str(getattr(plan, 'customer_name', '') or '').strip()
+    except Exception:
+        cust_name = ''
+
+    try:
+        ticket_txt = str(getattr(plan, 'sale_ticket', '') or '').strip()
+    except Exception:
+        ticket_txt = ''
+
+    try:
+        plan_mode = str(getattr(plan, 'mode', '') or '').strip()
+    except Exception:
+        plan_mode = ''
+
+    # Decidir si se puede borrar sin romper historial: si hay cuotas pagadas, mantener el plan cancelado.
+    has_paid = False
+    try:
+        for it in (getattr(plan, 'installments', None) or []):
+            st_it = str(getattr(it, 'status', '') or '').strip().lower()
+            if st_it == 'pagada':
+                has_paid = True
+                break
+            if getattr(it, 'paid_sale_id', None) is not None:
+                has_paid = True
+                break
+    except Exception:
+        has_paid = True
+
+    try:
+        cust_row = None
+        if cust_id:
+            cust_row = db.session.query(Customer).filter(Customer.company_id == cid, Customer.id == cust_id).first()
+
+        stamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M')
+        base = f"[{stamp}] Plan de cuotas cancelado"
+        if ticket_txt:
+            base += f" (Ticket {ticket_txt})"
+        if plan_mode:
+            base += f" · Modo: {plan_mode}"
+        if has_paid:
+            base += " · Se mantiene registro (había cuotas pagadas)."
+        else:
+            base += " · Plan eliminado."
+
+        if cust_row is not None:
+            prev = str(getattr(cust_row, 'notes', '') or '').strip()
+            cust_row.notes = (prev + ('\n' if prev else '') + base).strip()
+        else:
+            # Si por algún motivo no se puede resolver el cliente, no fallar la cancelación.
+            pass
+    except Exception:
+        current_app.logger.exception('Failed to append installment cancel note to customer notes')
+
+    try:
+        if has_paid:
+            plan.status = 'cancelado'
+        else:
+            # Borrar cuotas y plan
+            try:
+                for it in (getattr(plan, 'installments', None) or []):
+                    db.session.delete(it)
+            except Exception:
+                # Fallback por si la relación no está cargada
+                db.session.query(Installment).filter(Installment.company_id == cid, Installment.plan_id == plan.id).delete(synchronize_session=False)
+            db.session.delete(plan)
+
         db.session.commit()
     except Exception as e:
-        current_app.logger.exception('Failed to cancel installment plan')
+        current_app.logger.exception('Failed to cancel/delete installment plan')
         db.session.rollback()
         return jsonify({'ok': False, 'error': 'db_error', 'message': str(e)}), 400
 
-    return jsonify({'ok': True, 'item': {'id': plan.id, 'status': plan.status}})
+    return jsonify({'ok': True, 'item': {'id': pid, 'status': 'cancelado', 'deleted': (not has_paid)}})
 
 
 @bp.put('/api/sales/<ticket>')

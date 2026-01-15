@@ -126,7 +126,9 @@
     <div class="py-1 text-[11px]">
         <button type="button" class="w-full text-left px-3 py-1.5 text-blue-700 hover:bg-blue-50" data-action="legajo">Ver legajo</button>
         <button type="button" class="w-full text-left px-3 py-1.5 text-blue-700 hover:bg-blue-50" data-action="edit">Editar</button>
-        <button id="employee-actions-deactivate" type="button" class="w-full text-left px-3 py-1.5 text-red-700 hover:bg-red-50" data-action="deactivate">Eliminar</button>
+        <button id="employee-actions-deactivate" type="button" class="w-full text-left px-3 py-1.5 text-orange-700 hover:bg-orange-50" data-action="deactivate">Inactivar</button>
+        <button id="employee-actions-activate" type="button" class="w-full text-left px-3 py-1.5 text-emerald-700 hover:bg-emerald-50" data-action="activate">Activar</button>
+        <button id="employee-actions-delete" type="button" class="w-full text-left px-3 py-1.5 text-red-700 hover:bg-red-50" data-action="delete">Eliminar</button>
     </div>
 </div>
 
@@ -271,6 +273,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const employeeActionsMenu = document.getElementById('employee-actions-menu');
     const employeeActionsDeactivate = document.getElementById('employee-actions-deactivate');
+    const employeeActionsActivate = document.getElementById('employee-actions-activate');
+    const employeeActionsDelete = document.getElementById('employee-actions-delete');
     let employeeActionsId = '';
     let employeeActionsCanDeactivate = false;
 
@@ -338,6 +342,24 @@ document.addEventListener('DOMContentLoaded', function () {
     function deactivateEmployee(id) {
         const eid = String(id || '').trim();
         if (!eid) return Promise.resolve(null);
+        return fetch('/employees/api/employees/' + encodeURIComponent(eid) + '/deactivate', {
+            method: 'PUT',
+            credentials: 'same-origin'
+        }).then(r => r.json()).catch(() => null);
+    }
+
+    function activateEmployee(id) {
+        const eid = String(id || '').trim();
+        if (!eid) return Promise.resolve(null);
+        return fetch('/employees/api/employees/' + encodeURIComponent(eid) + '/activate', {
+            method: 'PUT',
+            credentials: 'same-origin'
+        }).then(r => r.json()).catch(() => null);
+    }
+
+    function deleteEmployee(id) {
+        const eid = String(id || '').trim();
+        if (!eid) return Promise.resolve(null);
         return fetch('/employees/api/employees/' + encodeURIComponent(eid), {
             method: 'DELETE',
             credentials: 'same-origin'
@@ -390,6 +412,12 @@ document.addEventListener('DOMContentLoaded', function () {
         employeeActionsCanDeactivate = !!canDeactivate;
         if (employeeActionsDeactivate) {
             employeeActionsDeactivate.classList.toggle('hidden', !employeeActionsCanDeactivate);
+        }
+        if (employeeActionsActivate) {
+            employeeActionsActivate.classList.toggle('hidden', employeeActionsCanDeactivate);
+        }
+        if (employeeActionsDelete) {
+            employeeActionsDelete.classList.remove('hidden');
         }
 
         employeeActionsMenu.classList.remove('hidden');
@@ -579,10 +607,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!eid) return;
         if (window.confirmModal) {
             window.confirmModal(
-                '¿Querés eliminar este empleado? No se elimina el registro, solo se marca como inactivo.',
-                'Eliminar empleado',
+                '¿Querés inactivar este empleado? Se mantiene el registro, pero queda como inactivo.',
+                'Inactivar empleado',
                 'Confirmación requerida',
-                { okText: 'Eliminar', cancelText: 'Cancelar' }
+                { okText: 'Inactivar', cancelText: 'Cancelar' }
             ).then(function (ok) {
                 if (!ok) return;
                 deactivateEmployee(eid).finally(function () {
@@ -591,9 +619,65 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             return;
         }
-        const ok = confirm('¿Querés eliminar este empleado? No se elimina el registro, solo se marca como inactivo.');
+        const ok = confirm('¿Querés inactivar este empleado? Se mantiene el registro, pero queda como inactivo.');
         if (!ok) return;
         deactivateEmployee(eid).finally(function () {
+            render();
+        });
+    }
+
+    function confirmActivateEmployee(id) {
+        const eid = String(id || '').trim();
+        if (!eid) return;
+        if (window.confirmModal) {
+            window.confirmModal(
+                '¿Querés activar este empleado? Volverá a figurar como activo.',
+                'Activar empleado',
+                'Confirmación requerida',
+                { okText: 'Activar', cancelText: 'Cancelar' }
+            ).then(function (ok) {
+                if (!ok) return;
+                activateEmployee(eid).finally(function () {
+                    render();
+                });
+            });
+            return;
+        }
+        const ok = confirm('¿Querés activar este empleado? Volverá a figurar como activo.');
+        if (!ok) return;
+        activateEmployee(eid).finally(function () {
+            render();
+        });
+    }
+
+    function confirmDeleteEmployee(id) {
+        const eid = String(id || '').trim();
+        if (!eid) return;
+        if (window.confirmModal) {
+            window.confirmModal(
+                '¿Querés eliminar este empleado definitivamente? Si tiene ventas/gastos/cierres asociados no se podrá eliminar.',
+                'Eliminar empleado',
+                'Confirmación requerida',
+                { okText: 'Eliminar', cancelText: 'Cancelar' }
+            ).then(function (ok) {
+                if (!ok) return;
+                deleteEmployee(eid).then(function (d) {
+                    if (d && d.ok === false && d.error === 'has_dependencies') {
+                        alert('No se puede eliminar: el empleado tiene movimientos asociados. Usá Inactivar.');
+                    }
+                }).finally(function () {
+                    render();
+                });
+            });
+            return;
+        }
+        const ok = confirm('¿Querés eliminar este empleado definitivamente? Si tiene ventas/gastos/cierres asociados no se podrá eliminar.');
+        if (!ok) return;
+        deleteEmployee(eid).then(function (d) {
+            if (d && d.ok === false && d.error === 'has_dependencies') {
+                alert('No se puede eliminar: el empleado tiene movimientos asociados. Usá Inactivar.');
+            }
+        }).finally(function () {
             render();
         });
     }
@@ -766,6 +850,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (action === 'legajo') openEmployeeLegajo(id);
             if (action === 'edit') window.location.href = editBaseUrl + '?id=' + encodeURIComponent(id);
             if (action === 'deactivate') confirmDeactivateEmployee(id);
+            if (action === 'activate') confirmActivateEmployee(id);
+            if (action === 'delete') confirmDeleteEmployee(id);
         });
     }
 
