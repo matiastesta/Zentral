@@ -68,6 +68,20 @@
                         </button>
                     </form>
                     {% endif %}
+                    {% if current_user.is_authenticated and ((current_user.role != 'zentral_admin') or is_support_mode) and (subscription_days_left is not none) and (subscription_days_left <= 10) %}
+                    <div class="inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-full border
+                        {% if subscription_badge == 'red' %}bg-red-100 text-red-900 border-red-200{% elif subscription_badge == 'yellow' %}bg-yellow-100 text-yellow-900 border-yellow-200{% else %}bg-green-100 text-green-900 border-green-200{% endif %}
+                    ">
+                        <i class="fas fa-clock mr-2"></i>
+                        {% if subscription_days_left <= 0 %}
+                            Suscripción vencida
+                        {% elif subscription_days_left == 1 %}
+                            Queda 1 día de suscripción
+                        {% else %}
+                            Quedan {{ subscription_days_left }} días de suscripción
+                        {% endif %}
+                    </div>
+                    {% endif %}
                     {% if current_user.is_authenticated %}
                     <a href="{{ url_for('user_settings.user_detail', user_id=current_user.id) }}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-100 hover:text-white hover:bg-blue-700 rounded-md">
                         <i class="fas fa-user-circle mr-2"></i> ¡Hola {{ current_user.display_name or current_user.username }}!
@@ -178,6 +192,22 @@
                                 <i class="fas fa-sign-out-alt mr-2"></i> Salir soporte
                             </button>
                         </form>
+                        {% endif %}
+                        {% if current_user.is_authenticated and ((current_user.role != 'zentral_admin') or is_support_mode) and (subscription_days_left is not none) and (subscription_days_left <= 10) %}
+                        <div class="px-4 pb-2">
+                            <div class="inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-full border
+                                {% if subscription_badge == 'red' %}bg-red-100 text-red-900 border-red-200{% elif subscription_badge == 'yellow' %}bg-yellow-100 text-yellow-900 border-yellow-200{% else %}bg-green-100 text-green-900 border-green-200{% endif %}
+                            ">
+                                <i class="fas fa-clock mr-2"></i>
+                                {% if subscription_days_left <= 0 %}
+                                    Suscripción vencida
+                                {% elif subscription_days_left == 1 %}
+                                    Queda 1 día de suscripción
+                                {% else %}
+                                    Quedan {{ subscription_days_left }} días de suscripción
+                                {% endif %}
+                            </div>
+                        </div>
                         {% endif %}
                         <a href="{{ url_for('user_settings.user_detail', user_id=current_user.id) }}" class="block px-4 py-2 text-base font-medium text-blue-200 hover:text-white hover:bg-blue-700">
                             <i class="fas fa-user-circle mr-2"></i> ¡Hola {{ current_user.display_name or current_user.username }}!

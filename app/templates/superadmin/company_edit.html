@@ -27,6 +27,11 @@
                 <option value="__new__">Agregar nuevo plan</option>
             </select>
         </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Vence suscripción</label>
+            <input type="hidden" id="subscription-ends-at" name="subscription_ends_at" value="{{ company.subscription_ends_at.isoformat() if company.subscription_ends_at else '' }}">
+            <input id="subscription-ends-at-display" class="w-full px-3 py-2 text-sm border rounded-md bg-white" value="" placeholder="dd/mm/aaaa" autocomplete="off">
+        </div>
         <div id="plan-new-wrap" class="hidden">
             <label class="block text-xs font-medium text-gray-600 mb-1">Nuevo plan</label>
             <input id="input-plan-new" name="plan_new" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: premium-mensual">
@@ -126,6 +131,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const planSelect = document.getElementById('select-plan');
     const planNewWrap = document.getElementById('plan-new-wrap');
     const planNewInput = document.getElementById('input-plan-new');
+    const subEndsHidden = document.getElementById('subscription-ends-at');
+    const subEndsDisplay = document.getElementById('subscription-ends-at-display');
     const plansModal = document.getElementById('modal-manage-plans');
     const btnOpenPlans = document.getElementById('btn-open-manage-plans');
     const btnClosePlans = document.getElementById('btn-close-manage-plans');
@@ -150,6 +157,81 @@ document.addEventListener('DOMContentLoaded', function () {
             plansModal.classList.add('hidden');
         }
     });
+
+    try {
+        if (subEndsDisplay && typeof flatpickr === 'function') {
+            if (flatpickr && flatpickr.l10ns && flatpickr.l10ns.es) {
+                try { flatpickr.localize(flatpickr.l10ns.es); } catch (e) { }
+            }
+            flatpickr(subEndsDisplay, {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                appendTo: document.body,
+                disableMobile: true,
+                locale: (flatpickr && flatpickr.l10ns && flatpickr.l10ns.es) ? flatpickr.l10ns.es : undefined,
+                defaultDate: (subEndsHidden && subEndsHidden.value) ? subEndsHidden.value : null,
+                onChange: function (selectedDates) {
+                    const d = (Array.isArray(selectedDates) && selectedDates.length) ? selectedDates[0] : null;
+                    if (!subEndsHidden) return;
+                    if (!d) {
+                        subEndsHidden.value = '';
+                        return;
+                    }
+                    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    subEndsHidden.value = iso;
+                },
+                onClose: function (selectedDates, dateStr, instance) {
+                    try {
+                        if (!subEndsHidden) return;
+                        const raw = String((dateStr || (instance && instance.input && instance.input.value) || '')).trim();
+                        if (!raw) {
+                            subEndsHidden.value = '';
+                            return;
+                        }
+                        const m = raw.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+                        if (!m) return;
+                        const dd = String(m[1]).padStart(2, '0');
+                        const mm = String(m[2]).padStart(2, '0');
+                        let yyyy = m[3] ? String(m[3]) : '';
+                        if (!yyyy) {
+                            yyyy = String(new Date().getFullYear());
+                        } else if (yyyy.length === 2) {
+                            yyyy = '20' + yyyy;
+                        }
+                        subEndsHidden.value = yyyy + '-' + mm + '-' + dd;
+                    } catch (e) {
+                    }
+                }
+            });
+
+            try {
+                subEndsDisplay.addEventListener('change', function () {
+                    try {
+                        if (!subEndsHidden) return;
+                        const raw = String(subEndsDisplay.value || '').trim();
+                        if (!raw) {
+                            subEndsHidden.value = '';
+                            return;
+                        }
+                        const m = raw.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+                        if (!m) return;
+                        const dd = String(m[1]).padStart(2, '0');
+                        const mm = String(m[2]).padStart(2, '0');
+                        let yyyy = m[3] ? String(m[3]) : '';
+                        if (!yyyy) {
+                            yyyy = String(new Date().getFullYear());
+                        } else if (yyyy.length === 2) {
+                            yyyy = '20' + yyyy;
+                        }
+                        subEndsHidden.value = yyyy + '-' + mm + '-' + dd;
+                    } catch (e) {
+                    }
+                });
+            } catch (e) {
+            }
+        }
+    } catch (e) {
+    }
     syncPlanNew();
 });
 </script>

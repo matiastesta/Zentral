@@ -610,6 +610,81 @@ def create_app(config_class=Config):
         except Exception:
             return {"is_support_mode": False, "support_company": None}
 
+    @app.context_processor
+    def inject_subscription_status():
+        try:
+            from flask import g
+            from app.tenancy import ensure_request_context
+            from app.tenancy import is_impersonating, effective_company_id
+            from flask_login import current_user
+            from app.models import Company
+
+            if not getattr(current_user, 'is_authenticated', False):
+                return {"subscription_days_left": None, "subscription_badge": None}
+
+            support_mode = False
+            try:
+                support_mode = bool(is_impersonating())
+            except Exception:
+                support_mode = False
+
+            if str(getattr(current_user, 'role', '') or '') == 'zentral_admin' and not support_mode:
+                return {"subscription_days_left": None, "subscription_badge": None}
+
+            # Resolve the effective tenant company id (supports impersonation).
+            cid = ''
+            try:
+                cid = str(effective_company_id() or '').strip()
+            except Exception:
+                cid = ''
+
+            if not cid:
+                try:
+                    ensure_request_context()
+                except Exception:
+                    pass
+                try:
+                    cid = str(getattr(g, 'company_id', '') or '').strip()
+                except Exception:
+                    cid = ''
+
+            c = None
+            if cid:
+                try:
+                    c = db.session.get(Company, cid)
+                except Exception:
+                    c = None
+
+            if not c:
+                return {"subscription_days_left": None, "subscription_badge": None}
+
+            end_d = None
+            try:
+                end_d = getattr(c, 'subscription_ends_at', None)
+            except Exception:
+                end_d = None
+            if not end_d:
+                return {"subscription_days_left": None, "subscription_badge": None}
+
+            try:
+                days_left = int((end_d - date.today()).days)
+            except Exception:
+                return {"subscription_days_left": None, "subscription_badge": None}
+
+            # Color thresholds: green (>7), yellow (1..7), red (<=0)
+            badge = 'green'
+            if days_left <= 0:
+                badge = 'red'
+            elif days_left <= 7:
+                badge = 'yellow'
+
+            return {
+                "subscription_days_left": days_left,
+                "subscription_badge": badge,
+            }
+        except Exception:
+            return {"subscription_days_left": None, "subscription_badge": None}
+
     @app.cli.group('zentral')
     def zentral_cli():
         pass

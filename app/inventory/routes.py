@@ -9,10 +9,17 @@ import unicodedata
 from io import BytesIO
 from uuid import uuid4
 
-from flask import current_app, jsonify, render_template, request, send_file, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    g,
+    render_template, request, send_file, url_for
+)
 from flask import g
 from flask_login import login_required
-from sqlalchemy import func, or_
+from sqlalchemy import and_, or_, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from typing import Optional
 from werkzeug.utils import secure_filename
@@ -1444,11 +1451,27 @@ def create_product():
     internal_code = None
     if codigo_interno_raw:
         internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
-        exists = db.session.query(Product.id).filter(Product.internal_code == internal_code).first() is not None
+        exists = (
+            db.session.query(Product.id)
+            .filter(Product.company_id == cid, Product.internal_code == internal_code)
+            .first()
+            is not None
+        )
         if exists:
             return jsonify({'ok': False, 'error': 'codigo_interno_already_exists'}), 400
     if not internal_code:
         internal_code = _generate_codigo_interno(cid, name, str(getattr(category, 'name', '') or '').strip() or 'GEN')
+
+    barcode_raw = str(payload.get('barcode') or '').strip() or None
+    if barcode_raw:
+        exists = (
+            db.session.query(Product.id)
+            .filter(Product.company_id == cid, Product.barcode == barcode_raw)
+            .first()
+            is not None
+        )
+        if exists:
+            return jsonify({'ok': False, 'error': 'barcode_already_exists'}), 400
 
     supplier_id = str(payload.get('primary_supplier_id') or '').strip() or None
     supplier_name = str(payload.get('primary_supplier_name') or '').strip() or None
@@ -1466,7 +1489,7 @@ def create_product():
         category_id=(category.id if category else None),
         sale_price=_num(payload.get('sale_price')),
         internal_code=internal_code,
-        barcode=str(payload.get('barcode') or '').strip() or None,
+        barcode=barcode_raw,
         image_filename=str(payload.get('image_filename') or '').strip() or None,
         unit_name='Unidad',
         uses_lots=True,
@@ -1481,6 +1504,9 @@ def create_product():
     db.session.add(row)
     try:
         db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'unique_violation'}), 400
     except Exception:
         db.session.rollback()
         return jsonify({'ok': False, 'error': 'db_error'}), 400
@@ -1519,13 +1545,30 @@ def update_product(product_id: int):
         raw_ci = str(raw_ci or '').strip()
         if raw_ci:
             next_ci = _validate_codigo_interno_or_raise(raw_ci)
-            exists = db.session.query(Product.id).filter(Product.internal_code == next_ci, Product.id != row.id).first() is not None
+            exists = (
+                db.session.query(Product.id)
+                .filter(Product.company_id == row.company_id, Product.internal_code == next_ci, Product.id != row.id)
+                .first()
+                is not None
+            )
             if exists:
                 return jsonify({'ok': False, 'error': 'codigo_interno_already_exists'}), 400
             row.internal_code = next_ci
         else:
             row.internal_code = None
-    row.barcode = str(payload.get('barcode') or '').strip() or None
+
+    if payload.get('barcode') is not None:
+        next_bc = str(payload.get('barcode') or '').strip() or None
+        if next_bc:
+            exists = (
+                db.session.query(Product.id)
+                .filter(Product.company_id == row.company_id, Product.barcode == next_bc, Product.id != row.id)
+                .first()
+                is not None
+            )
+            if exists:
+                return jsonify({'ok': False, 'error': 'barcode_already_exists'}), 400
+        row.barcode = next_bc
     if payload.get('primary_supplier_id') is not None:
         next_sid = str(payload.get('primary_supplier_id') or '').strip() or None
         if next_sid:
@@ -1907,6 +1950,51 @@ def create_lot():
     note = str(payload.get('note') or '').strip() or None
     exp_raw = str(payload.get('expiration_date') or '').strip()
     exp_dt = _parse_date_iso(exp_raw, None) if exp_raw else None
+
+    wants_merge = bool(payload.get('merge_existing'))
+
+    # Optionally merge into an existing lot for the same product (same supplier, expiration, unit_cost)
+    if wants_merge:
+        try:
+            existing = (
+                db.session.query(InventoryLot)
+                .filter(InventoryLot.product_id == product_id)
+                .filter(InventoryLot.supplier_id == supplier_id)
+                .filter(InventoryLot.expiration_date.is_(exp_dt) if exp_dt is None else (InventoryLot.expiration_date == exp_dt))
+                .filter(InventoryLot.unit_cost == unit_cost)
+                .order_by(InventoryLot.received_at.desc())
+                .first()
+            )
+        except Exception:
+            existing = None
+
+        if existing:
+            try:
+                existing.qty_initial = float(existing.qty_initial or 0) + qty
+                existing.qty_available = float(existing.qty_available or 0) + qty
+            except Exception:
+                pass
+
+            movement_date = _parse_date_iso(str(payload.get('date') or '').strip(), dt_date.today())
+            try:
+                received_at = datetime.combine(movement_date, datetime.min.time())
+            except Exception:
+                received_at = datetime.utcnow()
+
+            mv = InventoryMovement(
+                movement_date=movement_date,
+                type='purchase',
+                sale_ticket=None,
+                product_id=product_id,
+                lot_id=existing.id,
+                qty_delta=qty,
+                unit_cost=unit_cost,
+                total_cost=qty * unit_cost,
+            )
+            existing.received_at = received_at
+            db.session.add(mv)
+            db.session.commit()
+            return jsonify({'ok': True, 'item': _serialize_lot(existing)})
     row = InventoryLot(
         product_id=product_id,
         qty_initial=qty,
@@ -1921,7 +2009,7 @@ def create_lot():
     db.session.add(row)
     db.session.flush()
 
-    movement_date = dt_date.today()
+    movement_date = _parse_date_iso(str(payload.get('date') or '').strip(), dt_date.today())
     try:
         received_at = datetime.combine(movement_date, datetime.min.time())
     except Exception:

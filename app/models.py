@@ -83,6 +83,7 @@ class Company(db.Model):
     paused_at = db.Column(db.DateTime, nullable=True)
     pause_reason = db.Column(db.String(255), nullable=True)
     pause_scheduled_for = db.Column(db.Date, nullable=True)
+    subscription_ends_at = db.Column(db.Date, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
@@ -265,6 +266,11 @@ class Category(db.Model):
 class Product(db.Model):
     __tablename__ = 'product'
 
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'internal_code', name='uq_product_company_internal_code'),
+        db.UniqueConstraint('company_id', 'barcode', name='uq_product_company_barcode'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
     name = db.Column(db.String(255), nullable=False, index=True)
@@ -274,8 +280,8 @@ class Product(db.Model):
     category = db.relationship('Category', backref='products')
 
     sale_price = db.Column(db.Float, nullable=False, default=0.0)
-    internal_code = db.Column(db.String(64), nullable=True, unique=True, index=True)
-    barcode = db.Column(db.String(64), nullable=True, unique=True, index=True)
+    internal_code = db.Column(db.String(64), nullable=True, index=True)
+    barcode = db.Column(db.String(64), nullable=True, index=True)
 
     image_filename = db.Column(db.String(255), nullable=True)
     image_file_id = db.Column(db.String(64), nullable=True, index=True)

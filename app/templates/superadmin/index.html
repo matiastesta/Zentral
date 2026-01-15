@@ -47,7 +47,7 @@
 
                             <form method="post" action="{{ url_for('superadmin.schedule_pause_company', company_id=c.id) }}" class="inline">
                                 <div class="inline-flex items-center gap-2">
-                                    <input type="text" name="pause_scheduled_for" value="{{ c.pause_scheduled_for.isoformat() if c.pause_scheduled_for else '' }}" class="js-flatpickr-date h-8 w-32 px-2 text-xs border rounded-md bg-white text-gray-800" placeholder="dd/mm/aaaa" autocomplete="off">
+                                    <input type="text" name="subscription_ends_at" value="{{ c.subscription_ends_at.isoformat() if c.subscription_ends_at else '' }}" class="js-flatpickr-date h-8 w-32 px-2 text-xs border rounded-md bg-white text-gray-800" placeholder="Vence" autocomplete="off">
                                     <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-yellow-600 text-white hover:bg-yellow-700">Programar</button>
                                 </div>
                             </form>

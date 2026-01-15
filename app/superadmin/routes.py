@@ -436,6 +436,7 @@ def company_edit(company_id: str):
         plan = (request.form.get('plan') or '').strip()
         plan_new = (request.form.get('plan_new') or '').strip()
         notes = (request.form.get('notes') or '').strip() or None
+        subscription_ends_raw = (request.form.get('subscription_ends_at') or '').strip()
         admin_username = (request.form.get('admin_username') or '').strip()
         admin_password = (request.form.get('admin_password') or '').strip()
 
@@ -456,6 +457,32 @@ def company_edit(company_id: str):
             c.notes = notes
         except Exception:
             pass
+
+        try:
+            if not subscription_ends_raw:
+                c.subscription_ends_at = None
+            else:
+                d_end = None
+                try:
+                    d_end = date.fromisoformat(subscription_ends_raw)
+                except Exception:
+                    d_end = None
+                if d_end is None:
+                    try:
+                        d_end = datetime.strptime(subscription_ends_raw, '%d/%m/%Y').date()
+                    except Exception:
+                        d_end = None
+                if d_end is None:
+                    try:
+                        d_end = datetime.strptime(subscription_ends_raw, '%d/%m').date().replace(year=date.today().year)
+                    except Exception:
+                        d_end = None
+                if d_end is None:
+                    raise ValueError('invalid_date')
+                c.subscription_ends_at = d_end
+        except Exception:
+            flash('Fecha de vencimiento inválida. Usá el selector de fecha.', 'error')
+            return redirect(url_for('superadmin.company_edit', company_id=c.id))
 
         try:
             _ensure_default_roles(str(c.id))
@@ -580,34 +607,74 @@ def pause_company(company_id: str):
 def schedule_pause_company(company_id: str):
     _require_zentral_admin()
     raw = (request.form.get('pause_scheduled_for') or request.form.get('pause_date') or '').strip()
+    subscription_raw = (request.form.get('subscription_ends_at') or '').strip()
     c = db.session.get(Company, str(company_id))
     if not c:
         flash('Empresa inválida.', 'error')
         return redirect(url_for('superadmin.index'))
-    if not raw:
+
+    msgs = []
+
+    # Update subscription end date (if field present in form)
+    if 'subscription_ends_at' in request.form:
         try:
-            c.pause_scheduled_for = None
+            if not subscription_raw:
+                c.subscription_ends_at = None
+            else:
+                d_end = None
+                try:
+                    d_end = date.fromisoformat(subscription_raw)
+                except Exception:
+                    d_end = None
+                if d_end is None:
+                    try:
+                        d_end = datetime.strptime(subscription_raw, '%d/%m/%Y').date()
+                    except Exception:
+                        d_end = None
+                if d_end is None:
+                    try:
+                        d_end = datetime.strptime(subscription_raw, '%d/%m').date().replace(year=date.today().year)
+                    except Exception:
+                        d_end = None
+                if d_end is None:
+                    raise ValueError('invalid_date')
+                c.subscription_ends_at = d_end
+            msgs.append('Vencimiento actualizado')
         except Exception:
-            pass
-        db.session.commit()
-        flash('Programación de pausa eliminada.', 'success')
-        return redirect(url_for('superadmin.index'))
-    try:
-        d = date.fromisoformat(raw)
-    except Exception:
-        flash('Fecha inválida. Usá el selector de fecha.', 'error')
-        return redirect(url_for('superadmin.index'))
-    c.pause_scheduled_for = d
-    # If the selected date is today (or in the past), pause immediately.
-    try:
-        if d <= date.today() and str(getattr(c, 'status', '') or 'active') == 'active':
-            c.status = 'paused'
-            c.paused_at = datetime.utcnow()
-            c.pause_reason = 'scheduled'
-    except Exception:
-        pass
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            flash('Fecha de suscripción inválida. Usá el calendario.', 'error')
+            return redirect(url_for('superadmin.index'))
+
+    # Update scheduled pause only when field is present in the form.
+    if 'pause_scheduled_for' in request.form or 'pause_date' in request.form:
+        if not raw:
+            try:
+                c.pause_scheduled_for = None
+            except Exception:
+                pass
+            msgs.append('Programación de pausa eliminada')
+        else:
+            try:
+                d = date.fromisoformat(raw)
+            except Exception:
+                flash('Fecha inválida. Usá el selector de fecha.', 'error')
+                return redirect(url_for('superadmin.index'))
+            c.pause_scheduled_for = d
+            # If the selected date is today (or in the past), pause immediately.
+            try:
+                if d <= date.today() and str(getattr(c, 'status', '') or 'active') == 'active':
+                    c.status = 'paused'
+                    c.paused_at = datetime.utcnow()
+                    c.pause_reason = 'scheduled'
+            except Exception:
+                pass
+            msgs.append('Pausa programada')
+
     db.session.commit()
-    flash(f'Pausa programada para {c.name}: {d.isoformat()}', 'success')
+    flash(' · '.join(msgs) if msgs else 'Actualizado.', 'success')
     return redirect(url_for('superadmin.index'))
 
 
@@ -625,6 +692,51 @@ def cancel_schedule_pause_company(company_id: str):
         pass
     db.session.commit()
     flash('Programación de pausa eliminada.', 'success')
+    return redirect(url_for('superadmin.index'))
+
+
+@bp.post('/companies/<company_id>/subscription-ends-at')
+@login_required
+def set_subscription_ends_at_company(company_id: str):
+    _require_zentral_admin()
+    raw = (request.form.get('subscription_ends_at') or '').strip()
+    c = db.session.get(Company, str(company_id))
+    if not c:
+        flash('Empresa inválida.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    try:
+        if not raw:
+            c.subscription_ends_at = None
+        else:
+            d_end = None
+            try:
+                d_end = date.fromisoformat(raw)
+            except Exception:
+                d_end = None
+            if d_end is None:
+                try:
+                    d_end = datetime.strptime(raw, '%d/%m/%Y').date()
+                except Exception:
+                    d_end = None
+            if d_end is None:
+                try:
+                    d_end = datetime.strptime(raw, '%d/%m').date().replace(year=date.today().year)
+                except Exception:
+                    d_end = None
+            if d_end is None:
+                raise ValueError('invalid_date')
+            c.subscription_ends_at = d_end
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        flash('Fecha de suscripción inválida. Usá el calendario.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    flash('Vencimiento de suscripción actualizado.', 'success')
     return redirect(url_for('superadmin.index'))
 
 
