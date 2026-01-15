@@ -162,6 +162,37 @@ def _normalize_name(name: str) -> str:
     return raw
 
 
+def _find_product_by_norm_name(company_id: str, norm_name: str, active_only: bool = False):
+    cid = str(company_id or '').strip()
+    target = _normalize_name(norm_name)
+    if not cid or not target:
+        return None
+    q = (
+        db.session.query(Product)
+        .filter(Product.company_id == cid)
+        .filter(func.lower(func.trim(Product.name)) == target)
+    )
+    if active_only:
+        q = q.filter(Product.active == True)  # noqa: E712
+    return q.order_by(Product.id.asc()).first()
+
+
+def _product_stock_qty(company_id: str, product_id: int) -> float:
+    cid = str(company_id or '').strip()
+    if not cid:
+        return 0.0
+    try:
+        qty = (
+            db.session.query(func.coalesce(func.sum(InventoryLot.qty_available), 0.0))
+            .filter(InventoryLot.company_id == cid)
+            .filter(InventoryLot.product_id == int(product_id))
+            .scalar()
+        )
+        return float(qty or 0.0)
+    except Exception:
+        return 0.0
+
+
 def _normalize_header(name: str) -> str:
     key = _normalize_name(name)
     key = key.replace('-', ' ').replace('/', ' ').replace('.', ' ')
@@ -781,6 +812,9 @@ def inventory_import_excel():
                     .first()
                 )
 
+            if prod is not None and bool(getattr(prod, 'active', True)) is False:
+                prod.active = True
+
             if not prod:
                 internal_code = ''
                 if codigo_interno_raw:
@@ -1178,6 +1212,9 @@ def inventory_import_excel_commit():
                     .first()
                 )
 
+            if prod is not None and bool(getattr(prod, 'active', True)) is False:
+                prod.active = True
+
             if not prod:
                 internal_code = ''
                 if codigo_interno_raw:
@@ -1451,6 +1488,16 @@ def create_product():
     if not name:
         return jsonify({'ok': False, 'error': 'name_required'}), 400
 
+    restore_archived = True
+    existing_active_by_name = _find_product_by_norm_name(cid, name, active_only=True)
+    if existing_active_by_name is not None:
+        return jsonify({'ok': False, 'error': 'name_already_exists'}), 400
+    existing_archived_by_name = _find_product_by_norm_name(cid, name, active_only=False)
+    row = None
+    if restore_archived and existing_archived_by_name is not None and bool(getattr(existing_archived_by_name, 'active', True)) is False:
+        row = existing_archived_by_name
+        row.active = True
+
     cat_id = payload.get('category_id')
     category = None
     if cat_id is not None and cat_id != '':
@@ -1471,15 +1518,20 @@ def create_product():
     internal_code = None
     if codigo_interno_raw:
         internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
-        exists = (
-            db.session.query(Product.id)
+        existing_by_ci = (
+            db.session.query(Product)
             .filter(Product.company_id == cid, Product.internal_code == internal_code)
             .first()
-            is not None
         )
-        if exists:
-            return jsonify({'ok': False, 'error': 'codigo_interno_already_exists'}), 400
-    if not internal_code:
+        if existing_by_ci is not None:
+            if bool(getattr(existing_by_ci, 'active', True)) is False:
+                row = existing_by_ci
+                row.active = True
+            else:
+                # If it exists and is active, it blocks creation/update.
+                if row is None or int(getattr(row, 'id', 0) or 0) != int(getattr(existing_by_ci, 'id', 0) or 0):
+                    return jsonify({'ok': False, 'error': 'codigo_interno_already_exists'}), 400
+    if not internal_code and row is None:
         internal_code = _generate_codigo_interno(cid, name, str(getattr(category, 'name', '') or '').strip() or 'GEN')
 
     barcode_raw = str(payload.get('barcode') or '').strip() or None
@@ -1502,26 +1554,44 @@ def create_product():
             return jsonify({'ok': False, 'error': 'supplier_not_found'}), 400
         supplier_name = str(supplier_row.name or '').strip() or supplier_name
 
-    row = Product(
-        company_id=cid,
-        name=name,
-        description=str(payload.get('description') or '').strip() or None,
-        category_id=(category.id if category else None),
-        sale_price=_num(payload.get('sale_price')),
-        internal_code=internal_code,
-        barcode=barcode_raw,
-        image_filename=str(payload.get('image_filename') or '').strip() or None,
-        unit_name='Unidad',
-        uses_lots=True,
-        method='FIFO',
-        min_stock=_num(payload.get('min_stock')),
-        reorder_point=_num(payload.get('reorder_point')),
-        primary_supplier_id=supplier_id,
-        primary_supplier_name=supplier_name,
-        active=True,
-    )
-    _ensure_codigo_interno(row)
-    db.session.add(row)
+    if row is None:
+        row = Product(
+            company_id=cid,
+            name=name,
+            description=str(payload.get('description') or '').strip() or None,
+            category_id=(category.id if category else None),
+            sale_price=_num(payload.get('sale_price')),
+            internal_code=internal_code,
+            barcode=barcode_raw,
+            image_filename=str(payload.get('image_filename') or '').strip() or None,
+            unit_name='Unidad',
+            uses_lots=True,
+            method='FIFO',
+            min_stock=_num(payload.get('min_stock')),
+            reorder_point=_num(payload.get('reorder_point')),
+            primary_supplier_id=supplier_id,
+            primary_supplier_name=supplier_name,
+            active=True,
+        )
+        _ensure_codigo_interno(row)
+        db.session.add(row)
+    else:
+        row.name = name
+        row.description = str(payload.get('description') or '').strip() or None
+        row.category_id = (category.id if category else None)
+        row.sale_price = _num(payload.get('sale_price'))
+        if internal_code:
+            row.internal_code = internal_code
+        row.barcode = barcode_raw
+        row.image_filename = str(payload.get('image_filename') or '').strip() or None
+        row.unit_name = 'Unidad'
+        row.uses_lots = True
+        row.method = 'FIFO'
+        row.min_stock = _num(payload.get('min_stock'))
+        row.reorder_point = _num(payload.get('reorder_point'))
+        row.primary_supplier_id = supplier_id
+        row.primary_supplier_name = supplier_name
+        _ensure_codigo_interno(row)
     try:
         db.session.commit()
     except IntegrityError:
@@ -1641,6 +1711,11 @@ def upload_product_image(product_id: int):
     row = db.session.query(Product).filter(Product.company_id == cid, Product.id == int(product_id)).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    has_lots = db.session.query(InventoryLot.id).filter(InventoryLot.company_id == cid, InventoryLot.product_id == row.id).first() is not None
+    has_movements = db.session.query(InventoryMovement.id).filter(InventoryMovement.company_id == cid, InventoryMovement.product_id == row.id).first() is not None
+    if has_lots or has_movements:
+        return jsonify({'ok': False, 'error': 'has_history'}), 400
     f = request.files.get('image')
     if not f or not getattr(f, 'filename', ''):
         return jsonify({'ok': False, 'error': 'file_required'}), 400
@@ -1684,13 +1759,123 @@ def delete_product(product_id: int):
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
+    qty_now = _product_stock_qty(cid, row.id)
+    if qty_now > 1e-9:
+        return jsonify({'ok': False, 'error': 'stock_not_zero', 'stock_qty': round(float(qty_now or 0.0), 6)}), 400
+
     has_lots = db.session.query(InventoryLot.id).filter(InventoryLot.company_id == cid, InventoryLot.product_id == row.id).first() is not None
     has_movements = db.session.query(InventoryMovement.id).filter(InventoryMovement.company_id == cid, InventoryMovement.product_id == row.id).first() is not None
 
-    # Para mantener integridad y UX consistente, se desactiva (no se elimina) desde la UI.
     row.active = False
     db.session.commit()
-    return jsonify({'ok': True, 'soft_deleted': True, 'had_history': bool(has_lots or has_movements)})
+    return jsonify({'ok': True, 'archived': True, 'had_history': bool(has_lots or has_movements)})
+
+
+@bp.post('/api/products/<int:product_id>/restore')
+@login_required
+@module_required('inventory')
+def restore_product(product_id: int):
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    row = db.session.query(Product).filter(Product.company_id == cid, Product.id == int(product_id)).first()
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    other = _find_product_by_norm_name(cid, str(getattr(row, 'name', '') or ''), active_only=True)
+    if other is not None and int(getattr(other, 'id', 0) or 0) != int(row.id):
+        return jsonify({'ok': False, 'error': 'name_already_exists'}), 400
+
+    row.active = True
+    db.session.commit()
+    return jsonify({'ok': True, 'item': _serialize_product(row)})
+
+
+@bp.post('/api/products/<int:product_id>/empty_stock')
+@login_required
+@module_required('inventory')
+def empty_stock_product(product_id: int):
+    payload = request.get_json(silent=True) or {}
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    row = db.session.query(Product).filter(Product.company_id == cid, Product.id == int(product_id)).first()
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    note = str(payload.get('note') or '').strip()
+    today = dt_date.today()
+
+    lots = (
+        db.session.query(InventoryLot)
+        .filter(InventoryLot.company_id == cid)
+        .filter(InventoryLot.product_id == int(row.id))
+        .all()
+    )
+
+    updated = 0
+    for lot in (lots or []):
+        try:
+            qty_to_zero = float(getattr(lot, 'qty_available', 0.0) or 0.0)
+        except Exception:
+            qty_to_zero = 0.0
+        if qty_to_zero <= 1e-9:
+            continue
+        try:
+            sold_total = (
+                db.session.query(func.coalesce(func.sum(-InventoryMovement.qty_delta), 0.0))
+                .filter(InventoryMovement.company_id == cid)
+                .filter(InventoryMovement.lot_id == lot.id)
+                .filter(InventoryMovement.type == 'sale')
+                .scalar()
+            )
+            sold_total = float(sold_total or 0.0)
+        except Exception:
+            sold_total = 0.0
+
+        lot.qty_initial = float(sold_total)
+        lot.qty_available = 0.0
+        db.session.add(InventoryMovement(
+            company_id=cid,
+            movement_date=today,
+            type='lot_adjust',
+            sale_ticket=None,
+            product_id=lot.product_id,
+            lot_id=lot.id,
+            qty_delta=(-qty_to_zero),
+            unit_cost=float(getattr(lot, 'unit_cost', 0.0) or 0.0),
+            total_cost=(-qty_to_zero) * float(getattr(lot, 'unit_cost', 0.0) or 0.0),
+        ))
+        updated += 1
+
+    if note:
+        for lot in (lots or []):
+            if lot and getattr(lot, 'note', None) is not None:
+                try:
+                    if str(lot.note or '').strip():
+                        lot.note = str(lot.note) + ' | ' + note
+                    else:
+                        lot.note = note
+                except Exception:
+                    pass
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+    return jsonify({'ok': True, 'updated_lots': int(updated or 0)})
 
 
 @bp.delete('/api/products/<int:product_id>/hard')
@@ -1963,6 +2148,9 @@ def create_lot():
     if not prod:
         return jsonify({'ok': False, 'error': 'product_not_found'}), 404
 
+    if bool(getattr(prod, 'active', True)) is False:
+        prod.active = True
+
     if str(getattr(prod, 'company_id', '') or '').strip() != cid:
         return jsonify({'ok': False, 'error': 'forbidden'}), 403
 
@@ -1990,6 +2178,7 @@ def create_lot():
         try:
             existing = (
                 db.session.query(InventoryLot)
+                .filter(InventoryLot.company_id == cid)
                 .filter(InventoryLot.product_id == product_id)
                 .filter(InventoryLot.supplier_id == supplier_id)
                 .filter(InventoryLot.expiration_date.is_(exp_dt) if exp_dt is None else (InventoryLot.expiration_date == exp_dt))
