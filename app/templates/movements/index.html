@@ -282,6 +282,14 @@ document.addEventListener('DOMContentLoaded', function () {
         return isNaN(n) ? 0 : n;
     }
 
+    function isSupplierCcDoc(exp) {
+        const e = exp && typeof exp === 'object' ? exp : {};
+        const meta = (e.meta && typeof e.meta === 'object') ? e.meta : {};
+        const cc = (meta.supplier_cc && typeof meta.supplier_cc === 'object') ? meta.supplier_cc : null;
+        if (meta.supplier_cc_payment === true) return false;
+        return !!(cc && cc.enabled);
+    }
+
     function parseFecha(raw) {
         const v = String(raw || '').trim();
         if (!v) return null;
@@ -926,6 +934,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const pagosState = getSelectFilterState(fEgresosPago);
 
             let list = Array.isArray(egresos) ? egresos.slice() : [];
+            // Regla: movimientos/egresos muestran solo pagos reales.
+            // Documentos de CC proveedor (deuda) se registran en Gastos, pero no cuentan como egreso del día.
+            list = list.filter(function (e) { return !isSupplierCcDoc(e); });
             list = list.filter(e => {
                 const catKey = normKey(e?.categoria || '');
                 if (!egresosCatsAllSelected) {

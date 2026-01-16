@@ -596,6 +596,18 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function parseNumeroSeguro(v) {
+        const raw = String(v || '').trim();
+        if (!raw) return 0;
+        const cleaned = raw
+            .replace(/\s/g, '')
+            .replace(/\$/g, '')
+            .replace(/\./g, '')
+            .replace(/,/g, '.');
+        const n = parseFloat(cleaned);
+        return isNaN(n) ? 0 : n;
+    }
+
     async function apiJson(url, options) {
         const res = await fetch(url, {
             credentials: 'same-origin',
@@ -633,7 +645,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function badgeTxKind(k) {
         const v = String(k || '').trim();
         if (v === 'pago') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">Pago</span>';
-        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 text-[11px] font-medium">Compra</span>';
+        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 text-[11px] font-medium">Pago</span>';
     }
 
     function renderCcLedger(payload) {
@@ -704,7 +716,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 list.forEach(function (t) {
                     txs.push({
                         date: String(t?.date || '').trim(),
-                        kind: String(t?.kind || '').trim() || 'compra',
+                        kind: String(t?.kind || '').trim() || 'pago',
                         method: String(t?.payment_method || '').trim() || '—',
                         amount: parseFloat(t?.amount || 0) || 0,
                         docId: docId,
@@ -1043,7 +1055,7 @@ document.addEventListener('DOMContentLoaded', function () {
         btnPay.addEventListener('click', function () {
             if (ccPayError) ccPayError.classList.add('hidden');
             const expId = String(ccPayExpense?.value || '').trim();
-            const amt = parseFloat(ccPayAmount?.value || 0) || 0;
+            const amt = parseNumeroSeguro(ccPayAmount?.value);
             const method = String(ccPayMethod?.value || 'Efectivo').trim() || 'Efectivo';
             if (!ccSupplierId || !expId || !(amt > 0)) {
                 if (ccPayError) ccPayError.classList.remove('hidden');

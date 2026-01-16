@@ -99,6 +99,15 @@ def _days(v, default=0):
         return default
 
 
+def _add_days(d: dt_date, days: int) -> dt_date:
+    if not d:
+        return d
+    try:
+        return d + timedelta(days=max(0, int(days or 0)))
+    except Exception:
+        return d
+
+
 def _month_add(d: dt_date, months: int) -> dt_date:
     if not d:
         return d
@@ -134,45 +143,7 @@ def _parse_iso_date_safe(raw: str):
         return None
 
 
-def _compute_cc_schedule(expense_date: dt_date, amount: float, terms_days: int, installments: int, paid_total: float):
-    amount = _money(amount, 0.0)
-    terms_days = max(1, _days(terms_days, 30) or 30)
-    installments = max(1, _days(installments, 1) or 1)
-
-    first_due = (expense_date or dt_date.today()) + timedelta(days=terms_days)
-    per = (amount / installments) if installments else amount
-    schedule = []
-    remaining_pay = max(0.0, _money(paid_total, 0.0))
-
-    for i in range(installments):
-        due_date = _month_add(first_due, i)
-        inst_amount = per if i < (installments - 1) else (amount - per * (installments - 1))
-        inst_amount = round(_money(inst_amount, 0.0), 2)
-        paid_here = min(inst_amount, remaining_pay)
-        remaining_pay = max(0.0, remaining_pay - paid_here)
-        rem = round(inst_amount - paid_here, 2)
-        schedule.append({
-            'n': i + 1,
-            'due_date': due_date.isoformat() if due_date else '',
-            'amount': inst_amount,
-            'paid': round(paid_here, 2),
-            'remaining': rem,
-            'status': 'paid' if rem <= 0 else 'open'
-        })
-
-    return {
-        'first_due_date': first_due.isoformat() if first_due else '',
-        'schedule': schedule
-    }
-
-
-def _build_cc_transactions(expense_date: dt_date, amount: float, payments: list):
-    out = [{
-        'kind': 'compra',
-        'date': expense_date.isoformat() if expense_date else '',
-        'amount': round(_money(amount, 0.0), 2),
-        'payment_method': 'Cuenta corriente'
-    }]
+def _build_cc_transactions(payments: list):
     pay_list = payments if isinstance(payments, list) else []
     normalized = []
     for p in pay_list:
@@ -186,8 +157,7 @@ def _build_cc_transactions(expense_date: dt_date, amount: float, payments: list)
             'payment_method': str(p.get('payment_method') or '').strip() or 'Efectivo'
         })
     normalized.sort(key=lambda x: str(x.get('date') or ''))
-    out.extend(normalized)
-    return out
+    return normalized
 
 
 def _is_payment_expense(meta_obj: dict) -> bool:
@@ -245,30 +215,21 @@ def supplier_cc_ledger_api(supplier_id):
 
             amount = _money(r.amount, 0.0)
             terms_days = _days(cc.get('terms_days'), 30)
-            installments = _days(cc.get('installments'), 1)
             payments = cc.get('payments') if isinstance(cc.get('payments'), list) else []
             paid_total = sum([_money(p.get('amount'), 0.0) for p in payments if isinstance(p, dict)])
             paid_total = min(amount, paid_total)
             remaining = max(0.0, amount - paid_total)
 
-            transactions = _build_cc_transactions(r.expense_date, amount, payments)
+            due_date = _add_days(r.expense_date or dt_date.today(), max(1, _days(terms_days, 30) or 30))
+            has_overdue = bool(due_date and due_date < today and remaining > 0)
+            if has_overdue:
+                overdue_due += remaining
+            if due_date and remaining > 0:
+                if next_due_date is None or due_date < next_due_date:
+                    next_due_date = due_date
+                    next_due_amount = remaining
 
-            sched_info = _compute_cc_schedule(r.expense_date, amount, terms_days, installments, paid_total)
-            schedule = sched_info['schedule']
-
-            has_overdue = False
-            for inst in schedule:
-                if inst.get('status') != 'open':
-                    continue
-                due_dt = _parse_iso_date_safe(inst.get('due_date'))
-                rem_inst = _money(inst.get('remaining'), 0.0)
-                if due_dt and due_dt < today and rem_inst > 0:
-                    has_overdue = True
-                    overdue_due += rem_inst
-                if due_dt and rem_inst > 0:
-                    if next_due_date is None or due_dt < next_due_date:
-                        next_due_date = due_dt
-                        next_due_amount = rem_inst
+            transactions = _build_cc_transactions(payments)
 
             total_due += remaining
 
@@ -283,12 +244,10 @@ def supplier_cc_ledger_api(supplier_id):
                 'note': r.note or (r.description or ''),
                 'amount': amount,
                 'terms_days': terms_days,
-                'installments': installments,
                 'paid_total': round(paid_total, 2),
                 'remaining': round(remaining, 2),
-                'first_due_date': sched_info.get('first_due_date') or '',
+                'due_date': due_date.isoformat() if due_date else '',
                 'status': status,
-                'schedule': schedule,
                 'transactions': transactions,
             })
 

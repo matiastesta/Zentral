@@ -18,6 +18,108 @@ from app.permissions import module_required, module_required_any
 from app.expenses import bp
 
 
+def _money(v, default=0.0):
+    try:
+        return float(v)
+    except Exception:
+        return default
+
+
+def _normalize_supplier_cc_meta(meta_obj: dict) -> dict:
+    if not isinstance(meta_obj, dict):
+        return {}
+    cc = meta_obj.get('supplier_cc')
+    if not isinstance(cc, dict):
+        return meta_obj
+    if cc.get('enabled') is not True:
+        return meta_obj
+    if 'installments' in cc:
+        try:
+            cc.pop('installments', None)
+        except Exception:
+            pass
+    if 'schedule' in cc:
+        try:
+            cc.pop('schedule', None)
+        except Exception:
+            pass
+    meta_obj['supplier_cc'] = cc
+    return meta_obj
+
+
+def _apply_supplier_cc_paid_now(doc: Expense, meta_obj: dict) -> tuple[dict, Expense | None]:
+    """If doc is a supplier CC expense and has paid_now > 0, apply it as a payment.
+
+    Returns updated meta_obj and the created payment Expense (or None).
+    """
+    if not isinstance(meta_obj, dict):
+        return meta_obj, None
+    cc = meta_obj.get('supplier_cc')
+    if not isinstance(cc, dict) or not cc.get('enabled'):
+        return meta_obj, None
+
+    paid_now = _money(cc.get('paid_now'), 0.0)
+    if paid_now <= 0:
+        return meta_obj, None
+
+    method = str(cc.get('paid_now_method') or 'Efectivo').strip() or 'Efectivo'
+    if method not in ['Efectivo', 'Transferencia', 'Débito', 'Crédito']:
+        method = 'Efectivo'
+
+    doc_total = _money(getattr(doc, 'amount', 0.0), 0.0)
+    payments = cc.get('payments') if isinstance(cc.get('payments'), list) else []
+    paid_total = sum([_money(p.get('amount'), 0.0) for p in payments if isinstance(p, dict)])
+    remaining = max(0.0, doc_total - paid_total)
+    if remaining <= 0:
+        cc['paid_now'] = 0.0
+        meta_obj['supplier_cc'] = cc
+        return meta_obj, None
+
+    pay_amount = min(remaining, paid_now)
+    if pay_amount <= 0:
+        cc['paid_now'] = 0.0
+        meta_obj['supplier_cc'] = cc
+        return meta_obj, None
+
+    pay_id = uuid4().hex
+    pay_entry = {
+        'id': pay_id,
+        'date': (getattr(doc, 'expense_date', None) or dt_date.today()).isoformat(),
+        'amount': round(pay_amount, 2),
+        'payment_method': method,
+    }
+    payments.append(pay_entry)
+    cc['payments'] = payments
+    cc['paid_now'] = 0.0
+    meta_obj['supplier_cc'] = cc
+
+    pay_exp = Expense(
+        id=uuid4().hex,
+        company_id=getattr(doc, 'company_id', None),
+        expense_date=getattr(doc, 'expense_date', None) or dt_date.today(),
+        payment_method=method,
+        amount=round(pay_amount, 2),
+        category='Pago cuenta corriente proveedor',
+        supplier_id=getattr(doc, 'supplier_id', None),
+        supplier_name=getattr(doc, 'supplier_name', None),
+        note='Pago CC · ' + (getattr(doc, 'supplier_name', None) or 'Proveedor'),
+        description=None,
+        origin='manual',
+    )
+    pay_meta = {
+        'supplier_cc_payment': True,
+        'origin_ref': {
+            'kind': 'supplier_cc_payment',
+            'supplier_id': str(getattr(doc, 'supplier_id', '') or '').strip(),
+            'supplier_name': str(getattr(doc, 'supplier_name', '') or '').strip(),
+            'expense_id': str(getattr(doc, 'id', '') or '').strip(),
+            'payment_id': pay_id,
+        }
+    }
+    _save_meta_obj(pay_exp, pay_meta)
+    return meta_obj, pay_exp
+
+
 def _parse_date_iso(raw, default=None):
     s = str(raw or '').strip()
     if not s:
@@ -213,6 +315,7 @@ def _apply_expense_payload(row: Expense, payload: dict):
     if isinstance(payload.get('origin_ref'), dict):
         meta_obj['origin_ref'] = payload.get('origin_ref')
 
+    meta_obj = _normalize_supplier_cc_meta(meta_obj)
     _save_meta_obj(row, meta_obj)
 
 
@@ -291,6 +394,17 @@ def create_expense_api():
     _apply_expense_payload(row, payload)
     db.session.add(row)
 
+    # Apply initial payment for supplier CC (paid_now)
+    try:
+        meta_obj = _load_meta_obj(row)
+        meta_obj = _normalize_supplier_cc_meta(meta_obj)
+        meta_obj, pay_exp = _apply_supplier_cc_paid_now(row, meta_obj)
+        _save_meta_obj(row, meta_obj)
+        if pay_exp is not None:
+            db.session.add(pay_exp)
+    except Exception:
+        current_app.logger.exception('Failed to apply supplier CC paid_now')
+
     try:
         db.session.commit()
     except Exception:
@@ -327,6 +441,17 @@ def update_expense_api(expense_id):
     if _payload_uses_inventory_supplier(payload):
         return jsonify({'ok': False, 'error': 'inventory_supplier_forbidden'}), 400
     _apply_expense_payload(row, payload)
+
+    # Apply initial payment for supplier CC (paid_now)
+    try:
+        meta_obj = _load_meta_obj(row)
+        meta_obj = _normalize_supplier_cc_meta(meta_obj)
+        meta_obj, pay_exp = _apply_supplier_cc_paid_now(row, meta_obj)
+        _save_meta_obj(row, meta_obj)
+        if pay_exp is not None:
+            db.session.add(pay_exp)
+    except Exception:
+        current_app.logger.exception('Failed to apply supplier CC paid_now')
 
     try:
         db.session.commit()

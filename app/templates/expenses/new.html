@@ -121,17 +121,27 @@
                         <div class="md:col-span-2">
                             <label class="block text-xs font-medium text-gray-600 mb-1">Plazo de pago (días)</label>
                             <input id="egreso-cc-days" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="30">
-                            <div class="mt-1 text-[10px] text-gray-500">Días hasta el primer vencimiento.</div>
+                            <div class="mt-1 text-[10px] text-gray-500">Días hasta el vencimiento.</div>
                         </div>
                         <div class="md:col-span-2">
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Cuotas</label>
-                            <input id="egreso-cc-installments" type="number" min="1" class="w-full px-3 py-2 text-sm border rounded-md" value="1">
-                            <div class="mt-1 text-[10px] text-gray-500">Cuotas mensuales a partir del primer vencimiento.</div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Monto pagado ahora</label>
+                            <input id="egreso-cc-paid-now" type="text" inputmode="decimal" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="$0" data-currency="ars">
+                            <div class="mt-1 text-[10px] text-gray-500">Puede ser 0, parcial o total.</div>
                         </div>
                         <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Método de pago ahora</label>
+                            <select id="egreso-cc-paid-method" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                                <option>Efectivo</option>
+                                <option>Transferencia</option>
+                                <option>Débito</option>
+                                <option>Crédito</option>
+                            </select>
+                            <div class="mt-1 text-[10px] text-gray-500">Solo se aplica si pagás algo ahora.</div>
+                        </div>
+                        <div class="md:col-span-6">
                             <label class="block text-xs font-medium text-gray-600 mb-1">Resumen</label>
                             <div id="egreso-cc-summary" class="w-full px-3 py-2 text-sm border rounded-md bg-white text-gray-700"></div>
-                            <div class="mt-1 text-[10px] text-gray-500">Estimación según fecha y valor.</div>
+                            <div class="mt-1 text-[10px] text-gray-500">Total / Pagado / Saldo / Vencimiento.</div>
                         </div>
                     </div>
                 </div>
@@ -272,7 +282,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const radioPayCc = document.getElementById('egreso-paymode-cc');
     const panelCc = document.getElementById('panel-egreso-cc');
     const inputCcDays = document.getElementById('egreso-cc-days');
-    const inputCcInstallments = document.getElementById('egreso-cc-installments');
+    const inputCcPaidNow = document.getElementById('egreso-cc-paid-now');
+    const selectCcPaidMethod = document.getElementById('egreso-cc-paid-method');
     const ccSummary = document.getElementById('egreso-cc-summary');
 
     const wrapProveedor = document.getElementById('wrap-egreso-proveedor');
@@ -385,15 +396,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function syncCcSummary() {
         if (!ccSummary) return;
-        const fecha = String(inputFecha?.value || '').trim();
+        if (!isCcMode()) {
+            ccSummary.textContent = '';
+            return;
+        }
+        const fecha = (inputFecha?.value || '').trim();
         const base = dt_date_from_iso(fecha);
         const total = parseNumeroSeguro(inputValor?.value);
         const days = Math.max(1, parseInt(inputCcDays?.value || 30, 10) || 30);
-        const inst = Math.max(1, parseInt(inputCcInstallments?.value || 1, 10) || 1);
-        const firstDue = base ? addDays(base, days) : null;
-        const per = inst > 0 ? (total / inst) : total;
-        const dueLabel = firstDue ? toIsoDate(firstDue) : '—';
-        ccSummary.textContent = '1° venc.: ' + dueLabel + ' · ' + inst + ' cuota(s) · aprox. $' + per.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const paidNow = Math.max(0, parseNumeroSeguro(inputCcPaidNow?.value));
+        const effectivePaidNow = Math.min(Math.max(0, total), paidNow);
+        const remaining = Math.max(0, total - effectivePaidNow);
+        const due = base ? addDays(base, days) : null;
+        const dueLabel = due ? toIsoDate(due) : '—';
+        const method = String(selectCcPaidMethod?.value || 'Efectivo').trim() || 'Efectivo';
+        ccSummary.textContent = 'Total: ' + fmtMoney(total) + ' · Pagado: ' + fmtMoney(effectivePaidNow) + ' (' + method + ')' + ' · Saldo: ' + fmtMoney(remaining) + ' · Vence: ' + dueLabel;
     }
 
     function syncPayModeUi() {
@@ -1086,7 +1103,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     radioPayFull.checked = !cc;
                 }
                 if (inputCcDays) inputCcDays.value = String(parseInt(found?.meta?.supplier_cc?.terms_days || 30, 10) || 30);
-                if (inputCcInstallments) inputCcInstallments.value = String(parseInt(found?.meta?.supplier_cc?.installments || 1, 10) || 1);
+                if (inputCcPaidNow) inputCcPaidNow.value = '';
+                if (selectCcPaidMethod) selectCcPaidMethod.value = String(found?.meta?.supplier_cc?.paid_now_method || 'Efectivo') || 'Efectivo';
                 syncPayModeUi();
 
                 if (selectTipo) selectTipo.value = found.type || found.expense_type || 'Variable';
@@ -1152,7 +1170,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     radioPayFull.checked = !cc;
                 }
                 if (inputCcDays) inputCcDays.value = String(parseInt(found?.meta?.supplier_cc?.terms_days || 30, 10) || 30);
-                if (inputCcInstallments) inputCcInstallments.value = String(parseInt(found?.meta?.supplier_cc?.installments || 1, 10) || 1);
+                if (inputCcPaidNow) inputCcPaidNow.value = '';
                 syncPayModeUi();
 
                 if (selectTipo) selectTipo.value = found.type || found.expense_type || 'Variable';
@@ -1196,7 +1214,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const supplierId = (inputProveedorId?.value || '').trim();
 
         const ccDays = Math.max(1, parseInt(inputCcDays?.value || 30, 10) || 30);
-        const ccInst = Math.max(1, parseInt(inputCcInstallments?.value || 1, 10) || 1);
+        const ccPaidNow = Math.max(0, parseNumeroSeguro(inputCcPaidNow?.value));
+        const ccPaidMethod = String(selectCcPaidMethod?.value || 'Efectivo').trim() || 'Efectivo';
 
         if (payMode === 'cc') {
             if (!supplierId) {
@@ -1293,7 +1312,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 supplier_cc: (payMode === 'cc') ? {
                     enabled: true,
                     terms_days: ccDays,
-                    installments: ccInst
+                    paid_now: ccPaidNow,
+                    paid_now_method: ccPaidMethod
                 } : { enabled: false }
             }
         };
@@ -1523,7 +1543,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    [radioPayFull, radioPayCc, inputCcDays, inputCcInstallments, inputFecha, inputValor].forEach(function (el) {
+    [radioPayFull, radioPayCc, inputCcDays, inputCcPaidNow, selectCcPaidMethod, inputFecha, inputValor].forEach(function (el) {
         if (!el) return;
         el.addEventListener('change', function () {
             syncPayModeUi();

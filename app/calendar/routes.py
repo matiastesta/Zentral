@@ -487,7 +487,7 @@ def _get_system_events(cfg_data: dict, start: date, end: date):
                 event_type=kind,
             )
 
-    # Proveedores · Cuenta corriente (desde meta_json.supplier_cc.schedule)
+    # Proveedores · Cuenta corriente
     wants_past = _is_source_enabled(cfg_data, 'proveedores', 'deuda_vencida')
     wants_next = _is_source_enabled(cfg_data, 'proveedores', 'proximo_vencimiento')
     if wants_past or wants_next:
@@ -506,29 +506,46 @@ def _get_system_events(cfg_data: dict, start: date, end: date):
             cc = meta.get('supplier_cc')
             if not isinstance(cc, dict) or not cc.get('enabled'):
                 continue
-            schedule = cc.get('schedule')
-            if not isinstance(schedule, list):
+
+            payments = cc.get('payments') if isinstance(cc.get('payments'), list) else []
+            paid_total = 0.0
+            try:
+                for p in payments:
+                    if not isinstance(p, dict):
+                        continue
+                    paid_total += float(p.get('amount') or 0.0)
+            except Exception:
+                paid_total = 0.0
+
+            amount_total = 0.0
+            try:
+                amount_total = float(getattr(r, 'amount', 0.0) or 0.0)
+            except Exception:
+                amount_total = 0.0
+
+            remaining = max(0.0, amount_total - paid_total)
+            if remaining <= 0:
+                continue
+
+            base_date = getattr(r, 'expense_date', None) or today
+            terms_days = 30
+            try:
+                terms_days = int(cc.get('terms_days') or 30)
+            except Exception:
+                terms_days = 30
+            try:
+                due_d = base_date + timedelta(days=max(1, terms_days))
+            except Exception:
+                due_d = base_date
+
+            if not (start <= due_d <= end):
                 continue
             sid = str(getattr(r, 'supplier_id', '') or '').strip()
             sname = str(getattr(r, 'supplier_name', '') or '').strip()
             supp = sname or sid or 'Proveedor'
-            for inst in schedule:
-                if not isinstance(inst, dict):
-                    continue
-                if str(inst.get('status') or '').strip() != 'open':
-                    continue
-                due_s = str(inst.get('due_date') or '').strip()
-                rem = float(inst.get('remaining') or 0.0)
-                if not due_s or rem <= 0:
-                    continue
-                try:
-                    due_d = date.fromisoformat(due_s)
-                except Exception:
-                    continue
-                if not (start <= due_d <= end):
-                    continue
-                kind = 'deuda_vencida' if due_d < today else 'proximo_vencimiento'
-                by_due[(supp, due_d, kind)] = by_due.get((supp, due_d, kind), 0.0) + rem
+
+            kind = 'deuda_vencida' if due_d < today else 'proximo_vencimiento'
+            by_due[(supp, due_d, kind)] = by_due.get((supp, due_d, kind), 0.0) + remaining
 
         for (supp, due_d, kind), amt in by_due.items():
             if kind == 'deuda_vencida' and not wants_past:
