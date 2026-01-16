@@ -3184,18 +3184,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .sort((a, b) => _employeeDisplayName(a).localeCompare(_employeeDisplayName(b), 'es'))
             .map(e => ({ value: 'e:' + String(e?.id || '').trim(), label: _employeeDisplayName(e) }));
 
-        const userMap = new Map();
-        items.forEach(s => {
-            const rid = String(s?.responsible_id || '').trim();
-            if (!rid || !rid.startsWith('u:')) return;
-            const nm = String(s?.responsible_name || '').trim() || rid;
-            if (!userMap.has(rid)) userMap.set(rid, nm);
-        });
-        const userOpts = Array.from(userMap.entries())
-            .map(([value, label]) => ({ value: String(value), label: String(label) }))
-            .sort((a, b) => String(a.label).localeCompare(String(b.label), 'es'));
-
-        const withEmpty = [{ value: '__EMPTY__', label: '—' }, ...empOpts, ...userOpts];
+        const withEmpty = [{ value: '__EMPTY__', label: '-' }, ...empOpts];
         setVentasMultiOptions('employee', withEmpty);
         renderVentasMultiMenu('employee', itemsVentasFilterEmployee, labelVentasFilterEmployee);
     }
@@ -6384,13 +6373,23 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Escape') closeDeleteTicketModal(false);
     });
 
+    const deletingTickets = (window.__salesDeletingTickets && window.__salesDeletingTickets instanceof Set)
+        ? window.__salesDeletingTickets
+        : (window.__salesDeletingTickets = new Set());
+
     function deleteTicketById(ticket) {
         const t = String(ticket || '').trim();
         if (!t) return;
+        if (deletingTickets.has(t)) return;
         confirmDeleteTicket(t).then(function (confirmar) {
             if (!confirmar) return;
 
+            deletingTickets.add(t);
+
             apiDeleteSale(t).then(function (res) {
+                if (res && (res.error === 'not_found' || res.error === '404')) {
+                    res = { ok: true };
+                }
                 if (!res || res.ok !== true) {
                     const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo eliminar el ticket.';
                     showAlertModal(msg, 'Error', 'Operación fallida');
@@ -6404,6 +6403,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 scrollAElemento(historial || home);
             }).catch(function () {
                 showAlertModal('No se pudo eliminar el ticket.', 'Error', 'Operación fallida');
+            }).finally(function () {
+                try { deletingTickets.delete(t); } catch (e) {}
             });
         });
     }
@@ -6869,6 +6870,15 @@ td.num,th.num{text-align:right}
                 }
             }
 
+            if (window.__salesSavingSale === true) return;
+            window.__salesSavingSale = true;
+            try {
+                btnConfirmarVenta.disabled = true;
+                btnConfirmarVenta.classList.add('opacity-50');
+                btnConfirmarVenta.classList.add('cursor-not-allowed');
+            } catch (e) {
+            }
+
             const req = editTicketId ? apiUpdateSale(editTicketId, payload) : apiCreateSale(payload);
             Promise.resolve(req).then(function (res) {
                 if (!res || res.ok !== true) {
@@ -6919,6 +6929,14 @@ td.num,th.num{text-align:right}
                 }
             }).catch(function () {
                 showAlertModal('No se pudo registrar la venta.', 'Error', 'Operación fallida');
+            }).finally(function () {
+                try { window.__salesSavingSale = false; } catch (e) {}
+                try {
+                    btnConfirmarVenta.disabled = false;
+                    btnConfirmarVenta.classList.remove('opacity-50');
+                    btnConfirmarVenta.classList.remove('cursor-not-allowed');
+                } catch (e) {
+                }
             });
         });
     }

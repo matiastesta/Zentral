@@ -1463,10 +1463,37 @@ document.addEventListener('DOMContentLoaded', function () {
         menus.forEach(m => m.classList.add('hidden'));
     }
 
+    function dedupeSales(rows) {
+        const out = [];
+        const seen = new Set();
+        ensureArray(rows).forEach(function (s) {
+            const id = safeStr(s?.id).trim();
+            const ticket = safeStr(s?.ticket).trim();
+            const tipo = safeStr(s?.type || s?.sale_type).trim();
+            const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
+            const key = (ticket
+                ? ('t:' + ticket)
+                : (id ? ('id:' + id) : ('x:' + tipo + '|' + String(ts || 0) + '|' + safeStr(s?.customer_id).trim() + '|' + String(parseFloat(s?.total || 0) || 0))));
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            out.push(s);
+        });
+        return out;
+    }
+
+    function isPaymentSaleRow(s) {
+        const t = safeStr(s?.type || s?.sale_type).trim();
+        if (t === 'CobroCC' || t === 'CobroCuota' || t === 'CobroVenta') return true;
+        const tk = safeStr(s?.ticket).trim().toUpperCase();
+        const dtk = safeStr(s?.display_ticket).trim().toUpperCase();
+        if (tk.startsWith('#P') || tk.startsWith('P') || dtk.startsWith('#P') || dtk.startsWith('P')) return true;
+        return false;
+    }
+
     function salesForCustomer(customer) {
         const cid = safeStr(customer?.id);
         const fullName = safeStr(customer?.full_name).trim();
-        const list = ensureArray(cacheSales).filter(s => {
+        const list = dedupeSales(cacheSales).filter(s => {
             const sid = safeStr(s?.customer_id);
             if (sid && cid && sid === cid) return true;
             if (!sid && fullName) return safeStr(s?.customer_name).toLowerCase() === fullName.toLowerCase();
@@ -1631,9 +1658,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const criticalDays = Math.max(overdueDays + 1, parseInt(crm?.debt_critical_days || 60, 10) || 60);
 
         const ccPending = ensureArray(all).filter(s => {
-            const t = safeStr(s?.type || s?.sale_type).trim();
-            if (t === 'CobroCC') return false;
-            if (t === 'CobroCuota') return false;
+            if (isPaymentSaleRow(s)) return false;
             if (s && s.is_installments === true) return false;
             const due = parseFloat(s?.due_amount || 0) || 0;
             if (!(due > 0.00001)) return false;
@@ -1701,9 +1726,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (legajoNotes) legajoNotes.textContent = safeStr(c.notes || '—');
 
         const salesOnly = ensureArray(all).filter(s => {
-            const t = safeStr(s?.type || s?.sale_type).trim();
-            if (t === 'CobroCC') return false;
-            if (t === 'CobroCuota') return false;
+            if (isPaymentSaleRow(s)) return false;
             const total = parseFloat(s?.total || 0) || 0;
             return total > 0;
         });
@@ -1745,14 +1768,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (legajoPayments) {
             const pays = ensureArray(all).filter(s => {
-                const t = safeStr(s?.type || s?.sale_type).trim();
-                if (t !== 'CobroCC' && t !== 'CobroCuota') return false;
+                if (!isPaymentSaleRow(s)) return false;
                 const total = parseFloat(s?.total || 0) || 0;
                 return total > 0;
             });
 
             const ccPays = pays.filter(s => safeStr(s?.type || s?.sale_type).trim() === 'CobroCC');
             const cuotaPays = pays.filter(s => safeStr(s?.type || s?.sale_type).trim() === 'CobroCuota');
+            const ventaPays = pays.filter(s => safeStr(s?.type || s?.sale_type).trim() === 'CobroVenta');
 
             const groupedCuotas = groupInstallmentPayments(cuotaPays);
             const rows = [];
@@ -1768,6 +1791,23 @@ document.addEventListener('DOMContentLoaded', function () {
                         const ref = parsePaymentReference(s?.notes);
                         const tk = safeStr(ref.refTicket || s?.ticket || '').trim();
                         return tk ? ('Venta #' + tk) : '—';
+                    })(),
+                    method: safeStr(s?.payment_method || '—'),
+                    amount: parseFloat(s?.total || 0) || 0,
+                });
+            });
+
+            ventaPays.forEach(s => {
+                const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
+                const fechaRaw = ts ? new Date(ts).toISOString().slice(0, 10) : '—';
+                rows.push({
+                    sortTs: ts || 0,
+                    dateRaw: fechaRaw,
+                    type: 'Cobro',
+                    reference: (() => {
+                        const ref = parsePaymentReference(s?.notes);
+                        const tk = safeStr(ref.refTicket || s?.ticket || '').trim();
+                        return tk ? ('Ticket ' + tk) : '—';
                     })(),
                     method: safeStr(s?.payment_method || '—'),
                     amount: parseFloat(s?.total || 0) || 0,
@@ -2538,7 +2578,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function computeDerived(customers, salesArr) {
         const crm = getCrmCfg();
-        const sales = ensureArray(salesArr);
+        const sales = dedupeSales(salesArr);
         const nowTs = Date.now();
         const winMs = Math.max(1, parseInt(crm?.recent_days || 60, 10) || 60) * 24 * 60 * 60 * 1000;
         const freqMin = Math.max(1, parseInt(crm?.freq_min_purchases || 1, 10) || 1);
@@ -2583,10 +2623,8 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             const purchaseSales = salesFor.filter(s => {
-                const t = safeStr(s?.type || s?.sale_type).trim();
                 const total = parseFloat(s?.total || 0) || 0;
-                if (t === 'CobroCC') return false;
-                if (t === 'CobroCuota') return false;
+                if (isPaymentSaleRow(s)) return false;
                 return total > 0;
             });
 
@@ -2605,8 +2643,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const saldoCuotas = instSummary ? (parseFloat(instSummary.pending_amount || 0) || 0) : 0;
 
             const isPayment = function (s) {
-                const t = safeStr(s?.type || s?.sale_type).trim();
-                return (t === 'CobroCC' || t === 'CobroCuota');
+                return isPaymentSaleRow(s);
             };
             const isInstallmentSale = function (s) {
                 try {

@@ -44,11 +44,6 @@ def _default_calendar_config():
                 "stock_critico": True,
                 "reposicion": True,
             },
-            "movimientos": {
-                "arqueo_pendiente": True,
-                "diferencias_caja": True,
-                "cobros": True,
-            },
             "empleados": {
                 "cumpleanos": False,
             },
@@ -243,7 +238,6 @@ def _sanitize_source_module(v: str | None) -> str:
         'cuotas',
         'proveedores',
         'inventario',
-        'movimientos',
         'empleados',
     }
     return raw if raw in allowed else 'manual'
@@ -254,6 +248,8 @@ def _is_source_enabled(cfg_data: dict, source_module: str, event_type: str) -> b
     et = _normalize_event_type(sm, event_type)
 
     # UX cleanup: removed/noisy legacy modules & items
+    if sm == 'movimientos':
+        return False
     if sm in {'ventas', 'configuracion', 'sistema'}:
         return False
     if sm == 'clientes' and et == 'inactivos':
@@ -987,9 +983,6 @@ def index():
 
             _set(['inventario', 'stock_critico'], request.form.get('src_inventario_stock_critico') == 'on')
             _set(['inventario', 'reposicion'], request.form.get('src_inventario_reposicion') == 'on')
-
-            _set(['movimientos', 'arqueo_pendiente'], request.form.get('src_movimientos_arqueo_pendiente') == 'on')
-            _set(['movimientos', 'diferencias_caja'], request.form.get('src_movimientos_diferencias_caja') == 'on')
 
             _set(['empleados', 'cumpleanos'], request.form.get('src_empleados_cumpleanos') == 'on')
 

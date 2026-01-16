@@ -706,7 +706,15 @@ document.addEventListener('DOMContentLoaded', function () {
         return fetch('/sales/api/sales/' + encodeURIComponent(t), {
             method: 'DELETE',
             credentials: 'same-origin'
-        }).then(r => r.json()).catch(() => ({ ok: false, error: 'network' }));
+        }).then(function (r) {
+            if (!r) return { ok: false, error: 'network' };
+            if (r.status === 204) return { ok: true };
+            return r.json().catch(function () {
+                return { ok: (r && r.ok) ? true : false };
+            });
+        }).catch(function () {
+            return { ok: false, error: 'network' };
+        });
     }
 
     function apiDeleteExpense(expenseId) {

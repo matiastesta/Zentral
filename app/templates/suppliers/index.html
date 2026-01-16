@@ -331,10 +331,35 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function reloadEgresosFromApi() {
+        try {
+            return fetch('/expenses/api/expenses?limit=5000', { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    const items = (data && data.ok === true && Array.isArray(data.items)) ? data.items : (Array.isArray(data && data.items) ? data.items : []);
+                    try { guardarEgresos(items); } catch (e) {}
+                    return items;
+                })
+                .catch(function () { return []; });
+        } catch (e) {
+            return Promise.resolve([]);
+        }
+    }
+
     function guardarSuppliers(arr) {
         try {
             if (window.StorageService && typeof window.StorageService.saveSuppliers === 'function') {
                 return window.StorageService.saveSuppliers(Array.isArray(arr) ? arr : []);
+            }
+        } catch (e) {
+        }
+        return null;
+    }
+
+    function guardarEgresos(arr) {
+        try {
+            if (window.StorageService && typeof window.StorageService.saveExpenses === 'function') {
+                return window.StorageService.saveExpenses(Array.isArray(arr) ? arr : []);
             }
         } catch (e) {
         }
@@ -1066,7 +1091,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 body: JSON.stringify({ expense_id: expId, amount: amt, payment_method: method })
             }).then(function () {
                 if (ccPayAmount) ccPayAmount.value = '';
-                loadCcLedger();
+                return Promise.all([
+                    loadCcLedger(),
+                    reloadEgresosFromApi()
+                ]).then(function () {
+                    render();
+                });
             }).catch(function () {
                 if (ccPayError) ccPayError.classList.remove('hidden');
             });

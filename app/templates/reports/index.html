@@ -17,11 +17,6 @@
                 <input id="reports-month" type="month" class="col-span-2 sm:col-auto px-3 py-2 text-sm border border-gray-200 rounded-md bg-white text-gray-700" />
                 <input id="reports-date-from" type="date" class="hidden col-span-1 px-3 py-2 text-sm border border-gray-200 rounded-md bg-white text-gray-700" />
                 <input id="reports-date-to" type="date" class="hidden col-span-1 px-3 py-2 text-sm border border-gray-200 rounded-md bg-white text-gray-700" />
-                <select id="reports-compare-mode" class="col-span-2 sm:col-auto px-3 py-2 text-sm border border-gray-200 rounded-md bg-white text-gray-700">
-                    <option value="none">Sin comparar</option>
-                    <option value="prev">Comparar: mes anterior</option>
-                    <option value="yoy">Comparar: mismo mes año anterior</option>
-                </select>
                 <div class="col-span-2 sm:col-auto flex items-center justify-end gap-2">
                     <button id="btn-reports-apply" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
                         <i class="fas fa-filter mr-2"></i> Aplicar
@@ -1066,10 +1061,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const params = new URLSearchParams();
         params.set('from', p.from);
         params.set('to', p.to);
-        try {
-            const compare = (document.getElementById('reports-compare-mode') || {}).value || 'none';
-            if (compare && compare !== 'none') params.set('compare', compare);
-        } catch (e) {}
 
         const url = FINANCE_API_BASE + '?' + params.toString();
 
@@ -1317,7 +1308,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const filtered = applySearch(_invRowsState);
             const sorted = getSorted(filtered);
             if (!sorted.length) {
-                bodyEl.innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-sm text-gray-500">Sin datos.</td></tr>';
+                bodyEl.innerHTML = '<tr><td colspan="8" class="px-3 py-4 text-sm text-gray-500">Sin datos</td></tr>';
                 return;
             }
             bodyEl.innerHTML = sorted.slice(0, 800).map(function (r) {
@@ -1372,8 +1363,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const params = new URLSearchParams();
             params.set('from', p.from);
             params.set('to', p.to);
-            const compare = (document.getElementById('reports-compare-mode') || {}).value || 'none';
-            if (compare && compare !== 'none') params.set('compare', compare);
+
             const url = INVENTORY_API_BASE + '?' + params.toString();
 
             const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
@@ -1781,12 +1771,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function buildSalesUrl() {
         const p = getPeriod();
-        const compare = (document.getElementById('reports-compare-mode') || {}).value || 'none';
         const groupBy = (salesGroupBy && salesGroupBy.value) ? salesGroupBy.value : 'product';
         const params = new URLSearchParams();
         params.set('from', p.from);
         params.set('to', p.to);
-        if (compare && compare !== 'none') params.set('compare', compare);
         if (groupBy) params.set('group_by', groupBy);
 
         const cid = (salesFilterCategory && salesFilterCategory.value) ? salesFilterCategory.value.trim() : '';
@@ -2136,7 +2124,7 @@ document.addEventListener('DOMContentLoaded', function () {
         ];
 
         const dots = pts.slice(0, 320).map(function (p, idx) {
-            const cx = x(p.sales);
+            const cx = padX + idx * step + step / 2;
             const cy = y(p.margin_pct);
             const isHighSales = cx >= midX;
             const isLowMargin = cy >= midY;
@@ -2439,9 +2427,10 @@ document.addEventListener('DOMContentLoaded', function () {
             // Map tick to value (top=+safePos, bottom=-safeNeg)
             const val = safePos - (t / 4) * (safePos + safeNeg);
             yLabels.push('<text x="' + (padX - 8) + '" y="' + (yy + 3).toFixed(2) + '" text-anchor="end" font-size="10" fill="#6b7280">' + escapeHtml(fmtShortMoney(val)) + '</text>');
+
+            const xv = (t / 4) * (n - 1);
+            xLabels.push('<text x="' + (padX + xv * step + step / 2).toFixed(2) + '" y="' + (padY + innerH + 14).toFixed(2) + '" text-anchor="middle" font-size="10" fill="#6b7280">' + escapeHtml(String(Math.round(xv))) + '</text>');
         }
-        axis.push('<line x1="' + padX + '" y1="' + zeroY.toFixed(2) + '" x2="' + (w - padX) + '" y2="' + zeroY.toFixed(2) + '" stroke="#e5e7eb" stroke-width="1.25" />');
-        axis.push('<line x1="' + padX + '" y1="' + padY + '" x2="' + padX + '" y2="' + (padY + innerH) + '" stroke="#e5e7eb" stroke-width="1" />');
 
         // Axis labels
         const axisLabels = [
@@ -2591,11 +2580,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const qs = new URLSearchParams();
         if (from) qs.set('from', from);
         if (to) qs.set('to', to);
-        try {
-            const compare = (document.getElementById('reports-compare-mode') || {}).value || 'none';
-            if (compare && compare !== 'none') qs.set('compare', compare);
-        } catch (e) {}
-
         const url = EERR_API_BASE + '?' + qs.toString();
         let data = null;
         try {
@@ -2727,12 +2711,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (preset && preset.value !== 'custom') {
                 try { preset.value = 'custom'; setPresetUI('custom'); } catch (e) {}
             }
-            scheduleApply(220);
-        });
-    }
-    const cmp = document.getElementById('reports-compare-mode');
-    if (cmp) {
-        cmp.addEventListener('change', function () {
             scheduleApply(220);
         });
     }
