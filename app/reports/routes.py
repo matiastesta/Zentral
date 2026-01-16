@@ -526,7 +526,6 @@ def eerr_api():
             .join(InventoryMovement, and_(InventoryMovement.company_id == Product.company_id, InventoryMovement.product_id == Product.id))
             .join(Sale, and_(Sale.company_id == InventoryMovement.company_id, Sale.ticket == InventoryMovement.sale_ticket))
             .filter(Product.company_id == cid)
-            .filter(Product.active == True)  # noqa: E712
             .filter(InventoryMovement.company_id == cid)
             .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= d_from)
@@ -562,7 +561,6 @@ def eerr_api():
             .join(Sale, and_(Sale.company_id == InventoryMovement.company_id, Sale.ticket == InventoryMovement.sale_ticket))
             .filter(Category.company_id == cid)
             .filter(Product.company_id == cid)
-            .filter(Product.active == True)  # noqa: E712
             .filter(InventoryMovement.company_id == cid)
             .filter(Sale.company_id == cid)
             .filter(Sale.sale_date >= d_from)
@@ -1105,7 +1103,7 @@ def sales_analysis_api():
         # Map product info
         prod_map = {}
         try:
-            p_rows = db.session.query(Product).filter(Product.company_id == cid).filter(Product.active == True).all()  # noqa: E712
+            p_rows = db.session.query(Product).filter(Product.company_id == cid).all()
             for p in (p_rows or []):
                 pid = str(getattr(p, 'id', '') or '').strip()
                 if pid:
@@ -2247,13 +2245,8 @@ def inventory_rotation_api():
     if yellow_days <= green_days:
         yellow_days = green_days * 2
 
-    show_archived = (str(request.args.get('show_archived') or '').strip() in ('1', 'true', 'True'))
-
     # Products & category map
-    pq = db.session.query(Product).filter(Product.company_id == cid)
-    if not show_archived:
-        pq = pq.filter(Product.active == True)  # noqa: E712
-    products = pq.all()
+    products = db.session.query(Product).filter(Product.company_id == cid).all()
     cat_map = {}
     try:
         for c in (db.session.query(Category).filter(Category.company_id == cid).all() or []):
@@ -2378,7 +2371,8 @@ def inventory_rotation_api():
         active = bool(getattr(p, 'active', True))
         qty_now = _num(stock_now.get(pid))
 
-        if (not show_archived) and (not active):
+        # Follow the requested "activo" filter, but keep items that still have stock.
+        if (not active) and qty_now <= 1e-9:
             continue
 
         val_now = _num(stock_value_now.get(pid))

@@ -47,6 +47,7 @@ def _default_calendar_config():
             "movimientos": {
                 "arqueo_pendiente": True,
                 "diferencias_caja": True,
+                "cobros": True,
             },
             "empleados": {
                 "cumpleanos": False,
@@ -642,6 +643,52 @@ def _get_system_events(cfg_data: dict, start: date, end: date):
                 priority='alta',
                 source_module='movimientos',
                 event_type='diferencias_caja',
+            )
+
+    # Movimientos · Cobros (Cobro venta / CC / Cuotas)
+    if _is_source_enabled(cfg_data, 'movimientos', 'cobros'):
+        rows = (
+            db.session.query(Sale)
+            .filter(Sale.company_id == cid)
+            .filter(Sale.sale_date >= start)
+            .filter(Sale.sale_date <= end)
+            .filter(Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota']))
+            .order_by(Sale.sale_date.asc(), Sale.id.asc())
+            .limit(5000)
+            .all()
+        )
+        for s in (rows or []):
+            d = getattr(s, 'sale_date', None)
+            if not d:
+                continue
+            st = str(getattr(s, 'sale_type', '') or '').strip()
+            cust_id = str(getattr(s, 'customer_id', '') or '').strip()
+            cust_name = str(getattr(s, 'customer_name', '') or '').strip() or cust_id or 'Cliente'
+            amt = float(getattr(s, 'total', 0.0) or 0.0)
+
+            label = 'Cobro'
+            if st == 'CobroVenta':
+                label = 'Cobro venta'
+            elif st == 'CobroCC':
+                label = 'Cobro cuenta corriente'
+            elif st == 'CobroCuota':
+                label = 'Cobro cuota'
+
+            href = None
+            try:
+                if cust_id:
+                    href = url_for('customers.index', open_legajo=cust_id)
+            except Exception:
+                href = None
+
+            _add(
+                title=label + ': ' + cust_name + ((' ($' + _fmt_money(amt) + ')') if abs(amt) > 0.009 else ''),
+                description='Cliente: ' + cust_name + ((' · Monto: $' + _fmt_money(amt)) if abs(amt) > 0.009 else ''),
+                d=d,
+                priority='media',
+                source_module='movimientos',
+                event_type='cobros',
+                href=href,
             )
 
     # Cuotas · Vencimientos (evento por cuota) + Alertas hoy (vencido/crítico)
