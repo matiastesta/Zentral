@@ -2203,8 +2203,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const base = roundPrecio(oldP);
         const d = preciosDraft.get(id);
         if (d && typeof d === 'object') return d;
-        const cost = parseNumeroSeguro(unitCost);
-        const pct = (isFinite(cost) && cost > 0) ? pctFromNewPrice(cost, base) : 0;
+        const pct = pctFromNewPrice(base, base);
         return { newPrice: base, pct: pct, dirty: false };
     }
 
@@ -4568,9 +4567,7 @@ document.addEventListener('DOMContentLoaded', function () {
         products.forEach(p => {
             const oldP = parseNumeroSeguro(p?.sale_price);
             const base = roundPrecio(oldP);
-            const unitCost = unitCostForProduct(p?.id);
-            if (!(unitCost > 0)) return;
-            const newP = newPriceFromPct(unitCost, pv);
+            const newP = newPriceFromPct(base, pv);
             const dirty = Math.abs(newP - base) >= 1;
             setDraft(p?.id, { newPrice: newP, pct: pv, dirty });
         });
@@ -4629,10 +4626,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + (hasCost ? formatMoneyARS0(unitCost) : '<span class="text-amber-700" title="Este producto no tiene costo cargado">—</span>') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoneyARS0(base) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right">'
-                +   '<input type="text" inputmode="numeric" class="w-32 px-2 py-1 border rounded-md text-right text-sm input-new-price' + (hasCost ? '' : ' bg-gray-50 cursor-not-allowed') + '" value="' + esc(formatMoneyARS0(draft?.newPrice ?? base)) + '"' + (hasCost ? '' : ' disabled title="Este producto no tiene costo cargado"') + '>' 
+                +   '<input type="text" inputmode="numeric" class="w-32 px-2 py-1 border rounded-md text-right text-sm input-new-price" value="' + esc(formatMoneyARS0(draft?.newPrice ?? base)) + '">' 
                 + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right">'
-                +   '<input type="number" step="0.01" class="w-24 px-2 py-1 border rounded-md text-right text-sm input-pct-change' + (hasCost ? '' : ' bg-gray-50 cursor-not-allowed') + '" value="' + esc(String(parseNumeroSeguro(draft?.pct ?? 0).toFixed(2))) + '"' + (hasCost ? '' : ' disabled title="Este producto no tiene costo cargado"') + '>' 
+                +   '<input type="number" step="0.01" class="w-24 px-2 py-1 border rounded-md text-right text-sm input-pct-change" value="' + esc(String(parseNumeroSeguro(draft?.pct ?? 0).toFixed(2))) + '">' 
                 + '</td>';
             preciosTbody.appendChild(tr);
 
@@ -4651,17 +4648,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (input) {
                 input.addEventListener('focus', function () {
-                    if (!hasCost) return;
                     const d = getDraft(pid, base, unitCost);
                     input.value = String(roundPrecio(d?.newPrice ?? base));
                     try { input.select(); } catch (e) { }
                 });
 
                 input.addEventListener('input', function () {
-                    if (!hasCost) return;
                     const raw = parseMonedaARS(input.value);
                     const newP = roundPrecio(raw);
-                    const pct = pctFromNewPrice(unitCost, newP);
+                    const pct = pctFromNewPrice(base, newP);
                     const d = getDraft(pid, base, unitCost);
                     d.newPrice = newP;
                     d.pct = pct;
@@ -4678,9 +4673,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (pctInput) {
                 pctInput.addEventListener('input', function () {
-                    if (!hasCost) return;
                     const pv = parseNumeroSeguro(pctInput.value);
-                    const newP = newPriceFromPct(unitCost, pv);
+                    const newP = newPriceFromPct(base, pv);
                     const d = getDraft(pid, base, unitCost);
                     d.pct = pv;
                     d.newPrice = newP;
@@ -4836,14 +4830,9 @@ document.addEventListener('DOMContentLoaded', function () {
             rows.forEach(tr => {
                 const id = tr.getAttribute('data-product-id');
                 const oldP = roundPrecio(tr.getAttribute('data-old-price'));
-                const unitCost = parseNumeroSeguro(tr.getAttribute('data-unit-cost'));
                 const input = tr.querySelector('.input-new-price');
                 const newP = roundPrecio(parseMonedaARS(input?.value));
                 if (!id) return;
-                if (!(unitCost > 0)) {
-                    if (Math.abs(newP - oldP) >= 1) invalidRows.push('No se puede actualizar el precio sin costo unitario.');
-                    return;
-                }
                 if (!isFinite(newP) || newP <= 0) {
                     if (Math.abs(newP - oldP) >= 1) invalidRows.push('El nuevo precio debe ser mayor a cero.');
                     return;
