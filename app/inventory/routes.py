@@ -1742,6 +1742,15 @@ def hard_delete_product(product_id: int):
 @login_required
 @module_required('inventory')
 def bulk_update_product_prices():
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
     payload = request.get_json(silent=True) or {}
     items = payload.get('items')
     if not isinstance(items, list) or not items:
@@ -1759,7 +1768,7 @@ def bulk_update_product_prices():
             errors.append({'id': pid_raw, 'error': 'invalid_id'})
             continue
 
-        row = db.session.get(Product, pid)
+        row = db.session.query(Product).filter(Product.company_id == cid, Product.id == pid).first()
         if not row:
             errors.append({'id': pid, 'error': 'not_found'})
             continue
@@ -1768,7 +1777,12 @@ def bulk_update_product_prices():
             errors.append({'id': pid, 'error': 'sale_price_required'})
             continue
 
-        row.sale_price = _num(d.get('sale_price'))
+        next_price = _num(d.get('sale_price'))
+        if not (next_price > 0):
+            errors.append({'id': pid, 'error': 'sale_price_invalid'})
+            continue
+
+        row.sale_price = next_price
         updated.append(row)
 
     if not updated and errors:
@@ -1778,7 +1792,17 @@ def bulk_update_product_prices():
         db.session.commit()
     except Exception:
         db.session.rollback()
+        try:
+            current_app.logger.exception('Failed to bulk update product prices (company_id=%s)', cid)
+        except Exception:
+            pass
         return jsonify({'ok': False, 'error': 'db_error'}), 400
+
+    if errors:
+        try:
+            current_app.logger.warning('Bulk update product prices completed with item errors (company_id=%s, errors=%s)', cid, errors)
+        except Exception:
+            pass
 
     return jsonify({'ok': True, 'items': [_serialize_product(r) for r in updated], 'errors': errors})
 

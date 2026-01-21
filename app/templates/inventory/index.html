@@ -2420,7 +2420,23 @@ document.addEventListener('DOMContentLoaded', function () {
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ items: Array.isArray(items) ? items : [] })
-        }).then(r => r.json());
+        }).then(async function (r) {
+            let data = null;
+            try {
+                data = await r.json();
+            } catch (e) {
+                data = null;
+            }
+
+            if (!r.ok) {
+                const err = (data && (data.error || data.message)) ? String(data.error || data.message) : ('http_' + String(r.status || 'error'));
+                return { ok: false, error: err, status: r.status };
+            }
+            if (!data || typeof data !== 'object') {
+                return { ok: false, error: 'invalid_response' };
+            }
+            return data;
+        });
     }
 
     function apiDeleteLot(lotId) {
@@ -4846,7 +4862,14 @@ document.addEventListener('DOMContentLoaded', function () {
             if (preciosMsg) preciosMsg.textContent = 'Guardando…';
             apiBulkUpdatePrices(changes).then(function (res) {
                 if (!res || res.ok !== true) {
-                    if (preciosMsg) preciosMsg.textContent = 'No se pudieron guardar los precios.';
+                    try {
+                        const err = String(res?.error || res?.message || '').trim();
+                        const st = (res && res.status != null) ? String(res.status) : '';
+                        const suffix = (err || st) ? (' (' + [err, st ? ('http_' + st) : ''].filter(Boolean).join(' / ') + ')') : '';
+                        if (preciosMsg) preciosMsg.textContent = 'No se pudieron guardar los precios.' + suffix;
+                    } catch (e) {
+                        if (preciosMsg) preciosMsg.textContent = 'No se pudieron guardar los precios.';
+                    }
                     return;
                 }
                 const updated = Array.isArray(res.items) ? res.items : [];
