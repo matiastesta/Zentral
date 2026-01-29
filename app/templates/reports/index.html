@@ -1957,6 +1957,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function kvPreview(keyData) {
+            return '';
             if (!keyData || typeof keyData !== 'object') return '';
             const keys = Object.keys(keyData);
             if (!keys.length) return '';
