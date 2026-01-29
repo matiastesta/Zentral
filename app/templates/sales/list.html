@@ -1234,6 +1234,40 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function renderCambioTicketCartSummary() {
+        if (!cambioTicketCartItemsTbody) return;
+
+        const items = getCartItemsCambioVenta();
+        if (!items.length) {
+            cambioTicketCartItemsTbody.innerHTML = '<tr><td colspan="4" class="px-2 py-3 text-center text-gray-400 text-[11px]">Sin ítems.</td></tr>';
+            try { if (cambioTicketCartTotalEl) cambioTicketCartTotalEl.textContent = formatearMoneda(0); } catch (e) {}
+            return;
+        }
+
+        cambioTicketCartItemsTbody.innerHTML = '';
+        let total = 0;
+        items.forEach(it => {
+            const qty = parseNumeroFlexible(it?.cantidad || 0) || 0;
+            const unit = parseNumeroFlexible(it?.precio || 0) || 0;
+            const sub = parseNumeroFlexible(it?.subtotal || 0) || 0;
+            total += sub;
+
+            const tr = document.createElement('tr');
+            tr.className = 'border-t border-gray-100';
+            tr.innerHTML = ''
+                + '<td class="px-2 py-1 text-gray-700">' + escapeHtml(String(it?.nombre || 'Producto')) + '</td>'
+                + '<td class="px-2 py-1 text-right text-gray-500">' + String(qty || 0) + '</td>'
+                + '<td class="px-2 py-1 text-right text-gray-500">' + formatearMoneda(unit) + '</td>'
+                + '<td class="px-2 py-1 text-right text-gray-900 font-semibold">' + formatearMoneda(sub) + '</td>';
+            cambioTicketCartItemsTbody.appendChild(tr);
+        });
+
+        try {
+            if (cambioTicketCartTotalEl) cambioTicketCartTotalEl.textContent = formatearMoneda(total);
+        } catch (e) {
+        }
+    }
+
     const logoUrl = '/static/images/favicon.ico';
 
     function formatearNumero(n) {
@@ -7640,6 +7674,8 @@ td.num,th.num{text-align:right}
             // Pasar a Paso 3
             cambioPaso2.classList.add('hidden');
             cambioPaso3.classList.remove('hidden');
+
+            try { renderCambioTicketCartSummary(); } catch (e) {}
 
             maybeRefreshCambioGiftCode();
             if (pillCambioPaso1 && pillCambioPaso2 && pillCambioPaso3) {
