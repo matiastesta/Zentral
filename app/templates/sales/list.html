@@ -2940,12 +2940,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function apiCreateExchange(payload) {
-        return fetch(apiPath('/sales/api/exchanges'), {
+        return fetchJsonSafe(apiPath('/sales/api/exchanges'), {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
-        }).then(r => r.json());
+        });
     }
 
     function apiDebtSummary(customer) {
@@ -7610,49 +7610,52 @@ td.num,th.num{text-align:right}
                     showAlertModal(msg, 'Error', 'Operación fallida');
                     return;
                 }
+                try {
+                    const saleReturn = res?.items?.return || null;
+                    const saleNew = res?.items?.sale || null;
+                    if (saleNew && saleNew.ticket) salesCache.unshift(saleNew);
+                    if (saleReturn && saleReturn.ticket) salesCache.unshift(saleReturn);
+                    salesLoaded = true;
 
-                const saleReturn = res?.items?.return || null;
-                const saleNew = res?.items?.sale || null;
-                if (saleNew && saleNew.ticket) salesCache.unshift(saleNew);
-                if (saleReturn && saleReturn.ticket) salesCache.unshift(saleReturn);
-                salesLoaded = true;
+                    // refrescar inventario (cambió stock)
+                    invLoaded = false;
+                    invLoadPromise = null;
+                    renderProductosDesdeInventario();
+                    renderProductosCambioDesdeInventario();
+                    renderProductosCambioVentaDesdeInventario();
 
-                // refrescar inventario (cambió stock)
-                invLoaded = false;
-                invLoadPromise = null;
-                renderProductosDesdeInventario();
-                renderProductosCambioDesdeInventario();
-                renderProductosCambioVentaDesdeInventario();
+                    renderHistorialFromCache();
+                    applyVentasFilters();
+                    initKpisFromSales();
+                    recalcularArqueoAutomatico();
+                    emitCashflowChanged({ kind: 'sale', date: fecha, payment_method: pago, created_at: Date.now() });
 
-                renderHistorialFromCache();
-                applyVentasFilters();
-                initKpisFromSales();
-                recalcularArqueoAutomatico();
-                emitCashflowChanged({ kind: 'sale', date: fecha, payment_method: pago, created_at: Date.now() });
+                    // reset UI del cambio
+                    if (tablaCarritoCambio) {
+                        const b = tablaCarritoCambio.querySelector('tbody');
+                        if (b) b.innerHTML = '<tr id="carrito-cambio-empty-row"><td colspan="6" class="px-2 py-3 text-center text-gray-400 text-[11px]">Agregá productos devueltos para continuar.</td></tr>';
+                    }
+                    if (tablaCarritoCambioVenta) {
+                        const b2 = tablaCarritoCambioVenta.querySelector('tbody');
+                        if (b2) b2.innerHTML = '<tr id="carrito-cambio-venta-empty-row"><td colspan="6" class="px-2 py-3 text-center text-gray-400 text-[11px]">Agregá productos para la nueva venta.</td></tr>';
+                    }
 
-                // reset UI del cambio
-                if (tablaCarritoCambio) {
-                    const b = tablaCarritoCambio.querySelector('tbody');
-                    if (b) b.innerHTML = '<tr id="carrito-cambio-empty-row"><td colspan="6" class="px-2 py-3 text-center text-gray-400 text-[11px]">Agregá productos devueltos para continuar.</td></tr>';
+                    saldoAFavor = 0;
+                    if (saldoAFavorEl) saldoAFavorEl.textContent = formatearMoneda(0);
+                    if (resumenSaldoAFavorEl) resumenSaldoAFavorEl.textContent = formatearMoneda(0);
+                    if (inputCambioTicket) inputCambioTicket.value = computeNextCambioTicketPreview();
+
+                    cambioIsGift = false;
+                    cambioGiftCode = '';
+                    renderGiftUiCambio();
+
+                    // volver a home
+                    showHomeAll();
+                    setEditState('');
+                    scrollAElemento(historial || home);
+                } catch (e) {
+                    try { console.error('Exchange saved but UI post-success failed', e); } catch (err) {}
                 }
-                if (tablaCarritoCambioVenta) {
-                    const b2 = tablaCarritoCambioVenta.querySelector('tbody');
-                    if (b2) b2.innerHTML = '<tr id="carrito-cambio-venta-empty-row"><td colspan="6" class="px-2 py-3 text-center text-gray-400 text-[11px]">Agregá productos para la nueva venta.</td></tr>';
-                }
-
-                saldoAFavor = 0;
-                if (saldoAFavorEl) saldoAFavorEl.textContent = formatearMoneda(0);
-                if (resumenSaldoAFavorEl) resumenSaldoAFavorEl.textContent = formatearMoneda(0);
-                if (inputCambioTicket) inputCambioTicket.value = computeNextCambioTicketPreview();
-
-                cambioIsGift = false;
-                cambioGiftCode = '';
-                renderGiftUiCambio();
-
-                // volver a home
-                showHomeAll();
-                setEditState('');
-                scrollAElemento(historial || home);
             }).catch(function () {
                 showAlertModal('No se pudo registrar el cambio.', 'Error', 'Operación fallida');
             });

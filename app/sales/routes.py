@@ -1737,13 +1737,26 @@ def create_exchange():
             current_app.logger.exception('Failed to create exchange: db error')
             return jsonify({'ok': False, 'error': 'db_error'}), 400
 
+        related_for_return = {
+            'ticket': sale_row.ticket,
+            'type': _related_type_slug(str(getattr(sale_row, 'sale_type', '') or '').strip()),
+            'label': _build_related_label('Cambio', str(getattr(sale_row, 'sale_type', '') or '').strip(), sale_row.ticket),
+            'url': '',
+        }
+        related_for_sale = {
+            'ticket': return_row.ticket,
+            'type': _related_type_slug(str(getattr(return_row, 'sale_type', '') or '').strip()),
+            'label': _build_related_label('Venta', str(getattr(return_row, 'sale_type', '') or '').strip(), return_row.ticket),
+            'url': '',
+        }
+
         return jsonify({
             'ok': True,
             'return_ticket': return_row.ticket,
             'new_ticket': sale_row.ticket,
             'items': {
-                'return': _serialize_sale(return_row),
-                'sale': _serialize_sale(sale_row),
+                'return': _serialize_sale(return_row, related=related_for_return),
+                'sale': _serialize_sale(sale_row, related=related_for_sale),
             }
         })
 
@@ -2046,27 +2059,43 @@ def _delete_sale_full(*, cid: str, ticket: str, visited: set[str]):
             db.session.delete(it)
         db.session.delete(plan)
 
-    # Si esta venta tiene cobros de cuenta corriente asociados (tickets CobroCC), eliminarlos también.
-    # El vínculo es por nota: "Cobro cuenta corriente (Ticket <ref>)".
+    # Si esta venta tiene cobros asociados (tickets CobroVenta/CobroCC/CobroCuota), eliminarlos también.
+    # El vínculo es por nota: "... Ticket #<ref> ...".
     try:
-        if str(getattr(row, 'sale_type', '') or '').strip() != 'CobroCC':
-            needle = f"Ticket {t}"
-            cc_payments = (
+        st_row = str(getattr(row, 'sale_type', '') or '').strip()
+        if st_row not in ('CobroVenta', 'CobroCC', 'CobroCuota'):
+            t_norm = str(t or '').strip()
+            if t_norm and not t_norm.startswith('#'):
+                t_norm = '#' + t_norm
+            payments = (
                 db.session.query(Sale)
                 .filter(Sale.company_id == cid)
-                .filter(Sale.sale_type == 'CobroCC')
+                .filter(Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota']))
                 .filter(Sale.notes.isnot(None))
-                .filter(Sale.notes.ilike(f"%{needle}%"))
+                .filter(Sale.notes.ilike('%Ticket%'))
                 .with_for_update()
                 .all()
             )
-            for pay in (cc_payments or []):
+            for pay in (payments or []):
+                try:
+                    note = str(getattr(pay, 'notes', '') or '')
+                    m = re.search(r"Ticket\s*(?:original\s*)?#\s*(#?\w+)", note, re.IGNORECASE)
+                    ref = (m.group(1) if (m and m.group(1)) else '').strip()
+                except Exception:
+                    ref = ''
+
+                if ref and not ref.startswith('#'):
+                    ref = '#' + ref
+
+                if not ref or ref != t_norm:
+                    continue
+
                 pt = str(getattr(pay, 'ticket', '') or '').strip()
                 if pt and pt != t:
                     visited.add(pt)
                 db.session.delete(pay)
     except Exception:
-        current_app.logger.exception('Failed to delete associated CobroCC tickets')
+        current_app.logger.exception('Failed to delete associated payment tickets')
 
     if related_ticket and related_ticket != t:
         try:
@@ -2190,6 +2219,30 @@ def create_sale():
     on_account = bool(payload.get('on_account'))
     paid_amount = _num(payload.get('paid_amount'))
     due_amount = _num(payload.get('due_amount'))
+
+    # Normalización:
+    # - Movimientos (Ingresos) se basa en tickets CobroVenta/CobroCC/CobroCuota.
+    # - Para ventas comunes (contado) necesitamos paid_amount > 0 para generar CobroVenta.
+    try:
+        st_norm = str(sale_type or '').strip()
+    except Exception:
+        st_norm = str(sale_type)
+    if st_norm == 'Venta' and (not inst_enabled):
+        # Si NO es cuenta corriente, forzar venta pagada completa.
+        # El frontend a veces envía paid_amount=0/due_amount=0 para contado.
+        if not on_account:
+            paid_amount = float(total_amount or 0.0)
+            due_amount = 0.0
+        # Si es cuenta corriente pero no envió due_amount coherente, recalcular.
+        else:
+            try:
+                paid_amount = max(0.0, min(float(paid_amount or 0.0), float(total_amount or 0.0)))
+            except Exception:
+                paid_amount = 0.0
+            try:
+                due_amount = max(0.0, float(total_amount or 0.0) - float(paid_amount or 0.0))
+            except Exception:
+                due_amount = 0.0
 
     start_date = None
     interval_days = 30
