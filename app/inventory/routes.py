@@ -566,6 +566,14 @@ def inventory_import_excel_template():
     ws.append(headers)
 
     try:
+        # Ensure codigo_interno is treated as text (preserve leading zeros and allow alphanumeric input).
+        # Pre-format a reasonable amount of rows to help Excel users.
+        for row_idx in range(2, 1002):
+            ws.cell(row=row_idx, column=3).number_format = '@'
+    except Exception:
+        pass
+
+    try:
         ws.freeze_panes = 'A2'
     except Exception:
         pass

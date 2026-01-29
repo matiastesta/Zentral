@@ -167,6 +167,156 @@ def _is_payment_expense(meta_obj: dict) -> bool:
     return False
 
 
+def _is_cc_doc_expense(meta_obj: dict) -> bool:
+    cc = meta_obj.get('supplier_cc') if isinstance(meta_obj, dict) else None
+    return bool(isinstance(cc, dict) and cc.get('enabled'))
+
+
+def _serialize_legajo_expense(row: Expense, supplier_id: str, supplier_name: str):
+    meta_obj = _load_meta_obj(row.meta_json or '')
+
+    kind = 'egreso'
+    if _is_payment_expense(meta_obj):
+        kind = 'pago_cc'
+    elif _is_cc_doc_expense(meta_obj):
+        kind = 'doc_cc'
+
+    # CC fields
+    cc_status = None
+    cc_due_date = ''
+    cc_remaining = None
+    cc_paid_total = None
+    cc_terms_days = None
+    cc_transactions = []
+    if kind == 'doc_cc':
+        cc = meta_obj.get('supplier_cc') if isinstance(meta_obj, dict) else None
+        if isinstance(cc, dict):
+            terms_days = _days(cc.get('terms_days'), 30)
+            payments = cc.get('payments') if isinstance(cc.get('payments'), list) else []
+            amount = _money(row.amount, 0.0)
+            paid_total = sum([_money(p.get('amount'), 0.0) for p in payments if isinstance(p, dict)])
+            paid_total = min(amount, paid_total)
+            remaining = max(0.0, amount - paid_total)
+
+            due_date = _add_days(row.expense_date or dt_date.today(), max(1, _days(terms_days, 30) or 30))
+            today = dt_date.today()
+            has_overdue = bool(due_date and due_date < today and remaining > 0)
+
+            cc_status = 'paid'
+            if remaining > 0:
+                cc_status = 'overdue' if has_overdue else 'open'
+            cc_due_date = due_date.isoformat() if due_date else ''
+            cc_remaining = round(remaining, 2)
+            cc_paid_total = round(paid_total, 2)
+            cc_terms_days = terms_days
+            cc_transactions = _build_cc_transactions(payments)
+
+    return {
+        'id': row.id,
+        'date': row.expense_date.isoformat() if row.expense_date else '',
+        'kind': kind,
+        'category': row.category or '',
+        'payment_method': row.payment_method or '',
+        'amount': round(_money(row.amount, 0.0), 2),
+        'note': row.note or (row.description or ''),
+        'supplier_id': str(row.supplier_id or supplier_id or '').strip(),
+        'supplier_name': str(row.supplier_name or supplier_name or '').strip(),
+        'cc': {
+            'status': cc_status,
+            'due_date': cc_due_date,
+            'remaining': cc_remaining,
+            'paid_total': cc_paid_total,
+            'terms_days': cc_terms_days,
+            'transactions': cc_transactions,
+        }
+    }
+
+
+@bp.get('/api/suppliers/<supplier_id>/legajo')
+@login_required
+@module_required('suppliers')
+def supplier_legajo_api(supplier_id):
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    sid = str(supplier_id or '').strip()
+    supplier = db.session.get(Supplier, sid)
+    if (not supplier) or (str(getattr(supplier, 'company_id', '') or '').strip() != company_id):
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    sname = str(supplier.name or '').strip()
+
+    rows = (
+        db.session.query(Expense)
+        .filter(
+            Expense.company_id == company_id,
+            or_(
+                Expense.supplier_id == sid,
+                (Expense.supplier_id.is_(None) & (Expense.supplier_name.ilike(sname)))
+            )
+        )
+        .order_by(Expense.expense_date.desc(), Expense.created_at.desc())
+        .limit(5000)
+        .all()
+    )
+
+    items = []
+    total_expenses = 0.0
+    total_cc_docs = 0.0
+    total_cc_payments = 0.0
+    cc_total_due = 0.0
+    cc_overdue_due = 0.0
+    cc_next_due_date = None
+    cc_next_due_amount = 0.0
+
+    today = dt_date.today()
+
+    for r in rows:
+        it = _serialize_legajo_expense(r, sid, sname)
+        items.append(it)
+        amt = _money(it.get('amount'), 0.0)
+
+        if it.get('kind') == 'egreso':
+            total_expenses += amt
+        elif it.get('kind') == 'doc_cc':
+            total_cc_docs += amt
+            try:
+                rem = float(((it.get('cc') or {}).get('remaining') or 0.0))
+            except Exception:
+                rem = 0.0
+            cc_total_due += max(0.0, rem)
+
+            due_iso = str(((it.get('cc') or {}).get('due_date') or '')).strip()
+            due = _parse_iso_date_safe(due_iso)
+            if due and rem > 0:
+                if due < today:
+                    cc_overdue_due += rem
+                if cc_next_due_date is None or due < cc_next_due_date:
+                    cc_next_due_date = due
+                    cc_next_due_amount = rem
+        elif it.get('kind') == 'pago_cc':
+            total_cc_payments += amt
+
+    # Sort items ascending by date for display consistency in the modal.
+    items.sort(key=lambda x: (str(x.get('date') or ''), str(x.get('id') or '')))
+
+    return jsonify({
+        'ok': True,
+        'supplier': _serialize_supplier(supplier),
+        'summary': {
+            'total_expenses': round(total_expenses, 2),
+            'total_cc_docs': round(total_cc_docs, 2),
+            'total_cc_payments': round(total_cc_payments, 2),
+            'cc_total_due': round(cc_total_due, 2),
+            'cc_overdue_due': round(cc_overdue_due, 2),
+            'cc_next_due_date': cc_next_due_date.isoformat() if cc_next_due_date else '',
+            'cc_next_due_amount': round(cc_next_due_amount, 2) if cc_next_due_date else 0.0,
+        },
+        'items': items,
+    })
+
+
 @bp.get('/api/suppliers/<supplier_id>/cc-ledger')
 @login_required
 @module_required('suppliers')

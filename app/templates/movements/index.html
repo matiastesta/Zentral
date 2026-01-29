@@ -197,6 +197,15 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const TENANT_PREFIX = ((window.location && window.location.pathname || '').match(/^\/c\/[^\/]+/) || [''])[0];
+    function apiPath(p) {
+        const s = String(p || '');
+        if (!s.startsWith('/')) return s;
+        if (s.startsWith('/c/')) return s;
+        if (!TENANT_PREFIX) return s;
+        return TENANT_PREFIX + s;
+    }
+
     const tabVentas = document.getElementById('tab-mov-ventas');
     const tabEgresos = document.getElementById('tab-mov-egresos');
     const tabArqueo = document.getElementById('tab-mov-arqueo');
@@ -984,10 +993,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 tr.className = 'hover:bg-gray-50';
                 const eid = String(e?.id || '').trim();
                 const noteHtml = buildNoteCellHtml(e?.nota || '', eid || (e?.fecha || ''));
+                const sid = String(e?.supplier_id || '').trim();
+                const supLabel = String(e?.supplier_name || e?.proveedor || '');
+                const supHtml = sid
+                    ? ('<a class="text-indigo-700 hover:text-indigo-900 font-medium" href="' + apiPath('/suppliers') + '?open_legajo=' + encodeURIComponent(sid) + '">' + supLabel.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</a>')
+                    : supLabel;
                 tr.innerHTML = ''
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(e?.fecha || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-900">' + String(e?.categoria || '') + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-gray-500">' + String(e?.supplier_name || e?.proveedor || '') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-500">' + supHtml + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(e?.valor || 0) || 0) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(e?.forma_pago || e?.payment_method || e?.pago || '') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-500">' + noteHtml + '</td>'

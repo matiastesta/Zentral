@@ -247,12 +247,138 @@
         </div>
     </div>
 </div>
+
+<div id="modal-supplier-legajo" class="hidden fixed inset-0 z-50" style="z-index: 70;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-6xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden max-h-[85vh]">
+            <div class="sticky top-0 z-30 bg-white px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <div class="min-w-0">
+                    <h3 id="sup-legajo-title" class="text-sm font-semibold text-gray-900 truncate">Legajo del proveedor</h3>
+                    <p id="sup-legajo-subtitle" class="text-[11px] text-gray-500 truncate">—</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btn-close-supplier-legajo" type="button" class="h-8 w-8 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-4 space-y-3 overflow-y-auto" style="max-height: calc(85vh - 52px);">
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                    <div class="p-3 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Datos</div>
+                        <div class="mt-2 space-y-0.5 text-[13px] text-gray-800">
+                            <div><span class="text-gray-500">Nombre:</span> <span id="sup-legajo-name">—</span></div>
+                            <div><span class="text-gray-500">Tipo:</span> <span id="sup-legajo-type">—</span></div>
+                            <div><span class="text-gray-500">Estado:</span> <span id="sup-legajo-status">—</span></div>
+                            <div><span class="text-gray-500">Categorías:</span> <span id="sup-legajo-cats">—</span></div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Contacto</div>
+                        <div class="mt-2 space-y-0.5 text-[13px] text-gray-800">
+                            <div><span class="text-gray-500">Teléfono:</span> <span id="sup-legajo-phone">—</span></div>
+                            <div><span class="text-gray-500">Email:</span> <span id="sup-legajo-email">—</span></div>
+                            <div><span class="text-gray-500">Dirección:</span> <span id="sup-legajo-address">—</span></div>
+                            <div><span class="text-gray-500">Contacto:</span> <span id="sup-legajo-contact">—</span></div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Cuenta corriente</div>
+                        <div class="mt-2 space-y-0.5 text-[13px] text-gray-800">
+                            <div><span class="text-gray-500">Deuda total:</span> <span id="sup-legajo-cc-total">—</span></div>
+                            <div><span class="text-gray-500">Deuda vencida:</span> <span id="sup-legajo-cc-overdue">—</span></div>
+                            <div><span class="text-gray-500">Próximo vencimiento:</span> <span id="sup-legajo-cc-next">—</span></div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 border border-gray-200 rounded-xl bg-white">
+                        <div class="text-xs font-semibold text-gray-700">Totales</div>
+                        <div class="mt-2 space-y-0.5 text-[13px] text-gray-800">
+                            <div><span class="text-gray-500">Egresos:</span> <span id="sup-legajo-total-egresos">—</span></div>
+                            <div><span class="text-gray-500">Docs CC:</span> <span id="sup-legajo-total-docs">—</span></div>
+                            <div><span class="text-gray-500">Pagos CC:</span> <span id="sup-legajo-total-pagos">—</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 border border-gray-200 rounded-xl bg-white">
+                    <div class="sticky top-0 z-20 bg-white flex items-center justify-between gap-2 pb-2">
+                        <div>
+                            <div class="text-xs font-semibold text-gray-700">Legajo</div>
+                            <div class="text-[10px] text-gray-500">Vista informativa: movimientos vs pagos CC.</div>
+                        </div>
+                        <div class="inline-flex rounded-lg border border-gray-200 bg-white overflow-hidden">
+                            <button id="sup-legajo-tab-movs" type="button" class="px-3 py-2 text-xs font-semibold text-gray-900 bg-gray-100">Movimientos</button>
+                            <button id="sup-legajo-tab-pay" type="button" class="px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">Pagos CC</button>
+                        </div>
+                    </div>
+
+                    <div id="sup-legajo-panel-movs" class="mt-2">
+                        <div class="text-[10px] text-gray-500">Incluye egresos y documentos de cuenta corriente.</div>
+                        <div class="mt-2 overflow-hidden border border-gray-200 rounded-lg">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Tipo</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nota</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sup-legajo-movs" class="bg-white divide-y divide-gray-200">
+                                    <tr><td colspan="5" class="px-3 py-4 text-sm text-gray-500 text-center">—</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="sup-legajo-panel-pay" class="mt-2 hidden">
+                        <div class="text-[10px] text-gray-500">Pagos registrados para cuenta corriente del proveedor.</div>
+                        <div class="mt-2 overflow-hidden border border-gray-200 rounded-lg">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Método</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nota</th>
+                                        <th class="px-3 py-2 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sup-legajo-pagos" class="bg-white divide-y divide-gray-200">
+                                    <tr><td colspan="4" class="px-3 py-4 text-sm text-gray-500 text-center">—</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-4 py-3 border-t border-gray-100 flex justify-end gap-2">
+                <button id="btn-close-supplier-legajo-2" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const TENANT_PREFIX = ((window.location && window.location.pathname || '').match(/^\/c\/[^\/]+/) || [''])[0];
+    function apiPath(p) {
+        const s = String(p || '');
+        if (!s.startsWith('/')) return s;
+        if (s.startsWith('/c/')) return s;
+        if (!TENANT_PREFIX) return s;
+        return TENANT_PREFIX + s;
+    }
+
     const elTotal = document.getElementById('kpi-sup-total');
     const elActivos = document.getElementById('kpi-sup-active');
     const elMonthSpend = document.getElementById('kpi-sup-month-spend');
@@ -282,15 +408,48 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnPay = document.getElementById('btn-cc-pay');
     const ccTxTbody = document.getElementById('cc-tx-tbody');
 
+    const modalLegajo = document.getElementById('modal-supplier-legajo');
+    const btnCloseLegajo = document.getElementById('btn-close-supplier-legajo');
+    const btnCloseLegajo2 = document.getElementById('btn-close-supplier-legajo-2');
+
+    const legajoTitle = document.getElementById('sup-legajo-title');
+    const legajoSubtitle = document.getElementById('sup-legajo-subtitle');
+    const legajoName = document.getElementById('sup-legajo-name');
+    const legajoType = document.getElementById('sup-legajo-type');
+    const legajoStatus = document.getElementById('sup-legajo-status');
+    const legajoCats = document.getElementById('sup-legajo-cats');
+    const legajoPhone = document.getElementById('sup-legajo-phone');
+    const legajoEmail = document.getElementById('sup-legajo-email');
+    const legajoAddress = document.getElementById('sup-legajo-address');
+    const legajoContact = document.getElementById('sup-legajo-contact');
+
+    const legajoCcTotal = document.getElementById('sup-legajo-cc-total');
+    const legajoCcOverdue = document.getElementById('sup-legajo-cc-overdue');
+    const legajoCcNext = document.getElementById('sup-legajo-cc-next');
+
+    const legajoTotalEgresos = document.getElementById('sup-legajo-total-egresos');
+    const legajoTotalDocs = document.getElementById('sup-legajo-total-docs');
+    const legajoTotalPagos = document.getElementById('sup-legajo-total-pagos');
+
+    const tabMovs = document.getElementById('sup-legajo-tab-movs');
+    const tabPay = document.getElementById('sup-legajo-tab-pay');
+    const panelMovs = document.getElementById('sup-legajo-panel-movs');
+    const panelPay = document.getElementById('sup-legajo-panel-pay');
+    const tbodyMovs = document.getElementById('sup-legajo-movs');
+    const tbodyPay = document.getElementById('sup-legajo-pagos');
+
     const editBaseUrl = "{{ url_for('suppliers.new') }}";
 
     let ccSupplierId = '';
     let ccSupplierName = '';
     let ccLedgerCache = null;
 
+    let legajoSupplierId = '';
+    let legajoSupplierName = '';
+
     function leerSuppliers() {
         try {
-            return fetch('/suppliers/api/suppliers?limit=5000', { credentials: 'same-origin' })
+            return fetch(apiPath('/suppliers/api/suppliers?limit=5000'), { credentials: 'same-origin' })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (!data || data.ok !== true) {
@@ -319,7 +478,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (e) {
         }
         try {
-            return fetch('/expenses/api/expenses?limit=5000', { credentials: 'same-origin' })
+            return fetch(apiPath('/expenses/api/expenses?limit=5000'), { credentials: 'same-origin' })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (data && data.ok === true) return Array.isArray(data.items) ? data.items : [];
@@ -333,7 +492,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function reloadEgresosFromApi() {
         try {
-            return fetch('/expenses/api/expenses?limit=5000', { credentials: 'same-origin' })
+            return fetch(apiPath('/expenses/api/expenses?limit=5000'), { credentials: 'same-origin' })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     const items = (data && data.ok === true && Array.isArray(data.items)) ? data.items : (Array.isArray(data && data.items) ? data.items : []);
@@ -634,7 +793,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function apiJson(url, options) {
-        const res = await fetch(url, {
+        const res = await fetch(apiPath(url), {
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             ...(options || {})
@@ -800,7 +959,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function deleteSupplier(id) {
         const sid = String(id || '').trim();
         if (!sid) return Promise.resolve(null);
-        return fetch('/suppliers/api/suppliers/' + encodeURIComponent(sid), {
+        return fetch(apiPath('/suppliers/api/suppliers/' + encodeURIComponent(sid)), {
             method: 'DELETE',
             credentials: 'same-origin'
         }).then(r => r.json()).catch(() => null);
@@ -823,6 +982,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (v === 'Discontinued') return 'text-red-700 bg-red-50';
         return 'text-green-700 bg-green-50';
     }
+
+    function safeStr(v) { return String(v == null ? '' : v); }
+    function ensureArray(x) { return Array.isArray(x) ? x : []; }
 
     function render() {
         if (!tbody) return;
@@ -905,6 +1067,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             </button>
                             <div class="menu-sup-acciones hidden origin-top-right absolute right-0 mt-1 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
                                 <div class="py-1 text-[11px]">
+                                    <button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="legajo" data-id="${s?.id}" data-name="${String(s?.name || '').replace(/"/g, '&quot;')}">Legajo</button>
                                     <button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="cc" data-id="${s?.id}" data-name="${String(s?.name || '').replace(/"/g, '&quot;')}">Cuenta corriente</button>
                                     <button type="button" class="w-full text-left px-3 py-2 hover:bg-gray-100" data-action="edit" data-id="${s?.id}">Editar</button>
                                     <button type="button" class="w-full text-left px-3 py-2 text-red-700 hover:bg-red-50" data-action="delete" data-id="${s?.id}">Eliminar</button>
@@ -978,6 +1141,134 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function fmtMoney(n) {
+        try {
+            const v = Number(n || 0);
+            return v.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
+        } catch (e) {
+            return '$0,00';
+        }
+    }
+
+    function openModalLegajo() { if (modalLegajo) modalLegajo.classList.remove('hidden'); }
+    function closeModalLegajo() { if (modalLegajo) modalLegajo.classList.add('hidden'); }
+
+    function setLegajoTab(which) {
+        const k = String(which || 'movs');
+        const isMovs = k === 'movs';
+        if (tabMovs) {
+            tabMovs.classList.toggle('bg-gray-100', isMovs);
+            tabMovs.classList.toggle('text-gray-900', isMovs);
+            tabMovs.classList.toggle('text-gray-700', !isMovs);
+        }
+        if (tabPay) {
+            tabPay.classList.toggle('bg-gray-100', !isMovs);
+            tabPay.classList.toggle('text-gray-900', !isMovs);
+            tabPay.classList.toggle('text-gray-700', isMovs);
+        }
+        if (panelMovs) panelMovs.classList.toggle('hidden', !isMovs);
+        if (panelPay) panelPay.classList.toggle('hidden', isMovs);
+    }
+
+    function renderLegajo(data) {
+        const sup = data && data.supplier ? data.supplier : {};
+        const sum = data && data.summary ? data.summary : {};
+        const items = ensureArray(data && data.items);
+
+        const nm = safeStr(sup.name || legajoSupplierName || 'Proveedor');
+        if (legajoTitle) legajoTitle.textContent = 'Legajo: ' + nm;
+        if (legajoSubtitle) legajoSubtitle.textContent = (legajoSupplierId ? ('ID: ' + legajoSupplierId) : '—');
+
+        if (legajoName) legajoName.textContent = nm || '—';
+        if (legajoType) legajoType.textContent = safeStr(sup.supplier_type || '—');
+        if (legajoStatus) legajoStatus.textContent = safeStr(sup.status || '—');
+        if (legajoCats) {
+            const cats = Array.isArray(sup.categories) ? sup.categories : [];
+            legajoCats.textContent = cats.length ? cats.join(', ') : '—';
+        }
+        if (legajoPhone) legajoPhone.textContent = safeStr(sup.phone || '—') || '—';
+        if (legajoEmail) legajoEmail.textContent = safeStr(sup.email || '—') || '—';
+        if (legajoAddress) legajoAddress.textContent = safeStr(sup.address || '—') || '—';
+        if (legajoContact) legajoContact.textContent = safeStr(sup.contact_person || '—') || '—';
+
+        if (legajoCcTotal) legajoCcTotal.textContent = fmtMoney(sum.cc_total_due || 0);
+        if (legajoCcOverdue) legajoCcOverdue.textContent = fmtMoney(sum.cc_overdue_due || 0);
+        if (legajoCcNext) {
+            const d = safeStr(sum.cc_next_due_date || '').trim();
+            const a = fmtMoney(sum.cc_next_due_amount || 0);
+            legajoCcNext.textContent = d ? (d + ' · ' + a) : '—';
+        }
+
+        if (legajoTotalEgresos) legajoTotalEgresos.textContent = fmtMoney(sum.total_expenses || 0);
+        if (legajoTotalDocs) legajoTotalDocs.textContent = fmtMoney(sum.total_cc_docs || 0);
+        if (legajoTotalPagos) legajoTotalPagos.textContent = fmtMoney(sum.total_cc_payments || 0);
+
+        const movs = items.filter(it => {
+            const k = safeStr(it?.kind || '').trim();
+            return k === 'egreso' || k === 'doc_cc';
+        });
+        const pays = items.filter(it => safeStr(it?.kind || '').trim() === 'pago_cc');
+
+        if (tbodyMovs) {
+            tbodyMovs.innerHTML = '';
+            if (!movs.length) {
+                tbodyMovs.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-sm text-gray-500 text-center">Sin movimientos.</td></tr>';
+            } else {
+                movs.forEach(function (it) {
+                    const tr = document.createElement('tr');
+                    const k = safeStr(it?.kind || '').trim();
+                    const tipo = (k === 'doc_cc') ? 'Doc CC' : 'Egreso';
+                    tr.innerHTML = ''
+                        + '<td class="px-3 py-2 text-xs text-gray-500">' + safeStr(it?.date || '—') + '</td>'
+                        + '<td class="px-3 py-2 text-xs text-gray-700">' + tipo + '</td>'
+                        + '<td class="px-3 py-2 text-xs text-gray-700">' + safeStr(it?.category || '') + '</td>'
+                        + '<td class="px-3 py-2 text-xs text-gray-600">' + safeStr(it?.note || '') + '</td>'
+                        + '<td class="px-3 py-2 text-xs text-right font-semibold text-gray-900">' + fmtMoney(it?.amount || 0) + '</td>';
+                    tbodyMovs.appendChild(tr);
+                });
+            }
+        }
+
+        if (tbodyPay) {
+            tbodyPay.innerHTML = '';
+            if (!pays.length) {
+                tbodyPay.innerHTML = '<tr><td colspan="4" class="px-3 py-4 text-sm text-gray-500 text-center">Sin pagos.</td></tr>';
+            } else {
+                pays.forEach(function (it) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = ''
+                        + '<td class="px-3 py-2 text-xs text-gray-500">' + safeStr(it?.date || '—') + '</td>'
+                        + '<td class="px-3 py-2 text-xs text-gray-700">' + safeStr(it?.payment_method || '—') + '</td>'
+                        + '<td class="px-3 py-2 text-xs text-gray-600">' + safeStr(it?.note || '') + '</td>'
+                        + '<td class="px-3 py-2 text-xs text-right font-semibold text-blue-700">' + fmtMoney(it?.amount || 0) + '</td>';
+                    tbodyPay.appendChild(tr);
+                });
+            }
+        }
+    }
+
+    function openLegajo(id, name) {
+        legajoSupplierId = String(id || '').trim();
+        legajoSupplierName = String(name || '').trim();
+        if (!legajoSupplierId) return;
+        if (legajoTitle) legajoTitle.textContent = 'Legajo: ' + (legajoSupplierName || 'Proveedor');
+        if (legajoSubtitle) legajoSubtitle.textContent = 'Cargando…';
+        if (tbodyMovs) tbodyMovs.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-sm text-gray-500 text-center">Cargando…</td></tr>';
+        if (tbodyPay) tbodyPay.innerHTML = '<tr><td colspan="4" class="px-3 py-4 text-sm text-gray-500 text-center">Cargando…</td></tr>';
+        setLegajoTab('movs');
+        openModalLegajo();
+        apiJson('/suppliers/api/suppliers/' + encodeURIComponent(legajoSupplierId) + '/legajo')
+            .then(function (data) {
+                renderLegajo(data);
+            })
+            .catch(function (e) {
+                const msg = (e && e.message) ? String(e.message) : 'Error';
+                if (legajoSubtitle) legajoSubtitle.textContent = 'No se pudo cargar: ' + msg;
+                if (tbodyMovs) tbodyMovs.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-sm text-gray-500 text-center">No se pudo cargar.</td></tr>';
+                if (tbodyPay) tbodyPay.innerHTML = '<tr><td colspan="4" class="px-3 py-4 text-sm text-gray-500 text-center">No se pudo cargar.</td></tr>';
+            });
+    }
+
     if (statusItems) {
         statusItems.addEventListener('click', function (e) {
             const all = e.target.closest('.sup-st-all');
@@ -1020,6 +1311,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 const id = actionBtn.getAttribute('data-id') || '';
                 const name = actionBtn.getAttribute('data-name') || '';
                 document.querySelectorAll('.menu-sup-acciones').forEach(function (m) { m.classList.add('hidden'); });
+
+                if (action === 'legajo') {
+                    openLegajo(id, name);
+                    return;
+                }
 
                 if (action === 'cc') {
                     ccSupplierId = id;
@@ -1117,6 +1413,32 @@ document.addEventListener('DOMContentLoaded', function () {
             closeModalCc();
         });
     }
+
+    if (tabMovs) tabMovs.addEventListener('click', function () { setLegajoTab('movs'); });
+    if (tabPay) tabPay.addEventListener('click', function () { setLegajoTab('pay'); });
+
+    [btnCloseLegajo, btnCloseLegajo2].forEach(function (b) {
+        if (!b) return;
+        b.addEventListener('click', function () {
+            closeModalLegajo();
+        });
+    });
+
+    if (modalLegajo) {
+        modalLegajo.addEventListener('click', function (ev) {
+            const panel = modalLegajo.querySelector('.max-w-6xl');
+            if (panel && panel.contains(ev.target)) return;
+            closeModalLegajo();
+        });
+    }
+
+    try {
+        const params = new URLSearchParams(window.location.search || '');
+        const openId = String(params.get('open_legajo') || '').trim();
+        if (openId) {
+            openLegajo(openId, '');
+        }
+    } catch (e) {}
 
     render();
 });

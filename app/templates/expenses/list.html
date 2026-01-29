@@ -208,6 +208,15 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const TENANT_PREFIX = ((window.location && window.location.pathname || '').match(/^\/c\/[^\/]+/) || [''])[0];
+    function apiPath(p) {
+        const s = String(p || '');
+        if (!s.startsWith('/')) return s;
+        if (s.startsWith('/c/')) return s;
+        if (!TENANT_PREFIX) return s;
+        return TENANT_PREFIX + s;
+    }
+
     const tbody = document.getElementById('gastos-tbody');
     const elTotalPeriodo = document.getElementById('gastos-total-periodo');
 
@@ -858,7 +867,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     </span>
                 </td>
                 <td class="px-3 py-2 text-xs text-right text-gray-700">${formatearMoneda(parseNumeroSeguro(e?.valor))}</td>
-                <td class="px-3 py-2 text-xs text-gray-700">${e?.supplier_name || e?.proveedor || '-'}</td>
+                <td class="px-3 py-2 text-xs text-gray-700">${(() => {
+                    const sid = String(e?.supplier_id || '').trim();
+                    const label = String(e?.supplier_name || e?.proveedor || '-');
+                    if (sid) {
+                        return '<a class="text-indigo-700 hover:text-indigo-900 font-medium" href="' + apiPath('/suppliers') + '?open_legajo=' + encodeURIComponent(sid) + '">' + label.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</a>';
+                    }
+                    return label;
+                })()}</td>
                 <td class="px-3 py-2 text-xs text-gray-500">${noteHtml}</td>
                 <td class="px-3 py-2 text-xs text-gray-500">${fileBtn}</td>
                 <td class="px-3 py-2 text-xs text-right">
