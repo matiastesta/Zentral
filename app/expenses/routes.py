@@ -896,7 +896,10 @@ def list_expense_categories_api():
     limit = int(request.args.get('limit') or 5000)
     if limit <= 0 or limit > 10000:
         limit = 5000
-    query = db.session.query(ExpenseCategory)
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+    query = db.session.query(ExpenseCategory).filter(ExpenseCategory.company_id == cid)
     if q:
         like = f"%{q}%"
         query = query.filter(ExpenseCategory.name.ilike(like))
@@ -909,8 +912,13 @@ def list_expense_categories_api():
 @module_required('expenses')
 def get_expense_category_api(category_id):
     cid = str(category_id or '').strip()
+    company_id = str(getattr(g, 'company_id', '') or '').strip()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
     row = db.session.get(ExpenseCategory, cid)
     if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    if str(getattr(row, 'company_id', '') or '').strip() != company_id:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     return jsonify({'ok': True, 'item': _serialize_expense_category(row)})
 
@@ -920,12 +928,16 @@ def get_expense_category_api(category_id):
 @module_required('expenses')
 def create_expense_category_api():
     payload = request.get_json(silent=True) or {}
+    company_id = str(getattr(g, 'company_id', '') or '').strip()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'company_required'}), 400
     cid = str(payload.get('id') or '').strip() or uuid4().hex
     row = db.session.get(ExpenseCategory, cid)
     if row:
         return jsonify({'ok': False, 'error': 'already_exists'}), 400
     name = str(payload.get('name') or payload.get('categoria') or '').strip() or 'Categoría'
     row = ExpenseCategory(id=cid, name=name)
+    row.company_id = company_id
     _apply_expense_category_payload(row, payload)
     db.session.add(row)
     try:
@@ -941,8 +953,13 @@ def create_expense_category_api():
 @module_required('expenses')
 def update_expense_category_api(category_id):
     cid = str(category_id or '').strip()
+    company_id = str(getattr(g, 'company_id', '') or '').strip()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
     row = db.session.get(ExpenseCategory, cid)
     if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    if str(getattr(row, 'company_id', '') or '').strip() != company_id:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     payload = request.get_json(silent=True) or {}
     _apply_expense_category_payload(row, payload)
@@ -959,8 +976,13 @@ def update_expense_category_api(category_id):
 @module_required('expenses')
 def delete_expense_category_api(category_id):
     cid = str(category_id or '').strip()
+    company_id = str(getattr(g, 'company_id', '') or '').strip()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
     row = db.session.get(ExpenseCategory, cid)
     if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    if str(getattr(row, 'company_id', '') or '').strip() != company_id:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
     try:
         db.session.delete(row)
@@ -976,6 +998,9 @@ def delete_expense_category_api(category_id):
 @module_required('expenses')
 def upsert_expense_categories_bulk():
     payload = request.get_json(silent=True) or {}
+    company_id = str(getattr(g, 'company_id', '') or '').strip()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'company_required'}), 400
     items = payload.get('items')
     items_list = items if isinstance(items, list) else []
     out = []
@@ -985,7 +1010,11 @@ def upsert_expense_categories_bulk():
         row = db.session.get(ExpenseCategory, cid)
         if not row:
             row = ExpenseCategory(id=cid, name=str(d.get('name') or d.get('categoria') or 'Categoría').strip() or 'Categoría')
+            row.company_id = company_id
             db.session.add(row)
+        else:
+            if str(getattr(row, 'company_id', '') or '').strip() != company_id:
+                return jsonify({'ok': False, 'error': 'cross_company_id'}), 400
         _apply_expense_category_payload(row, d)
         out.append(row)
     try:
