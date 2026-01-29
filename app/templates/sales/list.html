@@ -7052,6 +7052,13 @@ td.num,th.num{text-align:right}
         });
     }
 
+    if (inputSearchVentaProducts) {
+        inputSearchVentaProducts.addEventListener('input', function () {
+            ventaSearchQuery = String(inputSearchVentaProducts.value || '');
+            applyVentaProductsFilter();
+        });
+    }
+
     if (inputSearchCambioProducts) {
         inputSearchCambioProducts.addEventListener('input', function () {
             cambioSearchQuery = String(inputSearchCambioProducts.value || '');
