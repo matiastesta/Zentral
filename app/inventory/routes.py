@@ -36,9 +36,10 @@ from app.tenancy import ensure_request_context
 from app.inventory import bp
 
 
-_CODIGO_INTERNO_MAX_LEN = 8
+_CODIGO_INTERNO_MIN_LEN = 4
+_CODIGO_INTERNO_MAX_LEN = 12
 _CODIGO_INTERNO_AUTO_LEN = 8
-_CODIGO_INTERNO_PATTERN = re.compile(r'^[A-Za-z0-9]{8}$')
+_CODIGO_INTERNO_PATTERN = re.compile(r'^[A-Za-z0-9]{4,12}$')
 
 
 def _company_id() -> str:
@@ -272,7 +273,7 @@ def _validate_codigo_interno_or_raise(code: str) -> str:
     c = _normalize_codigo_interno(code)
     if not c:
         return ''
-    if len(c) != _CODIGO_INTERNO_MAX_LEN:
+    if len(c) < _CODIGO_INTERNO_MIN_LEN or len(c) > _CODIGO_INTERNO_MAX_LEN:
         raise ValueError('codigo_interno_length')
     if _CODIGO_INTERNO_PATTERN.match(c) is None:
         raise ValueError('codigo_interno_invalid')
@@ -284,7 +285,7 @@ def _is_valid_codigo_interno(code: str) -> bool:
         c = _normalize_codigo_interno(code)
         if not c:
             return False
-        if len(c) != _CODIGO_INTERNO_MAX_LEN:
+        if len(c) < _CODIGO_INTERNO_MIN_LEN or len(c) > _CODIGO_INTERNO_MAX_LEN:
             return False
         return _CODIGO_INTERNO_PATTERN.match(c) is not None
     except Exception:

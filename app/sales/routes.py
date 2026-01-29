@@ -811,8 +811,10 @@ def _serialize_sale(row: Sale, related: dict = None, users_map: dict | None = No
     }
 
 
+_CODIGO_INTERNO_MIN_LEN = 4
+_CODIGO_INTERNO_MAX_LEN = 12
 _CODIGO_INTERNO_LEN = 8
-_CODIGO_INTERNO_PATTERN = re.compile(r'^[A-Z0-9]{8}$')
+_CODIGO_INTERNO_PATTERN = re.compile(r'^[A-Z0-9]{4,12}$')
 
 
 def _normalize_codigo_interno(raw: str) -> str:
@@ -821,7 +823,7 @@ def _normalize_codigo_interno(raw: str) -> str:
 
 def _is_valid_codigo_interno(code: str) -> bool:
     c = _normalize_codigo_interno(code)
-    if not c or len(c) != _CODIGO_INTERNO_LEN:
+    if not c or len(c) < _CODIGO_INTERNO_MIN_LEN or len(c) > _CODIGO_INTERNO_MAX_LEN:
         return False
     return _CODIGO_INTERNO_PATTERN.match(c) is not None
 
