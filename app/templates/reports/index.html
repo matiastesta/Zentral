@@ -2124,7 +2124,7 @@ document.addEventListener('DOMContentLoaded', function () {
         ];
 
         const dots = pts.slice(0, 320).map(function (p, idx) {
-            const cx = padX + idx * step + step / 2;
+            const cx = x(p.sales || 0);
             const cy = y(p.margin_pct);
             const isHighSales = cx >= midX;
             const isLowMargin = cy >= midY;

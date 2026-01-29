@@ -39,7 +39,7 @@ from app.inventory import bp
 _CODIGO_INTERNO_MIN_LEN = 4
 _CODIGO_INTERNO_MAX_LEN = 12
 _CODIGO_INTERNO_AUTO_LEN = 8
-_CODIGO_INTERNO_PATTERN = re.compile(r'^[A-Za-z0-9]{4,12}$')
+_CODIGO_INTERNO_PATTERN = re.compile(r'^\S{4,12}$')
 
 
 def _company_id() -> str:

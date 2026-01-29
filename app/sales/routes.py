@@ -798,11 +798,15 @@ def _serialize_sale(row: Sale, related: dict = None, users_map: dict | None = No
 _CODIGO_INTERNO_MIN_LEN = 4
 _CODIGO_INTERNO_MAX_LEN = 12
 _CODIGO_INTERNO_LEN = 8
-_CODIGO_INTERNO_PATTERN = re.compile(r'^[A-Z0-9]{4,12}$')
+_CODIGO_INTERNO_PATTERN = re.compile(r'^\S{4,12}$')
 
 
 def _normalize_codigo_interno(raw: str) -> str:
-    return str(raw or '').strip().upper()
+    try:
+        # Keep special characters; only remove whitespace and normalize case.
+        return re.sub(r'\s+', '', str(raw or '')).upper()
+    except Exception:
+        return str(raw or '').strip().upper()
 
 
 def _is_valid_codigo_interno(code: str) -> bool:
