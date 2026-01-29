@@ -716,26 +716,10 @@ def _serialize_sale(row: Sale, related: dict = None, users_map: dict | None = No
         created_by_user_id = None
 
     responsible_id = ''
-    responsible_name = ''
+    responsible_name = '-'
     if emp_id:
         responsible_id = 'e:' + emp_id
         responsible_name = emp_name or 'Empleado'
-    elif created_by_user_id is not None:
-        responsible_id = 'u:' + str(int(created_by_user_id))
-        try:
-            if isinstance(users_map, dict):
-                responsible_name = str(users_map.get(int(created_by_user_id)) or '').strip()
-        except Exception:
-            responsible_name = ''
-        if not responsible_name:
-            try:
-                from flask_login import current_user
-
-                if getattr(current_user, 'is_authenticated', False) and int(getattr(current_user, 'id', 0) or 0) == int(created_by_user_id):
-                    responsible_name = str(getattr(current_user, 'display_name', '') or getattr(current_user, 'username', '') or '').strip()
-            except Exception:
-                responsible_name = ''
-        responsible_name = responsible_name or ('Usuario #' + str(int(created_by_user_id)))
 
     cust_id = str(getattr(row, 'customer_id', '') or '').strip() or None
     cust_name_raw = str(getattr(row, 'customer_name', '') or '').strip() or None
