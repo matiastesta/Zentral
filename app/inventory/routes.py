@@ -769,6 +769,8 @@ def inventory_import_excel():
             if costo_unitario < 0:
                 raise ValueError('costo_unitario_invalid')
 
+            cost_provided = bool(costo_unitario_raw is not None and str(costo_unitario_raw).strip() != '')
+
             cantidad_raw = get_cell(vals, 'cantidad')
             cantidad = _num(cantidad_raw) if cantidad_raw is not None and str(cantidad_raw).strip() != '' else 0.0
             if cantidad < 0:
@@ -932,6 +934,26 @@ def inventory_import_excel():
                     total_cost=cantidad * costo_unitario,
                 )
                 db.session.add(mv)
+                created_lots += 1
+
+            elif cost_provided:
+                lot = InventoryLot(
+                    company_id=cid,
+                    product_id=prod.id,
+                    qty_initial=0.0,
+                    qty_available=0.0,
+                    unit_cost=costo_unitario,
+                    supplier_id=supplier_id,
+                    supplier_name=supplier_name,
+                    expiration_date=exp_dt,
+                    lot_code=_generate_lot_code(),
+                    note=nota_lote or ('Importación Excel (sin stock)' + (' - producto existente' if product_was_existing else '')),
+                )
+                if not supplier_id and not supplier_name:
+                    lot.supplier_id = None
+                    lot.supplier_name = 'Ajuste interno'
+                lot.received_at = received_at
+                db.session.add(lot)
                 created_lots += 1
 
             nested.commit()
@@ -1245,6 +1267,8 @@ def inventory_import_excel_commit():
             if costo_unitario < 0:
                 raise ValueError('costo_unitario_invalid')
 
+            cost_provided = (costo_raw != '')
+
             proveedor = str(d.get('proveedor') or '').strip() or ''
             vencimiento_raw = str(d.get('vencimiento') or '').strip() or ''
             exp_dt = _parse_date_flexible(vencimiento_raw, None) if vencimiento_raw else None
@@ -1397,6 +1421,26 @@ def inventory_import_excel_commit():
                     total_cost=cantidad * costo_unitario,
                 )
                 db.session.add(mv)
+                created_lots += 1
+
+            elif cost_provided:
+                lot = InventoryLot(
+                    company_id=cid,
+                    product_id=prod.id,
+                    qty_initial=0.0,
+                    qty_available=0.0,
+                    unit_cost=costo_unitario,
+                    supplier_id=supplier_id,
+                    supplier_name=supplier_name,
+                    expiration_date=exp_dt,
+                    lot_code=_generate_lot_code(),
+                    note=nota_lote or 'Importación Excel (sin stock)',
+                )
+                if not supplier_id and not supplier_name:
+                    lot.supplier_id = None
+                    lot.supplier_name = 'Ajuste interno'
+                lot.received_at = received_at
+                db.session.add(lot)
                 created_lots += 1
 
             nested.commit()

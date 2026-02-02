@@ -2284,6 +2284,30 @@ document.addEventListener('DOMContentLoaded', function () {
         abrirModal(modalPrecios, false);
     }
 
+    function lastUnitCost(relLots) {
+        const rel = Array.isArray(relLots) ? relLots : [];
+        if (!rel.length) return 0;
+        let best = null;
+        let bestT = 0;
+        let bestId = 0;
+        rel.forEach(function (l) {
+            const t = new Date(String(l?.received_at || '')).getTime() || 0;
+            const id = parseInt(String(l?.id || 0), 10) || 0;
+            if (!best) {
+                best = l;
+                bestT = t;
+                bestId = id;
+                return;
+            }
+            if (t > bestT || (t === bestT && id > bestId)) {
+                best = l;
+                bestT = t;
+                bestId = id;
+            }
+        });
+        return parseNumeroSeguro(best?.unit_cost);
+    }
+
     function apiListProducts() {
         return fetch('/inventory/api/products?limit=5000&active=1', { credentials: 'same-origin' })
             .then(function (r) {
@@ -3757,7 +3781,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const rel = lots.filter(l => String(l.product_id) === String(p.id));
             const stock = rel.reduce((acc, l) => acc + parseNumeroSeguro(l.qty_available), 0);
             const costSum = rel.reduce((acc, l) => acc + (parseNumeroSeguro(l.qty_available) * parseNumeroSeguro(l.unit_cost)), 0);
-            const avg = stock > 0 ? (costSum / stock) : 0;
+            const avg = stock > 0 ? (costSum / stock) : lastUnitCost(rel);
             const status = getStatus(stock, p.reorder_point, p.min_stock);
             return { stock, avg, total: stock * avg, status };
         };
@@ -3837,7 +3861,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const rel = lots.filter(l => String(l.product_id) === String(p.id));
             const stock = rel.reduce((acc, l) => acc + parseNumeroSeguro(l.qty_available), 0);
             const costSum = rel.reduce((acc, l) => acc + (parseNumeroSeguro(l.qty_available) * parseNumeroSeguro(l.unit_cost)), 0);
-            const avg = stock > 0 ? (costSum / stock) : 0;
+            const avg = stock > 0 ? (costSum / stock) : lastUnitCost(rel);
             totalValue += stock * avg;
             const st = getStatus(stock, p.reorder_point, p.min_stock);
             if (st !== 'OK') {
