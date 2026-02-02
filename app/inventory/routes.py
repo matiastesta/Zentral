@@ -19,7 +19,7 @@ from flask import (
 )
 from flask import g
 from flask_login import login_required
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from typing import Optional
@@ -92,6 +92,18 @@ def _num(v):
         return float(v)
     except Exception:
         return 0.0
+
+
+def _parse_bool(v) -> bool:
+    s = str(v or '').strip().lower()
+    if s in ('1', 'true', 'yes', 'y', 'si', 'sí', 'on', 'x'):
+        return True
+    if s in ('0', 'false', 'no', 'n', 'off', ''):
+        return False
+    try:
+        return bool(int(float(s)))
+    except Exception:
+        return False
 
 
 def _serialize_category(cat: Optional[Category]):
@@ -169,6 +181,35 @@ def _normalize_header(name: str) -> str:
     key = '_'.join([p for p in key.split(' ') if p])
     key = key.replace('__', '_')
     return key
+
+
+def _find_product_by_name(company_id: str, name: str, preferred_category_id: Optional[int] = None):
+    cid = str(company_id or '').strip()
+    raw = str(name or '').strip()
+    if not cid or not raw:
+        return None
+
+    q = (
+        db.session.query(Product)
+        .filter(Product.company_id == cid)
+        .filter(func.lower(func.trim(Product.name)) == raw.lower())
+    )
+
+    if preferred_category_id is not None:
+        try:
+            cat_id = int(preferred_category_id)
+        except Exception:
+            cat_id = None
+        if cat_id is not None:
+            q = q.order_by(
+                case((Product.category_id == cat_id, 1), else_=0).desc(),
+                Product.active.desc(),
+                Product.id.asc(),
+            )
+            return q.first()
+
+    q = q.order_by(Product.active.desc(), Product.id.asc())
+    return q.first()
 
 
 def _find_category_by_norm(company_id: str, norm: str):
@@ -735,7 +776,16 @@ def inventory_import_excel():
 
             descripcion = str(get_cell(vals, 'descripcion') or '').strip() or None
             codigo_interno_raw = str(get_cell(vals, 'codigo_interno') or '').strip() or ''
+            barcode_raw = str(get_cell(vals, 'barcode') or get_cell(vals, 'codigo_barra') or '').strip() or None
             nota_lote = str(get_cell(vals, 'nota_lote') or '').strip() or None
+
+            update_fields = _parse_bool(
+                get_cell(vals, 'actualizar_producto')
+                or get_cell(vals, 'actualizar_campos')
+                or get_cell(vals, 'update_fields')
+                or get_cell(vals, 'sobrescribir')
+                or get_cell(vals, 'overwrite')
+            )
 
             stock_minimo_raw = get_cell(vals, 'stock_minimo')
             stock_minimo = _num(stock_minimo_raw) if stock_minimo_raw is not None and str(stock_minimo_raw).strip() != '' else 0.0
@@ -770,33 +820,49 @@ def inventory_import_excel():
                 supplier_name = str(getattr(srow, 'name', '') or '').strip() or None
 
             prod = None
-            matched_product_id = d.get('matched_product_id')
-            if matched_product_id is not None and str(matched_product_id).strip() != '':
-                try:
-                    prod = db.session.query(Product).filter(Product.company_id == cid, Product.id == int(matched_product_id)).first()
-                except Exception:
-                    prod = None
-
-            if not prod and codigo_interno_raw:
+            internal_code = ''
+            if codigo_interno_raw:
                 internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
                 prod = db.session.query(Product).filter(Product.company_id == cid, Product.internal_code == internal_code).first()
 
-            if not prod:
-                prod = (
-                    db.session.query(Product)
-                    .filter(Product.company_id == cid)
-                    .filter(Product.category_id == cat_row.id)
-                    .filter(func.lower(func.trim(Product.name)) == nombre.lower())
-                    .first()
-                )
+            if not prod and barcode_raw:
+                prod = db.session.query(Product).filter(Product.company_id == cid, Product.barcode == barcode_raw).first()
 
             if not prod:
-                internal_code = ''
-                if codigo_interno_raw:
-                    internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
-                    exists = db.session.query(Product.id).filter(Product.company_id == cid, Product.internal_code == internal_code).first() is not None
-                    if exists:
-                        raise ValueError('codigo_interno_already_exists')
+                prod = _find_product_by_name(cid, nombre, preferred_category_id=cat_row.id)
+
+            product_was_existing = bool(prod)
+
+            if prod:
+                if not bool(getattr(prod, 'active', True)):
+                    prod.active = True
+                if update_fields:
+                    if descripcion is not None:
+                        prod.description = descripcion
+                    if precio_lista >= 0:
+                        prod.sale_price = precio_lista
+                    prod.min_stock = stock_minimo
+                    prod.reorder_point = punto_pedido
+                    if supplier_id is not None or supplier_name is not None:
+                        prod.primary_supplier_id = supplier_id
+                        prod.primary_supplier_name = supplier_name
+                    if barcode_raw is not None:
+                        if barcode_raw and (not prod.barcode or str(prod.barcode).strip() == ''):
+                            conflict = db.session.query(Product.id).filter(Product.company_id == cid, Product.barcode == barcode_raw, Product.id != prod.id).first() is not None
+                            if conflict:
+                                raise ValueError('barcode_conflict')
+                            prod.barcode = barcode_raw
+                        elif not barcode_raw:
+                            prod.barcode = None
+                    if internal_code:
+                        cur_ci = str(getattr(prod, 'internal_code', '') or '').strip()
+                        if not cur_ci:
+                            conflict = db.session.query(Product.id).filter(Product.company_id == cid, Product.internal_code == internal_code, Product.id != prod.id).first() is not None
+                            if conflict:
+                                raise ValueError('codigo_interno_conflict')
+                            prod.internal_code = internal_code
+
+            if not prod:
                 if not internal_code:
                     internal_code = _generate_codigo_interno(cid, nombre, categoria or 'GEN')
 
@@ -807,6 +873,7 @@ def inventory_import_excel():
                     category_id=cat_row.id,
                     sale_price=precio_lista,
                     internal_code=internal_code,
+                    barcode=barcode_raw,
                     unit_name='Unidad',
                     uses_lots=True,
                     method='FIFO',
@@ -817,7 +884,20 @@ def inventory_import_excel():
                     active=True,
                 )
                 db.session.add(prod)
-                db.session.flush()
+                try:
+                    db.session.flush()
+                except IntegrityError:
+                    db.session.rollback()
+                    nested = db.session.begin_nested()
+                    prod = None
+                    if internal_code:
+                        prod = db.session.query(Product).filter(Product.company_id == cid, Product.internal_code == internal_code).first()
+                    if not prod and barcode_raw:
+                        prod = db.session.query(Product).filter(Product.company_id == cid, Product.barcode == barcode_raw).first()
+                    if not prod:
+                        raise
+                    if not bool(getattr(prod, 'active', True)):
+                        prod.active = True
                 created_products += 1
 
             if cantidad > 0:
@@ -831,7 +911,7 @@ def inventory_import_excel():
                     supplier_name=supplier_name,
                     expiration_date=exp_dt,
                     lot_code=_generate_lot_code(),
-                    note=nota_lote or ('Ingreso por inventario (importación Excel)' + (' - producto existente' if (d.get('product_exists') is True) else '')),
+                    note=nota_lote or ('Ingreso por inventario (importación Excel)' + (' - producto existente' if product_was_existing else '')),
                 )
                 if not supplier_id and not supplier_name:
                     lot.supplier_id = None
@@ -956,6 +1036,7 @@ def inventory_import_excel_preview():
     existing_sup = set()
     existing_prod = set()
     existing_by_ci = {}
+    existing_by_barcode = {}
     try:
         cats = (
             db.session.query(Category)
@@ -990,9 +1071,13 @@ def inventory_import_excel_preview():
             ci = str(getattr(p, 'internal_code', '') or '').strip()
             if ci:
                 existing_by_ci[ci] = p
+            bc = str(getattr(p, 'barcode', '') or '').strip()
+            if bc:
+                existing_by_barcode[bc] = p
     except Exception:
         existing_prod = set()
         existing_by_ci = {}
+        existing_by_barcode = {}
 
     out_rows = []
     new_cats = set()
@@ -1013,6 +1098,7 @@ def inventory_import_excel_preview():
         nombre = str(get_cell(vals, 'nombre') or '').strip()
         categoria = str(get_cell(vals, 'categoria') or '').strip()
         codigo_interno = str(get_cell(vals, 'codigo_interno') or '').strip()
+        barcode = str(get_cell(vals, 'barcode') or get_cell(vals, 'codigo_barra') or '').strip()
         precio_lista = str(get_cell(vals, 'precio_lista') or '').strip()
         descripcion = str(get_cell(vals, 'descripcion') or '').strip()
         cantidad = str(get_cell(vals, 'cantidad') or '').strip()
@@ -1022,6 +1108,15 @@ def inventory_import_excel_preview():
         nota_lote = str(get_cell(vals, 'nota_lote') or '').strip()
         stock_minimo = str(get_cell(vals, 'stock_minimo') or '').strip()
         punto_pedido = str(get_cell(vals, 'punto_pedido') or '').strip()
+
+        actualizar_producto = str(
+            get_cell(vals, 'actualizar_producto')
+            or get_cell(vals, 'actualizar_campos')
+            or get_cell(vals, 'update_fields')
+            or get_cell(vals, 'sobrescribir')
+            or get_cell(vals, 'overwrite')
+            or ''
+        ).strip()
 
         cat_norm = _normalize_name(categoria)
         sup_norm = _normalize_name(proveedor)
@@ -1034,6 +1129,12 @@ def inventory_import_excel_preview():
             product_exists = True
             try:
                 matched_product_id = int(getattr(existing_by_ci[codigo_interno], 'id', None))
+            except Exception:
+                matched_product_id = None
+        elif barcode and barcode in existing_by_barcode:
+            product_exists = True
+            try:
+                matched_product_id = int(getattr(existing_by_barcode[barcode], 'id', None))
             except Exception:
                 matched_product_id = None
         else:
@@ -1049,6 +1150,7 @@ def inventory_import_excel_preview():
             'nombre': nombre,
             'categoria': categoria,
             'codigo_interno': codigo_interno,
+            'barcode': barcode,
             'precio_lista': precio_lista,
             'descripcion': descripcion,
             'cantidad': cantidad,
@@ -1058,6 +1160,7 @@ def inventory_import_excel_preview():
             'nota_lote': nota_lote,
             'stock_minimo': stock_minimo,
             'punto_pedido': punto_pedido,
+            'actualizar_producto': actualizar_producto,
             'will_create_category': will_create_category,
             'will_create_supplier': will_create_supplier,
             'product_exists': product_exists,
@@ -1113,7 +1216,16 @@ def inventory_import_excel_commit():
             nombre = str(d.get('nombre') or '').strip()
             categoria = str(d.get('categoria') or '').strip()
             codigo_interno_raw = str(d.get('codigo_interno') or '').strip() or ''
+            barcode_raw = str(d.get('barcode') or d.get('codigo_barra') or '').strip() or None
             descripcion = str(d.get('descripcion') or '').strip() or None
+
+            update_fields = _parse_bool(
+                d.get('actualizar_producto')
+                or d.get('actualizar_campos')
+                or d.get('update_fields')
+                or d.get('sobrescribir')
+                or d.get('overwrite')
+            )
 
             precio_lista = _num(d.get('precio_lista'))
             if not nombre:
@@ -1174,31 +1286,48 @@ def inventory_import_excel_commit():
                 except Exception:
                     prod = None
 
+            internal_code = ''
+
             if not prod and codigo_interno_raw:
                 internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
                 prod = db.session.query(Product).filter(Product.company_id == cid, Product.internal_code == internal_code).first()
 
-            if not prod:
-                prod = (
-                    db.session.query(Product)
-                    .filter(Product.company_id == cid)
-                    .filter(Product.category_id == cat_row.id)
-                    .filter(func.lower(func.trim(Product.name)) == nombre.lower())
-                    .first()
-                )
+            if not prod and barcode_raw:
+                prod = db.session.query(Product).filter(Product.company_id == cid, Product.barcode == barcode_raw).first()
 
             if not prod:
-                internal_code = ''
-                if codigo_interno_raw:
-                    internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
-                    exists = (
-                        db.session.query(Product.id)
-                        .filter(Product.company_id == cid, Product.internal_code == internal_code)
-                        .first()
-                        is not None
-                    )
-                    if exists:
-                        raise ValueError('codigo_interno_already_exists')
+                prod = _find_product_by_name(cid, nombre, preferred_category_id=cat_row.id)
+
+            if prod:
+                if not bool(getattr(prod, 'active', True)):
+                    prod.active = True
+                if update_fields:
+                    if descripcion is not None:
+                        prod.description = descripcion
+                    if precio_lista >= 0:
+                        prod.sale_price = precio_lista
+                    prod.min_stock = stock_minimo
+                    prod.reorder_point = punto_pedido
+                    if supplier_id is not None or supplier_name is not None:
+                        prod.primary_supplier_id = supplier_id
+                        prod.primary_supplier_name = supplier_name
+                    if barcode_raw is not None:
+                        if barcode_raw and (not prod.barcode or str(prod.barcode).strip() == ''):
+                            conflict = db.session.query(Product.id).filter(Product.company_id == cid, Product.barcode == barcode_raw, Product.id != prod.id).first() is not None
+                            if conflict:
+                                raise ValueError('barcode_conflict')
+                            prod.barcode = barcode_raw
+                        elif not barcode_raw:
+                            prod.barcode = None
+                    if internal_code:
+                        cur_ci = str(getattr(prod, 'internal_code', '') or '').strip()
+                        if not cur_ci:
+                            conflict = db.session.query(Product.id).filter(Product.company_id == cid, Product.internal_code == internal_code, Product.id != prod.id).first() is not None
+                            if conflict:
+                                raise ValueError('codigo_interno_conflict')
+                            prod.internal_code = internal_code
+
+            if not prod:
                 if not internal_code:
                     internal_code = _generate_codigo_interno(cid, nombre, categoria or 'GEN')
 
@@ -1209,6 +1338,7 @@ def inventory_import_excel_commit():
                     category_id=cat_row.id,
                     sale_price=precio_lista,
                     internal_code=internal_code,
+                    barcode=barcode_raw,
                     unit_name='Unidad',
                     uses_lots=True,
                     method='FIFO',
@@ -1219,7 +1349,20 @@ def inventory_import_excel_commit():
                     active=True,
                 )
                 db.session.add(prod)
-                db.session.flush()
+                try:
+                    db.session.flush()
+                except IntegrityError:
+                    db.session.rollback()
+                    nested = db.session.begin_nested()
+                    prod = None
+                    if internal_code:
+                        prod = db.session.query(Product).filter(Product.company_id == cid, Product.internal_code == internal_code).first()
+                    if not prod and barcode_raw:
+                        prod = db.session.query(Product).filter(Product.company_id == cid, Product.barcode == barcode_raw).first()
+                    if not prod:
+                        raise
+                    if not bool(getattr(prod, 'active', True)):
+                        prod.active = True
                 created_products += 1
 
             if cantidad > 0:
@@ -1480,27 +1623,71 @@ def create_product():
     internal_code = None
     if codigo_interno_raw:
         internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
-        exists = (
-            db.session.query(Product.id)
-            .filter(Product.company_id == cid, Product.internal_code == internal_code)
-            .first()
-            is not None
-        )
-        if exists:
-            return jsonify({'ok': False, 'error': 'codigo_interno_already_exists'}), 400
-    if not internal_code:
-        internal_code = _generate_codigo_interno(cid, name, str(getattr(category, 'name', '') or '').strip() or 'GEN')
 
     barcode_raw = str(payload.get('barcode') or '').strip() or None
+
+    existing_by_ci = None
+    existing_by_bc = None
+    if internal_code:
+        existing_by_ci = db.session.query(Product).filter(Product.company_id == cid, Product.internal_code == internal_code).first()
     if barcode_raw:
-        exists = (
-            db.session.query(Product.id)
-            .filter(Product.company_id == cid, Product.barcode == barcode_raw)
-            .first()
-            is not None
-        )
-        if exists:
-            return jsonify({'ok': False, 'error': 'barcode_already_exists'}), 400
+        existing_by_bc = db.session.query(Product).filter(Product.company_id == cid, Product.barcode == barcode_raw).first()
+
+    if existing_by_ci is not None and existing_by_bc is not None and int(existing_by_ci.id) != int(existing_by_bc.id):
+        return jsonify({'ok': False, 'error': 'code_barcode_conflict'}), 400
+
+    existing = existing_by_ci or existing_by_bc
+    if existing is None:
+        existing = _find_product_by_name(cid, name, preferred_category_id=category.id)
+
+    if existing is not None:
+        if bool(getattr(existing, 'active', True)):
+            if existing_by_ci is not None:
+                return jsonify({'ok': False, 'error': 'codigo_interno_already_exists'}), 400
+            if existing_by_bc is not None:
+                return jsonify({'ok': False, 'error': 'barcode_already_exists'}), 400
+            return jsonify({'ok': False, 'error': 'already_exists'}), 400
+
+        existing.active = True
+        existing.name = name
+        existing.description = str(payload.get('description') or '').strip() or None
+        existing.category_id = category.id
+        existing.sale_price = _num(payload.get('sale_price'))
+        if internal_code is not None:
+            existing.internal_code = internal_code
+        if barcode_raw is not None:
+            existing.barcode = barcode_raw
+        existing.image_filename = str(payload.get('image_filename') or '').strip() or None
+        existing.unit_name = 'Unidad'
+        existing.uses_lots = True
+        existing.method = 'FIFO'
+        existing.min_stock = _num(payload.get('min_stock'))
+        existing.reorder_point = _num(payload.get('reorder_point'))
+
+        supplier_id = str(payload.get('primary_supplier_id') or '').strip() or None
+        supplier_name = str(payload.get('primary_supplier_name') or '').strip() or None
+        supplier_row = None
+        if supplier_id:
+            supplier_row = db.session.query(Supplier).filter(Supplier.company_id == cid, Supplier.id == supplier_id).first()
+            if not supplier_row:
+                return jsonify({'ok': False, 'error': 'supplier_not_found'}), 400
+            supplier_name = str(supplier_row.name or '').strip() or supplier_name
+        existing.primary_supplier_id = supplier_id
+        existing.primary_supplier_name = supplier_name
+
+        _ensure_codigo_interno(existing)
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({'ok': False, 'error': 'unique_violation'}), 400
+        except Exception:
+            db.session.rollback()
+            return jsonify({'ok': False, 'error': 'db_error'}), 400
+        return jsonify({'ok': True, 'reactivated': True, 'item': _serialize_product(existing)})
+
+    if not internal_code:
+        internal_code = _generate_codigo_interno(cid, name, str(getattr(category, 'name', '') or '').strip() or 'GEN')
 
     supplier_id = str(payload.get('primary_supplier_id') or '').strip() or None
     supplier_name = str(payload.get('primary_supplier_name') or '').strip() or None
