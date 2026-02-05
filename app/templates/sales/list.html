@@ -2697,7 +2697,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (tablaProductosCambioBody) tablaProductosCambioBody.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-sm text-gray-500">No hay productos en inventario.</td></tr>';
                 return;
             }
-            products.slice(0, 200).forEach(p => {
+            products.forEach(p => {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const cat = String(p?.category?.name || p?.category_name || '').trim();
@@ -2763,7 +2763,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (tablaProductosCambioVentaBody) tablaProductosCambioVentaBody.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-sm text-gray-500">No hay productos en inventario.</td></tr>';
                 return;
             }
-            products.slice(0, 200).forEach(p => {
+            products.forEach(p => {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const cat = String(p?.category?.name || p?.category_name || '').trim();
@@ -3881,7 +3881,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (tablaProductosBody) tablaProductosBody.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-sm text-gray-500">No hay productos en inventario.</td></tr>';
                 return;
             }
-            products.slice(0, 200).forEach(p => {
+            products.forEach(p => {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const displayPrice = price > 0 ? price : 0;
@@ -3938,7 +3938,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 gridProductos.innerHTML = '<div class="col-span-full px-3 py-4 text-sm text-gray-500">No hay productos en inventario.</div>';
                 return;
             }
-            products.slice(0, 200).forEach(p => {
+            products.forEach(p => {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const displayPrice = price > 0 ? price : 0;
@@ -4142,7 +4142,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            products.slice(0, 200).forEach(p => {
+            products.forEach(p => {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const btn = document.createElement('button');
@@ -4213,7 +4213,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            products.slice(0, 200).forEach(p => {
+            products.forEach(p => {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
                 const btn = document.createElement('button');
