@@ -7209,6 +7209,12 @@ td.num,th.num{text-align:right}
     if (inputDescuentoGeneral) {
         inputDescuentoGeneral.addEventListener('input', function () {
             computeTicketTotals();
+            try {
+                if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
+                    renderTicketCartSummary();
+                }
+            } catch (e) {
+            }
         });
         inputDescuentoGeneral.addEventListener('focus', function () {
             const v = String(inputDescuentoGeneral.value || '').trim();
@@ -7226,6 +7232,12 @@ td.num,th.num{text-align:right}
                 inputDescuentoGeneralPaso2.value = inputDescuentoGeneral.value;
             }
             computeTicketTotals();
+            try {
+                if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
+                    renderTicketCartSummary();
+                }
+            } catch (e) {
+            }
         });
     }
 
@@ -7235,6 +7247,12 @@ td.num,th.num{text-align:right}
                 inputDescuentoGeneral.value = String(inputDescuentoGeneralPaso2.value || '');
             }
             computeTicketTotals();
+            try {
+                if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
+                    renderTicketCartSummary();
+                }
+            } catch (e) {
+            }
         });
         inputDescuentoGeneralPaso2.addEventListener('focus', function () {
             const v = String(inputDescuentoGeneralPaso2.value || '').trim();
@@ -7252,6 +7270,12 @@ td.num,th.num{text-align:right}
                 inputDescuentoGeneral.value = inputDescuentoGeneralPaso2.value;
             }
             computeTicketTotals();
+            try {
+                if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
+                    renderTicketCartSummary();
+                }
+            } catch (e) {
+            }
         });
     }
 
