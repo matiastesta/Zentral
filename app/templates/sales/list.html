@@ -1288,6 +1288,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function formatearPctParaInputNumber(n) {
+        const v = (typeof n === 'number') ? n : (parseFloat(String(n ?? '0').replace(',', '.')) || 0);
+        const x = (!isFinite(v) || v <= 0) ? 0 : Math.min(100, Math.max(0, v));
+        if (!x) return '';
+        // Inputs type="number" no aceptan coma decimal (es-AR), usar punto.
+        return String(x.toFixed(2)).replace(/\.00$/, '');
+    }
+
     function formatearMoneda(valor) {
         const n = (typeof valor === 'number') ? valor : (parseFloat(String(valor ?? '0').replace(',', '.')) || 0);
         try {
@@ -4890,7 +4898,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                if (inputDescuentoGeneral) inputDescuentoGeneral.value = (sale.discount_general_pct ? formatearPct(parseFloat(sale.discount_general_pct || 0) || 0) : '');
+                if (inputDescuentoGeneral) inputDescuentoGeneral.value = formatearPctParaInputNumber(parseFloat(sale.discount_general_pct || 0) || 0);
                 if (inputDescuentoGeneralPaso2) inputDescuentoGeneralPaso2.value = inputDescuentoGeneral?.value || '';
             } catch (e) {
             }
@@ -7212,7 +7220,7 @@ td.num,th.num{text-align:right}
             if (!isFinite(n) || n <= 0) {
                 inputDescuentoGeneral.value = '';
             } else {
-                inputDescuentoGeneral.value = formatearPct(n);
+                inputDescuentoGeneral.value = formatearPctParaInputNumber(n);
             }
             if (inputDescuentoGeneralPaso2 && document.activeElement !== inputDescuentoGeneralPaso2) {
                 inputDescuentoGeneralPaso2.value = inputDescuentoGeneral.value;
@@ -7238,7 +7246,7 @@ td.num,th.num{text-align:right}
             if (!isFinite(n) || n <= 0) {
                 inputDescuentoGeneralPaso2.value = '';
             } else {
-                inputDescuentoGeneralPaso2.value = formatearPct(n);
+                inputDescuentoGeneralPaso2.value = formatearPctParaInputNumber(n);
             }
             if (inputDescuentoGeneral && document.activeElement !== inputDescuentoGeneral) {
                 inputDescuentoGeneral.value = inputDescuentoGeneralPaso2.value;
