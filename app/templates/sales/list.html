@@ -4460,14 +4460,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             if (!tsFila) {
-                const raw = (typeof s?.created_at === 'number') ? s.created_at : 0;
-                tsFila = raw || 0;
+                const raw = s?.created_at;
+                if (typeof raw === 'number' && isFinite(raw)) {
+                    tsFila = raw || 0;
+                } else {
+                    const v = String(raw || '').trim();
+                    const ts = v ? Date.parse(v) : 0;
+                    tsFila = isNaN(ts) ? 0 : ts;
+                }
             }
             if (!tsFila || tsFila < startDay || tsFila > endDay) return;
 
             const tipo = String(s?.type || s?.sale_type || '').trim();
-            const totalVenta = parseFloat(s?.total || 0) || 0;
-            const paid = parseFloat(s?.paid_amount || 0) || 0;
+            const totalVenta = (typeof parseMonedaARSInput === 'function')
+                ? (parseMonedaARSInput(s?.total || 0) || 0)
+                : (parseFloat(s?.total || 0) || 0);
+            const paid = (typeof parseMonedaARSInput === 'function')
+                ? (parseMonedaARSInput(s?.paid_amount || 0) || 0)
+                : (parseFloat(s?.paid_amount || 0) || 0);
 
             if (tipo === 'Venta') {
                 return;
@@ -4539,27 +4549,50 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!ts || ts < start || ts > end) return;
                 const metodo = String(e?.forma_pago || e?.payment_method || 'Efectivo').trim();
                 if (metodo !== 'Efectivo') return;
-                const val = parseFloat(e?.valor || e?.amount || 0) || 0;
+                const val = (typeof parseMonedaARSInput === 'function')
+                    ? (parseMonedaARSInput(e?.valor ?? e?.amount ?? 0) || 0)
+                    : (parseFloat(e?.valor || e?.amount || 0) || 0);
                 total -= val;
             });
         };
-        if (isPromise(res)) res.then(apply);
-        else apply(res);
-
+        if (isPromise(res)) {
+            return Promise.resolve(res)
+                .then(function (arr) {
+                    apply(arr);
+                    return total;
+                })
+                .catch(function () {
+                    return total;
+                });
+        }
+        apply(res);
         return total;
     }
 
     function recalcularArqueoAutomatico() {
-        try {
-            const efectivoDia = calcularEfectivoDelDiaDesdeHistorial();
-            if (typeof setMonedaARSInput === 'function') {
-                setMonedaARSInput(montoEfectivoDia, efectivoDia);
-            } else if (montoEfectivoDia) {
-                montoEfectivoDia.value = formatearMoneda(efectivoDia);
+        const setAndValidate = function (efectivoDia) {
+            try {
+                const v = (typeof efectivoDia === 'number' && isFinite(efectivoDia)) ? efectivoDia : 0;
+                if (typeof setMonedaARSInput === 'function') {
+                    setMonedaARSInput(montoEfectivoDia, v);
+                } else if (montoEfectivoDia) {
+                    montoEfectivoDia.value = formatearMoneda(v);
+                }
+            } catch (e) {
             }
+            try { validarCierreArqueo(); } catch (e) {}
+        };
+
+        try {
+            const res = calcularEfectivoDelDiaDesdeHistorial();
+            if (isPromise(res)) {
+                Promise.resolve(res).then(setAndValidate).catch(function () { setAndValidate(0); });
+                return;
+            }
+            setAndValidate(res);
         } catch (e) {
+            setAndValidate(0);
         }
-        try { validarCierreArqueo(); } catch (e) {}
     }
 
     function setArqueoBadge(state) {
