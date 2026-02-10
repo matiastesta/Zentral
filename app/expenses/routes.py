@@ -337,6 +337,7 @@ def list_expenses_api():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
     category = (request.args.get('category') or '').strip()
+    include_inventory = str(request.args.get('include_inventory') or '').strip() in ('1', 'true', 'True')
     limit = int(request.args.get('limit') or 5000)
     if limit <= 0 or limit > 10000:
         limit = 5000
@@ -349,6 +350,8 @@ def list_expenses_api():
         return jsonify({'ok': True, 'items': []})
 
     q = db.session.query(Expense).filter(Expense.company_id == cid)
+    if not include_inventory:
+        q = q.filter(Expense.origin != 'inventory')
     if d_from:
         q = q.filter(Expense.expense_date >= d_from)
     if d_to:
