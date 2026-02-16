@@ -1,5 +1,6 @@
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 revision = 'n1a2b3c4d5e6'
 down_revision = 'm3d4e5f6g7h8'
@@ -8,6 +9,13 @@ depends_on = None
 
 
 def upgrade() -> None:
+    try:
+        bind = op.get_bind()
+        insp = inspect(bind)
+        if 'cash_withdrawals' in set(insp.get_table_names() or []):
+            return
+    except Exception:
+        pass
     op.create_table(
         'cash_withdrawals',
         sa.Column('id', sa.Integer(), primary_key=True),

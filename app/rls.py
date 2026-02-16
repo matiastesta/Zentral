@@ -322,13 +322,7 @@ def bootstrap_schema(reset: bool) -> None:
         except Exception:
             tables = set()
 
-        try:
-            if 'installment_plan' not in tables or 'installment' not in tables:
-                from app.models import Installment, InstallmentPlan
-
-                db.metadata.create_all(bind=engine, tables=[InstallmentPlan.__table__, Installment.__table__])
-        except Exception:
-            db.session.rollback()
+        # No crear tablas en Postgres desde runtime; debe manejarse por Alembic.
 
         try:
             _postgres_ensure_sale_employee_columns()
