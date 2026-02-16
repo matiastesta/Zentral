@@ -50,6 +50,9 @@ def _default_calendar_config():
             "manual": {
                 "notas_avisos": True,
             },
+            "caja": {
+                "retiro_efectivo": True,
+            },
         },
         "dashboard_integration": True,
     }
@@ -239,6 +242,7 @@ def _sanitize_source_module(v: str | None) -> str:
         'proveedores',
         'inventario',
         'empleados',
+        'caja',
     }
     return raw if raw in allowed else 'manual'
 
@@ -1069,6 +1073,8 @@ def index():
         except Exception:
             sm = ''
             et = ''
+        if sm == 'caja':
+            return 'Caja'
         if sm == 'clientes':
             return 'Clientes'
         if sm == 'cuotas':

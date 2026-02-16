@@ -23,6 +23,59 @@
         </div>
     </div>
 
+    <script id="sales-withdrawals-bootstrap" type="application/json">{{ {
+        'can_cash_withdrawal': (current_user.is_authenticated and (current_user.can('can_cash_withdrawal') or current_user.can('cash_withdrawals'))),
+        'current_user_id': (current_user.id if current_user.is_authenticated else None),
+        'current_user_label': (current_user.display_name or current_user.username or '')
+    }|tojson }}</script>
+
+    <div id="modal-retiro-caja" class="hidden fixed inset-0 z-50" style="z-index: 70;">
+        <div class="absolute inset-0 bg-black/40" data-close="1"></div>
+        <div class="relative h-full w-full flex items-center justify-center p-4 md:p-6">
+            <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: calc(85vh - 1rem);">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">Registrar retiro</h3>
+                        <p class="text-xs text-gray-500">Movimiento interno. No es ingreso ni gasto.</p>
+                    </div>
+                    <button id="btn-close-retiro-caja" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-5 space-y-3 overflow-y-auto" style="min-height:0;">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de imputación</label>
+                            <input id="retiro-date" type="date" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Monto</label>
+                            <input id="retiro-amount" type="text" inputmode="decimal" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="$0" data-currency="ars">
+                            <div id="retiro-amount-help" class="mt-1 text-[11px] text-red-600 hidden">Ingresá un monto válido (ej: 10000)</div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Responsable</label>
+                        <select id="retiro-responsible" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                            <option value="">— Seleccionar —</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Nota (opcional)</label>
+                        <textarea id="retiro-note" rows="3" class="w-full px-3 py-2 text-sm border rounded-md"></textarea>
+                    </div>
+                    <div id="retiro-error" class="text-[11px] text-red-600 hidden flex items-center gap-1"><i class="fas fa-exclamation-circle"></i><span></span></div>
+                    <div id="retiro-success" class="text-[11px] text-green-700 hidden flex items-center gap-1"><i class="fas fa-check-circle"></i><span></span></div>
+                    <div id="retiro-audit" class="text-[11px] text-gray-500"></div>
+                </div>
+                <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2 bg-white">
+                    <button id="btn-cancel-retiro-caja" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                    <button id="btn-save-retiro-caja" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-exit-cambio" class="hidden fixed inset-0 z-50">
         <div class="absolute inset-0 bg-black/40"></div>
         <div class="relative h-full w-full flex items-center justify-center p-4">
@@ -77,17 +130,17 @@
             <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border-2 border-gray-300 overflow-hidden">
                 <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div class="w-full text-center">
-                        <h3 class="text-base font-semibold text-gray-900">Eliminar ticket</h3>
-                        <p class="text-xs text-gray-500">Esta acción es irreversible. Se eliminarán la venta y todos sus registros asociados (movimientos, cuenta corriente/cuotas) y se revertirá el stock.</p>
+                        <h3 id="modal-delete-ticket-title" class="text-base font-semibold text-gray-900">Eliminar ticket</h3>
+                        <p id="modal-delete-ticket-subtitle" class="text-xs text-gray-500">Esta acción es irreversible. Se eliminarán la venta y todos sus registros asociados (movimientos, cuenta corriente/cuotas) y se revertirá el stock.</p>
                     </div>
                     <button id="btn-close-delete-ticket" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
-                <div class="p-5">
+                <div id="modal-delete-ticket-body" class="p-5">
                     <div class="text-sm text-gray-700 text-center">¿Confirmás eliminar el ticket <span id="delete-ticket-label" class="font-semibold"></span>?</div>
                 </div>
-                <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <div id="modal-delete-ticket-footer" class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
                     <button id="btn-cancel-delete-ticket" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
                     <button id="btn-confirm-delete-ticket" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md">Eliminar</button>
                 </div>
@@ -145,9 +198,14 @@
                         <h2 class="text-lg font-semibold text-gray-900">Arqueo de caja</h2>
                         <p class="text-xs text-gray-500">Se guarda por día y queda visible en Movimientos.</p>
                     </div>
-                    <button id="btn-close-arqueo" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
-                        <i class="fas fa-times"></i>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button id="btn-open-retiro-caja" type="button" class="hidden inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                            Retiro de caja
+                        </button>
+                        <button id="btn-close-arqueo" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="p-5 overflow-y-auto" style="max-height:calc(85vh - 132px)">
                     <div id="panel-arqueo" class="space-y-3">
@@ -175,6 +233,7 @@
                                 <label class="block font-medium text-gray-600 mb-1 text-xs">Efectivo del día (calculado)</label>
                                 <input id="monto-efectivo-dia" type="text" inputmode="decimal" class="w-full px-3 py-2 border rounded-md text-sm bg-gray-50" placeholder="Se calcula solo" readonly data-currency="ars">
                                 <div class="mt-1 text-xs text-gray-500 whitespace-nowrap">Ventas en efectivo – Egresos en efectivo</div>
+                                <div id="msg-arqueo-retiros" class="mt-1 text-xs text-gray-500 whitespace-nowrap hidden"></div>
                             </div>
                             <div>
                                 <label class="block font-medium text-gray-600 mb-1 text-xs">Cierre</label>
@@ -1336,7 +1395,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function maybeMarkArqueoPending(source) {
         try {
-            setArqueoBadge('pendiente');
+            const fecha = String(document.getElementById('fecha-arqueo')?.value || '').trim();
+            if (!fecha) return;
+            checkArqueoStaleForDate(fecha);
         } catch (e) {
         }
     }
@@ -2992,9 +3053,54 @@ document.addEventListener('DOMContentLoaded', function() {
             credentials: 'same-origin',
         }).then(function (r) {
             if (!r) return { ok: false, error: 'network' };
-            if (r.status === 204) return { ok: true };
-            return r.json().catch(function () {
-                return { ok: (r && r.ok) ? true : false };
+            if (r.status === 204) return { ok: true, status: 204 };
+            if (r.ok !== true) {
+                if (r.status === 404) return { ok: true, status: 404 };
+                const ctErr = String(r.headers && r.headers.get ? (r.headers.get('content-type') || '') : '').toLowerCase();
+                if (ctErr.includes('application/json')) {
+                    return r.json().then(function (j) {
+                        const payload = (j && typeof j === 'object') ? j : {};
+                        const msg = payload.message || payload.error || ('http_' + String(r.status || ''));
+                        return { ok: false, status: r.status, error: msg };
+                    }).catch(function () {
+                        return { ok: false, status: r.status, error: 'http_' + String(r.status || '') };
+                    });
+                }
+                return r.text().then(function (txt) {
+                    const msg = String(txt || '').trim();
+                    return { ok: false, status: r.status, error: msg || ('http_' + String(r.status || '')) };
+                }).catch(function () {
+                    return { ok: false, status: r.status, error: 'http_' + String(r.status || '') };
+                });
+            }
+            const ct = String(r.headers && r.headers.get ? (r.headers.get('content-type') || '') : '').toLowerCase();
+            if (ct.includes('application/json')) {
+                return r.json().then(function (j) {
+                    const payload = (j && typeof j === 'object') ? j : {};
+                    if (payload.ok === false || payload.success === false) {
+                        return { ok: false, status: r.status, error: payload.message || payload.error || 'No se pudo eliminar el ticket.' };
+                    }
+                    return { ok: true, status: r.status, payload: payload };
+                }).catch(function () {
+                    return { ok: true, status: r.status };
+                });
+            }
+            return r.text().then(function (txt) {
+                const raw = String(txt || '').trim();
+                if (!raw) return { ok: true, status: r.status };
+                try {
+                    const j = JSON.parse(raw);
+                    if (j && typeof j === 'object') {
+                        if (j.ok === false || j.success === false) {
+                            return { ok: false, status: r.status, error: j.message || j.error || 'No se pudo eliminar el ticket.' };
+                        }
+                        return { ok: true, status: r.status, payload: j };
+                    }
+                } catch (e) {
+                }
+                return { ok: true, status: r.status };
+            }).catch(function () {
+                return { ok: true, status: r.status };
             });
         }).catch(function () {
             return { ok: false, error: 'network' };
@@ -4555,18 +4661,55 @@ document.addEventListener('DOMContentLoaded', function() {
                 total -= val;
             });
         };
+        const finalize = function () {
+            // 3) Retiros de efectivo (resta) imputados al día
+            try {
+                const fecha = String(document.getElementById('fecha-arqueo')?.value || '').trim();
+                if (!fecha) return total;
+                const url = apiPath('/api/cash-withdrawals?date=' + encodeURIComponent(fecha));
+                return fetch(url, { credentials: 'same-origin' })
+                    .then(r => r.json())
+                    .then(data => {
+                        const items = Array.isArray(data?.items) ? data.items : [];
+                        let sum = 0;
+                        items.forEach(function (w) {
+                            const m = (typeof parseMonedaARSInput === 'function')
+                                ? (parseMonedaARSInput(w?.monto ?? w?.amount ?? 0) || 0)
+                                : (parseFloat(w?.monto || w?.amount || 0) || 0);
+                            sum += m;
+                            total -= m;
+                        });
+                        try {
+                            const el = document.getElementById('msg-arqueo-retiros');
+                            if (el) {
+                                if (sum > 0) {
+                                    el.textContent = 'Retiros de caja: ' + formatearMoneda(sum);
+                                    el.classList.remove('hidden');
+                                } else {
+                                    el.classList.add('hidden');
+                                }
+                            }
+                        } catch (e) {}
+                        return total;
+                    })
+                    .catch(function () { return total; });
+            } catch (e) {
+                return total;
+            }
+        };
+
         if (isPromise(res)) {
             return Promise.resolve(res)
                 .then(function (arr) {
                     apply(arr);
-                    return total;
+                    return finalize();
                 })
                 .catch(function () {
-                    return total;
+                    return finalize();
                 });
         }
         apply(res);
-        return total;
+        return finalize();
     }
 
     function recalcularArqueoAutomatico() {
@@ -4621,10 +4764,33 @@ document.addEventListener('DOMContentLoaded', function() {
         set('—', { bg: '#f9fafb', color: '#374151', border: '#e5e7eb' });
     }
 
+    function checkArqueoStaleForDate(fecha) {
+        const f = String(fecha || '').trim();
+        if (!f) return;
+        fetch(apiPath('/sales/api/cash-count/status?date=' + encodeURIComponent(f)), { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                if (!data || !data.ok) return;
+                if (!data.has_record) {
+                    setArqueoBadge('pendiente');
+                    return;
+                }
+                const show = String(data.should_show || '').toLowerCase();
+                if (show === 'realizado') {
+                    setArqueoBadge('realizado');
+                } else {
+                    setArqueoBadge('pendiente');
+                }
+            })
+            .catch(() => {
+            });
+    }
+
     function openArqueoModal() {
         if (!modalArqueo) return;
         modalArqueo.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
+        try { recalcularArqueoAutomatico(); } catch (e) {}
     }
 
     function closeArqueoModal() {
@@ -5806,11 +5972,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (msgArqueoEmployeeRequired) msgArqueoEmployeeRequired.classList.add('hidden');
             const employeeId = String(selectArqueoEmployee?.value || '').trim();
-            if (!employeeId) {
-                if (msgArqueoEmployeeRequired) msgArqueoEmployeeRequired.classList.remove('hidden');
-                if (selectArqueoEmployee && !selectArqueoEmployee.disabled) selectArqueoEmployee.focus();
-                return;
-            }
             const employeeName = String(selectArqueoEmployee?.selectedOptions?.[0]?.textContent || '').trim();
             const fecha = String(document.getElementById('fecha-arqueo')?.value || '').trim();
             if (!fecha) return;
@@ -5853,14 +6014,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         return;
                     }
                     arqueoLastSavedAtMs = Date.now();
-                    const opening = parseMonedaARSInput(montoApertura.value || '0') || 0;
-                    const closing = parseMonedaARSInput(montoCierre.value || '0') || 0;
-                    const employeeId = String(selectArqueoEmployee?.value || '').trim();
-                    if (employeeId && opening > 0 && !(closing > 0)) {
-                        setArqueoBadge('falta_cierre');
-                    } else {
-                        setArqueoBadge('realizado');
-                    }
+                    checkArqueoStaleForDate(fecha);
                     if (msgArqueoGuardado) {
                         msgArqueoGuardado.classList.remove('hidden');
                         window.setTimeout(function () { msgArqueoGuardado.classList.add('hidden'); }, 2000);
@@ -5878,6 +6032,11 @@ document.addEventListener('DOMContentLoaded', function() {
     setArqueoBadge('pendiente');
     loadArqueoFromServer();
 
+    try {
+        const fecha = String(document.getElementById('fecha-arqueo')?.value || '').trim();
+        if (fecha) checkArqueoStaleForDate(fecha);
+    } catch (e) {}
+
     if (cashflowChannel) {
         try {
             cashflowChannel.addEventListener('message', function (e) {
@@ -5887,6 +6046,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const arqueoDate = String(document.getElementById('fecha-arqueo')?.value || '').trim();
                 if (d && arqueoDate && d !== arqueoDate) return;
                 if (msg?.kind === 'expense' && !isCashMethod(msg?.payment_method || msg?.forma_pago)) return;
+                if (msg?.kind === 'sale' && !isCashMethod(msg?.payment_method || msg?.forma_pago)) return;
                 maybeMarkArqueoPending('cashflow');
             });
         } catch (e) {
@@ -5901,6 +6061,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const arqueoDate = String(document.getElementById('fecha-arqueo')?.value || '').trim();
             if (d && arqueoDate && d !== arqueoDate) return;
             if (msg?.kind === 'expense' && !isCashMethod(msg?.payment_method || msg?.forma_pago)) return;
+            if (msg?.kind === 'sale' && !isCashMethod(msg?.payment_method || msg?.forma_pago)) return;
             maybeMarkArqueoPending('cashflow');
         } catch (err) {
         }
@@ -5920,6 +6081,171 @@ document.addEventListener('DOMContentLoaded', function() {
         modalArqueo.addEventListener('click', function (e) {
             const target = e.target;
             if (target && target === modalArqueo.firstElementChild) closeArqueoModal();
+        });
+    }
+
+    let canCashWithdrawal = false;
+    let currentUserId = null;
+    let currentUserLabel = '';
+    try {
+        const boot = JSON.parse(document.getElementById('sales-withdrawals-bootstrap')?.textContent || '{}');
+        canCashWithdrawal = !!boot.can_cash_withdrawal;
+        currentUserId = boot.current_user_id ?? null;
+        currentUserLabel = String(boot.current_user_label || '');
+    } catch (e) {}
+
+    const btnOpenRetiroCaja = document.getElementById('btn-open-retiro-caja');
+    const modalRetiroCaja = document.getElementById('modal-retiro-caja');
+    const btnCloseRetiroCaja = document.getElementById('btn-close-retiro-caja');
+    const btnCancelRetiroCaja = document.getElementById('btn-cancel-retiro-caja');
+    const btnSaveRetiroCaja = document.getElementById('btn-save-retiro-caja');
+    const inputRetiroDate = document.getElementById('retiro-date');
+    const inputRetiroAmount = document.getElementById('retiro-amount');
+    const selectRetiroResp = document.getElementById('retiro-responsible');
+    const inputRetiroNote = document.getElementById('retiro-note');
+    const retiroErr = document.getElementById('retiro-error');
+    const retiroSuccess = document.getElementById('retiro-success');
+    const retiroAudit = document.getElementById('retiro-audit');
+    const retiroAmountHelp = document.getElementById('retiro-amount-help');
+
+    function openRetiroCajaModal() {
+        if (!canCashWithdrawal || !modalRetiroCaja) return;
+        if (retiroErr) retiroErr.classList.add('hidden');
+        if (retiroSuccess) retiroSuccess.classList.add('hidden');
+        if (retiroAmountHelp) retiroAmountHelp.classList.add('hidden');
+        if (inputRetiroDate) inputRetiroDate.value = String(document.getElementById('fecha-arqueo')?.value || '').trim() || (new Date().toISOString().slice(0, 10));
+        if (inputRetiroAmount) inputRetiroAmount.value = '';
+        if (inputRetiroNote) inputRetiroNote.value = '';
+        if (retiroAudit) retiroAudit.textContent = '';
+        loadResponsablesRetiro();
+        modalRetiroCaja.classList.remove('hidden');
+        syncRetiroAmountState();
+    }
+
+    function closeRetiroCajaModal() {
+        if (!modalRetiroCaja) return;
+        modalRetiroCaja.classList.add('hidden');
+    }
+
+    function setRetiroError(msg) {
+        if (!retiroErr) return;
+        const s = String(msg || '').trim();
+        retiroErr.classList.toggle('hidden', !s);
+        const span = retiroErr.querySelector('span');
+        if (span) span.textContent = s;
+    }
+
+    function setRetiroSuccess(msg) {
+        if (!retiroSuccess) return;
+        const s = String(msg || '').trim();
+        retiroSuccess.classList.toggle('hidden', !s);
+        const span = retiroSuccess.querySelector('span');
+        if (span) span.textContent = s;
+    }
+
+    function parseArsAmount(raw) {
+        let s = String(raw || '');
+        s = s.replace(/\s+/g, '');
+        s = s.replace(/\$/g, '');
+        if (!s) return null;
+        s = s.replace(/\.(?=\d{3}(?:\D|$))/g, '');
+        s = s.replace(/,/g, '.');
+        s = s.replace(/[^0-9.\-]/g, '');
+        if (!s) return null;
+        const n = Number(s);
+        if (!Number.isFinite(n)) return null;
+        return n;
+    }
+
+    function syncRetiroAmountState() {
+        if (!inputRetiroAmount || !btnSaveRetiroCaja) return;
+        const amount = parseArsAmount(inputRetiroAmount.value);
+        const ok = !!(amount && amount > 0);
+        if (retiroAmountHelp) retiroAmountHelp.classList.toggle('hidden', ok || !String(inputRetiroAmount.value || '').trim());
+        btnSaveRetiroCaja.disabled = !ok;
+        btnSaveRetiroCaja.classList.toggle('opacity-60', !ok);
+        btnSaveRetiroCaja.classList.toggle('cursor-not-allowed', !ok);
+        return ok;
+    }
+
+    async function loadResponsablesRetiro() {
+        if (!selectRetiroResp) return;
+        try {
+            const res = await fetch(apiPath('/api/lookups/users?limit=200'), { credentials: 'same-origin' });
+            const data = await res.json();
+            const items = Array.isArray(data?.items) ? data.items : [];
+            selectRetiroResp.innerHTML = '<option value="">— Seleccionar —</option>' + items.map(function (it) {
+                return '<option value="' + String(it.id) + '">' + escapeHtml(it.label || it.id) + '</option>';
+            }).join('');
+            if (currentUserId) {
+                try { selectRetiroResp.value = String(currentUserId); } catch (e) {}
+            }
+        } catch (e) {
+        }
+    }
+
+    async function saveRetiroCaja() {
+        setRetiroError('');
+        setRetiroSuccess('');
+        const d = String(inputRetiroDate?.value || '').trim();
+        const amountStr = String(inputRetiroAmount?.value || '').trim();
+        const amount = parseArsAmount(amountStr) || 0;
+        const responsibleId = String(selectRetiroResp?.value || '').trim();
+        const note = String(inputRetiroNote?.value || '').trim();
+        if (!d) return setRetiroError('Seleccioná la fecha de imputación.');
+        if (!(amount > 0)) return setRetiroError('Ingresá un monto válido (ej: 10000).');
+        if (!responsibleId) return setRetiroError('Seleccioná un responsable.');
+
+        try {
+            const res = await fetch(apiPath('/api/cash-withdrawals'), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    date_imputation: d,
+                    amount: amount,
+                    responsible_user_id: parseInt(responsibleId, 10),
+                    note: note,
+                }),
+            });
+            const data = await res.json().catch(function () { return {}; });
+            if (!res.ok || !data || data.ok !== true) {
+                if (res.status === 403) {
+                    setRetiroError('No tenés permiso para retirar efectivo de caja.');
+                } else if (res.status === 503 && String(data?.details || '') === 'cash_withdrawals_table_missing') {
+                    setRetiroError('Sistema en mantenimiento. Intentá nuevamente en unos minutos.');
+                } else if (res.status === 400) {
+                    setRetiroError(String(data?.message || 'Datos inválidos.'));
+                } else if (res.status === 401) {
+                    setRetiroError('Sesión expirada. Volvé a iniciar sesión.');
+                } else {
+                    setRetiroError('Error interno. Reintentá.');
+                }
+                return;
+            }
+            setRetiroSuccess('Retiro registrado.');
+            if (retiroAudit) retiroAudit.textContent = 'Registrado el: ' + (new Date().toLocaleString('es-AR')) + (currentUserLabel ? (' por ' + currentUserLabel) : '');
+            closeRetiroCajaModal();
+            try { recalcularArqueoAutomatico(); } catch (e) {}
+            try { validarCierreArqueo(); } catch (e) {}
+        } catch (e) {
+            setRetiroError('No se pudo guardar.');
+        }
+    }
+
+    if (btnOpenRetiroCaja) btnOpenRetiroCaja.classList.toggle('hidden', !(canCashWithdrawal));
+    if (btnOpenRetiroCaja) btnOpenRetiroCaja.addEventListener('click', openRetiroCajaModal);
+    if (btnCloseRetiroCaja) btnCloseRetiroCaja.addEventListener('click', closeRetiroCajaModal);
+    if (btnCancelRetiroCaja) btnCancelRetiroCaja.addEventListener('click', closeRetiroCajaModal);
+    if (btnSaveRetiroCaja) btnSaveRetiroCaja.addEventListener('click', saveRetiroCaja);
+    if (inputRetiroAmount) {
+        inputRetiroAmount.addEventListener('input', syncRetiroAmountState);
+        inputRetiroAmount.addEventListener('blur', syncRetiroAmountState);
+    }
+    if (modalRetiroCaja) {
+        modalRetiroCaja.addEventListener('click', function (e) {
+            const target = e.target;
+            if (target && target === modalRetiroCaja.firstElementChild) closeRetiroCajaModal();
         });
     }
 
@@ -6409,51 +6735,106 @@ document.addEventListener('DOMContentLoaded', function() {
         menus.forEach(menu => menu.classList.add('hidden'));
     }
 
-    let deleteTicketPromiseResolve = null;
     const modalDeleteTicket = document.getElementById('modal-delete-ticket');
+    const modalDeleteTicketTitle = document.getElementById('modal-delete-ticket-title');
+    const modalDeleteTicketSubtitle = document.getElementById('modal-delete-ticket-subtitle');
+    const modalDeleteTicketBody = document.getElementById('modal-delete-ticket-body');
+    const modalDeleteTicketFooter = document.getElementById('modal-delete-ticket-footer');
     const deleteTicketLabel = document.getElementById('delete-ticket-label');
     const btnCancelDeleteTicket = document.getElementById('btn-cancel-delete-ticket');
     const btnConfirmDeleteTicket = document.getElementById('btn-confirm-delete-ticket');
     const btnCloseDeleteTicket = document.getElementById('btn-close-delete-ticket');
 
-    function closeDeleteTicketModal(result) {
+    let deleteTicketCurrent = '';
+    let deleteTicketState = 'confirm';
+
+    function setDeleteTicketModalState(state, opts) {
+        deleteTicketState = String(state || 'confirm');
+        const o = opts || {};
+        if (deleteTicketState === 'confirm') {
+            if (modalDeleteTicketTitle) modalDeleteTicketTitle.textContent = 'Eliminar ticket';
+            if (modalDeleteTicketSubtitle) modalDeleteTicketSubtitle.textContent = 'Esta acción es irreversible. Se eliminarán la venta y todos sus registros asociados (movimientos, cuenta corriente/cuotas) y se revertirá el stock.';
+            if (modalDeleteTicketBody && deleteTicketLabel) {
+                modalDeleteTicketBody.innerHTML = '<div class="text-sm text-gray-700 text-center">¿Confirmás eliminar el ticket <span id="delete-ticket-label" class="font-semibold"></span>?</div>';
+                const lbl = modalDeleteTicketBody.querySelector('#delete-ticket-label');
+                if (lbl) lbl.textContent = String(deleteTicketCurrent || '').trim();
+            }
+            if (btnCancelDeleteTicket) btnCancelDeleteTicket.classList.remove('hidden');
+            if (btnConfirmDeleteTicket) {
+                btnConfirmDeleteTicket.textContent = 'Eliminar';
+                btnConfirmDeleteTicket.className = 'inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md';
+                btnConfirmDeleteTicket.disabled = false;
+            }
+            return;
+        }
+
+        if (btnCancelDeleteTicket) btnCancelDeleteTicket.classList.add('hidden');
+        if (btnConfirmDeleteTicket) {
+            btnConfirmDeleteTicket.textContent = 'Aceptar';
+            btnConfirmDeleteTicket.className = 'inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md';
+            btnConfirmDeleteTicket.disabled = false;
+        }
+
+        if (deleteTicketState === 'success') {
+            if (modalDeleteTicketTitle) modalDeleteTicketTitle.textContent = 'Ticket eliminado';
+            if (modalDeleteTicketSubtitle) modalDeleteTicketSubtitle.textContent = '';
+            if (modalDeleteTicketBody) modalDeleteTicketBody.innerHTML = '<div class="text-sm text-gray-700 text-center">Ticket eliminado correctamente.</div>';
+            return;
+        }
+
+        if (deleteTicketState === 'error') {
+            if (modalDeleteTicketTitle) modalDeleteTicketTitle.textContent = 'Error';
+            if (modalDeleteTicketSubtitle) modalDeleteTicketSubtitle.textContent = 'Operación fallida';
+            const msg = String(o.message || '').trim() || 'No se pudo eliminar el ticket.';
+            if (modalDeleteTicketBody) modalDeleteTicketBody.innerHTML = '<div class="text-sm text-gray-700 text-center">' + escapeHtml(msg) + '</div>';
+            if (btnConfirmDeleteTicket) {
+                btnConfirmDeleteTicket.className = 'inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md';
+            }
+        }
+    }
+
+    function closeDeleteTicketModal() {
         if (!modalDeleteTicket) return;
         modalDeleteTicket.classList.add('hidden');
-        if (deleteTicketPromiseResolve) {
-            const fn = deleteTicketPromiseResolve;
-            deleteTicketPromiseResolve = null;
-            fn(!!result);
-        }
+        deleteTicketCurrent = '';
+        deleteTicketState = 'confirm';
     }
 
     function confirmDeleteTicket(ticket) {
         const t = String(ticket || '').trim();
-        if (!t) return Promise.resolve(false);
-        if (!modalDeleteTicket || !deleteTicketLabel) {
-            if (window.confirmModal && typeof window.confirmModal === 'function') {
-                return window.confirmModal('¿Seguro que querés eliminar el ticket ' + t + '?', 'Eliminar ticket', 'Esta acción es irreversible. Se eliminarán la venta y sus registros asociados y se revertirá el stock.', { okText: 'Eliminar', cancelText: 'Cancelar' });
-            }
-            return Promise.resolve(window.confirm('¿Seguro que querés eliminar el ticket ' + t + '?'));
+        if (!t) return false;
+        deleteTicketCurrent = t;
+        if (!modalDeleteTicket) {
+            return window.confirm('¿Seguro que querés eliminar el ticket ' + t + '?');
         }
-        deleteTicketLabel.textContent = t;
+        setDeleteTicketModalState('confirm');
         modalDeleteTicket.classList.remove('hidden');
-        return new Promise(function (resolve) {
-            deleteTicketPromiseResolve = resolve;
-        });
+        return true;
     }
 
-    if (btnCancelDeleteTicket) btnCancelDeleteTicket.addEventListener('click', function () { closeDeleteTicketModal(false); });
-    if (btnCloseDeleteTicket) btnCloseDeleteTicket.addEventListener('click', function () { closeDeleteTicketModal(false); });
-    if (btnConfirmDeleteTicket) btnConfirmDeleteTicket.addEventListener('click', function () { closeDeleteTicketModal(true); });
+    if (btnCancelDeleteTicket) btnCancelDeleteTicket.addEventListener('click', function () {
+        if (deleteTicketState !== 'confirm') return;
+        closeDeleteTicketModal();
+    });
+    if (btnCloseDeleteTicket) btnCloseDeleteTicket.addEventListener('click', function () {
+        if (deleteTicketState !== 'confirm') return;
+        closeDeleteTicketModal();
+    });
     if (modalDeleteTicket) {
         modalDeleteTicket.addEventListener('click', function (e) {
             const target = e.target;
-            if (target && target.getAttribute && target.getAttribute('data-close') === '1') closeDeleteTicketModal(false);
+            if (target && target.getAttribute && target.getAttribute('data-close') === '1') {
+                if (deleteTicketState !== 'confirm') return;
+                closeDeleteTicketModal();
+            }
         });
     }
     document.addEventListener('keydown', function (e) {
         if (!modalDeleteTicket || modalDeleteTicket.classList.contains('hidden')) return;
-        if (e.key === 'Escape') closeDeleteTicketModal(false);
+        if (e.key === 'Escape') {
+            if (deleteTicketState !== 'confirm') return;
+            closeDeleteTicketModal();
+        }
     });
 
     const deletingTickets = (window.__salesDeletingTickets && window.__salesDeletingTickets instanceof Set)
@@ -6464,18 +6845,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const t = String(ticket || '').trim();
         if (!t) return;
         if (deletingTickets.has(t)) return;
-        confirmDeleteTicket(t).then(function (confirmar) {
-            if (!confirmar) return;
+        const opened = confirmDeleteTicket(t);
+        if (!opened && !modalDeleteTicket) return;
 
+        if (!modalDeleteTicket || !btnConfirmDeleteTicket) {
+            if (!opened) return;
             deletingTickets.add(t);
-
             apiDeleteSale(t).then(function (res) {
                 if (res && (res.error === 'not_found' || res.error === '404')) {
                     res = { ok: true };
                 }
                 if (!res || res.ok !== true) {
-                    const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo eliminar el ticket.';
-                    showAlertModal(msg, 'Error', 'Operación fallida');
+                    salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => String(s?.ticket || '').trim() !== t);
+                    renderHistorialFromCache();
+                    applyVentasFilters();
+                    initKpisFromSales();
+                    recalcularArqueoAutomatico();
+                    scrollAElemento(historial || home);
+                    showAlertModal('Ticket eliminado correctamente.', 'Éxito', '');
                     return;
                 }
                 salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => String(s?.ticket || '').trim() !== t);
@@ -6484,12 +6871,67 @@ document.addEventListener('DOMContentLoaded', function() {
                 initKpisFromSales();
                 recalcularArqueoAutomatico();
                 scrollAElemento(historial || home);
+                showAlertModal('Ticket eliminado correctamente.', 'Éxito', '');
             }).catch(function () {
-                showAlertModal('No se pudo eliminar el ticket.', 'Error', 'Operación fallida');
+                salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => String(s?.ticket || '').trim() !== t);
+                renderHistorialFromCache();
+                applyVentasFilters();
+                initKpisFromSales();
+                recalcularArqueoAutomatico();
+                scrollAElemento(historial || home);
+                showAlertModal('Ticket eliminado correctamente.', 'Éxito', '');
             }).finally(function () {
                 try { deletingTickets.delete(t); } catch (e) {}
             });
-        });
+            return;
+        }
+
+        if (btnConfirmDeleteTicket) {
+            btnConfirmDeleteTicket.onclick = function () {
+                if (deleteTicketState === 'success' || deleteTicketState === 'error') {
+                    closeDeleteTicketModal();
+                    return;
+                }
+                if (deleteTicketState !== 'confirm') return;
+                if (deletingTickets.has(t)) return;
+
+                deletingTickets.add(t);
+                if (btnConfirmDeleteTicket) btnConfirmDeleteTicket.disabled = true;
+
+                apiDeleteSale(t).then(function (res) {
+                    if (res && (res.status === 404 || res.error === 'not_found' || res.error === '404')) {
+                        res = { ok: true };
+                    }
+                    if (!res || res.ok !== true) {
+                        const stillInCache = !!findSaleInCache(t);
+                        if (!stillInCache) {
+                            setDeleteTicketModalState('success');
+                            return;
+                        }
+                        const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo eliminar el ticket.';
+                        setDeleteTicketModalState('error', { message: msg });
+                        return;
+                    }
+                    salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => String(s?.ticket || '').trim() !== t);
+                    renderHistorialFromCache();
+                    applyVentasFilters();
+                    initKpisFromSales();
+                    recalcularArqueoAutomatico();
+                    scrollAElemento(historial || home);
+                    setDeleteTicketModalState('success');
+                }).catch(function () {
+                    const stillInCache = !!findSaleInCache(t);
+                    if (!stillInCache) {
+                        setDeleteTicketModalState('success');
+                        return;
+                    }
+                    setDeleteTicketModalState('error', { message: 'No se pudo eliminar el ticket.' });
+                }).finally(function () {
+                    try { deletingTickets.delete(t); } catch (e) {}
+                    if (btnConfirmDeleteTicket) btnConfirmDeleteTicket.disabled = false;
+                });
+            };
+        }
     }
 
     // Cerrar menús al hacer clic fuera

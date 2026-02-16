@@ -9,7 +9,7 @@ from flask_login import login_required
 from sqlalchemy import and_
 
 from app import db
-from app.models import BusinessSettings, CashCount, Category, Employee, Expense, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem
+from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Expense, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem
 from app.permissions import module_required
 from app.reports import bp
 
@@ -2246,7 +2246,7 @@ def inventory_rotation_api():
         yellow_days = green_days * 2
 
     # Products & category map
-    products = db.session.query(Product).filter(Product.company_id == cid).all()
+    products = db.session.query(Product).filter(Product.company_id == cid).filter(Product.active.is_(True)).all()
     cat_map = {}
     try:
         for c in (db.session.query(Category).filter(Category.company_id == cid).all() or []):
@@ -2368,12 +2368,8 @@ def inventory_rotation_api():
         pid = int(getattr(p, 'id', 0) or 0)
         if pid <= 0:
             continue
-        active = bool(getattr(p, 'active', True))
+        active = True
         qty_now = _num(stock_now.get(pid))
-
-        # Follow the requested "activo" filter, but keep items that still have stock.
-        if (not active) and qty_now <= 1e-9:
-            continue
 
         val_now = _num(stock_value_now.get(pid))
         totals_stock_value += val_now
@@ -2768,34 +2764,53 @@ def lookup_products_api():
 @module_required('reports')
 def lookup_customers_api():
     q = (request.args.get('q') or '').strip().lower()
-    limit = int(request.args.get('limit') or 100)
-    if limit <= 0 or limit > 300:
-        limit = 100
+    try:
+        limit = int(request.args.get('limit') or 50)
+    except Exception:
+        limit = 50
+    if limit <= 0:
+        limit = 50
+    if limit > 200:
+        limit = 200
 
     cid = _company_id()
     if not cid:
-        return jsonify({'ok': True, 'items': []})
+        return jsonify({'ok': False, 'error': 'unauthorized', 'message': 'No autorizado o sesión expirada.'}), 401
 
-    query = db.session.query(Customer).filter(Customer.company_id == cid)
-    if q:
-        like = f"%{q}%"
-        query = query.filter(
-            (Customer.name.ilike(like))
-            | (Customer.first_name.ilike(like))
-            | (Customer.last_name.ilike(like))
-            | (Customer.email.ilike(like))
-            | (Customer.phone.ilike(like))
-        )
-    rows = query.order_by(Customer.updated_at.desc(), Customer.created_at.desc()).limit(limit).all()
+    try:
+        query = db.session.query(Customer).filter(Customer.company_id == cid)
+        if q:
+            like = f"%{q}%"
+            query = query.filter(
+                (Customer.name.ilike(like))
+                | (Customer.first_name.ilike(like))
+                | (Customer.last_name.ilike(like))
+                | (Customer.email.ilike(like))
+                | (Customer.phone.ilike(like))
+            )
+        rows = query.order_by(Customer.name.asc(), Customer.updated_at.desc(), Customer.created_at.desc()).limit(limit).all()
 
-    def _full_name(c: Customer) -> str:
-        full = (str(getattr(c, 'first_name', '') or '').strip() + ' ' + str(getattr(c, 'last_name', '') or '').strip()).strip()
-        return (str(getattr(c, 'name', '') or '').strip() or full or str(getattr(c, 'id', '') or '').strip())
+        def _full_name(c: Customer) -> str:
+            full = (str(getattr(c, 'first_name', '') or '').strip() + ' ' + str(getattr(c, 'last_name', '') or '').strip()).strip()
+            return (str(getattr(c, 'name', '') or '').strip() or full or str(getattr(c, 'id', '') or '').strip())
 
-    return jsonify({
-        'ok': True,
-        'items': [{'id': str(r.id), 'label': _full_name(r)} for r in (rows or [])],
-    })
+        return jsonify({
+            'ok': True,
+            'items': [
+                {
+                    'id': str(r.id),
+                    'label': _full_name(r),
+                    'name': _full_name(r),
+                }
+                for r in (rows or [])
+            ],
+        })
+    except Exception:
+        try:
+            current_app.logger.exception('lookup_customers_api failed')
+        except Exception:
+            pass
+        return jsonify({'ok': False, 'error': 'internal_server_error'}), 500
 
 
 @bp.get('/api/lookups/payment_methods')
@@ -2817,6 +2832,9 @@ def lookup_payment_methods_api():
     for (pm,) in (rows or []):
         s = str(pm or '').strip()
         if not s:
+            continue
+        s_norm = s.lower()
+        if s_norm in ('ajuste interno', 'ajuste', 'interno', 'reversión', 'reversion'):
             continue
         if q and q not in s.lower():
             continue

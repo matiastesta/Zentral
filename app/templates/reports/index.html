@@ -983,16 +983,30 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
             const ct = String(res.headers.get('content-type') || '').toLowerCase();
+            if (res.status === 401 || res.status === 403) {
+                lookupResults.innerHTML = '<div class="p-3 text-sm text-gray-700">No autorizado / sesión expirada.</div>';
+                return;
+            }
             if (!res.ok) {
-                const txt = await res.text();
-                throw new Error('HTTP ' + res.status + ' ' + (txt ? txt.slice(0, 180) : ''));
+                let txt = '';
+                try { txt = await res.text(); } catch (e) { txt = ''; }
+                const suffix = txt ? (' ' + txt.slice(0, 180)) : '';
+                lookupResults.innerHTML = '<div class="p-3 text-sm text-gray-700">No se pudo cargar: HTTP ' + String(res.status) + escapeHtml(suffix) + '</div>';
+                return;
             }
             if (!ct.includes('application/json')) {
                 const txt = await res.text();
-                throw new Error('Respuesta no JSON (posible redirect). ' + (txt ? txt.slice(0, 180) : ''));
+                lookupResults.innerHTML = '<div class="p-3 text-sm text-gray-700">No se pudo cargar: Respuesta no JSON.</div>';
+                return;
             }
             const data = await res.json();
-            const items = (data && Array.isArray(data.items)) ? data.items : [];
+            let items = (data && Array.isArray(data.items)) ? data.items : [];
+            if (lookupActive === 'payment') {
+                items = items.filter(function (it) {
+                    const label = String((it && (it.label || it.name || it.id)) || '').trim().toLowerCase();
+                    return label !== 'ajuste interno';
+                });
+            }
             if (!items.length) {
                 lookupResults.innerHTML = '<div class="p-3 text-sm text-gray-500">Sin resultados.</div>';
                 return;

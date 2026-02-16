@@ -19,6 +19,8 @@ MODULE_KEYS = [
     'sales',
     'expenses',
     'inventory',
+    'cash_withdrawals',
+    'can_cash_withdrawal',
     'movements',
     'customers',
     'suppliers',
@@ -177,6 +179,12 @@ def index():
             perms = {}
             for key in MODULE_KEYS:
                 perms[key] = bool(request.form.get(f'perm_{key}') == 'on')
+            try:
+                v = bool(perms.get('can_cash_withdrawal', False) or perms.get('cash_withdrawals', False))
+                perms['can_cash_withdrawal'] = v
+                perms['cash_withdrawals'] = v
+            except Exception:
+                pass
             u.set_permissions(perms)
 
             db.session.add(u)
@@ -233,6 +241,12 @@ def index():
             perms = {}
             for key in MODULE_KEYS:
                 perms[key] = bool(request.form.get(f'perm_{key}') == 'on')
+            try:
+                v = bool(perms.get('can_cash_withdrawal', False) or perms.get('cash_withdrawals', False))
+                perms['can_cash_withdrawal'] = v
+                perms['cash_withdrawals'] = v
+            except Exception:
+                pass
             u.set_permissions(perms)
 
             db.session.commit()
@@ -372,6 +386,12 @@ def user_detail(user_id: int):
             perms = {}
             for key in MODULE_KEYS:
                 perms[key] = bool(request.form.get(f'perm_{key}') == 'on')
+            try:
+                v = bool(perms.get('can_cash_withdrawal', False) or perms.get('cash_withdrawals', False))
+                perms['can_cash_withdrawal'] = v
+                perms['cash_withdrawals'] = v
+            except Exception:
+                pass
             u.set_permissions(perms)
 
             db.session.commit()

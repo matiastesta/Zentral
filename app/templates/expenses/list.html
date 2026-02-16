@@ -25,7 +25,7 @@
                 <i class="fas fa-money-bill-wave"></i>
             </div>
             <div>
-                <p class="text-xs uppercase tracking-wide text-gray-500">Gastos de hoy</p>
+                <p id="kpi-gastos-hoy-label" class="text-xs uppercase tracking-wide text-gray-500">Gastos de hoy</p>
                 <p id="kpi-gastos-hoy" class="text-lg font-semibold text-gray-900">$0,00</p>
             </div>
         </div>
@@ -35,7 +35,7 @@
                 <i class="fas fa-receipt"></i>
             </div>
             <div>
-                <p class="text-xs uppercase tracking-wide text-gray-500">Cantidad de gastos de hoy</p>
+                <p id="kpi-cant-gastos-hoy-label" class="text-xs uppercase tracking-wide text-gray-500">Cantidad de gastos de hoy</p>
                 <p id="kpi-cant-gastos-hoy" class="text-lg font-semibold text-gray-900">0</p>
             </div>
         </div>
@@ -208,20 +208,13 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const TENANT_PREFIX = ((window.location && window.location.pathname || '').match(/^\/c\/[^\/]+/) || [''])[0];
-    function apiPath(p) {
-        const s = String(p || '');
-        if (!s.startsWith('/')) return s;
-        if (s.startsWith('/c/')) return s;
-        if (!TENANT_PREFIX) return s;
-        return TENANT_PREFIX + s;
-    }
-
     const tbody = document.getElementById('gastos-tbody');
     const elTotalPeriodo = document.getElementById('gastos-total-periodo');
 
     const kpiGastosHoy = document.getElementById('kpi-gastos-hoy');
+    const kpiGastosHoyLabel = document.getElementById('kpi-gastos-hoy-label');
     const kpiCantGastosHoy = document.getElementById('kpi-cant-gastos-hoy');
+    const kpiCantGastosHoyLabel = document.getElementById('kpi-cant-gastos-hoy-label');
     const kpiGastosMes = document.getElementById('kpi-gastos-mes');
     const kpiTopCatsPie = document.getElementById('kpi-top-cats-pie');
     const kpiTopCatsTooltip = document.getElementById('kpi-top-cats-tooltip');
@@ -284,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
     }
 
-    function updateKpis(allEgresos) {
+    function updateKpis(allEgresos, rangoFechas) {
         const list = Array.isArray(allEgresos) ? allEgresos : [];
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -296,6 +289,9 @@ document.addEventListener('DOMContentLoaded', function () {
         let totalMes = 0;
         const cats = {};
 
+        const hayRangoFechas = rangoFechas && rangoFechas.from && rangoFechas.to;
+        const esRangoHoy = hayRangoFechas && isSameDay(rangoFechas.from, today) && isSameDay(rangoFechas.to, today);
+
         list.forEach(e => {
             if (e && e.meta && e.meta.supplier_cc_payment === true) return;
             const dt = parseFechaEgreso(e?.fecha);
@@ -303,9 +299,16 @@ document.addEventListener('DOMContentLoaded', function () {
             const val = parseNumeroSeguro(e?.valor);
             if (!(val > 0)) return;
 
-            if (isSameDay(dt, today)) {
-                totalHoy += val;
-                countHoy += 1;
+            if (hayRangoFechas) {
+                if (dt >= rangoFechas.from && dt <= rangoFechas.to) {
+                    totalHoy += val;
+                    countHoy += 1;
+                }
+            } else {
+                if (isSameDay(dt, today)) {
+                    totalHoy += val;
+                    countHoy += 1;
+                }
             }
 
             if (dt.getFullYear() === year && dt.getMonth() === month) {
@@ -314,6 +317,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 cats[c] = (cats[c] || 0) + val;
             }
         });
+
+        if (hayRangoFechas && !esRangoHoy) {
+            if (kpiGastosHoyLabel) kpiGastosHoyLabel.textContent = 'Gastos del período';
+            if (kpiCantGastosHoyLabel) kpiCantGastosHoyLabel.textContent = 'Cantidad de gastos del período';
+        } else {
+            if (kpiGastosHoyLabel) kpiGastosHoyLabel.textContent = 'Gastos de hoy';
+            if (kpiCantGastosHoyLabel) kpiCantGastosHoyLabel.textContent = 'Cantidad de gastos de hoy';
+        }
 
         if (kpiGastosHoy) kpiGastosHoy.textContent = formatearMoneda(totalHoy);
         if (kpiCantGastosHoy) kpiCantGastosHoy.textContent = String(countHoy);
@@ -667,6 +678,16 @@ document.addEventListener('DOMContentLoaded', function () {
     function parseFechaEgreso(raw) {
         const v = String(raw || '').trim();
         if (!v) return null;
+        if (/^\d{4}-\d{2}-\d{2}/.test(v)) {
+            const base = v.slice(0, 10);
+            const parts = base.split('-').map(x => parseInt(x, 10));
+            const y = parts[0];
+            const m = parts[1];
+            const d = parts[2];
+            if (!d || !m || !y) return null;
+            const dtLocal = new Date(y, m - 1, d);
+            return isNaN(dtLocal.getTime()) ? null : dtLocal;
+        }
         if (v.includes('/')) {
             const [d, m, y] = v.split('/').map(x => parseInt(x, 10));
             if (!d || !m || !y) return null;
@@ -789,12 +810,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const res = leerEgresos();
         const apply = function (arr) {
         const egresosAll = Array.isArray(arr) ? arr.slice() : [];
-        updateKpis(egresosAll);
+        const rango = parseRangoFechas(filtroRango?.value);
+        updateKpis(egresosAll, rango);
         let egresos = egresosAll
             .filter(e => !(e && e.meta && e.meta.supplier_cc_payment === true))
             .slice();
 
-        const rango = parseRangoFechas(filtroRango?.value);
         if (rango) {
             egresos = egresos.filter(e => {
                 const dt = parseFechaEgreso(e?.fecha);
@@ -867,14 +888,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     </span>
                 </td>
                 <td class="px-3 py-2 text-xs text-right text-gray-700">${formatearMoneda(parseNumeroSeguro(e?.valor))}</td>
-                <td class="px-3 py-2 text-xs text-gray-700">${(() => {
-                    const sid = String(e?.supplier_id || '').trim();
-                    const label = String(e?.supplier_name || e?.proveedor || '-');
-                    if (sid) {
-                        return '<a class="text-indigo-700 hover:text-indigo-900 font-medium" href="' + apiPath('/suppliers') + '?open_legajo=' + encodeURIComponent(sid) + '">' + label.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</a>';
-                    }
-                    return label;
-                })()}</td>
+                <td class="px-3 py-2 text-xs text-gray-700">${e?.supplier_name || e?.proveedor || '-'}</td>
                 <td class="px-3 py-2 text-xs text-gray-500">${noteHtml}</td>
                 <td class="px-3 py-2 text-xs text-gray-500">${fileBtn}</td>
                 <td class="px-3 py-2 text-xs text-right">
@@ -1037,18 +1051,30 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (filtroRango && window.flatpickr) {
-        flatpickr(filtroRango, {
+        const fp = flatpickr(filtroRango, {
             mode: 'range',
             dateFormat: 'd/m/Y',
             locale: window.flatpickr && window.flatpickr.l10ns ? window.flatpickr.l10ns.es : 'es',
             allowInput: false,
             onChange: function (selectedDates) {
-                if (Array.isArray(selectedDates) && selectedDates.length === 2) {
+                if (!Array.isArray(selectedDates)) return;
+                if (selectedDates.length === 2) {
+                    renderTabla();
+                    return;
+                }
+                if (selectedDates.length === 0) {
+                    if (filtroRango) filtroRango.value = '';
                     renderTabla();
                 }
             },
             onClose: function (selectedDates) {
-                if (Array.isArray(selectedDates) && selectedDates.length === 2) {
+                if (!Array.isArray(selectedDates)) return;
+                if (selectedDates.length === 2) {
+                    renderTabla();
+                    return;
+                }
+                if (selectedDates.length === 0) {
+                    if (filtroRango) filtroRango.value = '';
                     renderTabla();
                 }
             }
@@ -1056,6 +1082,12 @@ document.addEventListener('DOMContentLoaded', function () {
         filtroRango.addEventListener('change', function () {
             renderTabla();
         });
+
+        try {
+            fp.setDate([], false);
+            if (filtroRango) filtroRango.value = '';
+        } catch (e) {
+        }
     }
 
     function openExport() {
@@ -1177,6 +1209,13 @@ td.num,th.num{text-align:right}
     }
     if (btnExportXls) btnExportXls.addEventListener('click', function () { exportCsv(); closeExport(); });
     if (btnExportPdf) btnExportPdf.addEventListener('click', function () { exportPdfPrint(); closeExport(); });
+
+    if (!filtroRango || !window.flatpickr) {
+        try {
+            if (filtroRango) filtroRango.value = '';
+        } catch (e) {
+        }
+    }
 
     renderTabla();
 });

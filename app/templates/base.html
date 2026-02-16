@@ -570,6 +570,28 @@
     <script>
         // Toggle mobile menu
         document.addEventListener('DOMContentLoaded', function() {
+            function setAppVh() {
+                try {
+                    const vv = window.visualViewport;
+                    const h = (vv && typeof vv.height === 'number' && vv.height > 0) ? vv.height : window.innerHeight;
+                    const vh = (h || 0) * 0.01;
+                    if (vh > 0) document.documentElement.style.setProperty('--app-vh', vh + 'px');
+                } catch (e) {
+                }
+            }
+
+            setAppVh();
+            window.addEventListener('resize', setAppVh, { passive: true });
+            window.addEventListener('orientationchange', function () {
+                setTimeout(setAppVh, 80);
+            }, { passive: true });
+            try {
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', setAppVh, { passive: true });
+                }
+            } catch (e) {
+            }
+
             const nav = document.querySelector('nav[data-brand-color]');
             if (nav) {
                 const c = (nav.getAttribute('data-brand-color') || '').trim();

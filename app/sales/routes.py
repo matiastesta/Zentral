@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload, joinedload
 
 from app import db
-from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem, User
+from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Expense, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem, User
 from app.permissions import module_required, module_required_any
 from app.sales import bp
 
@@ -28,6 +28,51 @@ def _dt_to_ms(dt):
     except Exception:
         current_app.logger.exception('Failed to convert datetime to milliseconds')
         return 0
+
+
+def _ensure_cash_count_snapshot_column() -> None:
+    try:
+        engine = db.engine
+        insp = inspect(engine)
+        if 'cash_count' not in set(insp.get_table_names() or []):
+            return
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('cash_count') or [])}
+        stmts = []
+        if 'efectivo_calculado_snapshot' not in cols:
+            if str(engine.url.drivername).startswith('sqlite'):
+                stmts.append('ALTER TABLE cash_count ADD COLUMN efectivo_calculado_snapshot FLOAT')
+            else:
+                stmts.append('ALTER TABLE cash_count ADD COLUMN IF NOT EXISTS efectivo_calculado_snapshot DOUBLE PRECISION')
+        if 'cash_expected_at_save' not in cols:
+            if str(engine.url.drivername).startswith('sqlite'):
+                stmts.append('ALTER TABLE cash_count ADD COLUMN cash_expected_at_save FLOAT')
+            else:
+                stmts.append('ALTER TABLE cash_count ADD COLUMN IF NOT EXISTS cash_expected_at_save DOUBLE PRECISION')
+        if 'last_cash_event_at_save' not in cols:
+            if str(engine.url.drivername).startswith('sqlite'):
+                stmts.append('ALTER TABLE cash_count ADD COLUMN last_cash_event_at_save DATETIME')
+            else:
+                stmts.append('ALTER TABLE cash_count ADD COLUMN IF NOT EXISTS last_cash_event_at_save TIMESTAMP')
+        if 'status' not in cols:
+            if str(engine.url.drivername).startswith('sqlite'):
+                stmts.append("ALTER TABLE cash_count ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'draft'")
+            else:
+                stmts.append("ALTER TABLE cash_count ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'draft'")
+        if 'done_at' not in cols:
+            if str(engine.url.drivername).startswith('sqlite'):
+                stmts.append('ALTER TABLE cash_count ADD COLUMN done_at DATETIME')
+            else:
+                stmts.append('ALTER TABLE cash_count ADD COLUMN IF NOT EXISTS done_at TIMESTAMP')
+        if not stmts:
+            return
+        with engine.begin() as conn:
+            for sql in stmts:
+                conn.execute(text(sql))
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to ensure cash_count snapshot column')
+        except Exception:
+            pass
 
 
 def _resolve_customer_display_name(cid: str, customer_id: str = None, customer_name: str = None) -> str:
@@ -1797,6 +1842,67 @@ def _num(v):
         return 0.0
 
 
+def _last_cash_event_sale(cid: str, d: dt_date):
+    try:
+        return (
+            db.session.query(func.max(Sale.updated_at))
+            .filter(Sale.company_id == cid)
+            .filter(Sale.sale_date == d)
+            .filter(Sale.payment_method == 'Efectivo')
+            .filter(Sale.status != 'Reemplazada')
+            .filter(Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota', 'Cambio', 'Devolucion', 'Devolución', 'Pago']))
+            .scalar()
+        )
+    except Exception:
+        return None
+
+
+def _last_cash_event_expense(cid: str, d: dt_date):
+    try:
+        return (
+            db.session.query(func.max(Expense.updated_at))
+            .filter(Expense.company_id == cid)
+            .filter(Expense.expense_date == d)
+            .filter(Expense.payment_method == 'Efectivo')
+            .scalar()
+        )
+    except Exception:
+        return None
+
+
+def _last_cash_event_withdrawal(cid: str, d: dt_date):
+    try:
+        from app.models import CashWithdrawal
+        return (
+            db.session.query(func.max(CashWithdrawal.updated_at))
+            .filter(CashWithdrawal.company_id == cid)
+            .filter(CashWithdrawal.fecha_imputacion == d)
+            .scalar()
+        )
+    except Exception:
+        return None
+
+
+def _cash_expected_now(cid: str, d: dt_date) -> float:
+    ventas = _cash_sales_total(cid, d)
+    egresos = _cash_expenses_total(cid, d)
+    retiros = _cash_withdrawals_total(cid, d)
+    return float((ventas or 0.0) - (egresos or 0.0) - (retiros or 0.0))
+
+
+def _last_cash_event_now(cid: str, d: dt_date):
+    a = _last_cash_event_sale(cid, d)
+    b = _last_cash_event_expense(cid, d)
+    c = _last_cash_event_withdrawal(cid, d)
+    candidates = [x for x in [a, b, c] if x is not None]
+    if not candidates:
+        return None
+    try:
+        return max(candidates)
+    except Exception:
+        return None
+
+
 def _int_or_none(v):
     try:
         if v is None:
@@ -3427,13 +3533,13 @@ def delete_sale(ticket):
     cid = _company_id()
     row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == t).first()
     if not row:
-        return jsonify({'ok': False, 'error': 'not_found'}), 404
+        return jsonify({'ok': False, 'error': 'not_found', 'message': 'Ticket no encontrado.'}), 404
 
     try:
         st = str(getattr(row, 'sale_type', '') or '').strip()
         notes = str(getattr(row, 'notes', '') or '')
         if st in ('AjusteInvCosto', 'IngresoAjusteInv') or ('AdjustmentId:' in notes):
-            return jsonify({'ok': False, 'error': 'locked'}), 400
+            return jsonify({'ok': False, 'error': 'locked', 'message': 'Este ticket no se puede eliminar.'}), 400
     except Exception:
         pass
     try:
@@ -3442,14 +3548,15 @@ def delete_sale(ticket):
         db.session.commit()
     except Exception:
         db.session.rollback()
-        return jsonify({'ok': False, 'error': 'db_error'}), 400
-    return jsonify({'ok': True})
+        return jsonify({'ok': False, 'error': 'db_error', 'message': 'No se pudo eliminar el ticket.'}), 400
+    return ('', 204)
 
 
 @bp.get('/api/cash-count')
 @login_required
 @module_required('sales')
 def get_cash_count():
+    _ensure_cash_count_snapshot_column()
     raw = (request.args.get('date') or '').strip()
     try:
         d = dt_date.fromisoformat(raw) if raw else dt_date.today()
@@ -3483,6 +3590,7 @@ def get_cash_count():
 @login_required
 @module_required('sales')
 def save_cash_count():
+    _ensure_cash_count_snapshot_column()
     payload = request.get_json(silent=True) or {}
 
     raw = str(payload.get('date') or payload.get('fecha') or '').strip()
@@ -3501,13 +3609,18 @@ def save_cash_count():
         except Exception:
             return 0.0
 
-    opening = num(payload.get('opening_amount'))
-    cash_day = num(payload.get('cash_day_amount'))
-    closing = num(payload.get('closing_amount'))
-    diff = (opening + cash_day) - closing
+    opening_in = payload.get('opening_amount', None)
+    cash_day_in = payload.get('cash_day_amount', None)
+    closing_in = payload.get('closing_amount', None)
 
-    employee_id = str(payload.get('employee_id') or '').strip() or None
-    employee_name = str(payload.get('employee_name') or '').strip() or None
+    opening = num(opening_in) if opening_in not in (None, '') else None
+    cash_day = num(cash_day_in) if cash_day_in not in (None, '') else None
+    closing = num(closing_in) if closing_in not in (None, '') else None
+
+    employee_id_raw = payload.get('employee_id', None)
+    employee_name_raw = payload.get('employee_name', None)
+    employee_id = str(employee_id_raw or '').strip() or None if employee_id_raw not in (None, '') else None
+    employee_name = str(employee_name_raw or '').strip() or None if employee_name_raw not in (None, '') else None
 
     row = db.session.query(CashCount).filter(CashCount.company_id == cid, CashCount.count_date == d).first()
     if not row:
@@ -3523,12 +3636,55 @@ def save_cash_count():
             except Exception:
                 pass
 
-    row.employee_id = employee_id
-    row.employee_name = employee_name
-    row.opening_amount = opening
-    row.cash_day_amount = cash_day
-    row.closing_amount = closing
-    row.difference_amount = diff
+    if 'employee_id' in payload and employee_id_raw not in (None, ''):
+        row.employee_id = employee_id
+    if 'employee_name' in payload and employee_name_raw not in (None, ''):
+        row.employee_name = employee_name
+    if 'opening_amount' in payload and opening is not None:
+        row.opening_amount = opening
+    if 'cash_day_amount' in payload and cash_day is not None:
+        row.cash_day_amount = cash_day
+        try:
+            row.efectivo_calculado_snapshot = float(cash_day)
+        except Exception:
+            row.efectivo_calculado_snapshot = None
+    if 'closing_amount' in payload and closing is not None:
+        row.closing_amount = closing
+
+    try:
+        opening_final = float(getattr(row, 'opening_amount', 0.0) or 0.0)
+    except Exception:
+        opening_final = 0.0
+    try:
+        cash_day_final = float(getattr(row, 'cash_day_amount', 0.0) or 0.0)
+    except Exception:
+        cash_day_final = 0.0
+    try:
+        closing_final = float(getattr(row, 'closing_amount', 0.0) or 0.0)
+    except Exception:
+        closing_final = 0.0
+    row.difference_amount = (opening_final + cash_day_final) - closing_final
+
+    cash_expected = _cash_expected_now(cid, d)
+    last_event = _last_cash_event_now(cid, d)
+    try:
+        row.cash_expected_at_save = float(cash_expected)
+    except Exception:
+        row.cash_expected_at_save = None
+    try:
+        row.last_cash_event_at_save = last_event
+    except Exception:
+        row.last_cash_event_at_save = None
+
+    has_employee = bool(str(getattr(row, 'employee_id', '') or '').strip())
+    has_cash_snapshot = row.cash_expected_at_save is not None
+    has_closing = bool((getattr(row, 'closing_amount', 0.0) or 0.0) > 0)
+    if has_employee and has_cash_snapshot and has_closing:
+        row.status = 'final'
+        if not getattr(row, 'done_at', None):
+            row.done_at = datetime.utcnow()
+    else:
+        row.status = 'draft'
     try:
         from flask_login import current_user
         row.created_by_user_id = int(getattr(current_user, 'id', 0) or 0) or None
@@ -3571,3 +3727,164 @@ def save_cash_count():
         return jsonify({'ok': False, 'error': 'db_error'}), 400
 
     return jsonify({'ok': True, 'item': {'date': row.count_date.isoformat(), 'difference_amount': row.difference_amount}})
+
+
+def _round2(v: float) -> float:
+    try:
+        return float(f"{float(v or 0.0):.2f}")
+    except Exception:
+        return 0.0
+
+
+def _cash_sales_total(cid: str, d: dt_date) -> float:
+    try:
+        q = (
+            db.session.query(func.coalesce(func.sum(Sale.total), 0.0))
+            .filter(Sale.company_id == cid)
+            .filter(Sale.sale_date == d)
+            .filter(Sale.payment_method == 'Efectivo')
+            .filter(Sale.status != 'Reemplazada')
+            .filter(Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota', 'Cambio', 'Devolucion', 'Devolución', 'Pago']))
+        )
+        return float(q.scalar() or 0.0)
+    except Exception:
+        return 0.0
+
+
+def _cash_expenses_total(cid: str, d: dt_date) -> float:
+    try:
+        q = (
+            db.session.query(func.coalesce(func.sum(Expense.amount), 0.0))
+            .filter(Expense.company_id == cid)
+            .filter(Expense.expense_date == d)
+            .filter(Expense.payment_method == 'Efectivo')
+        )
+        return float(q.scalar() or 0.0)
+    except Exception:
+        return 0.0
+
+
+def _cash_withdrawals_total(cid: str, d: dt_date) -> float:
+    try:
+        from app.models import CashWithdrawal
+        q = (
+            db.session.query(func.coalesce(func.sum(CashWithdrawal.monto), 0.0))
+            .filter(CashWithdrawal.company_id == cid)
+            .filter(CashWithdrawal.fecha_imputacion == d)
+        )
+        return float(q.scalar() or 0.0)
+    except Exception:
+        return 0.0
+
+
+@bp.get('/api/cash-register/status')
+@login_required
+@module_required('sales')
+def cash_register_status():
+    _ensure_cash_count_snapshot_column()
+    raw = (request.args.get('date') or '').strip()
+    try:
+        d = dt_date.fromisoformat(raw) if raw else dt_date.today()
+    except Exception:
+        d = dt_date.today()
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'is_done': False, 'has_cash_count': False})
+
+    row = db.session.query(CashCount).filter(CashCount.company_id == cid, CashCount.count_date == d).first()
+    if not row:
+        return jsonify({'ok': True, 'is_done': False, 'has_cash_count': False})
+
+    snap = getattr(row, 'efectivo_calculado_snapshot', None)
+    if snap is None:
+        snap = getattr(row, 'cash_day_amount', None)
+    try:
+        snap_v = float(snap or 0.0)
+    except Exception:
+        snap_v = 0.0
+
+    ventas = _cash_sales_total(cid, d)
+    egresos = _cash_expenses_total(cid, d)
+    retiros = _cash_withdrawals_total(cid, d)
+    actual = ventas - egresos - retiros
+
+    is_done = _round2(actual) == _round2(snap_v)
+    return jsonify({
+        'ok': True,
+        'has_cash_count': True,
+        'is_done': bool(is_done),
+        'date': d.isoformat(),
+        'efectivo_actual_calculado': _round2(actual),
+        'efectivo_calculado_snapshot': _round2(snap_v),
+    })
+
+
+@bp.get('/api/cash-count/status')
+@login_required
+@module_required('sales')
+def cash_count_status():
+    _ensure_cash_count_snapshot_column()
+    raw = (request.args.get('date') or '').strip()
+    try:
+        d = dt_date.fromisoformat(raw) if raw else dt_date.today()
+    except Exception:
+        d = dt_date.today()
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'date': d.isoformat(), 'has_record': False, 'status': 'none', 'is_valid': False, 'should_show': 'pendiente'})
+
+    row = db.session.query(CashCount).filter(CashCount.company_id == cid, CashCount.count_date == d).first()
+    if not row:
+        return jsonify({'ok': True, 'date': d.isoformat(), 'has_record': False, 'status': 'none', 'is_valid': False, 'should_show': 'pendiente'})
+
+    expected_now = _cash_expected_now(cid, d)
+    last_now = _last_cash_event_now(cid, d)
+
+    expected_save = getattr(row, 'cash_expected_at_save', None)
+    if expected_save is None:
+        expected_save = getattr(row, 'efectivo_calculado_snapshot', None)
+    if expected_save is None:
+        expected_save = getattr(row, 'cash_day_amount', None)
+
+    try:
+        expected_save_v = float(expected_save or 0.0)
+    except Exception:
+        expected_save_v = 0.0
+
+    last_save = getattr(row, 'last_cash_event_at_save', None)
+
+    st = str(getattr(row, 'status', '') or '').strip().lower()
+    if st not in ('draft', 'final'):
+        st = 'draft'
+
+    same_cash = _round2(expected_now) == _round2(expected_save_v)
+    time_ok = True
+    if last_now is not None and last_save is not None:
+        try:
+            time_ok = last_now <= last_save
+        except Exception:
+            time_ok = False
+    elif last_now is not None and last_save is None:
+        time_ok = False
+
+    is_valid = bool(st == 'final' and same_cash and time_ok)
+    should_show = 'realizado' if is_valid else 'pendiente'
+
+    return jsonify({
+        'ok': True,
+        'date': d.isoformat(),
+        'has_record': True,
+        'status': st,
+        'is_valid': is_valid,
+        'should_show': should_show,
+        'apertura': float(getattr(row, 'opening_amount', 0.0) or 0.0),
+        'cierre': float(getattr(row, 'closing_amount', 0.0) or 0.0),
+        'responsable_id': getattr(row, 'employee_id', None),
+        'cash_expected_now': _round2(expected_now),
+        'cash_expected_at_save': _round2(expected_save_v),
+        'last_cash_event_now': (last_now.isoformat() if last_now else None),
+        'last_cash_event_at_save': (last_save.isoformat() if last_save else None),
+        'done_at': (getattr(row, 'done_at', None).isoformat() if getattr(row, 'done_at', None) else None),
+    })

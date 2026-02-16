@@ -161,6 +161,8 @@ class User(UserMixin, db.Model):
             'sales': val,
             'expenses': val,
             'inventory': val,
+            'cash_withdrawals': val,
+            'can_cash_withdrawal': val,
             'customers': val,
             'suppliers': val,
             'employees': val,
@@ -178,7 +180,10 @@ class User(UserMixin, db.Model):
         if self.role in {'zentral_admin'}:
             return True
         perms = self.get_permissions()
-        return bool(perms.get(str(module_name), False))
+        key = str(module_name or '').strip()
+        if key in {'can_cash_withdrawal', 'cash_withdrawals'}:
+            return bool(perms.get('can_cash_withdrawal', False) or perms.get('cash_withdrawals', False))
+        return bool(perms.get(key, False))
 
 
 class BusinessSettings(db.Model):
@@ -494,6 +499,11 @@ class CashCount(db.Model):
     employee_name = db.Column(db.String(255), nullable=True)
     opening_amount = db.Column(db.Float, nullable=False, default=0.0)
     cash_day_amount = db.Column(db.Float, nullable=False, default=0.0)
+    efectivo_calculado_snapshot = db.Column(db.Float, nullable=True)
+    cash_expected_at_save = db.Column(db.Float, nullable=True)
+    last_cash_event_at_save = db.Column(db.DateTime, nullable=True)
+    status = db.Column(db.String(16), nullable=False, default='draft')
+    done_at = db.Column(db.DateTime, nullable=True)
     closing_amount = db.Column(db.Float, nullable=False, default=0.0)
     difference_amount = db.Column(db.Float, nullable=False, default=0.0)
     created_by_user_id = db.Column(db.Integer, nullable=True)
@@ -502,6 +512,29 @@ class CashCount(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('company_id', 'count_date', name='uq_cash_count_company_date'),
+    )
+
+
+class CashWithdrawal(db.Model):
+    __tablename__ = 'cash_withdrawals'
+
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
+
+    fecha_imputacion = db.Column(db.Date, nullable=False, index=True)
+    fecha_registro = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    monto = db.Column(db.Float, nullable=False, default=0.0)
+    nota = db.Column(db.Text, nullable=True)
+
+    usuario_registro_id = db.Column(db.Integer, nullable=True)
+    usuario_responsable_id = db.Column(db.Integer, nullable=True)
+
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('ix_cash_withdrawals_company_imputacion', 'company_id', 'fecha_imputacion'),
     )
 
 

@@ -6,6 +6,109 @@
     <p class="mt-1 text-sm text-gray-600">Consulta el historial de ingresos y gastos con filtros avanzados.</p>
 </div>
 
+<script id="mov-withdrawals-bootstrap" type="application/json">{{ {
+    'can_withdraw': (current_user.is_authenticated and current_user.can('cash_withdrawals')),
+    'is_admin': (current_user.is_authenticated and (current_user.is_master or current_user.role in ['admin','company_admin','zentral_admin'])),
+    'current_user_label': (current_user.display_name or current_user.username or '')
+}|tojson }}</script>
+
+<div id="modal-arqueo-detalle" class="hidden fixed inset-0 z-50" style="z-index: 80;">
+    <div class="absolute inset-0 bg-black/40" data-close="1"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: calc(100dvh - 2rem);">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Detalle del arqueo</h3>
+                    <p id="arqueo-detalle-subtitle" class="text-xs text-gray-500">—</p>
+                </div>
+                <button id="btn-close-arqueo-detalle" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4 overflow-y-auto" style="min-height: 0;">
+                <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div class="text-sm font-semibold text-gray-900">Retiros de efectivo</div>
+                    <div class="mt-1 text-xs text-gray-500">Movimientos internos que reducen el efectivo disponible. Impactan por fecha de imputación.</div>
+                    <div class="mt-3 flex items-center justify-between gap-3">
+                        <div id="arqueo-detalle-msg" class="text-[11px] text-gray-600"></div>
+                        <button id="btn-open-new-withdrawal" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700 hidden">
+                            <i class="fas fa-minus-circle mr-2"></i> Registrar retiro
+                        </button>
+                    </div>
+
+                    <div class="mt-3 rounded-lg border border-gray-200 bg-white overflow-hidden">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm" id="table-withdrawals">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha imputación</th>
+                                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Monto</th>
+                                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Nota</th>
+                                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Registrado el</th>
+                                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Usuario</th>
+                                    <th class="px-4 py-3"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="withdrawals-tbody" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2 bg-white">
+                <button id="btn-close-arqueo-detalle-footer" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-new-withdrawal" class="hidden fixed inset-0 z-50" style="z-index: 90;">
+    <div class="absolute inset-0 bg-black/40" data-close="1"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: calc(100dvh - 2rem);">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Registrar retiro</h3>
+                    <p id="new-withdrawal-subtitle" class="text-xs text-gray-500">Movimiento interno. No es ingreso ni gasto.</p>
+                </div>
+                <button id="btn-close-new-withdrawal" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-3 overflow-y-auto" style="min-height: 0;">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Fecha de imputación</label>
+                        <input id="withdrawal-date" type="date" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                        <div id="withdrawal-date-help" class="mt-1 text-[11px] text-gray-500"></div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Monto</label>
+                        <input id="withdrawal-amount" type="text" inputmode="decimal" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="$0">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Responsable</label>
+                    <select id="withdrawal-responsible" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
+                        <option value="">— Seleccionar —</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Nota</label>
+                    <textarea id="withdrawal-note" rows="3" class="w-full px-3 py-2 text-sm border rounded-md" placeholder=""></textarea>
+                    <div id="withdrawal-note-help" class="mt-1 text-[11px] text-gray-500 hidden">Estás registrando un retiro retroactivo. El registro quedará auditado con fecha actual.</div>
+                </div>
+                <div id="withdrawal-error" class="text-[11px] text-red-600 hidden flex items-center gap-1"><i class="fas fa-exclamation-circle"></i><span></span></div>
+                <div id="withdrawal-audit" class="text-[11px] text-gray-500"></div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2 bg-white">
+                <button id="btn-cancel-new-withdrawal" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-save-new-withdrawal" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="bg-white rounded-lg shadow border border-gray-200 overflow-visible">
     <div class="border-b border-gray-200">
         <nav class="flex -mb-px" aria-label="Tabs">
@@ -149,10 +252,11 @@
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Apertura</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Efectivo del día</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Cierre</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"></th>
                         </tr>
                     </thead>
                     <tbody id="mov-arqueo-tbody" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
+                        <tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -248,6 +352,21 @@ document.addEventListener('DOMContentLoaded', function () {
     function formatearMoneda(valor) {
         const numero = isNaN(valor) ? 0 : valor;
         return '$' + numero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    let CAN_WITHDRAW = false;
+    let IS_ADMIN = false;
+    let CURRENT_USER_LABEL = '';
+    try {
+        const bootEl = document.getElementById('mov-withdrawals-bootstrap');
+        const boot = bootEl ? JSON.parse(bootEl.textContent || '{}') : {};
+        CAN_WITHDRAW = !!boot.can_withdraw;
+        IS_ADMIN = !!boot.is_admin;
+        CURRENT_USER_LABEL = String(boot.current_user_label || '');
+    } catch (e) {
+        CAN_WITHDRAW = false;
+        IS_ADMIN = false;
+        CURRENT_USER_LABEL = '';
     }
 
     function fmtFecha(v) {
@@ -1043,7 +1162,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const fromIso = rango ? (rango.from.getFullYear() + '-' + String(rango.from.getMonth() + 1).padStart(2, '0') + '-' + String(rango.from.getDate()).padStart(2, '0')) : '';
         const toIso = rango ? (rango.to.getFullYear() + '-' + String(rango.to.getMonth() + 1).padStart(2, '0') + '-' + String(rango.to.getDate()).padStart(2, '0')) : '';
 
-        tbodyArqueo.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
+        tbodyArqueo.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
         getArqueosFromApi(fromIso, toIso, function (items) {
             let historico = Array.isArray(items) ? items.slice() : [];
             historico.sort((a, b) => String(b?.date || '').localeCompare(String(a?.date || '')));
@@ -1058,22 +1177,267 @@ document.addEventListener('DOMContentLoaded', function () {
 
             tbodyArqueo.innerHTML = '';
             if (!historico.length) {
-                tbodyArqueo.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+                tbodyArqueo.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
                 return;
             }
             historico.forEach(r => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
+                const dateIso = String(r?.date || '').trim();
                 tr.innerHTML = ''
                     + '<td class="px-4 py-3 text-sm text-gray-700">' + fmtFecha(r?.date || '-') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-700">' + String(r?.employee_name || '-') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.opening_amount)) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.cash_day_amount)) + '</td>'
-                    + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.closing_amount)) + '</td>';
+                    + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.closing_amount)) + '</td>'
+                    + '<td class="px-4 py-3 text-right">'
+                    +   '<button type="button" class="btn-arqueo-detalle inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-md hover:bg-blue-100" data-date="' + escapeHtml(dateIso) + '">Ver detalle</button>'
+                    + '</td>';
                 tbodyArqueo.appendChild(tr);
             });
+
+            try {
+                tbodyArqueo.querySelectorAll('.btn-arqueo-detalle').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        const d = String(btn.getAttribute('data-date') || '').trim();
+                        if (!d) return;
+                        openArqueoDetalle(d);
+                    });
+                });
+            } catch (e) {}
         });
     }
+
+    const modalDetalle = document.getElementById('modal-arqueo-detalle');
+    const btnCloseDetalle = document.getElementById('btn-close-arqueo-detalle');
+    const btnCloseDetalleFooter = document.getElementById('btn-close-arqueo-detalle-footer');
+    const detalleSubtitle = document.getElementById('arqueo-detalle-subtitle');
+    const detalleMsg = document.getElementById('arqueo-detalle-msg');
+    const btnOpenNewWithdrawal = document.getElementById('btn-open-new-withdrawal');
+    const tbodyWithdrawals = document.getElementById('withdrawals-tbody');
+
+    const modalNewWithdrawal = document.getElementById('modal-new-withdrawal');
+    const btnCloseNewWithdrawal = document.getElementById('btn-close-new-withdrawal');
+    const btnCancelNewWithdrawal = document.getElementById('btn-cancel-new-withdrawal');
+    const btnSaveNewWithdrawal = document.getElementById('btn-save-new-withdrawal');
+    const inputWDate = document.getElementById('withdrawal-date');
+    const helpWDate = document.getElementById('withdrawal-date-help');
+    const inputWAmount = document.getElementById('withdrawal-amount');
+    const inputWNote = document.getElementById('withdrawal-note');
+    const helpWNote = document.getElementById('withdrawal-note-help');
+    const selWResp = document.getElementById('withdrawal-responsible');
+    const errW = document.getElementById('withdrawal-error');
+    const auditW = document.getElementById('withdrawal-audit');
+
+    let activeDetalleDate = '';
+
+    function todayIso() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + dd;
+    }
+
+    function openModal(modal) {
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+    function closeModal(modal) {
+        if (!modal) return;
+        modal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    async function loadResponsibles() {
+        if (!selWResp) return;
+        try {
+            const url = apiPath('/movements/api/lookups/users?limit=200');
+            const res = await fetch(url, { credentials: 'same-origin' });
+            const data = await res.json();
+            const items = Array.isArray(data?.items) ? data.items : [];
+            selWResp.innerHTML = '<option value="">— Seleccionar —</option>' + items.map(function (it) {
+                return '<option value="' + String(it.id) + '">' + escapeHtml(it.label || it.id) + '</option>';
+            }).join('');
+        } catch (e) {
+        }
+    }
+
+    function syncRetroNote() {
+        const d = String(inputWDate?.value || '').trim();
+        const retro = d && d !== todayIso();
+        if (helpWNote) helpWNote.classList.toggle('hidden', !retro);
+    }
+
+    function setWithdrawalError(msg) {
+        if (!errW) return;
+        const s = String(msg || '').trim();
+        errW.classList.toggle('hidden', !s);
+        const span = errW.querySelector('span');
+        if (span) span.textContent = s;
+    }
+
+    async function fetchWithdrawals(dIso) {
+        const url = apiPath('/movements/api/cash-withdrawals?date=' + encodeURIComponent(dIso));
+        const res = await fetch(url, { credentials: 'same-origin' });
+        const data = await res.json();
+        return Array.isArray(data?.items) ? data.items : [];
+    }
+
+    function renderWithdrawals(items) {
+        if (!tbodyWithdrawals) return;
+        const list = Array.isArray(items) ? items : [];
+        if (!list.length) {
+            tbodyWithdrawals.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin retiros.</td></tr>';
+            return;
+        }
+        tbodyWithdrawals.innerHTML = '';
+        list.forEach(function (w) {
+            const tr = document.createElement('tr');
+            const rid = String(w?.id || '').trim();
+            tr.innerHTML = ''
+                + '<td class="px-4 py-3 text-sm text-gray-700">' + escapeHtml(w?.fecha_imputacion || '—') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseNumeroSeguro(w?.monto)) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600">' + escapeHtml(w?.nota || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-500">' + escapeHtml((w?.fecha_registro || '').replace('T', ' ').slice(0, 16)) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-700">' + escapeHtml(w?.usuario_registro || w?.usuario_responsable || '—') + '</td>'
+                + '<td class="px-4 py-3 text-right">'
+                +   (CAN_WITHDRAW ? '<button type="button" class="btn-del-w h-9 w-9 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-id="' + escapeHtml(rid) + '" title="Eliminar"><i class="fas fa-trash text-[12px]"></i></button>' : '')
+                + '</td>';
+            tbodyWithdrawals.appendChild(tr);
+        });
+
+        try {
+            tbodyWithdrawals.querySelectorAll('.btn-del-w').forEach(function (btn) {
+                btn.addEventListener('click', async function () {
+                    const id = String(btn.getAttribute('data-id') || '').trim();
+                    if (!id) return;
+                    const ok = await (window.confirmModal ? window.confirmModal(
+                        '¿Querés eliminar este retiro? Impacta el arqueo por la fecha de imputación.',
+                        'Eliminar retiro',
+                        'No se puede deshacer.'
+                    ) : Promise.resolve(window.confirm('¿Eliminar retiro?')));
+                    if (!ok) return;
+                    const url = apiPath('/movements/api/cash-withdrawals/' + encodeURIComponent(id));
+                    const res = await fetch(url, { method: 'DELETE', credentials: 'same-origin' });
+                    const data = await res.json().catch(function () { return {}; });
+                    if (!data || data.ok !== true) {
+                        const msg = String(data?.message || data?.error || 'No se pudo eliminar.');
+                        if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Eliminar retiro');
+                        return;
+                    }
+                    await refreshDetalle();
+                });
+            });
+        } catch (e) {}
+    }
+
+    async function refreshDetalle() {
+        if (!activeDetalleDate) return;
+        if (tbodyWithdrawals) tbodyWithdrawals.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
+        try {
+            const items = await fetchWithdrawals(activeDetalleDate);
+            renderWithdrawals(items);
+            if (detalleMsg) detalleMsg.textContent = '';
+        } catch (e) {
+            if (detalleMsg) detalleMsg.textContent = 'No se pudieron cargar los retiros.';
+        }
+    }
+
+    async function openArqueoDetalle(dateIso) {
+        activeDetalleDate = String(dateIso || '').trim();
+        if (detalleSubtitle) detalleSubtitle.textContent = activeDetalleDate ? ('Fecha: ' + activeDetalleDate) : '—';
+        if (btnOpenNewWithdrawal) btnOpenNewWithdrawal.classList.toggle('hidden', !(CAN_WITHDRAW));
+        openModal(modalDetalle);
+        await refreshDetalle();
+    }
+
+    function openNewWithdrawal() {
+        if (!CAN_WITHDRAW) return;
+        setWithdrawalError('');
+        if (auditW) {
+            const now = new Date();
+            auditW.textContent = 'Registrado el: ' + now.toLocaleString('es-AR') + (CURRENT_USER_LABEL ? (' por ' + CURRENT_USER_LABEL) : '');
+        }
+
+        const d = activeDetalleDate || todayIso();
+        if (inputWDate) inputWDate.value = d;
+        if (helpWDate) helpWDate.textContent = IS_ADMIN ? 'Podés imputar a otra fecha.' : 'Solo podés imputar al día actual.';
+        if (inputWDate) inputWDate.disabled = (!IS_ADMIN);
+        if (inputWAmount) inputWAmount.value = '';
+        if (inputWNote) inputWNote.value = '';
+        if (selWResp) selWResp.value = '';
+        syncRetroNote();
+        openModal(modalNewWithdrawal);
+        loadResponsibles();
+    }
+
+    async function saveNewWithdrawal() {
+        setWithdrawalError('');
+        const d = String(inputWDate?.value || '').trim();
+        const amountRaw = String(inputWAmount?.value || '').trim();
+        const n = parseNumeroSeguro(amountRaw.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''));
+        const note = String(inputWNote?.value || '').trim();
+        const resp = String(selWResp?.value || '').trim();
+
+        if (!d) {
+            setWithdrawalError('Seleccioná la fecha de imputación.');
+            return;
+        }
+        if (!isFinite(n) || n <= 0) {
+            setWithdrawalError('El monto debe ser mayor a 0.');
+            return;
+        }
+        if (d !== todayIso() && !note) {
+            setWithdrawalError('La nota es obligatoria para retiros retroactivos.');
+            return;
+        }
+
+        const payload = {
+            fecha_imputacion: d,
+            monto: n,
+            nota: note,
+            usuario_responsable_id: resp ? parseInt(resp, 10) : null,
+        };
+        try {
+            const url = apiPath('/movements/api/cash-withdrawals');
+            const res = await fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json().catch(function () { return {}; });
+            if (!data || data.ok !== true) {
+                setWithdrawalError(String(data?.message || data?.error || 'No se pudo guardar.'));
+                return;
+            }
+            closeModal(modalNewWithdrawal);
+            await refreshDetalle();
+        } catch (e) {
+            setWithdrawalError('No se pudo guardar.');
+        }
+    }
+
+    if (btnOpenNewWithdrawal) btnOpenNewWithdrawal.addEventListener('click', openNewWithdrawal);
+    if (btnCloseDetalle) btnCloseDetalle.addEventListener('click', function () { closeModal(modalDetalle); });
+    if (btnCloseDetalleFooter) btnCloseDetalleFooter.addEventListener('click', function () { closeModal(modalDetalle); });
+
+    if (btnCloseNewWithdrawal) btnCloseNewWithdrawal.addEventListener('click', function () { closeModal(modalNewWithdrawal); });
+    if (btnCancelNewWithdrawal) btnCancelNewWithdrawal.addEventListener('click', function () { closeModal(modalNewWithdrawal); });
+    if (btnSaveNewWithdrawal) btnSaveNewWithdrawal.addEventListener('click', saveNewWithdrawal);
+    if (inputWDate) inputWDate.addEventListener('change', syncRetroNote);
+
+    document.addEventListener('click', function (e) {
+        const tgt = e && e.target ? e.target : null;
+        if (!tgt) return;
+        const close = tgt.getAttribute && tgt.getAttribute('data-close') === '1';
+        if (!close) return;
+        const modal = tgt.parentElement;
+        if (modal === modalDetalle) closeModal(modalDetalle);
+        if (modal === modalNewWithdrawal) closeModal(modalNewWithdrawal);
+    });
 
     function setTab(tab) {
         activeTab = tab;
@@ -1392,7 +1756,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     setTab('ventas');
 
-    return;
 });
 </script>
 {% endblock %}
