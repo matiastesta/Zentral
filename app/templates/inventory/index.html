@@ -179,7 +179,7 @@
                         <div id="adjust-lot-product" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
                     </div>
                     <div class="md:col-span-3">
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Consumido</label>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Cantidad inicial</label>
                         <div id="adjust-lot-consumed" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
                     </div>
                     <div class="md:col-span-3">
@@ -4322,14 +4322,21 @@ document.addEventListener('DOMContentLoaded', function () {
         const today = new Date();
         const isoToday = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
 
-        if (adjustLotSubtitle) adjustLotSubtitle.textContent = String(prod?.name || lot?.product_name || '');
+        const remainingQty = parseNumeroSeguro(lot?.qty_available);
+        const initialQty = parseNumeroSeguro(lot?.qty_initial);
+        const consumedQty = parseNumeroSeguro(editingLotConsumedQty);
+
+        if (adjustLotSubtitle) {
+            const base = String(prod?.name || lot?.product_name || '');
+            adjustLotSubtitle.textContent = base + (consumedQty > 1e-9 ? (' · Consumido: ' + String(consumedQty.toLocaleString('es-AR', { maximumFractionDigits: 2 }))) : '');
+        }
         if (adjustLotProduct) adjustLotProduct.textContent = String(prod?.name || lot?.product_name || '');
-        if (adjustLotConsumed) adjustLotConsumed.textContent = String(parseNumeroSeguro(editingLotConsumedQty).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+        if (adjustLotConsumed) adjustLotConsumed.textContent = String(initialQty.toLocaleString('es-AR', { maximumFractionDigits: 2 }));
         if (adjustLotDate) adjustLotDate.textContent = fmtFecha(isoToday);
-        if (adjustLotQtyOld) adjustLotQtyOld.textContent = String(parseNumeroSeguro(lot?.qty_initial).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+        if (adjustLotQtyOld) adjustLotQtyOld.textContent = String(remainingQty.toLocaleString('es-AR', { maximumFractionDigits: 2 }));
         if (adjustLotCuOld) adjustLotCuOld.textContent = formatMonedaARS(parseNumeroSeguro(lot?.unit_cost));
 
-        if (adjustLotQtyNew) adjustLotQtyNew.value = String(parseNumeroSeguro(lot?.qty_initial) || '');
+        if (adjustLotQtyNew) adjustLotQtyNew.value = String(remainingQty || '');
         if (adjustLotCuNew) adjustLotCuNew.value = formatMonedaARS(parseNumeroSeguro(lot?.unit_cost));
         if (adjustLotNote) adjustLotNote.value = '';
         if (adjustLotMsg) adjustLotMsg.textContent = '';
@@ -4342,17 +4349,18 @@ document.addEventListener('DOMContentLoaded', function () {
         const id = String(editingLotId || '').trim();
         if (!id) return;
 
-        const qtyInitial = parseNumeroSeguro(adjustLotQtyNew?.value);
+        const newRemaining = parseNumeroSeguro(adjustLotQtyNew?.value);
+        const consumedQty = parseNumeroSeguro(editingLotConsumedQty);
+        const qtyInitial = consumedQty + Math.max(0, newRemaining);
         const unitCost = parseMonedaARS(adjustLotCuNew?.value);
         const note = String(adjustLotNote?.value || '').trim();
 
-        if (!(qtyInitial > 0)) {
-            if (adjustLotMsg) adjustLotMsg.textContent = 'La cantidad debe ser mayor a 0.';
+        if (!(newRemaining >= 0)) {
+            if (adjustLotMsg) adjustLotMsg.textContent = 'La cantidad no puede ser negativa.';
             return;
         }
-        if (qtyInitial + 1e-9 < parseNumeroSeguro(editingLotConsumedQty)) {
-            if (adjustLotMsg) adjustLotMsg.textContent = 'La cantidad nueva no puede ser menor a la cantidad ya consumida.';
-            return;
+        if (newRemaining <= 1e-9) {
+            if (adjustLotMsg) adjustLotMsg.textContent = 'Esto dejará el lote sin stock disponible.';
         }
         if (!(unitCost >= 0)) {
             if (adjustLotMsg) adjustLotMsg.textContent = 'El costo unitario no puede ser negativo.';
@@ -4379,7 +4387,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const msg = (err === 'qty_below_consumed')
                     ? 'La cantidad nueva no puede ser menor a lo consumido.'
                     : (err === 'qty_required')
-                        ? 'La cantidad debe ser mayor a 0.'
+                        ? 'La cantidad no puede ser negativa.'
                         : (err === 'unit_cost_invalid')
                             ? 'El costo unitario no puede ser negativo.'
                             : (err === 'no_company')

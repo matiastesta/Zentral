@@ -2560,7 +2560,7 @@ def adjust_lot(lot_id: int):
     new_qty_initial = old_qty_initial
     if qty_initial_raw is not None:
         new_qty_initial = _num(qty_initial_raw)
-        if new_qty_initial <= 0:
+        if new_qty_initial < 0:
             return jsonify({'ok': False, 'error': 'qty_required'}), 400
 
     new_unit_cost = old_unit_cost
