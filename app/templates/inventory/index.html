@@ -6108,14 +6108,4 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 {% endblock %}
-            try { document.getElementById('panel-current')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); } catch (e) { }
-        });
-    }
 
-    try { restoreInventoryDraft(); } catch (e) { }
-    applyReturnedSupplierSelection();
-
-    switchTab('current');
-});
-</script>
-{% endblock %}
