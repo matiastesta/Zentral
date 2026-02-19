@@ -19,7 +19,7 @@ from flask import (
 )
 from flask import g
 from flask_login import login_required
-from sqlalchemy import and_, or_, func, case
+from sqlalchemy import and_, or_, func, case, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from typing import Optional
@@ -49,12 +49,36 @@ def _company_id() -> str:
         return ''
 
 
+def _ensure_product_stock_ilimitado_column() -> None:
+    try:
+        engine = db.engine
+        insp = inspect(engine)
+        if 'product' not in set(insp.get_table_names() or []):
+            return
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('product') or [])}
+        if 'stock_ilimitado' in cols:
+            return
+        sql = None
+        if str(engine.url.drivername).startswith('sqlite'):
+            sql = 'ALTER TABLE product ADD COLUMN stock_ilimitado BOOLEAN NOT NULL DEFAULT 0'
+        else:
+            sql = "ALTER TABLE product ADD COLUMN IF NOT EXISTS stock_ilimitado BOOLEAN NOT NULL DEFAULT false"
+        with engine.begin() as conn:
+            conn.execute(text(sql))
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to ensure product.stock_ilimitado column')
+        except Exception:
+            pass
+
+
 @bp.route('/')
 @bp.route('/index')
 @login_required
 @module_required('inventory')
 def index():
     """Inventario avanzado."""
+    _ensure_product_stock_ilimitado_column()
     return render_template('inventory/index.html', title='Inventario')
 
 
@@ -154,6 +178,7 @@ def _serialize_product(p: Product):
         'image_url': _image_url(p),
         'unit_name': (p.unit_name or 'Unidad'),
         'uses_lots': bool(p.uses_lots),
+        'stock_ilimitado': bool(getattr(p, 'stock_ilimitado', False)),
         'method': p.method or 'FIFO',
         'min_stock': p.min_stock,
         'reorder_point': getattr(p, 'reorder_point', 0.0) or 0.0,
@@ -661,6 +686,7 @@ def inventory_import_excel_template():
 @login_required
 @module_required('inventory')
 def inventory_import_excel():
+    _ensure_product_stock_ilimitado_column()
     try:
         ensure_request_context()
     except Exception:
@@ -772,9 +798,15 @@ def inventory_import_excel():
             cost_provided = bool(costo_unitario_raw is not None and str(costo_unitario_raw).strip() != '')
 
             cantidad_raw = get_cell(vals, 'cantidad')
-            cantidad = _num(cantidad_raw) if cantidad_raw is not None and str(cantidad_raw).strip() != '' else 0.0
-            if cantidad < 0:
-                raise ValueError('cantidad_invalid')
+            cantidad_txt = str(cantidad_raw or '').strip()
+            is_unlimited = False
+            if cantidad_txt and cantidad_txt.lower() == 'indeterminado':
+                is_unlimited = True
+                cantidad = 0.0
+            else:
+                cantidad = _num(cantidad_raw) if cantidad_raw is not None and str(cantidad_raw).strip() != '' else 0.0
+                if cantidad < 0:
+                    raise ValueError('cantidad_invalid')
 
             descripcion = str(get_cell(vals, 'descripcion') or '').strip() or None
             codigo_interno_raw = str(get_cell(vals, 'codigo_interno') or '').strip() or ''
@@ -845,6 +877,13 @@ def inventory_import_excel():
                         prod.sale_price = precio_lista
                     prod.min_stock = stock_minimo
                     prod.reorder_point = punto_pedido
+                    try:
+                        prod.stock_ilimitado = bool(is_unlimited)
+                        if bool(is_unlimited):
+                            prod.min_stock = 0.0
+                            prod.reorder_point = 0.0
+                    except Exception:
+                        pass
                     if supplier_id is not None or supplier_name is not None:
                         prod.primary_supplier_id = supplier_id
                         prod.primary_supplier_name = supplier_name
@@ -878,6 +917,7 @@ def inventory_import_excel():
                     barcode=barcode_raw,
                     unit_name='Unidad',
                     uses_lots=True,
+                    stock_ilimitado=bool(is_unlimited),
                     method='FIFO',
                     min_stock=stock_minimo,
                     reorder_point=punto_pedido,
@@ -885,6 +925,9 @@ def inventory_import_excel():
                     primary_supplier_name=supplier_name,
                     active=True,
                 )
+                if bool(is_unlimited):
+                    prod.min_stock = 0.0
+                    prod.reorder_point = 0.0
                 db.session.add(prod)
                 try:
                     db.session.flush()
@@ -902,7 +945,10 @@ def inventory_import_excel():
                         prod.active = True
                 created_products += 1
 
-            if cantidad > 0:
+            if bool(is_unlimited):
+                # Stock ilimitado: no crear lotes ni movimientos de inventario.
+                pass
+            elif cantidad > 0:
                 lot = InventoryLot(
                     company_id=cid,
                     product_id=prod.id,
@@ -990,6 +1036,7 @@ def inventory_import_excel():
 @login_required
 @module_required('inventory')
 def inventory_import_excel_preview():
+    _ensure_product_stock_ilimitado_column()
     try:
         ensure_request_context()
     except Exception:
@@ -1204,6 +1251,7 @@ def inventory_import_excel_preview():
 @login_required
 @module_required('inventory')
 def inventory_import_excel_commit():
+    _ensure_product_stock_ilimitado_column()
     try:
         ensure_request_context()
     except Exception:
@@ -1258,8 +1306,9 @@ def inventory_import_excel_commit():
                 raise ValueError('precio_lista_invalid')
 
             cantidad_raw = str(d.get('cantidad') or '').strip()
-            cantidad = _num(cantidad_raw) if cantidad_raw != '' else 0.0
-            if cantidad < 0:
+            is_unlimited = bool(cantidad_raw and cantidad_raw.lower() == 'indeterminado')
+            cantidad = 0.0 if is_unlimited else (_num(cantidad_raw) if cantidad_raw != '' else 0.0)
+            if (not is_unlimited) and cantidad < 0:
                 raise ValueError('cantidad_invalid')
 
             costo_raw = str(d.get('costo_unitario') or '').strip()
@@ -1332,6 +1381,13 @@ def inventory_import_excel_commit():
                         prod.sale_price = precio_lista
                     prod.min_stock = stock_minimo
                     prod.reorder_point = punto_pedido
+                    try:
+                        prod.stock_ilimitado = bool(is_unlimited)
+                        if bool(is_unlimited):
+                            prod.min_stock = 0.0
+                            prod.reorder_point = 0.0
+                    except Exception:
+                        pass
                     if supplier_id is not None or supplier_name is not None:
                         prod.primary_supplier_id = supplier_id
                         prod.primary_supplier_name = supplier_name
@@ -1365,6 +1421,7 @@ def inventory_import_excel_commit():
                     barcode=barcode_raw,
                     unit_name='Unidad',
                     uses_lots=True,
+                    stock_ilimitado=bool(is_unlimited),
                     method='FIFO',
                     min_stock=stock_minimo,
                     reorder_point=punto_pedido,
@@ -1372,6 +1429,9 @@ def inventory_import_excel_commit():
                     primary_supplier_name=supplier_name,
                     active=True,
                 )
+                if bool(is_unlimited):
+                    prod.min_stock = 0.0
+                    prod.reorder_point = 0.0
                 db.session.add(prod)
                 try:
                     db.session.flush()
@@ -1389,7 +1449,10 @@ def inventory_import_excel_commit():
                         prod.active = True
                 created_products += 1
 
-            if cantidad > 0:
+            if bool(is_unlimited):
+                # Stock ilimitado: no crear lotes ni movimientos de inventario.
+                pass
+            elif cantidad > 0:
                 lot = InventoryLot(
                     company_id=cid,
                     product_id=prod.id,
@@ -1560,6 +1623,7 @@ def _serialize_movement(m: InventoryMovement):
 @login_required
 @module_required('inventory')
 def list_products():
+    _ensure_product_stock_ilimitado_column()
     limit = int(request.args.get('limit') or 500)
     if limit <= 0 or limit > 5000:
         limit = 500
@@ -1593,6 +1657,7 @@ def list_products():
 @login_required
 @module_required('inventory')
 def search_products():
+    _ensure_product_stock_ilimitado_column()
     qraw = (request.args.get('q') or '').strip()
     limit = int(request.args.get('limit') or 50)
     if limit <= 0 or limit > 200:
@@ -1634,6 +1699,7 @@ def search_products():
 @login_required
 @module_required('inventory')
 def create_product():
+    _ensure_product_stock_ilimitado_column()
     payload = request.get_json(silent=True) or {}
     try:
         ensure_request_context()
@@ -1742,6 +1808,7 @@ def create_product():
             return jsonify({'ok': False, 'error': 'supplier_not_found'}), 400
         supplier_name = str(supplier_row.name or '').strip() or supplier_name
 
+    stock_ilimitado = bool(payload.get('stock_ilimitado'))
     row = Product(
         company_id=cid,
         name=name,
@@ -1753,9 +1820,10 @@ def create_product():
         image_filename=str(payload.get('image_filename') or '').strip() or None,
         unit_name='Unidad',
         uses_lots=True,
+        stock_ilimitado=stock_ilimitado,
         method='FIFO',
-        min_stock=_num(payload.get('min_stock')),
-        reorder_point=_num(payload.get('reorder_point')),
+        min_stock=(0.0 if stock_ilimitado else _num(payload.get('min_stock'))),
+        reorder_point=(0.0 if stock_ilimitado else _num(payload.get('reorder_point'))),
         primary_supplier_id=supplier_id,
         primary_supplier_name=supplier_name,
         active=True,
@@ -1777,6 +1845,7 @@ def create_product():
 @login_required
 @module_required('inventory')
 def update_product(product_id: int):
+    _ensure_product_stock_ilimitado_column()
     row = db.session.get(Product, int(product_id))
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
@@ -1847,6 +1916,11 @@ def update_product(product_id: int):
             row.primary_supplier_id = None
     if payload.get('reorder_point') is not None:
         row.reorder_point = _num(payload.get('reorder_point'))
+    if payload.get('stock_ilimitado') is not None:
+        row.stock_ilimitado = bool(payload.get('stock_ilimitado'))
+        if bool(row.stock_ilimitado):
+            row.min_stock = 0.0
+            row.reorder_point = 0.0
     row.unit_name = 'Unidad'
     if payload.get('uses_lots') is not None:
         row.uses_lots = bool(payload.get('uses_lots'))
@@ -2154,6 +2228,7 @@ def clear_inventory():
 @login_required
 @module_required('inventory')
 def list_lots():
+    _ensure_product_stock_ilimitado_column()
     limit = int(request.args.get('limit') or 5000)
     if limit <= 0 or limit > 20000:
         limit = 5000

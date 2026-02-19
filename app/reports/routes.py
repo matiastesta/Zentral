@@ -2246,7 +2246,17 @@ def inventory_rotation_api():
         yellow_days = green_days * 2
 
     # Products & category map
-    products = db.session.query(Product).filter(Product.company_id == cid).filter(Product.active.is_(True)).all()
+    q_products = (
+        db.session.query(Product)
+        .filter(Product.company_id == cid)
+        .filter(Product.active.is_(True))
+    )
+    try:
+        if hasattr(Product, 'stock_ilimitado'):
+            q_products = q_products.filter(Product.stock_ilimitado.is_(False))
+    except Exception:
+        pass
+    products = q_products.all()
     cat_map = {}
     try:
         for c in (db.session.query(Category).filter(Category.company_id == cid).all() or []):

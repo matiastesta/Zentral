@@ -770,6 +770,15 @@
                                 <input id="prod-lot-qty" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
                             </div>
 
+                            <div class="md:col-span-4">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">&nbsp;</label>
+                                <label class="inline-flex items-center gap-2 text-xs text-gray-700 select-none">
+                                    <input id="prod-stock-ilimitado" type="checkbox" class="h-4 w-4 rounded border-gray-300">
+                                    Stock indeterminado
+                                </label>
+                                <div id="prod-stock-ilimitado-hint" class="mt-1 text-[11px] text-gray-500 hidden">Este producto no tendrá control de stock</div>
+                            </div>
+
                             <div class="md:col-span-3">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Costo total</label>
                                 <input id="prod-lot-ct" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" value="$0" readonly>
@@ -912,6 +921,7 @@
                             </div>
                         </div>
                         <div class="mt-3 text-[11px] text-gray-500">Cada fila representa un ítem. Si hay cantidad, se crea un lote inicial.</div>
+                        <div class="mt-1 text-[11px] text-gray-500">Si en la columna "cantidad" escribís "indeterminado", el producto se cargará sin control de stock (stock ilimitado).</div>
                     </div>
 
                     <div class="flex flex-col md:flex-row md:items-end gap-3">
@@ -1484,6 +1494,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnSelectSupplierProdLot = document.getElementById('btn-select-supplier-prod-lot');
     const prodLotCu = document.getElementById('prod-lot-cu');
     const prodLotQty = document.getElementById('prod-lot-qty');
+    const prodStockIlimitado = document.getElementById('prod-stock-ilimitado');
+    const prodStockIlimitadoHint = document.getElementById('prod-stock-ilimitado-hint');
     const prodLotCt = document.getElementById('prod-lot-ct');
     const prodLotExp = document.getElementById('prod-lot-exp');
     const prodLotNoExp = document.getElementById('prod-lot-no-exp');
@@ -5302,6 +5314,20 @@ document.addEventListener('DOMContentLoaded', function () {
     if (prodLotCu) prodLotCu.addEventListener('input', updateProdLotCt);
     if (prodLotQty) prodLotQty.addEventListener('input', updateProdLotCt);
 
+    if (prodStockIlimitado) {
+        prodStockIlimitado.addEventListener('change', function () {
+            const on = !!prodStockIlimitado.checked;
+            if (prodLotQty) {
+                if (on) {
+                    try { prodLotQty.value = '0'; } catch (e) {}
+                }
+                prodLotQty.disabled = on;
+                prodLotQty.classList.toggle('bg-gray-50', on);
+            }
+            if (prodStockIlimitadoHint) prodStockIlimitadoHint.classList.toggle('hidden', !on);
+        });
+    }
+
     if (btnSaveProduct) {
         btnSaveProduct.addEventListener('click', function () {
             const name = String(prodName?.value || '').trim();
@@ -5317,7 +5343,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const active = true;
 
             const firstLotQty = parseNumeroSeguro(prodLotQty?.value);
-            const wantsFirstLot = (!editingProductId) && (firstLotQty > 0);
+            const isUnlimited = !!prodStockIlimitado?.checked;
+            const wantsFirstLot = (!editingProductId) && (!isUnlimited) && (firstLotQty > 0);
 
             if (!name) { if (window.showAlertModal) window.showAlertModal('Completá el nombre del producto.', 'Atención', 'Validación requerida'); else alert('Completá el nombre del producto.'); return; }
             if (!categoryId) { if (window.showAlertModal) window.showAlertModal('Seleccioná la categoría del producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná la categoría del producto.'); return; }
@@ -5337,7 +5364,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 reorder_point: reorderPoint,
                 description: desc,
                 active: true,
-                sale_price: salePrice
+                sale_price: salePrice,
+                stock_ilimitado: isUnlimited
             };
 
             const req = editingProductId
@@ -6069,6 +6097,17 @@ document.addEventListener('DOMContentLoaded', function () {
         kpiAlertsCard.addEventListener('click', function () {
             setStatusFilter(['Reponer', 'Crítico']);
             try { switchTab('current'); } catch (e) { }
+            try { document.getElementById('panel-current')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); } catch (e) { }
+        });
+    }
+
+    try { restoreInventoryDraft(); } catch (e) { }
+    applyReturnedSupplierSelection();
+
+    switchTab('current');
+});
+</script>
+{% endblock %}
             try { document.getElementById('panel-current')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); } catch (e) { }
         });
     }

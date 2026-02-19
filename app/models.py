@@ -293,6 +293,7 @@ class Product(db.Model):
 
     unit_name = db.Column(db.String(32), nullable=True)
     uses_lots = db.Column(db.Boolean, nullable=False, default=True)
+    stock_ilimitado = db.Column(db.Boolean, nullable=False, default=False)
     method = db.Column(db.String(16), nullable=False, default='FIFO')
     min_stock = db.Column(db.Float, nullable=False, default=0.0)
     reorder_point = db.Column(db.Float, nullable=False, default=0.0)

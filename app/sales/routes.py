@@ -1940,6 +1940,10 @@ def _apply_inventory_for_sale(*, sale_ticket: str, sale_date: dt_date, items: Li
         if cid and str(getattr(prod, 'company_id', '') or '') != cid:
             continue
 
+        if bool(getattr(prod, 'stock_ilimitado', False)):
+            # Stock ilimitado: no validar ni afectar lotes/movimientos.
+            continue
+
         if direction == 'in':
             # Devolución: entra stock. Creamos lote propio para trazabilidad.
             last_cost = (
