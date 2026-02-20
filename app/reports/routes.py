@@ -2741,7 +2741,12 @@ def lookup_products_api():
     if not cid:
         return jsonify({'ok': True, 'items': []})
 
-    query = db.session.query(Product).filter(Product.company_id == cid).filter(Product.active.is_(True))
+    query = (
+        db.session.query(Product)
+        .filter(Product.company_id == cid)
+        .filter(Product.active.is_(True))
+        .filter(getattr(Product, 'deleted_at', None).is_(None) if hasattr(Product, 'deleted_at') else True)
+    )
     if category_id:
         try:
             query = query.filter(Product.category_id == int(category_id))

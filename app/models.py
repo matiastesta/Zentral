@@ -303,6 +303,7 @@ class Product(db.Model):
     primary_supplier_name = db.Column(db.String(255), nullable=True)
 
     active = db.Column(db.Boolean, nullable=False, default=True)
+    deleted_at = db.Column(db.DateTime, nullable=True, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 

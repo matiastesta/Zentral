@@ -2184,6 +2184,7 @@ def list_products_for_sales():
         .options(joinedload(Product.category))
         .filter(Product.company_id == cid)
         .filter(Product.active == True)  # noqa: E712
+        .filter(getattr(Product, 'deleted_at', None).is_(None) if hasattr(Product, 'deleted_at') else True)
     )
     if qraw:
         like = f"%{qraw}%"

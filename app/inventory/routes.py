@@ -29,7 +29,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 
 from app import db
-from app.models import Category, Expense, FileAsset, InventoryLot, InventoryMovement, Product, Sale, Supplier
+from app.models import Category, Expense, FileAsset, InventoryLot, InventoryMovement, Product, Sale, SaleItem, Supplier
 from app.files.storage import upload_to_r2_and_create_asset
 from app.permissions import module_required, module_required_any
 from app.tenancy import ensure_request_context
@@ -72,6 +72,53 @@ def _ensure_product_stock_ilimitado_column() -> None:
             pass
 
 
+def _ensure_product_deleted_at_column() -> None:
+    try:
+        engine = db.engine
+        insp = inspect(engine)
+        if 'product' not in set(insp.get_table_names() or []):
+            return
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('product') or [])}
+        if 'deleted_at' in cols:
+            return
+        sql = None
+        if str(engine.url.drivername).startswith('sqlite'):
+            sql = 'ALTER TABLE product ADD COLUMN deleted_at DATETIME'
+        else:
+            sql = 'ALTER TABLE product ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL'
+        with engine.begin() as conn:
+            conn.execute(text(sql))
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to ensure product.deleted_at column')
+        except Exception:
+            pass
+
+
+def _ensure_product_unique_name_category_active_index() -> None:
+    try:
+        engine = db.engine
+        if 'product' not in set(inspect(engine).get_table_names() or []):
+            return
+        sql = None
+        if str(engine.url.drivername).startswith('sqlite'):
+            sql = (
+                'CREATE UNIQUE INDEX IF NOT EXISTS uq_product_company_category_name_active '
+                'ON product(company_id, category_id, lower(trim(name))) '
+                'WHERE deleted_at IS NULL'
+            )
+        else:
+            sql = (
+                'CREATE UNIQUE INDEX IF NOT EXISTS uq_product_company_category_name_active '
+                'ON product(company_id, category_id, lower(trim(name))) '
+                'WHERE deleted_at IS NULL'
+            )
+        with engine.begin() as conn:
+            conn.execute(text(sql))
+    except Exception:
+        pass
+
+
 def _ensure_product_ref_cost_column() -> None:
     try:
         engine = db.engine
@@ -103,6 +150,8 @@ def index():
     """Inventario avanzado."""
     _ensure_product_stock_ilimitado_column()
     _ensure_product_ref_cost_column()
+    _ensure_product_deleted_at_column()
+    _ensure_product_unique_name_category_active_index()
     return render_template('inventory/index.html', title='Inventario')
 
 
@@ -211,6 +260,91 @@ def _serialize_product(p: Product):
         'primary_supplier_name': getattr(p, 'primary_supplier_name', '') or '',
         'active': bool(p.active),
     }
+
+
+def tryDeleteProduct(product_id: int, company_id: str) -> dict:
+    cid = str(company_id or '').strip()
+    try:
+        pid = int(product_id)
+    except Exception:
+        return {'ok': False, 'deleted': False, 'kind': 'invalid_id'}
+
+    row = db.session.query(Product).filter(Product.company_id == cid, Product.id == pid).first()
+    if not row:
+        return {'ok': True, 'deleted': False, 'kind': 'not_found'}
+
+    pid_str = str(pid)
+    has_sales = (
+        db.session.query(SaleItem.id)
+        .filter(SaleItem.company_id == cid)
+        .filter(func.trim(func.coalesce(SaleItem.product_id, '')) == pid_str)
+        .first()
+        is not None
+    )
+    has_movements = (
+        db.session.query(InventoryMovement.id)
+        .filter(InventoryMovement.company_id == cid)
+        .filter(InventoryMovement.product_id == pid)
+        .first()
+        is not None
+    )
+    has_lots = (
+        db.session.query(InventoryLot.id)
+        .filter(InventoryLot.company_id == cid)
+        .filter(InventoryLot.product_id == pid)
+        .first()
+        is not None
+    )
+
+    has_refs = bool(has_sales or has_movements or has_lots)
+    if has_refs:
+        row.active = False
+        try:
+            if getattr(row, 'deleted_at', None) is None:
+                row.deleted_at = datetime.utcnow()
+        except Exception:
+            pass
+        db.session.commit()
+        return {'ok': True, 'deleted': True, 'kind': 'soft', 'had_history': True}
+
+    try:
+        img_asset_id = str(getattr(row, 'image_file_id', '') or '').strip()
+        if img_asset_id:
+            db.session.query(FileAsset).filter(FileAsset.company_id == cid, FileAsset.id == img_asset_id).delete(synchronize_session=False)
+        db.session.query(FileAsset).filter(
+            FileAsset.company_id == cid,
+            FileAsset.entity_type == 'product',
+            FileAsset.entity_id == str(row.id),
+        ).delete(synchronize_session=False)
+
+        db.session.delete(row)
+        db.session.commit()
+        return {'ok': True, 'deleted': True, 'kind': 'hard', 'had_history': False}
+    except Exception:
+        db.session.rollback()
+        return {'ok': False, 'deleted': False, 'kind': 'db_error'}
+
+
+def _maybe_autocleanup_product(cid: str, product_id: int) -> None:
+    try:
+        total = (
+            db.session.query(func.coalesce(func.sum(InventoryLot.qty_available), 0.0))
+            .filter(InventoryLot.company_id == cid)
+            .filter(InventoryLot.product_id == int(product_id))
+            .scalar()
+        )
+        if float(total or 0.0) > 1e-9:
+            return
+    except Exception:
+        return
+
+    try:
+        tryDeleteProduct(int(product_id), cid)
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
 
 
 def _normalize_name(name: str) -> str:
@@ -1086,6 +1220,7 @@ def inventory_import_excel():
 @module_required('inventory')
 def inventory_import_excel_preview():
     _ensure_product_stock_ilimitado_column()
+    _ensure_product_deleted_at_column()
     try:
         ensure_request_context()
     except Exception:
@@ -1184,6 +1319,7 @@ def inventory_import_excel_preview():
         prods = (
             db.session.query(Product)
             .filter(Product.company_id == cid)
+            .filter(Product.deleted_at.is_(None))
             .limit(20000)
             .all()
         )
@@ -1272,6 +1408,7 @@ def inventory_import_excel_preview():
                         db.session.query(Product.id)
                         .filter(Product.company_id == cid, Product.category_id == cat_id)
                         .filter(func.lower(func.trim(Product.name)) == nombre.lower())
+                        .filter(Product.deleted_at.is_(None))
                         .order_by(Product.active.desc(), Product.id.asc())
                         .all()
                     )
@@ -1335,6 +1472,7 @@ def inventory_import_excel_preview():
 @module_required('inventory')
 def inventory_import_excel_commit():
     _ensure_product_stock_ilimitado_column()
+    _ensure_product_deleted_at_column()
     try:
         ensure_request_context()
     except Exception:
@@ -1448,7 +1586,12 @@ def inventory_import_excel_commit():
             matched_product_id = d.get('matched_product_id')
             if matched_product_id is not None and str(matched_product_id).strip() != '':
                 try:
-                    prod = db.session.query(Product).filter(Product.company_id == cid, Product.id == int(matched_product_id)).first()
+                    prod = (
+                        db.session.query(Product)
+                        .filter(Product.company_id == cid, Product.id == int(matched_product_id))
+                        .filter(Product.deleted_at.is_(None))
+                        .first()
+                    )
                 except Exception:
                     prod = None
 
@@ -1456,13 +1599,19 @@ def inventory_import_excel_commit():
 
             if not prod and codigo_interno_raw:
                 internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
-                prod = db.session.query(Product).filter(Product.company_id == cid, Product.internal_code == internal_code).first()
+                prod = (
+                    db.session.query(Product)
+                    .filter(Product.company_id == cid, Product.internal_code == internal_code)
+                    .filter(Product.deleted_at.is_(None))
+                    .first()
+                )
 
             if not prod and (not codigo_interno_raw):
                 candidates = (
                     db.session.query(Product)
                     .filter(Product.company_id == cid, Product.category_id == cat_row.id)
                     .filter(func.lower(func.trim(Product.name)) == nombre.lower())
+                    .filter(Product.deleted_at.is_(None))
                     .order_by(Product.active.desc(), Product.id.asc())
                     .all()
                 )
@@ -1730,6 +1879,7 @@ def _serialize_movement(m: InventoryMovement):
 def list_products():
     _ensure_product_stock_ilimitado_column()
     _ensure_product_ref_cost_column()
+    _ensure_product_deleted_at_column()
     limit = int(request.args.get('limit') or 500)
     if limit <= 0 or limit > 5000:
         limit = 500
@@ -1742,7 +1892,7 @@ def list_products():
     if not cid:
         return jsonify({'ok': True, 'items': []})
 
-    q = db.session.query(Product).filter(Product.company_id == cid)
+    q = db.session.query(Product).filter(Product.company_id == cid).filter(Product.deleted_at.is_(None))
     if active in ('1', 'true', 'True'):
         q = q.filter(Product.active == True)  # noqa: E712
     q = q.order_by(Product.name.asc()).limit(limit)
@@ -1765,6 +1915,7 @@ def list_products():
 def search_products():
     _ensure_product_stock_ilimitado_column()
     _ensure_product_ref_cost_column()
+    _ensure_product_deleted_at_column()
     qraw = (request.args.get('q') or '').strip()
     limit = int(request.args.get('limit') or 50)
     if limit <= 0 or limit > 200:
@@ -1778,7 +1929,12 @@ def search_products():
     if not cid:
         return jsonify({'ok': True, 'items': []})
 
-    q = db.session.query(Product).filter(Product.company_id == cid, Product.active == True)  # noqa: E712
+    q = (
+        db.session.query(Product)
+        .filter(Product.company_id == cid)
+        .filter(Product.deleted_at.is_(None))
+        .filter(Product.active == True)  # noqa: E712
+    )
     if qraw:
         term = f"%{qraw}%"
         q = q.filter(
@@ -1808,6 +1964,8 @@ def search_products():
 def create_product():
     _ensure_product_stock_ilimitado_column()
     _ensure_product_ref_cost_column()
+    _ensure_product_deleted_at_column()
+    _ensure_product_unique_name_category_active_index()
     payload = request.get_json(silent=True) or {}
     try:
         ensure_request_context()
@@ -2109,17 +2267,13 @@ def delete_product(product_id: int):
     if not cid:
         return jsonify({'ok': False, 'error': 'no_company'}), 400
 
-    row = db.session.query(Product).filter(Product.company_id == cid, Product.id == int(product_id)).first()
-    if not row:
+    _ensure_product_deleted_at_column()
+    res = tryDeleteProduct(int(product_id), cid)
+    if not bool(res.get('ok')):
+        return jsonify({'ok': False, 'error': str(res.get('kind') or 'db_error')}), 400
+    if res.get('kind') == 'not_found':
         return jsonify({'ok': False, 'error': 'not_found'}), 404
-
-    has_lots = db.session.query(InventoryLot.id).filter(InventoryLot.company_id == cid, InventoryLot.product_id == row.id).first() is not None
-    has_movements = db.session.query(InventoryMovement.id).filter(InventoryMovement.company_id == cid, InventoryMovement.product_id == row.id).first() is not None
-
-    # Para mantener integridad y UX consistente, se desactiva (no se elimina) desde la UI.
-    row.active = False
-    db.session.commit()
-    return jsonify({'ok': True, 'soft_deleted': True, 'had_history': bool(has_lots or has_movements)})
+    return jsonify({'ok': True, 'deleted': True, 'kind': res.get('kind'), 'had_history': bool(res.get('had_history'))})
 
 
 @bp.delete('/api/products/<int:product_id>/hard')
@@ -2261,6 +2415,7 @@ def empty_inventory():
         return jsonify({'ok': False, 'error': 'confirm_required'}), 400
 
     try:
+        _ensure_product_deleted_at_column()
         detached = (
             db.session.query(InventoryMovement)
             .filter(InventoryMovement.company_id == cid)
@@ -2322,7 +2477,7 @@ def clear_inventory():
         deactivated_products = (
             db.session.query(Product)
             .filter(Product.company_id == cid)
-            .update({Product.active: False}, synchronize_session=False)
+            .update({Product.active: False, Product.deleted_at: datetime.utcnow()}, synchronize_session=False)
         )
         db.session.commit()
         return jsonify({
@@ -2344,6 +2499,7 @@ def clear_inventory():
 @module_required('inventory')
 def list_lots():
     _ensure_product_stock_ilimitado_column()
+    _ensure_product_deleted_at_column()
     limit = int(request.args.get('limit') or 5000)
     if limit <= 0 or limit > 20000:
         limit = 5000
@@ -2361,6 +2517,7 @@ def list_lots():
         .join(Product)
         .filter(InventoryLot.company_id == cid)
         .filter(Product.company_id == cid)
+        .filter(Product.deleted_at.is_(None))
     )
     if product_id:
         try:
@@ -2730,6 +2887,15 @@ def update_lot(lot_id: int):
         db.session.rollback()
         return jsonify({'ok': False, 'error': 'db_error'}), 400
 
+    try:
+        cid = str(getattr(lot, 'company_id', '') or '').strip()
+        pid = int(getattr(lot, 'product_id', 0) or 0)
+        if cid and pid:
+            _ensure_product_deleted_at_column()
+            _maybe_autocleanup_product(cid, pid)
+    except Exception:
+        pass
+
     return jsonify({'ok': True, 'item': _serialize_lot(lot)})
 
 
@@ -2905,6 +3071,13 @@ def adjust_lot(lot_id: int):
         }
 
         db.session.commit()
+
+        try:
+            if cid and int(getattr(lot, 'product_id', 0) or 0):
+                _ensure_product_deleted_at_column()
+                _maybe_autocleanup_product(cid, int(getattr(lot, 'product_id', 0) or 0))
+        except Exception:
+            pass
         return jsonify({
             'ok': True,
             'item': _serialize_lot(lot),
@@ -2940,6 +3113,7 @@ def delete_lot(lot_id: int):
     # - egresos creados desde inventario que referencien este lote (meta_json.origin_ref.lot_id)
     try:
         cid = str(getattr(lot, 'company_id', '') or '').strip()
+        pid = int(getattr(lot, 'product_id', 0) or 0)
 
         # borrar egresos vinculados al lote
         # Nota: Expense.meta_json guarda origin_ref (dict) y puede tener lot_id como número o string.
@@ -2972,6 +3146,13 @@ def delete_lot(lot_id: int):
         db.session.rollback()
         current_app.logger.exception('Failed to delete inventory lot')
         return jsonify({'ok': False, 'error': 'db_error'}), 400
+
+    try:
+        if cid and pid:
+            _ensure_product_deleted_at_column()
+            _maybe_autocleanup_product(cid, pid)
+    except Exception:
+        pass
     return jsonify({'ok': True})
 
 
