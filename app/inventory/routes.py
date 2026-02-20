@@ -72,6 +72,29 @@ def _ensure_product_stock_ilimitado_column() -> None:
             pass
 
 
+def _ensure_product_ref_cost_column() -> None:
+    try:
+        engine = db.engine
+        insp = inspect(engine)
+        if 'product' not in set(insp.get_table_names() or []):
+            return
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('product') or [])}
+        if 'costo_unitario_referencia' in cols:
+            return
+        sql = None
+        if str(engine.url.drivername).startswith('sqlite'):
+            sql = 'ALTER TABLE product ADD COLUMN costo_unitario_referencia REAL'
+        else:
+            sql = 'ALTER TABLE product ADD COLUMN IF NOT EXISTS costo_unitario_referencia DOUBLE PRECISION'
+        with engine.begin() as conn:
+            conn.execute(text(sql))
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to ensure product.costo_unitario_referencia column')
+        except Exception:
+            pass
+
+
 @bp.route('/')
 @bp.route('/index')
 @login_required
@@ -79,6 +102,7 @@ def _ensure_product_stock_ilimitado_column() -> None:
 def index():
     """Inventario avanzado."""
     _ensure_product_stock_ilimitado_column()
+    _ensure_product_ref_cost_column()
     return render_template('inventory/index.html', title='Inventario')
 
 
@@ -179,6 +203,7 @@ def _serialize_product(p: Product):
         'unit_name': (p.unit_name or 'Unidad'),
         'uses_lots': bool(p.uses_lots),
         'stock_ilimitado': bool(getattr(p, 'stock_ilimitado', False)),
+        'costo_unitario_referencia': getattr(p, 'costo_unitario_referencia', None),
         'method': p.method or 'FIFO',
         'min_stock': p.min_stock,
         'reorder_point': getattr(p, 'reorder_point', 0.0) or 0.0,
@@ -799,12 +824,18 @@ def inventory_import_excel():
 
             cantidad_raw = get_cell(vals, 'cantidad')
             cantidad_txt = str(cantidad_raw or '').strip()
-            is_unlimited = False
-            if cantidad_txt and cantidad_txt.lower() == 'indeterminado':
-                is_unlimited = True
+            cantidad_norm = cantidad_txt.lower()
+            is_unlimited = bool(cantidad_norm in ('indeterminado', '∞', 'ilimitado'))
+            if is_unlimited:
                 cantidad = 0.0
             else:
-                cantidad = _num(cantidad_raw) if cantidad_raw is not None and str(cantidad_raw).strip() != '' else 0.0
+                if cantidad_raw is not None and str(cantidad_raw).strip() != '':
+                    try:
+                        cantidad = _num(cantidad_raw)
+                    except Exception:
+                        raise ValueError('cantidad_invalid')
+                else:
+                    cantidad = 0.0
                 if cantidad < 0:
                     raise ValueError('cantidad_invalid')
 
@@ -859,11 +890,18 @@ def inventory_import_excel():
                 internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
                 prod = db.session.query(Product).filter(Product.company_id == cid, Product.internal_code == internal_code).first()
 
-            if not prod and barcode_raw:
-                prod = db.session.query(Product).filter(Product.company_id == cid, Product.barcode == barcode_raw).first()
-
-            if not prod:
-                prod = _find_product_by_name(cid, nombre, preferred_category_id=cat_row.id)
+            if not codigo_interno_raw:
+                candidates = (
+                    db.session.query(Product)
+                    .filter(Product.company_id == cid, Product.category_id == cat_row.id)
+                    .filter(func.lower(func.trim(Product.name)) == nombre.lower())
+                    .order_by(Product.active.desc(), Product.id.asc())
+                    .all()
+                )
+                if len(candidates) == 1:
+                    prod = candidates[0]
+                elif len(candidates) >= 2:
+                    raise ValueError('ambiguous_requires_codigo_interno')
 
             product_was_existing = bool(prod)
 
@@ -882,6 +920,12 @@ def inventory_import_excel():
                         if bool(is_unlimited):
                             prod.min_stock = 0.0
                             prod.reorder_point = 0.0
+                    except Exception:
+                        pass
+
+                    try:
+                        if bool(is_unlimited) and cost_provided:
+                            setattr(prod, 'costo_unitario_referencia', float(costo_unitario))
                     except Exception:
                         pass
                     if supplier_id is not None or supplier_name is not None:
@@ -925,6 +969,11 @@ def inventory_import_excel():
                     primary_supplier_name=supplier_name,
                     active=True,
                 )
+                try:
+                    if bool(is_unlimited) and cost_provided:
+                        setattr(prod, 'costo_unitario_referencia', float(costo_unitario))
+                except Exception:
+                    pass
                 if bool(is_unlimited):
                     prod.min_stock = 0.0
                     prod.reorder_point = 0.0
@@ -1106,6 +1155,7 @@ def inventory_import_excel_preview():
     existing_prod = set()
     existing_by_ci = {}
     existing_by_barcode = {}
+    existing_cat_by_norm = {}
     try:
         cats = (
             db.session.query(Category)
@@ -1114,8 +1164,10 @@ def inventory_import_excel_preview():
             .all()
         )
         existing_cat = set(_normalize_name(c.name) for c in (cats or []) if _normalize_name(c.name))
+        existing_cat_by_norm = { _normalize_name(c.name): int(getattr(c, 'id', 0) or 0) for c in (cats or []) if _normalize_name(c.name) and getattr(c, 'id', None) is not None }
     except Exception:
         existing_cat = set()
+        existing_cat_by_norm = {}
 
     try:
         sups = (
@@ -1194,20 +1246,49 @@ def inventory_import_excel_preview():
         will_create_category = bool(cat_norm) and (cat_norm not in existing_cat)
         will_create_supplier = bool(sup_norm) and (sup_norm not in existing_sup)
         matched_product_id = None
-        if codigo_interno and codigo_interno in existing_by_ci:
-            product_exists = True
-            try:
-                matched_product_id = int(getattr(existing_by_ci[codigo_interno], 'id', None))
-            except Exception:
-                matched_product_id = None
-        elif barcode and barcode in existing_by_barcode:
-            product_exists = True
-            try:
-                matched_product_id = int(getattr(existing_by_barcode[barcode], 'id', None))
-            except Exception:
-                matched_product_id = None
+        match_kind = 'new'
+        requires_codigo_interno = False
+
+        if codigo_interno:
+            if codigo_interno in existing_by_ci:
+                product_exists = True
+                match_kind = 'codigo_interno'
+                try:
+                    matched_product_id = int(getattr(existing_by_ci[codigo_interno], 'id', None))
+                except Exception:
+                    matched_product_id = None
+            else:
+                product_exists = False
+                match_kind = 'new_codigo_interno'
         else:
-            product_exists = bool(prod_norm) and (prod_norm in existing_prod)
+            product_exists = False
+            if cat_norm and cat_norm in existing_cat_by_norm and prod_norm:
+                try:
+                    cat_id = int(existing_cat_by_norm.get(cat_norm) or 0)
+                except Exception:
+                    cat_id = 0
+                if cat_id:
+                    candidates = (
+                        db.session.query(Product.id)
+                        .filter(Product.company_id == cid, Product.category_id == cat_id)
+                        .filter(func.lower(func.trim(Product.name)) == nombre.lower())
+                        .order_by(Product.active.desc(), Product.id.asc())
+                        .all()
+                    )
+                    if len(candidates) == 1:
+                        product_exists = True
+                        match_kind = 'nombre_categoria'
+                        try:
+                            matched_product_id = int(getattr(candidates[0], 'id', None))
+                        except Exception:
+                            try:
+                                matched_product_id = int(candidates[0][0])
+                            except Exception:
+                                matched_product_id = None
+                    elif len(candidates) >= 2:
+                        product_exists = True
+                        match_kind = 'ambiguous'
+                        requires_codigo_interno = True
 
         if will_create_category:
             new_cats.add(cat_norm)
@@ -1234,6 +1315,8 @@ def inventory_import_excel_preview():
             'will_create_supplier': will_create_supplier,
             'product_exists': product_exists,
             'matched_product_id': matched_product_id,
+            'match_kind': match_kind,
+            'requires_codigo_interno': requires_codigo_interno,
         })
 
     return jsonify({
@@ -1306,10 +1389,20 @@ def inventory_import_excel_commit():
                 raise ValueError('precio_lista_invalid')
 
             cantidad_raw = str(d.get('cantidad') or '').strip()
-            is_unlimited = bool(cantidad_raw and cantidad_raw.lower() == 'indeterminado')
-            cantidad = 0.0 if is_unlimited else (_num(cantidad_raw) if cantidad_raw != '' else 0.0)
-            if (not is_unlimited) and cantidad < 0:
-                raise ValueError('cantidad_invalid')
+            cantidad_norm = cantidad_raw.lower()
+            is_unlimited = bool(cantidad_norm in ('indeterminado', '∞', 'ilimitado'))
+            if is_unlimited:
+                cantidad = 0.0
+            else:
+                if cantidad_raw != '':
+                    try:
+                        cantidad = float(cantidad_raw)
+                    except Exception:
+                        raise ValueError('cantidad_invalid')
+                else:
+                    cantidad = 0.0
+                if cantidad < 0:
+                    raise ValueError('cantidad_invalid')
 
             costo_raw = str(d.get('costo_unitario') or '').strip()
             costo_unitario = _num(costo_raw) if costo_raw != '' else 0.0
@@ -1365,11 +1458,18 @@ def inventory_import_excel_commit():
                 internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
                 prod = db.session.query(Product).filter(Product.company_id == cid, Product.internal_code == internal_code).first()
 
-            if not prod and barcode_raw:
-                prod = db.session.query(Product).filter(Product.company_id == cid, Product.barcode == barcode_raw).first()
-
-            if not prod:
-                prod = _find_product_by_name(cid, nombre, preferred_category_id=cat_row.id)
+            if not prod and (not codigo_interno_raw):
+                candidates = (
+                    db.session.query(Product)
+                    .filter(Product.company_id == cid, Product.category_id == cat_row.id)
+                    .filter(func.lower(func.trim(Product.name)) == nombre.lower())
+                    .order_by(Product.active.desc(), Product.id.asc())
+                    .all()
+                )
+                if len(candidates) == 1:
+                    prod = candidates[0]
+                elif len(candidates) >= 2:
+                    raise ValueError('ambiguous_requires_codigo_interno')
 
             if prod:
                 if not bool(getattr(prod, 'active', True)):
@@ -1429,6 +1529,11 @@ def inventory_import_excel_commit():
                     primary_supplier_name=supplier_name,
                     active=True,
                 )
+                try:
+                    if bool(is_unlimited) and cost_provided:
+                        setattr(prod, 'costo_unitario_referencia', float(costo_unitario))
+                except Exception:
+                    pass
                 if bool(is_unlimited):
                     prod.min_stock = 0.0
                     prod.reorder_point = 0.0
@@ -1624,6 +1729,7 @@ def _serialize_movement(m: InventoryMovement):
 @module_required('inventory')
 def list_products():
     _ensure_product_stock_ilimitado_column()
+    _ensure_product_ref_cost_column()
     limit = int(request.args.get('limit') or 500)
     if limit <= 0 or limit > 5000:
         limit = 500
@@ -1658,6 +1764,7 @@ def list_products():
 @module_required('inventory')
 def search_products():
     _ensure_product_stock_ilimitado_column()
+    _ensure_product_ref_cost_column()
     qraw = (request.args.get('q') or '').strip()
     limit = int(request.args.get('limit') or 50)
     if limit <= 0 or limit > 200:
@@ -1700,6 +1807,7 @@ def search_products():
 @module_required('inventory')
 def create_product():
     _ensure_product_stock_ilimitado_column()
+    _ensure_product_ref_cost_column()
     payload = request.get_json(silent=True) or {}
     try:
         ensure_request_context()
@@ -1809,6 +1917,8 @@ def create_product():
         supplier_name = str(supplier_row.name or '').strip() or supplier_name
 
     stock_ilimitado = bool(payload.get('stock_ilimitado'))
+    ref_cost_raw = payload.get('costo_unitario_referencia')
+    ref_cost = None if ref_cost_raw in (None, '') else _num(ref_cost_raw)
     row = Product(
         company_id=cid,
         name=name,
@@ -1821,6 +1931,7 @@ def create_product():
         unit_name='Unidad',
         uses_lots=True,
         stock_ilimitado=stock_ilimitado,
+        costo_unitario_referencia=ref_cost,
         method='FIFO',
         min_stock=(0.0 if stock_ilimitado else _num(payload.get('min_stock'))),
         reorder_point=(0.0 if stock_ilimitado else _num(payload.get('reorder_point'))),
@@ -1846,6 +1957,7 @@ def create_product():
 @module_required('inventory')
 def update_product(product_id: int):
     _ensure_product_stock_ilimitado_column()
+    _ensure_product_ref_cost_column()
     row = db.session.get(Product, int(product_id))
     if not row:
         return jsonify({'ok': False, 'error': 'not_found'}), 404
@@ -1921,6 +2033,9 @@ def update_product(product_id: int):
         if bool(row.stock_ilimitado):
             row.min_stock = 0.0
             row.reorder_point = 0.0
+    if 'costo_unitario_referencia' in payload:
+        raw = payload.get('costo_unitario_referencia')
+        row.costo_unitario_referencia = None if raw in (None, '') else _num(raw)
     row.unit_name = 'Unidad'
     if payload.get('uses_lots') is not None:
         row.uses_lots = bool(payload.get('uses_lots'))
@@ -2305,6 +2420,9 @@ def create_lot():
     if str(getattr(prod, 'company_id', '') or '').strip() != cid:
         return jsonify({'ok': False, 'error': 'forbidden'}), 403
 
+    if bool(getattr(prod, 'stock_ilimitado', False)):
+        return jsonify({'ok': False, 'error': 'stock_ilimitado'}), 400
+
     qty = _num(payload.get('qty'))
     if qty <= 0:
         return jsonify({'ok': False, 'error': 'qty_required'}), 400
@@ -2403,6 +2521,98 @@ def create_lot():
     db.session.add(mv)
     db.session.commit()
     return jsonify({'ok': True, 'item': _serialize_lot(row)})
+
+
+@bp.post('/api/products/<int:product_id>/stock_mode')
+@login_required
+@module_required('inventory')
+def set_product_stock_mode(product_id: int):
+    _ensure_product_stock_ilimitado_column()
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    row = db.session.get(Product, int(product_id))
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    if str(getattr(row, 'company_id', '') or '').strip() != cid:
+        return jsonify({'ok': False, 'error': 'forbidden'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    mode = str(payload.get('mode') or '').strip().lower()
+    if mode not in ('unlimited', 'controlled'):
+        return jsonify({'ok': False, 'error': 'mode_required'}), 400
+
+    if mode == 'unlimited':
+        row.stock_ilimitado = True
+        row.min_stock = 0.0
+        row.reorder_point = 0.0
+        db.session.commit()
+        return jsonify({'ok': True, 'item': _serialize_product(row)})
+
+    qty_initial = _num(payload.get('qty_initial'))
+    unit_cost = _num(payload.get('unit_cost'))
+    if qty_initial < 0:
+        return jsonify({'ok': False, 'error': 'qty_invalid'}), 400
+    if unit_cost < 0:
+        return jsonify({'ok': False, 'error': 'unit_cost_invalid'}), 400
+
+    supplier_id = str(payload.get('supplier_id') or '').strip() or None
+    supplier_name = str(payload.get('supplier_name') or '').strip() or None
+    if supplier_id:
+        srow = db.session.get(Supplier, supplier_id)
+        if not srow:
+            return jsonify({'ok': False, 'error': 'supplier_not_found'}), 400
+        supplier_name = str(srow.name or '').strip() or supplier_name
+
+    note = str(payload.get('note') or '').strip() or None
+    exp_raw = str(payload.get('expiration_date') or '').strip()
+    exp_dt = _parse_date_iso(exp_raw, None) if exp_raw else None
+    movement_date = _parse_date_iso(str(payload.get('date') or '').strip(), dt_date.today())
+
+    row.stock_ilimitado = False
+    db.session.flush()
+
+    lot = InventoryLot(
+        company_id=cid,
+        product_id=row.id,
+        qty_initial=qty_initial,
+        qty_available=qty_initial,
+        unit_cost=unit_cost,
+        supplier_id=supplier_id,
+        supplier_name=supplier_name,
+        expiration_date=exp_dt,
+        lot_code=_generate_lot_code(),
+        note=note,
+    )
+    db.session.add(lot)
+    db.session.flush()
+
+    try:
+        received_at = datetime.combine(movement_date, datetime.min.time())
+    except Exception:
+        received_at = datetime.utcnow()
+    lot.received_at = received_at
+
+    mv = InventoryMovement(
+        company_id=cid,
+        movement_date=movement_date,
+        type='purchase',
+        sale_ticket=None,
+        product_id=row.id,
+        lot_id=lot.id,
+        qty_delta=qty_initial,
+        unit_cost=unit_cost,
+        total_cost=qty_initial * unit_cost,
+    )
+    db.session.add(mv)
+    db.session.commit()
+    return jsonify({'ok': True, 'item': _serialize_product(row), 'lot': _serialize_lot(lot)})
 
 
 @bp.put('/api/lots/<int:lot_id>')

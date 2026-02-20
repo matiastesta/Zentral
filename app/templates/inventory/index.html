@@ -375,6 +375,20 @@
                                 <div id="file-stock" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
                             </div>
                             <div class="md:col-span-3">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Stock indeterminado</label>
+                                <label id="file-stock-ilimitado-wrap" class="hidden w-full inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-md bg-white cursor-pointer select-none">
+                                    <input id="file-stock-ilimitado" type="checkbox" class="rounded border-gray-300">
+                                    <span class="text-sm text-gray-700">∞ Stock sin control</span>
+                                </label>
+                                <div id="file-stock-ilimitado-hint" class="hidden mt-1 text-[10px] leading-tight text-gray-500">No se descuenta en ventas y no participa en valorización ni alertas.</div>
+                            </div>
+                            <div id="file-ref-cost-wrap" class="hidden md:col-span-3">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Costo unitario (opcional)</label>
+                                <input id="file-ref-cost" type="text" inputmode="decimal" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: 3500">
+                                <div id="file-ref-cost-hint" class="mt-1 text-[10px] leading-tight text-gray-500">Este costo se utilizará para calcular el Costo de Mercadería Vendida aunque el producto no tenga control de stock.</div>
+                                <div id="file-ref-cost-warn" class="hidden mt-1 text-[10px] leading-tight text-amber-700">⚠️ Este producto no tiene costo configurado. El CMV será 0 hasta que se configure uno.</div>
+                            </div>
+                            <div class="md:col-span-3">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Stock mínimo</label>
                                 <div id="file-min-view" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
                                 <input id="file-min" type="number" min="0" step="0.01" class="hidden w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
@@ -440,6 +454,84 @@
 
             <div class="px-5 py-4 border-t border-gray-100 flex justify-end sticky bottom-0 bg-white z-10">
                 <button id="btn-close-file-bottom" type="button" class="text-sm font-medium text-gray-700 hover:text-gray-900">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-convert-to-unlimited" class="hidden fixed inset-0 z-50" style="z-index: 68;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Convertir a stock indeterminado</h3>
+                    <p class="text-xs text-gray-500">Este cambio desactiva el control de stock del producto.</p>
+                </div>
+                <button id="btn-close-convert-unlimited" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-5 text-sm text-gray-700 space-y-2">
+                <div>Al convertir:</div>
+                <div class="text-xs text-gray-600">- No se descontará stock en ventas y no se generarán alertas.</div>
+                <div class="text-xs text-gray-600">- Podés volver a activar el control cuando quieras (se creará un lote inicial).</div>
+                <div id="convert-unlimited-msg" class="mt-2 text-[11px] text-gray-600"></div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+                <button id="btn-cancel-convert-unlimited" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-confirm-convert-unlimited" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">Confirmar conversión</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-activate-controlled" class="hidden fixed inset-0 z-50" style="z-index: 68;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Activar control de stock</h3>
+                    <p class="text-xs text-gray-500">Se creará un lote inicial para reactivar el control.</p>
+                </div>
+                <button id="btn-close-activate-controlled" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-5">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Cantidad inicial <span class="text-red-600">*</span></label>
+                        <input id="activate-controlled-qty" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
+                    </div>
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Costo unitario <span class="text-red-600">*</span></label>
+                        <input id="activate-controlled-cu" type="text" inputmode="decimal" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="$0" data-currency="ars">
+                    </div>
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Vencimiento</label>
+                        <input id="activate-controlled-exp" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="dd/mm/aaaa" autocomplete="off">
+                    </div>
+
+                    <div class="md:col-span-12">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Proveedor (opcional)</label>
+                        <div class="relative">
+                            <input id="activate-controlled-supplier" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-white" placeholder="Buscar y seleccionar proveedor" autocomplete="off">
+                            <input id="activate-controlled-supplier-id" type="hidden" value="">
+                        </div>
+                        <div class="mt-2 grid grid-cols-2 gap-2">
+                            <a id="link-create-supplier-activate" href="{{ url_for('suppliers.new') }}" class="w-full text-center px-3 py-1.5 text-xs font-medium rounded-md border border-gray-200 bg-white hover:bg-gray-50">Crear proveedor</a>
+                            <button id="btn-select-supplier-activate" type="button" class="w-full px-3 py-1.5 text-xs font-medium rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">Seleccionar</button>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-12">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Nota (opcional)</label>
+                        <input id="activate-controlled-note" type="text" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
+                        <div id="activate-controlled-msg" class="mt-2 text-[11px] text-gray-600"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+                <button id="btn-cancel-activate-controlled" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+                <button id="btn-confirm-activate-controlled" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">Activar stock</button>
             </div>
         </div>
     </div>
@@ -777,6 +869,12 @@
                                     Stock indeterminado
                                 </label>
                                 <div id="prod-stock-ilimitado-hint" class="mt-1 text-[11px] text-gray-500 hidden">Este producto no tendrá control de stock</div>
+                            </div>
+
+                            <div id="prod-ref-cost-wrap" class="hidden md:col-span-3">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Costo unitario (opcional)</label>
+                                <input id="prod-ref-cost" type="text" inputmode="decimal" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Ej: 3500">
+                                <div id="prod-ref-cost-hint" class="mt-1 text-[11px] text-gray-500">Se usa para CMV cuando el stock es indeterminado.</div>
                             </div>
 
                             <div class="md:col-span-3">
@@ -1346,6 +1444,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let editingLotConsumedQty = 0;
     let canAdjustLot = false;
 
+    let fileOriginalStockIlimitado = false;
+
     try {
         const el = document.getElementById('inv-permissions');
         const parsed = el ? JSON.parse(String(el.textContent || '{}')) : {};
@@ -1420,10 +1520,37 @@ document.addEventListener('DOMContentLoaded', function () {
     const fileMethodLockMsg = document.getElementById('file-method-lock-msg');
 
     const fileStock = document.getElementById('file-stock');
+    const fileStockIlimitadoWrap = document.getElementById('file-stock-ilimitado-wrap');
+    const fileStockIlimitado = document.getElementById('file-stock-ilimitado');
+    const fileStockIlimitadoHint = document.getElementById('file-stock-ilimitado-hint');
+    const fileRefCostWrap = document.getElementById('file-ref-cost-wrap');
+    const fileRefCost = document.getElementById('file-ref-cost');
+    const fileRefCostWarn = document.getElementById('file-ref-cost-warn');
     const fileMinView = document.getElementById('file-min-view');
     const fileMin = document.getElementById('file-min');
     const fileReorderView = document.getElementById('file-reorder-view');
     const fileReorder = document.getElementById('file-reorder');
+
+    const modalConvertUnlimited = document.getElementById('modal-convert-to-unlimited');
+    const btnCloseConvertUnlimited = document.getElementById('btn-close-convert-unlimited');
+    const btnCancelConvertUnlimited = document.getElementById('btn-cancel-convert-unlimited');
+    const btnConfirmConvertUnlimited = document.getElementById('btn-confirm-convert-unlimited');
+    const convertUnlimitedMsg = document.getElementById('convert-unlimited-msg');
+
+    const modalActivateControlled = document.getElementById('modal-activate-controlled');
+    const btnCloseActivateControlled = document.getElementById('btn-close-activate-controlled');
+    const btnCancelActivateControlled = document.getElementById('btn-cancel-activate-controlled');
+    const btnConfirmActivateControlled = document.getElementById('btn-confirm-activate-controlled');
+    const activateControlledQty = document.getElementById('activate-controlled-qty');
+    const activateControlledCu = document.getElementById('activate-controlled-cu');
+    const activateControlledExp = document.getElementById('activate-controlled-exp');
+    const activateControlledSupplier = document.getElementById('activate-controlled-supplier');
+    const activateControlledSupplierId = document.getElementById('activate-controlled-supplier-id');
+    const btnSelectSupplierActivate = document.getElementById('btn-select-supplier-activate');
+    const activateControlledNote = document.getElementById('activate-controlled-note');
+    const activateControlledMsg = document.getElementById('activate-controlled-msg');
+
+    let pendingStockModeProductId = '';
     const fileStatus = document.getElementById('file-status');
     const fileLotsTbody = document.getElementById('file-lots-tbody');
 
@@ -1496,6 +1623,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const prodLotQty = document.getElementById('prod-lot-qty');
     const prodStockIlimitado = document.getElementById('prod-stock-ilimitado');
     const prodStockIlimitadoHint = document.getElementById('prod-stock-ilimitado-hint');
+    const prodRefCostWrap = document.getElementById('prod-ref-cost-wrap');
+    const prodRefCost = document.getElementById('prod-ref-cost');
     const prodLotCt = document.getElementById('prod-lot-ct');
     const prodLotExp = document.getElementById('prod-lot-exp');
     const prodLotNoExp = document.getElementById('prod-lot-no-exp');
@@ -2103,6 +2232,15 @@ document.addEventListener('DOMContentLoaded', function () {
     function setSupplierOnTarget(s) {
         const id = String(s?.id || '').trim();
         const name = String(s?.name || '').trim();
+        if (currentSupplierTarget === 'activate') {
+            suppressSupplierInputClear = true;
+            const supId = document.getElementById('activate-controlled-supplier-id');
+            const sup = document.getElementById('activate-controlled-supplier');
+            if (supId) supId.value = id;
+            if (sup) sup.value = name;
+            suppressSupplierInputClear = false;
+            return;
+        }
         if (currentSupplierTarget === 'lot_edit') {
             suppressSupplierInputClear = true;
             if (editLotSupplierId) editLotSupplierId.value = id;
@@ -2426,6 +2564,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }).then(r => r.json());
     }
 
+    function apiSetProductStockMode(productId, payload) {
+        return fetch('/inventory/api/products/' + encodeURIComponent(String(productId)) + '/stock_mode', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {})
+        }).then(r => r.json());
+    }
+
     function apiDeleteProduct(productId) {
         return fetch('/inventory/api/products/' + encodeURIComponent(String(productId)), {
             method: 'DELETE',
@@ -2693,12 +2840,35 @@ document.addEventListener('DOMContentLoaded', function () {
         if (fileMethodView) fileMethodView.classList.toggle('hidden', fileEditMode);
         if (fileMethod) fileMethod.classList.toggle('hidden', !fileEditMode);
 
+        if (fileStockIlimitadoWrap) fileStockIlimitadoWrap.classList.toggle('hidden', !fileEditMode);
+        if (fileStockIlimitadoHint) fileStockIlimitadoHint.classList.toggle('hidden', !fileEditMode);
+
         if (fileMinView) fileMinView.classList.toggle('hidden', fileEditMode);
         if (fileMin) fileMin.classList.toggle('hidden', !fileEditMode);
         if (fileReorderView) fileReorderView.classList.toggle('hidden', fileEditMode);
         if (fileReorder) fileReorder.classList.toggle('hidden', !fileEditMode);
 
         setFileCompactMode(!fileEditMode);
+    }
+
+    function syncFileStockIlimitadoUi() {
+        const isUnlimited = !!fileStockIlimitado?.checked;
+        if (fileMin) {
+            fileMin.disabled = isUnlimited;
+            fileMin.classList.toggle('bg-gray-50', isUnlimited);
+        }
+        if (fileReorder) {
+            fileReorder.disabled = isUnlimited;
+            fileReorder.classList.toggle('bg-gray-50', isUnlimited);
+        }
+        if (fileStockIlimitadoHint) fileStockIlimitadoHint.classList.toggle('hidden', !isUnlimited);
+        if (fileRefCostWrap) fileRefCostWrap.classList.toggle('hidden', !isUnlimited);
+        if (fileRefCost) {
+            if (!isUnlimited) {
+                try { fileRefCost.value = ''; } catch (e) {}
+            }
+        }
+        if (fileRefCostWarn) fileRefCostWarn.classList.add('hidden');
     }
 
     function setFileCompactMode(compact) {
@@ -2966,20 +3136,49 @@ document.addEventListener('DOMContentLoaded', function () {
                 try {
                     const relLots = (Array.isArray(cacheLots) ? cacheLots : []).filter(l => String(l?.product_id) === pid);
                     const stock = relLots.reduce((acc, l) => acc + parseNumeroSeguro(l?.qty_available), 0);
-                    const status = getStatus(stock, prod?.reorder_point, prod?.min_stock);
-                    const statusLabel = (status === 'Crítico') ? '🔴 Crítico' : (status === 'Reponer') ? '🟡 Atención' : '🟢 OK';
+                    const isUnlimited = !!(prod && (prod.stock_ilimitado === true || prod.stock_ilimitado === 1));
+                    fileOriginalStockIlimitado = isUnlimited;
+                    if (fileStockIlimitado) fileStockIlimitado.checked = isUnlimited;
 
-                    if (fileStock) fileStock.textContent = String(stock.toLocaleString('es-AR', { maximumFractionDigits: 2 }));
-                    if (fileMinView) fileMinView.textContent = String(parseNumeroSeguro(prod?.min_stock).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
-                    if (fileMin) fileMin.value = String(prod?.min_stock ?? '');
-                    if (fileReorderView) fileReorderView.textContent = String(parseNumeroSeguro(prod?.reorder_point).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
-                    if (fileReorder) fileReorder.value = String(prod?.reorder_point ?? '');
-                    if (fileStatus) fileStatus.textContent = statusLabel;
+                    try {
+                        const rc = (prod && (prod.costo_unitario_referencia ?? prod.ref_cost ?? null));
+                        if (fileRefCost) fileRefCost.value = (rc === null || rc === undefined || rc === '') ? '' : String(rc);
+                        const hasCost = (fileRefCost && String(fileRefCost.value || '').trim() !== '');
+                        if (fileRefCostWarn) fileRefCostWarn.classList.toggle('hidden', !isUnlimited || hasCost);
+                    } catch (e) {
+                        if (fileRefCostWarn) fileRefCostWarn.classList.add('hidden');
+                    }
+                    syncFileStockIlimitadoUi();
 
-                    if (fileVStock) fileVStock.textContent = String(stock.toLocaleString('es-AR', { maximumFractionDigits: 2 }));
-                    if (fileVMin) fileVMin.textContent = String(parseNumeroSeguro(prod?.min_stock).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
-                    if (fileVReorder) fileVReorder.textContent = String(parseNumeroSeguro(prod?.reorder_point).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
-                    if (fileVStatus) fileVStatus.textContent = statusLabel;
+                    if (isUnlimited) {
+                        const statusLabel = '⚪ Sin control de stock';
+                        if (fileStock) fileStock.textContent = 'Indeterminado';
+                        if (fileMinView) fileMinView.textContent = '—';
+                        if (fileMin) fileMin.value = '0';
+                        if (fileReorderView) fileReorderView.textContent = '—';
+                        if (fileReorder) fileReorder.value = '0';
+                        if (fileStatus) fileStatus.textContent = statusLabel;
+
+                        if (fileVStock) fileVStock.textContent = 'Indeterminado';
+                        if (fileVMin) fileVMin.textContent = '—';
+                        if (fileVReorder) fileVReorder.textContent = '—';
+                        if (fileVStatus) fileVStatus.textContent = statusLabel;
+                    } else {
+                        const status = getStatus(stock, prod?.reorder_point, prod?.min_stock);
+                        const statusLabel = (status === 'Crítico') ? '🔴 Crítico' : (status === 'Reponer') ? '🟡 Atención' : '🟢 OK';
+
+                        if (fileStock) fileStock.textContent = String(stock.toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+                        if (fileMinView) fileMinView.textContent = String(parseNumeroSeguro(prod?.min_stock).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+                        if (fileMin) fileMin.value = String(prod?.min_stock ?? '');
+                        if (fileReorderView) fileReorderView.textContent = String(parseNumeroSeguro(prod?.reorder_point).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+                        if (fileReorder) fileReorder.value = String(prod?.reorder_point ?? '');
+                        if (fileStatus) fileStatus.textContent = statusLabel;
+
+                        if (fileVStock) fileVStock.textContent = String(stock.toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+                        if (fileVMin) fileVMin.textContent = String(parseNumeroSeguro(prod?.min_stock).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+                        if (fileVReorder) fileVReorder.textContent = String(parseNumeroSeguro(prod?.reorder_point).toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+                        if (fileVStatus) fileVStatus.textContent = statusLabel;
+                    }
                 } catch (e) {
                 }
 
@@ -3022,6 +3221,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const min = parseNumeroSeguro(fileMin?.value);
         const reorderPoint = parseNumeroSeguro(fileReorder?.value);
+        const wantsUnlimited = !!fileStockIlimitado?.checked;
+        const refCostRaw = String(fileRefCost?.value || '').trim();
+        let refCost = null;
+        if (refCostRaw) {
+            refCost = parseNumeroSeguro(refCostRaw);
+            if (!isFinite(parseFloat(refCost)) && refCost !== 0) {
+                if (window.showAlertModal) window.showAlertModal('El costo unitario debe ser numérico.', 'Atención', 'Validación requerida');
+                else alert('El costo unitario debe ser numérico.');
+                return;
+            }
+        }
 
         if (!name) { if (window.showAlertModal) window.showAlertModal('Completá el nombre del producto.', 'Atención', 'Validación requerida'); else alert('Completá el nombre del producto.'); return; }
         if (!categoryId) { if (window.showAlertModal) window.showAlertModal('Seleccioná la categoría del producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná la categoría del producto.'); return; }
@@ -3039,12 +3249,23 @@ document.addEventListener('DOMContentLoaded', function () {
             primary_supplier_id: primarySupplierId,
             primary_supplier_name: primarySupplierName,
             active: active,
-            min_stock: min,
-            reorder_point: reorderPoint,
+            stock_ilimitado: wantsUnlimited,
+            costo_unitario_referencia: wantsUnlimited ? (refCostRaw ? refCost : null) : null,
+            min_stock: wantsUnlimited ? 0 : min,
+            reorder_point: wantsUnlimited ? 0 : reorderPoint,
         };
 
         if (fileMethod && !fileMethod.disabled) {
             payload.method = String(fileMethod.value || '').trim() || 'FIFO';
+        }
+
+        if (!fileOriginalStockIlimitado && wantsUnlimited) {
+            openConvertToUnlimitedModal(pid);
+            return;
+        }
+        if (fileOriginalStockIlimitado && !wantsUnlimited) {
+            openActivateControlledModal(pid);
+            return;
         }
 
         apiUpdateProduct(pid, payload).then(function (res) {
@@ -3091,6 +3312,109 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function openConvertToUnlimitedModal(productId) {
+        pendingStockModeProductId = String(productId || '').trim();
+        if (convertUnlimitedMsg) convertUnlimitedMsg.textContent = '';
+        abrirModal(modalConvertUnlimited, true);
+    }
+
+    function closeConvertToUnlimitedModal() {
+        pendingStockModeProductId = '';
+        if (convertUnlimitedMsg) convertUnlimitedMsg.textContent = '';
+        abrirModal(modalConvertUnlimited, false);
+    }
+
+    function confirmConvertToUnlimited() {
+        const pid = String(pendingStockModeProductId || '').trim();
+        if (!pid) return;
+        if (convertUnlimitedMsg) convertUnlimitedMsg.textContent = 'Aplicando…';
+        apiSetProductStockMode(pid, { mode: 'unlimited' }).then(function (res) {
+            if (!res || res.ok !== true) {
+                const err = String(res?.error || '').trim();
+                if (convertUnlimitedMsg) convertUnlimitedMsg.textContent = 'No se pudo convertir.' + (err ? (' (' + err + ')') : '');
+                return;
+            }
+            try {
+                const item = res.item;
+                if (item && item.id) {
+                    cacheProducts = (Array.isArray(cacheProducts) ? cacheProducts : []).map(p => (String(p?.id) === String(item.id)) ? item : p);
+                }
+            } catch (e) {
+            }
+            closeConvertToUnlimitedModal();
+            renderAll();
+            openProductFile(pid);
+        }).catch(function () {
+            if (convertUnlimitedMsg) convertUnlimitedMsg.textContent = 'No se pudo convertir.';
+        });
+    }
+
+    function openActivateControlledModal(productId) {
+        pendingStockModeProductId = String(productId || '').trim();
+        if (activateControlledMsg) activateControlledMsg.textContent = '';
+        if (activateControlledQty) activateControlledQty.value = '0';
+        if (activateControlledCu) activateControlledCu.value = '$0';
+        if (activateControlledExp) activateControlledExp.value = '';
+        if (activateControlledSupplier) activateControlledSupplier.value = '';
+        if (activateControlledSupplierId) activateControlledSupplierId.value = '';
+        if (activateControlledNote) activateControlledNote.value = 'Activación de control de stock desde stock indeterminado';
+        abrirModal(modalActivateControlled, true);
+    }
+
+    function closeActivateControlledModal() {
+        pendingStockModeProductId = '';
+        if (activateControlledMsg) activateControlledMsg.textContent = '';
+        abrirModal(modalActivateControlled, false);
+    }
+
+    function confirmActivateControlled() {
+        const pid = String(pendingStockModeProductId || '').trim();
+        if (!pid) return;
+        const qty = parseNumeroSeguro(activateControlledQty?.value);
+        const cu = parseMonedaARS(activateControlledCu?.value);
+        const expIso = toIsoDate(String(activateControlledExp?.value || '').trim());
+        const supplierId = String(activateControlledSupplierId?.value || '').trim();
+        const supplierName = String(activateControlledSupplier?.value || '').trim();
+        const note = String(activateControlledNote?.value || '').trim();
+
+        if (!(qty >= 0)) { if (activateControlledMsg) activateControlledMsg.textContent = 'La cantidad no puede ser negativa.'; return; }
+        if (!(cu >= 0)) { if (activateControlledMsg) activateControlledMsg.textContent = 'El costo unitario no puede ser negativo.'; return; }
+
+        if (activateControlledMsg) activateControlledMsg.textContent = 'Activando…';
+        apiSetProductStockMode(pid, {
+            mode: 'controlled',
+            qty_initial: qty,
+            unit_cost: cu,
+            supplier_id: supplierId,
+            supplier_name: supplierName,
+            expiration_date: expIso,
+            note: note,
+        }).then(function (res) {
+            if (!res || res.ok !== true) {
+                const err = String(res?.error || '').trim();
+                const det = String(res?.details || '').trim();
+                if (activateControlledMsg) activateControlledMsg.textContent = 'No se pudo activar.' + (det ? (' (' + det + ')') : (err ? (' (' + err + ')') : ''));
+                return;
+            }
+            try {
+                const item = res.item;
+                if (item && item.id) {
+                    cacheProducts = (Array.isArray(cacheProducts) ? cacheProducts : []).map(p => (String(p?.id) === String(item.id)) ? item : p);
+                }
+                const lot = res.lot;
+                if (lot && lot.id) {
+                    cacheLots = (Array.isArray(cacheLots) ? cacheLots : []).concat([lot]);
+                }
+            } catch (e) {
+            }
+            closeActivateControlledModal();
+            renderAll();
+            openProductFile(pid);
+        }).catch(function () {
+            if (activateControlledMsg) activateControlledMsg.textContent = 'No se pudo activar.';
+        });
+    }
+
     function clearProductForm() {
         if (prodName) prodName.value = '';
         if (prodCatId) prodCatId.value = '';
@@ -3129,6 +3453,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (prodLotCu) prodLotCu.value = '';
         if (prodLotQty) prodLotQty.value = '';
         if (prodLotCt) prodLotCt.value = '$0';
+        if (prodStockIlimitado) prodStockIlimitado.checked = false;
+        if (prodStockIlimitadoHint) prodStockIlimitadoHint.classList.add('hidden');
+        if (prodRefCost) prodRefCost.value = '';
+        if (prodRefCostWrap) prodRefCostWrap.classList.add('hidden');
         if (prodLotNoExp) prodLotNoExp.checked = true;
         if (prodLotExp) {
             prodLotExp.value = '';
@@ -3209,6 +3537,18 @@ document.addEventListener('DOMContentLoaded', function () {
         if (prodActive) prodActive.checked = (prod?.active !== false);
         if (prodDesc) prodDesc.value = String(prod?.description || '');
         syncProductToggleLabels();
+
+        try {
+            const isUnlimited = !!(prod && (prod.stock_ilimitado === true || prod.stock_ilimitado === 1));
+            if (prodStockIlimitado) prodStockIlimitado.checked = isUnlimited;
+            if (prodStockIlimitadoHint) prodStockIlimitadoHint.classList.toggle('hidden', !isUnlimited);
+            if (prodRefCostWrap) prodRefCostWrap.classList.toggle('hidden', !isUnlimited);
+            const rc = (prod && (prod.costo_unitario_referencia ?? null));
+            if (prodRefCost) prodRefCost.value = (rc === null || rc === undefined || rc === '') ? '' : String(rc);
+        } catch (e) {
+            if (prodRefCost) prodRefCost.value = '';
+            if (prodRefCostWrap) prodRefCostWrap.classList.add('hidden');
+        }
 
         const imgUrl = String(prod?.image_url || '').trim();
         if (imgUrl && prodImagePreview) {
@@ -3433,6 +3773,12 @@ document.addEventListener('DOMContentLoaded', function () {
         return { ok: true, value: v };
     }
 
+    function isCantidadIndeterminadaRaw(raw) {
+        const s = String(raw ?? '').trim().toLowerCase();
+        if (!s) return false;
+        return (s === 'indeterminado' || s === '∞' || s === 'ilimitado');
+    }
+
     let pendingImportConfirmRows = [];
 
     function closeImportConfirm() {
@@ -3443,6 +3789,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function countLotsFromRows(rows) {
         const list = Array.isArray(rows) ? rows : [];
         return list.filter(r => {
+            if (isCantidadIndeterminadaRaw(r?.cantidad)) return false;
             const n = parseNumberRaw(r?.cantidad);
             return n.ok && (n.value || 0) > 0;
         }).length;
@@ -3496,7 +3843,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const categoria = String(d.categoria ?? '').trim();
         const codigoInterno = String(d.codigo_interno ?? '').trim();
         const precio = parseNumberRaw(d.precio_lista);
-        const cantidad = parseNumberRaw(d.cantidad);
+        const isIndet = isCantidadIndeterminadaRaw(d.cantidad);
+        if (isIndet) d.cantidad = 'indeterminado';
+        const cantidad = isIndet ? { ok: true, value: null } : parseNumberRaw(d.cantidad);
         const cu = parseNumberRaw(d.costo_unitario);
         const venc = String(d.vencimiento ?? '').trim();
 
@@ -3505,8 +3854,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!precio.ok) errs.precio_lista = 'Precio de lista debe ser numérico.';
         else if ((precio.value ?? 0) < 0) errs.precio_lista = 'Precio de lista debe ser ≥ 0.';
 
-        if (!cantidad.ok) errs.cantidad = 'Cantidad debe ser numérica.';
-        else if ((cantidad.value ?? 0) < 0) errs.cantidad = 'Cantidad debe ser ≥ 0.';
+        if (!isIndet) {
+            if (!cantidad.ok) errs.cantidad = 'Cantidad debe ser numérica.';
+            else if ((cantidad.value ?? 0) < 0) errs.cantidad = 'Cantidad debe ser ≥ 0.';
+        }
 
         if (!cu.ok) errs.costo_unitario = 'Costo unitario debe ser numérico.';
         else if ((cu.value ?? 0) < 0) errs.costo_unitario = 'Costo unitario debe ser ≥ 0.';
@@ -3514,11 +3865,16 @@ document.addEventListener('DOMContentLoaded', function () {
         if (codigoInterno && (codigoInterno.length < 4 || codigoInterno.length > 12)) errs.codigo_interno = 'Código interno: 4 a 12 caracteres.';
         else if (codigoInterno && /\s/.test(codigoInterno)) errs.codigo_interno = 'Código interno: sin espacios.';
 
+        if (d.requires_codigo_interno === true) {
+            errs.codigo_interno = 'Hay más de un producto con este nombre y categoría. Debés completar “codigo_interno”.';
+        }
+
         if (!isValidDateFlexible(venc)) errs.vencimiento = 'Vencimiento inválido (usa dd/mm/aaaa o yyyy-mm-dd).';
 
         r._errors = errs;
         r._errorCount = Object.keys(errs).length;
         r._isValid = r._errorCount === 0;
+        r._cantidad_indeterminada = isIndet;
         return r;
     }
 
@@ -3527,6 +3883,22 @@ document.addEventListener('DOMContentLoaded', function () {
             if (r && r._deleted) return r;
             return validatePreviewRow(r);
         });
+
+        try {
+            const counts = {};
+            (Array.isArray(previewRows) ? previewRows : []).forEach(function (r) {
+                if (!r || r._deleted) return;
+                const ci = String(r.codigo_interno ?? '').trim();
+                if (!ci) return;
+                counts[ci] = (counts[ci] || 0) + 1;
+            });
+            (Array.isArray(previewRows) ? previewRows : []).forEach(function (r) {
+                if (!r || r._deleted) return;
+                const ci = String(r.codigo_interno ?? '').trim();
+                r._warn_codigo_repetido = !!(ci && (counts[ci] || 0) >= 2);
+            });
+        } catch (e) {
+        }
     }
 
     function setCellErrorUI(inputEl, msg) {
@@ -3550,7 +3922,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const valid = total - errRows;
         const newCats = rows.filter(r => !!r.will_create_category).length;
         const newSups = rows.filter(r => !!r.will_create_supplier).length;
-        const exists = rows.filter(r => !!r.product_exists).length;
+        const exists = rows.filter(r => (r.matched_product_id !== null && r.matched_product_id !== undefined && String(r.matched_product_id).trim() !== '')).length;
 
         if (previewCountTotal) previewCountTotal.textContent = String(total);
         if (previewCountValid) previewCountValid.textContent = String(valid);
@@ -3592,8 +3964,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ' + cls + '">' + esc(txt) + '</span>';
             };
             const flags = [];
-            if (r.product_exists) flags.push(badge('Ya existe', 'bg-gray-100 text-gray-700'));
+            if (r.product_exists && (r.match_kind !== 'ambiguous')) flags.push(badge('Ya existe', 'bg-gray-100 text-gray-700'));
             else flags.push(badge('Nuevo', 'bg-indigo-50 text-indigo-700'));
+
+            const mk = String(r.match_kind || '').trim();
+            if (mk === 'codigo_interno') flags.push(badge('Match por código', 'bg-sky-50 text-sky-700'));
+            else if (mk === 'nombre_categoria') flags.push(badge('Match nombre+cat', 'bg-sky-50 text-sky-700'));
+            else if (mk === 'new_codigo_interno') flags.push(badge('Nuevo (código)', 'bg-indigo-50 text-indigo-700'));
+            else if (mk === 'ambiguous' || r.requires_codigo_interno === true) flags.push(badge('Requiere código', 'bg-red-50 text-red-700'));
+
+            if (r._warn_codigo_repetido === true) flags.push(badge('Código repetido', 'bg-amber-50 text-amber-800'));
 
             const td = function (html) {
                 const el = document.createElement('td');
@@ -3644,7 +4024,13 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.appendChild(td(input('codigo_interno', '', '')));
             tr.appendChild(td(input('precio_lista', '', '0')));
             tr.appendChild(td(input('descripcion', '', '')));
-            tr.appendChild(td(input('cantidad', '', '0')));
+            if (r._cantidad_indeterminada === true || isCantidadIndeterminadaRaw(r.cantidad)) {
+                tr.appendChild(td('<div class="flex items-center justify-center">'
+                    + '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700">∞ Indeterminado</span>'
+                    + '</div>'));
+            } else {
+                tr.appendChild(td(input('cantidad', '', '0')));
+            }
             tr.appendChild(td(input('costo_unitario', '', '0')));
             tr.appendChild(td(cellSupplier()));
             tr.appendChild(td(input('vencimiento', '', 'dd/mm/aaaa')));
@@ -3668,6 +4054,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 validatePreviewRow(row);
                 setCellErrorUI(el, row._errors ? row._errors[field] : '');
                 renderPreviewSummary();
+                if (field === 'cantidad') {
+                    renderPreviewTable();
+                    return;
+                }
                 // update row error counter
                 try {
                     const firstTd = el.closest('tr')?.querySelector('td');
@@ -3790,12 +4180,16 @@ document.addEventListener('DOMContentLoaded', function () {
             : [];
 
         const compute = (p) => {
+            const isUnlimited = !!(p && (p.stock_ilimitado === true || p.stock_ilimitado === 1));
+            if (isUnlimited) {
+                return { stock: null, avg: null, total: null, status: 'OK', unlimited: true };
+            }
             const rel = lots.filter(l => String(l.product_id) === String(p.id));
             const stock = rel.reduce((acc, l) => acc + parseNumeroSeguro(l.qty_available), 0);
             const costSum = rel.reduce((acc, l) => acc + (parseNumeroSeguro(l.qty_available) * parseNumeroSeguro(l.unit_cost)), 0);
             const avg = stock > 0 ? (costSum / stock) : lastUnitCost(rel);
             const status = getStatus(stock, p.reorder_point, p.min_stock);
-            return { stock, avg, total: stock * avg, status };
+            return { stock, avg, total: stock * avg, status, unlimited: false };
         };
 
         const filteredProducts = products
@@ -3870,6 +4264,9 @@ document.addEventListener('DOMContentLoaded', function () {
         let alerts = 0;
         const alertProducts = [];
         activeProducts.forEach(p => {
+            if (p && (p.stock_ilimitado === true || p.stock_ilimitado === 1)) {
+                return;
+            }
             const rel = lots.filter(l => String(l.product_id) === String(p.id));
             const stock = rel.reduce((acc, l) => acc + parseNumeroSeguro(l.qty_available), 0);
             const costSum = rel.reduce((acc, l) => acc + (parseNumeroSeguro(l.qty_available) * parseNumeroSeguro(l.unit_cost)), 0);
@@ -3946,18 +4343,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? ('<img src="' + imgUrl + '" alt="" class="h-9 w-9 rounded-md object-cover border border-gray-200 bg-gray-50">')
                 : ('<div class="h-9 w-9 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400"><i class="fas fa-image"></i></div>');
             const codigoInterno = String(p?.codigo_interno || p?.internal_code || '').trim();
+            const isUnlimited = !!(p && (p.stock_ilimitado === true || p.stock_ilimitado === 1));
+
+            const unlimitedStockCell = '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-semibold" title="Stock sin control activo. No se descuenta en ventas y no participa en valorización.">∞ Indeterminado</span>';
 
             const isInactive = (p && p.active === false);
             const toggleText = isInactive ? 'Activar' : 'Inactivar';
             const toggleCls = isInactive ? 'text-green-700' : 'text-gray-700';
 
+            const addLotDisabled = isUnlimited;
+            const addLotBtnHtml = addLotDisabled
+                ? '<button type="button" class="w-full text-left px-3 py-2 text-xs text-gray-400 cursor-not-allowed" disabled title="Producto con stock indeterminado: no se pueden crear lotes.">Agregar lote</button>'
+                : '<button type="button" class="btn-add-lot-product w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Agregar lote</button>';
+
             tr.innerHTML = ''
                 + '<td class="px-4 py-3 text-sm text-gray-700">' + imgCell + '</td>'
                 + '<td class="px-4 py-3 text-sm font-medium text-gray-900">' + esc(p.name) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(categoryLabel(p)) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-600">' + fmtNumero(m.stock) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right text-gray-600">' + fmtMoneda(m.avg) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right text-gray-600">' + fmtMoneda(m.total) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600">' + (isUnlimited ? unlimitedStockCell : fmtNumero(m.stock)) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-600">' + (isUnlimited ? '—' : fmtMoneda(m.avg)) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-600">' + (isUnlimited ? '—' : fmtMoneda(m.total)) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(codigoInterno || '—') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-600">' + statusBadgeHtml(m.status) + '</td>'
                 + '<td class="px-4 py-3 text-right">'
@@ -3968,7 +4373,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '    <div class="row-actions-menu hidden absolute right-0 mt-2 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-30">'
                 + '    <div class="py-1 text-[11px]">'
                 + '      <button type="button" class="btn-view-file w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Ver legajo</button>'
-                + '      <button type="button" class="btn-add-lot-product w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Agregar lote</button>'
+                +        addLotBtnHtml
                 + '      <button type="button" class="btn-toggle-active-product w-full text-left px-3 py-2 text-xs ' + toggleCls + ' hover:bg-gray-50" data-product-id="' + String(p.id) + '" data-active="' + (isInactive ? '0' : '1') + '">' + toggleText + '</button>'
                 + '      <button type="button" class="btn-hard-delete-product w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Eliminar</button>'
                 + '    </div>'
@@ -5259,6 +5664,16 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btnCancelFile) btnCancelFile.addEventListener('click', function () { if (fileProductId) openProductFile(fileProductId); else closeProductFile(); });
     if (btnSaveFile) btnSaveFile.addEventListener('click', saveProductFile);
     if (btnCloseFile) btnCloseFile.addEventListener('click', closeProductFile);
+
+    if (fileStockIlimitado) fileStockIlimitado.addEventListener('change', syncFileStockIlimitadoUi);
+
+    if (btnCloseConvertUnlimited) btnCloseConvertUnlimited.addEventListener('click', closeConvertToUnlimitedModal);
+    if (btnCancelConvertUnlimited) btnCancelConvertUnlimited.addEventListener('click', closeConvertToUnlimitedModal);
+    if (btnConfirmConvertUnlimited) btnConfirmConvertUnlimited.addEventListener('click', confirmConvertToUnlimited);
+
+    if (btnCloseActivateControlled) btnCloseActivateControlled.addEventListener('click', closeActivateControlledModal);
+    if (btnCancelActivateControlled) btnCancelActivateControlled.addEventListener('click', closeActivateControlledModal);
+    if (btnConfirmActivateControlled) btnConfirmActivateControlled.addEventListener('click', confirmActivateControlled);
     if (btnCloseFileBottom) btnCloseFileBottom.addEventListener('click', closeProductFile);
 
     if (fileActive) fileActive.addEventListener('change', syncFileToggleLabels);
@@ -5272,6 +5687,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (btnSelectSupplierFile) btnSelectSupplierFile.addEventListener('click', function () { openSupplierModal('file'); });
     if (linkCreateSupplierFile) linkCreateSupplierFile.addEventListener('click', function (ev) { ev.preventDefault(); goCreateSupplier('file'); });
+
+    if (btnSelectSupplierActivate) btnSelectSupplierActivate.addEventListener('click', function () { openSupplierModal('activate'); });
 
     if (fileImage) {
         fileImage.addEventListener('change', function () {
@@ -5333,6 +5750,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 prodLotQty.classList.toggle('bg-gray-50', on);
             }
             if (prodStockIlimitadoHint) prodStockIlimitadoHint.classList.toggle('hidden', !on);
+            if (prodRefCostWrap) prodRefCostWrap.classList.toggle('hidden', !on);
         });
     }
 
@@ -5352,6 +5770,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const firstLotQty = parseNumeroSeguro(prodLotQty?.value);
             const isUnlimited = !!prodStockIlimitado?.checked;
+            const refCostRaw = String(prodRefCost?.value || '').trim();
+            const refCost = (refCostRaw ? parseNumeroSeguro(refCostRaw) : null);
             const wantsFirstLot = (!editingProductId) && (!isUnlimited) && (firstLotQty > 0);
 
             if (!name) { if (window.showAlertModal) window.showAlertModal('Completá el nombre del producto.', 'Atención', 'Validación requerida'); else alert('Completá el nombre del producto.'); return; }
@@ -5373,7 +5793,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 description: desc,
                 active: true,
                 sale_price: salePrice,
-                stock_ilimitado: isUnlimited
+                stock_ilimitado: isUnlimited,
+                costo_unitario_referencia: isUnlimited ? (refCostRaw ? refCost : null) : null
             };
 
             const req = editingProductId

@@ -294,6 +294,7 @@ class Product(db.Model):
     unit_name = db.Column(db.String(32), nullable=True)
     uses_lots = db.Column(db.Boolean, nullable=False, default=True)
     stock_ilimitado = db.Column(db.Boolean, nullable=False, default=False)
+    costo_unitario_referencia = db.Column(db.Float, nullable=True)
     method = db.Column(db.String(16), nullable=False, default='FIFO')
     min_stock = db.Column(db.Float, nullable=False, default=0.0)
     reorder_point = db.Column(db.Float, nullable=False, default=0.0)
@@ -384,6 +385,9 @@ class Sale(db.Model):
 
     exchange_return_total = db.Column(db.Float, nullable=True)
     exchange_new_total = db.Column(db.Float, nullable=True)
+
+    cmv_incomplete = db.Column(db.Boolean, nullable=False, default=False)
+    cmv_incomplete_reason = db.Column(db.String(255), nullable=True)
 
     created_by_user_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -476,6 +480,70 @@ class CalendarUserConfig(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('company_id', 'user_id', name='uq_calendar_user_config_company_user'),
+    )
+
+    def get_config(self) -> dict:
+        try:
+            parsed = json.loads(self.config_json or '{}')
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+
+    def set_config(self, cfg: dict) -> None:
+        payload = cfg if isinstance(cfg, dict) else {}
+        self.config_json = json.dumps(payload, ensure_ascii=False)
+
+
+class UserTableColumnPrefs(db.Model):
+    __tablename__ = 'user_table_column_prefs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
+    user_id = db.Column(db.Integer, nullable=False, index=True)
+    module_key = db.Column(db.String(128), nullable=False, index=True)
+    visible_columns_json = db.Column(db.Text, nullable=False, default='[]')
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'user_id', 'module_key', name='uq_user_table_column_prefs_company_user_module'),
+    )
+
+    def get_visible_columns(self) -> list[str]:
+        try:
+            parsed = json.loads(self.visible_columns_json or '[]')
+            if isinstance(parsed, list):
+                out: list[str] = []
+                for c in parsed:
+                    k = str(c or '').strip().lower()
+                    if k and k not in out:
+                        out.append(k)
+                return out
+            return []
+        except Exception:
+            return []
+
+    def set_visible_columns(self, cols: list) -> None:
+        arr = cols if isinstance(cols, list) else []
+        out: list[str] = []
+        for c in arr:
+            k = str(c or '').strip().lower()
+            if k and k not in out:
+                out.append(k)
+        self.visible_columns_json = json.dumps(out, ensure_ascii=False)
+
+
+class SalesHistoryUserConfig(db.Model):
+    __tablename__ = 'sales_history_user_config'
+
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
+    user_id = db.Column(db.Integer, nullable=False, index=True)
+    config_json = db.Column(db.Text, nullable=False, default='{}')
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'user_id', name='uq_sales_history_user_config_company_user'),
     )
 
     def get_config(self) -> dict:

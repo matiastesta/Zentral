@@ -8,14 +8,14 @@ import os
 import unicodedata
 
 from flask import current_app, g, jsonify, render_template, request, url_for
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from sqlalchemy import func, inspect, text, and_, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload, joinedload
 
 from app import db
-from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Expense, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem, User
+from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Expense, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem, SalesHistoryUserConfig, User, UserTableColumnPrefs
 from app.permissions import module_required, module_required_any
 from app.sales import bp
 
@@ -23,11 +23,416 @@ from app.sales import bp
 def _dt_to_ms(dt):
     if not dt:
         return 0
+
     try:
         return int(dt.timestamp() * 1000)
     except Exception:
         current_app.logger.exception('Failed to convert datetime to milliseconds')
         return 0
+
+
+def _default_sales_history_columns_config() -> dict:
+    # Columns order for Ventas -> Historial de movimientos.
+    return {
+        'columns': [
+            'ticket',
+            'fecha',
+            'cliente',
+            'empleado',
+            'total',
+            'pago',
+            'tipo',
+        ]
+    }
+
+
+_VENTAS_HISTORIAL_MODULE_KEY = 'ventas_historial_movimientos'
+_VENTAS_HISTORIAL_ALLOWED_COLUMNS = {
+    'ticket',
+    'fecha',
+    'cliente',
+    'empleado',
+    'total',
+    'pago',
+    'tipo',
+    'productos',
+    'cantidad_items',
+    'descuento',
+    'regalo',
+    'margen_bruto',
+    'cmv',
+    'observaciones',
+    'cliente_direccion',
+    'cliente_email',
+    'cliente_telefono',
+    'cliente_cumple',
+    'cliente_clasificacion',
+    'cliente_saldo_cc',
+}
+
+
+def _filter_ventas_historial_visible_columns_for_load(cols_in: list) -> list[str]:
+    cols = cols_in if isinstance(cols_in, list) else []
+    out: list[str] = []
+    for c in cols:
+        k = str(c or '').strip().lower()
+        if not k:
+            continue
+        if k not in _VENTAS_HISTORIAL_ALLOWED_COLUMNS:
+            continue
+        if k not in out:
+            out.append(k)
+    if len(out) > 10:
+        out = out[:10]
+    if len(out) < 1:
+        out = _default_ventas_historial_visible_columns()
+    return out
+
+
+def _default_ventas_historial_visible_columns() -> list[str]:
+    return ['ticket', 'fecha', 'cliente', 'empleado', 'total', 'pago', 'tipo']
+
+
+def _ensure_user_table_column_prefs_table() -> None:
+    try:
+        engine = db.engine
+        if str(engine.url.drivername).startswith('sqlite'):
+            try:
+                db.metadata.create_all(bind=engine, tables=[UserTableColumnPrefs.__table__])
+            except Exception:
+                pass
+            return
+        insp = inspect(engine)
+        tables = set(insp.get_table_names() or [])
+        if 'user_table_column_prefs' in tables:
+            return
+        with engine.begin() as conn:
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS user_table_column_prefs (
+                    id SERIAL PRIMARY KEY,
+                    company_id VARCHAR(36) NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    module_key VARCHAR(128) NOT NULL,
+                    visible_columns_json TEXT NOT NULL DEFAULT '[]',
+                    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+                )
+                """
+            ))
+            conn.execute(text(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_user_table_column_prefs_company_user_module
+                ON user_table_column_prefs (company_id, user_id, module_key)
+                """
+            ))
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to ensure user_table_column_prefs table')
+        except Exception:
+            pass
+
+
+def _validate_ventas_historial_visible_columns(cols_in: list) -> tuple[list[str] | None, str | None]:
+    cols = cols_in if isinstance(cols_in, list) else []
+    out: list[str] = []
+    unknown: list[str] = []
+    for c in cols:
+        k = str(c or '').strip().lower()
+        if not k:
+            continue
+        if k not in _VENTAS_HISTORIAL_ALLOWED_COLUMNS:
+            unknown.append(k)
+            continue
+        if k not in out:
+            out.append(k)
+
+    if unknown:
+        return None, 'Columnas desconocidas.'
+    if len(out) < 1:
+        return None, 'Debe haber al menos 1 columna.'
+    if len(out) > 10:
+        return None, 'Máximo 10 columnas.'
+    return out, None
+
+
+@bp.get('/api/user-table-column-prefs')
+@login_required
+@module_required_any('sales', 'movements')
+def get_user_table_column_prefs():
+    _ensure_user_table_column_prefs_table()
+    cid = _company_id()
+    uid = int(getattr(current_user, 'id', 0) or 0)
+    module_key = str(request.args.get('module_key') or '').strip()
+    if not uid:
+        return jsonify({'ok': False, 'message': 'no_user'}), 400
+    if not module_key:
+        return jsonify({'ok': False, 'message': 'module_key requerido'}), 400
+
+    row = (
+        db.session.query(UserTableColumnPrefs)
+        .execution_options(_sqlite_tenant_guard_applied=True)
+        .filter(UserTableColumnPrefs.company_id == (cid or ''), UserTableColumnPrefs.user_id == uid, UserTableColumnPrefs.module_key == module_key)
+        .first()
+    )
+
+    visible_columns = row.get_visible_columns() if row else []
+    if module_key == _VENTAS_HISTORIAL_MODULE_KEY:
+        if not visible_columns:
+            visible_columns = _default_ventas_historial_visible_columns()
+        visible_columns = _filter_ventas_historial_visible_columns_for_load(visible_columns)
+
+    return jsonify({
+        'ok': True,
+        'module_key': module_key,
+        'visible_columns': visible_columns,
+        'updated_at': _dt_to_ms(getattr(row, 'updated_at', None)) if row else 0,
+    })
+
+
+@bp.post('/api/user-table-column-prefs')
+@login_required
+@module_required_any('sales', 'movements')
+def save_user_table_column_prefs():
+    _ensure_user_table_column_prefs_table()
+    cid = _company_id()
+    uid = int(getattr(current_user, 'id', 0) or 0)
+    if not uid:
+        return jsonify({'ok': False, 'message': 'no_user'}), 400
+
+    payload = request.get_json(silent=True) or {}
+    module_key = str(payload.get('module_key') or '').strip()
+    visible_columns_in = payload.get('visible_columns')
+
+    if not module_key:
+        return jsonify({'ok': False, 'message': 'module_key requerido'}), 400
+
+    if module_key == _VENTAS_HISTORIAL_MODULE_KEY:
+        cols, err = _validate_ventas_historial_visible_columns(visible_columns_in)
+        if err:
+            return jsonify({'ok': False, 'message': err}), 400
+        visible_columns = cols or []
+    else:
+        visible_columns = []
+        if isinstance(visible_columns_in, list):
+            for c in visible_columns_in:
+                k = str(c or '').strip().lower()
+                if k and k not in visible_columns:
+                    visible_columns.append(k)
+        if not visible_columns:
+            return jsonify({'ok': False, 'message': 'Debe haber al menos 1 columna.'}), 400
+        if len(visible_columns) > 10:
+            return jsonify({'ok': False, 'message': 'Máximo 10 columnas.'}), 400
+
+    row = (
+        db.session.query(UserTableColumnPrefs)
+        .execution_options(_sqlite_tenant_guard_applied=True)
+        .filter(UserTableColumnPrefs.company_id == (cid or ''), UserTableColumnPrefs.user_id == uid, UserTableColumnPrefs.module_key == module_key)
+        .first()
+    )
+    if not row:
+        row = UserTableColumnPrefs(company_id=(cid or ''), user_id=uid, module_key=module_key)
+        db.session.add(row)
+    row.set_visible_columns(visible_columns)
+    row.updated_at = datetime.utcnow()
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'message': 'No se pudo guardar la configuración.'}), 400
+
+    return jsonify({
+        'ok': True,
+        'module_key': module_key,
+        'visible_columns': row.get_visible_columns(),
+        'updated_at': _dt_to_ms(row.updated_at),
+    })
+
+
+def _ensure_sales_history_user_config_table() -> None:
+    try:
+        engine = db.engine
+        if str(engine.url.drivername).startswith('sqlite'):
+            try:
+                db.metadata.create_all(bind=engine, tables=[SalesHistoryUserConfig.__table__])
+            except Exception:
+                pass
+            return
+        insp = inspect(engine)
+        tables = set(insp.get_table_names() or [])
+        if 'sales_history_user_config' in tables:
+            return
+        with engine.begin() as conn:
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS sales_history_user_config (
+                    id SERIAL PRIMARY KEY,
+                    company_id VARCHAR(36) NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    config_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+                )
+                """
+            ))
+            conn.execute(text(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_sales_history_user_config_company_user
+                ON sales_history_user_config (company_id, user_id)
+                """
+            ))
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to ensure sales_history_user_config table')
+        except Exception:
+            pass
+
+
+def _get_sales_history_user_config():
+    _ensure_sales_history_user_config_table()
+    try:
+        uid = int(getattr(current_user, 'id', 0) or 0)
+    except Exception:
+        uid = 0
+    cid = _company_id()
+    if not uid:
+        return None
+
+    # Idempotent: mirror CalendarUserConfig approach (handle legacy UNIQUE(user_id) safely).
+    with db.session.no_autoflush:
+        try:
+            row = db.session.execute(
+                text('SELECT id, company_id FROM sales_history_user_config WHERE user_id = :uid LIMIT 1'),
+                {'uid': uid},
+                execution_options={'_sqlite_tenant_guard_applied': True},
+            ).fetchone()
+        except Exception:
+            row = None
+
+    existing_id = None
+    existing_cid = ''
+    if row:
+        try:
+            existing_id = int(row[0])
+        except Exception:
+            existing_id = None
+        try:
+            existing_cid = str(row[1] or '').strip()
+        except Exception:
+            existing_cid = ''
+
+    if existing_id is not None:
+        if cid and existing_cid != cid:
+            try:
+                db.session.execute(
+                    text('UPDATE sales_history_user_config SET company_id = :cid WHERE user_id = :uid'),
+                    {'cid': cid, 'uid': uid},
+                    execution_options={'_sqlite_tenant_guard_applied': True},
+                )
+                db.session.commit()
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+
+        with db.session.no_autoflush:
+            cfg = db.session.get(SalesHistoryUserConfig, existing_id)
+            if not cfg:
+                cfg = (
+                    db.session.query(SalesHistoryUserConfig)
+                    .execution_options(_sqlite_tenant_guard_applied=True)
+                    .filter(SalesHistoryUserConfig.user_id == uid)
+                    .first()
+                )
+        if cfg:
+            return cfg
+
+    cfg = SalesHistoryUserConfig(user_id=uid)
+    cfg.company_id = cid or ''
+    cfg.set_config(_default_sales_history_columns_config())
+    db.session.add(cfg)
+    try:
+        db.session.commit()
+        return cfg
+    except IntegrityError:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        with db.session.no_autoflush:
+            cfg2 = (
+                db.session.query(SalesHistoryUserConfig)
+                .execution_options(_sqlite_tenant_guard_applied=True)
+                .filter(SalesHistoryUserConfig.user_id == uid)
+                .first()
+            )
+        if cfg2 and cid:
+            try:
+                db.session.execute(
+                    text('UPDATE sales_history_user_config SET company_id = :cid WHERE user_id = :uid'),
+                    {'cid': cid, 'uid': uid},
+                    execution_options={'_sqlite_tenant_guard_applied': True},
+                )
+                db.session.commit()
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+        if cfg2:
+            return cfg2
+
+        fallback = SalesHistoryUserConfig(user_id=uid, company_id=(cid or ''))
+        fallback.set_config(_default_sales_history_columns_config())
+        return fallback
+
+
+@bp.get('/api/sales-history/columns')
+@login_required
+@module_required_any('sales', 'movements')
+def get_sales_history_columns_config():
+    cfg = _get_sales_history_user_config()
+    data = cfg.get_config() if cfg else {}
+    if not isinstance(data, dict):
+        data = {}
+    if 'columns' not in data:
+        data = _default_sales_history_columns_config()
+    return jsonify({'ok': True, 'config': data})
+
+
+@bp.post('/api/sales-history/columns')
+@login_required
+@module_required_any('sales', 'movements')
+def save_sales_history_columns_config():
+    payload = request.get_json(silent=True) or {}
+    cfg_in = payload.get('config') if isinstance(payload, dict) else None
+    cfg_in = cfg_in if isinstance(cfg_in, dict) else {}
+
+    cols = cfg_in.get('columns')
+    cols = cols if isinstance(cols, list) else []
+    cols_norm = []
+    for c in cols:
+        k = str(c or '').strip().lower()
+        if not k:
+            continue
+        if k not in cols_norm:
+            cols_norm.append(k)
+
+    if not cols_norm:
+        cols_norm = _default_sales_history_columns_config().get('columns') or []
+
+    out = {'columns': cols_norm}
+    cfg = _get_sales_history_user_config()
+    if not cfg:
+        return jsonify({'ok': False, 'error': 'no_user'}), 400
+    cfg.set_config(out)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+    return jsonify({'ok': True, 'config': out})
 
 
 def _ensure_cash_count_snapshot_column() -> None:
@@ -736,7 +1141,19 @@ def index():
     return render_template('sales/list.html', title='Ventas')
 
 
-def _serialize_sale(row: Sale, related: dict = None, users_map: dict | None = None):
+def _serialize_sale(
+    row: Sale,
+    related: dict = None,
+    users_map: dict | None = None,
+    customers_map: dict | None = None,
+    customer_saldo_map: dict | None = None,
+    customer_sales_count_map: dict | None = None,
+    customer_clasificacion_map: dict | None = None,
+    customer_clasificacion_tags_map: dict | None = None,
+    customer_clasificacion_primary_map: dict | None = None,
+    customer_clasificacion_primary_tag_map: dict | None = None,
+    cmv_by_ticket: dict | None = None,
+):
     has_venta_libre = False
     venta_libre_count = 0
     try:
@@ -769,6 +1186,78 @@ def _serialize_sale(row: Sale, related: dict = None, users_map: dict | None = No
     cust_id = str(getattr(row, 'customer_id', '') or '').strip() or None
     cust_name_raw = str(getattr(row, 'customer_name', '') or '').strip() or None
     cust_name = _resolve_customer_display_name(str(getattr(row, 'company_id', '') or '').strip(), cust_id, cust_name_raw)
+
+    cust_row = None
+    try:
+        cust_row = (customers_map or {}).get(str(cust_id or '').strip()) if cust_id else None
+    except Exception:
+        cust_row = None
+
+    cust_address = ''
+    cust_email = ''
+    cust_phone = ''
+    cust_birth_iso = ''
+    try:
+        if cust_row is not None:
+            cust_address = str(getattr(cust_row, 'address', '') or '').strip()
+            cust_email = str(getattr(cust_row, 'email', '') or '').strip()
+            cust_phone = str(getattr(cust_row, 'phone', '') or '').strip()
+            bd = getattr(cust_row, 'birthday', None)
+            if bd:
+                cust_birth_iso = bd.isoformat()
+    except Exception:
+        cust_address = ''
+        cust_email = ''
+        cust_phone = ''
+        cust_birth_iso = ''
+
+    saldo_cc = 0.0
+    try:
+        if cust_id:
+            saldo_cc = float((customer_saldo_map or {}).get(str(cust_id), 0.0) or 0.0)
+    except Exception:
+        saldo_cc = 0.0
+
+    sales_n = 0
+    try:
+        if cust_id:
+            sales_n = int((customer_sales_count_map or {}).get(str(cust_id), 0) or 0)
+    except Exception:
+        sales_n = 0
+
+    customer_clasificacion = ''
+    customer_clasificacion_tags: list[str] = []
+    customer_clasificacion_primary = ''
+    customer_clasificacion_primary_tag = ''
+    try:
+        if cust_id:
+            customer_clasificacion = str((customer_clasificacion_map or {}).get(str(cust_id), '') or '').strip()
+            raw_tags = (customer_clasificacion_tags_map or {}).get(str(cust_id), [])
+            if isinstance(raw_tags, list):
+                customer_clasificacion_tags = [str(x or '').strip() for x in raw_tags if str(x or '').strip()]
+            customer_clasificacion_primary = str((customer_clasificacion_primary_map or {}).get(str(cust_id), '') or '').strip()
+            customer_clasificacion_primary_tag = str((customer_clasificacion_primary_tag_map or {}).get(str(cust_id), '') or '').strip()
+    except Exception:
+        customer_clasificacion = ''
+        customer_clasificacion_tags = []
+        customer_clasificacion_primary = ''
+        customer_clasificacion_primary_tag = ''
+
+    cmv_total = None
+    try:
+        tk = str(getattr(row, 'ticket', '') or '').strip()
+        if tk and (cmv_by_ticket or None) is not None:
+            cmv_total = float((cmv_by_ticket or {}).get(tk, 0.0) or 0.0)
+    except Exception:
+        cmv_total = None
+
+    costo_total_ticket = cmv_total
+    margen_bruto = None
+    try:
+        if cmv_total is not None:
+            margen_bruto = float(getattr(row, 'total', 0.0) or 0.0) - float(cmv_total or 0.0)
+    except Exception:
+        margen_bruto = None
 
     display_ticket = str(getattr(row, 'ticket', '') or '').strip()
     try:
@@ -809,8 +1298,22 @@ def _serialize_sale(row: Sale, related: dict = None, users_map: dict | None = No
         'total': row.total,
         'discount_general_pct': row.discount_general_pct,
         'discount_general_amount': row.discount_general_amount,
+        'cmv_total': cmv_total,
+        'costo_total_ticket': costo_total_ticket,
+        'margen_bruto': margen_bruto,
+        'cmv_incomplete': bool(getattr(row, 'cmv_incomplete', False)),
+        'cmv_incomplete_reason': str(getattr(row, 'cmv_incomplete_reason', '') or ''),
         'customer_id': cust_id or '',
         'customer_name': cust_name or '',
+        'customer_address': cust_address,
+        'customer_email': cust_email,
+        'customer_phone': cust_phone,
+        'customer_birth_date': cust_birth_iso,
+        'customer_clasificacion': customer_clasificacion,
+        'customer_clasificacion_tags': customer_clasificacion_tags,
+        'customer_clasificacion_primary': customer_clasificacion_primary,
+        'customer_clasificacion_primary_tag': customer_clasificacion_primary_tag,
+        'customer_saldo_cc': saldo_cc,
         'employee_id': emp_id,
         'employee_name': emp_name,
         'responsible_id': responsible_id,
@@ -1005,12 +1508,78 @@ def _serialize_product_for_sales(p: Product):
         'barcode': (getattr(p, 'barcode', None) or ''),
         'description': (p.description or ''),
         'sale_price': p.sale_price,
+        'stock_ilimitado': bool(getattr(p, 'stock_ilimitado', False)),
+        'costo_unitario_referencia': getattr(p, 'costo_unitario_referencia', None),
         'category_id': p.category_id,
         'category': cat,
         'category_name': (cat.get('name') if isinstance(cat, dict) else ''),
         'active': bool(p.active),
         'image_url': _image_url(p),
     }
+
+
+def _ensure_sale_cmv_flags_columns() -> None:
+    try:
+        engine = db.engine
+        insp = inspect(engine)
+        if 'sale' not in set(insp.get_table_names() or []):
+            return
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('sale') or [])}
+        stmts = []
+        if 'cmv_incomplete' not in cols:
+            if str(engine.url.drivername).startswith('sqlite'):
+                stmts.append('ALTER TABLE sale ADD COLUMN cmv_incomplete BOOLEAN NOT NULL DEFAULT 0')
+            else:
+                stmts.append('ALTER TABLE sale ADD COLUMN IF NOT EXISTS cmv_incomplete BOOLEAN NOT NULL DEFAULT false')
+        if 'cmv_incomplete_reason' not in cols:
+            if str(engine.url.drivername).startswith('sqlite'):
+                stmts.append('ALTER TABLE sale ADD COLUMN cmv_incomplete_reason VARCHAR(255)')
+            else:
+                stmts.append('ALTER TABLE sale ADD COLUMN IF NOT EXISTS cmv_incomplete_reason VARCHAR(255)')
+        if not stmts:
+            return
+        with engine.begin() as conn:
+            for sql in stmts:
+                conn.execute(text(sql))
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to ensure sale CMV flags columns')
+        except Exception:
+            pass
+
+
+def _compute_sale_cmv_incomplete(*, cid: str, items: list) -> tuple[bool, str]:
+    if not cid:
+        return False, ''
+    missing_names: list[str] = []
+    for it in (items or []):
+        d = it if isinstance(it, dict) else {}
+        direction = str(d.get('direction') or 'out').strip().lower() or 'out'
+        if direction != 'out':
+            continue
+        pid = _int_or_none(d.get('product_id'))
+        if not pid:
+            continue
+        prod = db.session.get(Product, pid)
+        if not prod:
+            continue
+        if str(getattr(prod, 'company_id', '') or '') != cid:
+            continue
+        if not bool(getattr(prod, 'stock_ilimitado', False)):
+            continue
+        ref = getattr(prod, 'costo_unitario_referencia', None)
+        if ref is None:
+            nm = str(getattr(prod, 'name', '') or '').strip() or str(d.get('nombre') or d.get('product_name') or '').strip() or 'Producto'
+            missing_names.append(nm)
+    if not missing_names:
+        return False, ''
+    unique = []
+    for n in missing_names:
+        if n in unique:
+            continue
+        unique.append(n)
+    reason = 'Sin costo de referencia en: ' + ', '.join(unique[:8])
+    return True, reason
 
 
 def _serialize_lot_for_sales(l: InventoryLot):
@@ -1079,6 +1648,281 @@ def list_sales():
         q = q.filter(Sale.sale_type != 'CobroCC')
     q = q.order_by(Sale.sale_date.desc(), Sale.id.desc()).limit(limit)
     rows = q.all()
+
+    customers_map: dict[str, Customer] = {}
+    customer_saldo_map: dict[str, float] = {}
+    customer_sales_count_map: dict[str, int] = {}
+    customer_clasificacion_map: dict[str, str] = {}
+    customer_clasificacion_tags_map: dict[str, list[str]] = {}
+    customer_clasificacion_primary_map: dict[str, str] = {}
+    customer_clasificacion_primary_tag_map: dict[str, str] = {}
+    try:
+        cust_ids = sorted({str(getattr(r, 'customer_id', '') or '').strip() for r in rows if str(getattr(r, 'customer_id', '') or '').strip()})
+        if cust_ids:
+            for c in (db.session.query(Customer).filter(Customer.company_id == cid, Customer.id.in_(cust_ids)).all() or []):
+                try:
+                    customers_map[str(getattr(c, 'id', '') or '').strip()] = c
+                except Exception:
+                    continue
+            for (ccid, total_due) in (
+                db.session.query(Sale.customer_id, func.sum(Sale.due_amount))
+                .filter(Sale.company_id == cid)
+                .filter(Sale.customer_id.in_(cust_ids))
+                .filter(Sale.sale_type == 'Venta')
+                .filter(Sale.status != 'Reemplazada')
+                .group_by(Sale.customer_id)
+                .all()
+            ):
+                k = str(ccid or '').strip()
+                if k:
+                    try:
+                        customer_saldo_map[k] = float(total_due or 0.0)
+                    except Exception:
+                        customer_saldo_map[k] = 0.0
+            for (ccid, n) in (
+                db.session.query(Sale.customer_id, func.count(Sale.id))
+                .filter(Sale.company_id == cid)
+                .filter(Sale.customer_id.in_(cust_ids))
+                .filter(Sale.sale_type == 'Venta')
+                .filter(Sale.status != 'Reemplazada')
+                .group_by(Sale.customer_id)
+                .all()
+            ):
+                k = str(ccid or '').strip()
+                if k:
+                    try:
+                        customer_sales_count_map[k] = int(n or 0)
+                    except Exception:
+                        customer_sales_count_map[k] = 0
+
+            crm_cfg = None
+            try:
+                from app.customers.routes import _load_crm_config as _load_crm_cfg
+                crm_cfg = _load_crm_cfg(cid)
+            except Exception:
+                crm_cfg = None
+
+            recent_days = 60
+            debt_overdue_days = 30
+            debt_critical_days = 60
+            freq_min_purchases = 1
+            best_min_purchases = 2
+            inst_overdue_count = 1
+            inst_critical_count = 3
+            labels = {
+                'best': 'Mejor cliente',
+                'freq': 'Frecuente',
+                'occasional': 'Ocasional',
+                'inactive': 'Inactivo',
+                'debtor': 'CC Vencida',
+                'debtor_critical': 'CC Vencida Crítica',
+                'installments_overdue': 'Sistema de Cuotas Vencido',
+                'installments_critical': 'Sistema de Cuotas Crítico',
+            }
+            try:
+                if isinstance(crm_cfg, dict):
+                    recent_days = max(1, int(crm_cfg.get('recent_days') or recent_days))
+                    debt_overdue_days = max(1, int(crm_cfg.get('debt_overdue_days') or debt_overdue_days))
+                    debt_critical_days = max(debt_overdue_days, int(crm_cfg.get('debt_critical_days') or debt_critical_days))
+                    freq_min_purchases = max(1, int(crm_cfg.get('freq_min_purchases') or freq_min_purchases))
+                    best_min_purchases = max(freq_min_purchases + 1, int(crm_cfg.get('best_min_purchases') or best_min_purchases))
+                    inst_overdue_count = max(1, int(crm_cfg.get('installments_overdue_count') or inst_overdue_count))
+                    inst_critical_count = max(inst_overdue_count + 1, int(crm_cfg.get('installments_critical_count') or inst_critical_count))
+                    lbl = crm_cfg.get('labels') if isinstance(crm_cfg.get('labels'), dict) else {}
+                    for k in list(labels.keys()):
+                        v = str(lbl.get(k) or '').strip()
+                        if v:
+                            labels[k] = v
+            except Exception:
+                pass
+
+            try:
+                last_sale_map: dict[str, dt_date] = {}
+                for (ccid, mx) in (
+                    db.session.query(Sale.customer_id, func.max(Sale.sale_date))
+                    .filter(Sale.company_id == cid)
+                    .filter(Sale.customer_id.in_(cust_ids))
+                    .filter(Sale.sale_type == 'Venta')
+                    .filter(Sale.status != 'Reemplazada')
+                    .group_by(Sale.customer_id)
+                    .all()
+                ):
+                    k = str(ccid or '').strip()
+                    if k and mx:
+                        last_sale_map[k] = mx
+
+                oldest_due_map: dict[str, dt_date] = {}
+                for (ccid, mn) in (
+                    db.session.query(Sale.customer_id, func.min(Sale.sale_date))
+                    .filter(Sale.company_id == cid)
+                    .filter(Sale.customer_id.in_(cust_ids))
+                    .filter(Sale.sale_type == 'Venta')
+                    .filter(Sale.status != 'Reemplazada')
+                    .filter(Sale.due_amount > 0)
+                    .group_by(Sale.customer_id)
+                    .all()
+                ):
+                    k = str(ccid or '').strip()
+                    if k and mn:
+                        oldest_due_map[k] = mn
+
+                installments_enabled = False
+                try:
+                    from app.customers.routes import _installments_enabled as _inst_enabled
+                    installments_enabled = bool(_inst_enabled(cid))
+                except Exception:
+                    installments_enabled = False
+
+                sc_overdue_by_customer: dict[str, int] = {}
+                if installments_enabled:
+                    today = dt_date.today()
+                    try:
+                        rows_inst = (
+                            db.session.query(Installment, InstallmentPlan)
+                            .join(InstallmentPlan, Installment.plan_id == InstallmentPlan.id)
+                            .filter(Installment.company_id == cid)
+                            .filter(InstallmentPlan.company_id == cid)
+                            .filter(InstallmentPlan.customer_id.in_(cust_ids))
+                            .filter(db.func.lower(InstallmentPlan.status) == 'activo')
+                            .filter(db.func.lower(Installment.status) != 'pagada')
+                            .all()
+                        )
+                    except Exception:
+                        rows_inst = []
+                    for inst, plan in (rows_inst or []):
+                        ccid = str(getattr(plan, 'customer_id', '') or '').strip()
+                        if not ccid:
+                            continue
+                        dd = getattr(inst, 'due_date', None)
+                        if dd and dd < today:
+                            sc_overdue_by_customer[ccid] = int(sc_overdue_by_customer.get(ccid, 0) or 0) + 1
+
+                now = dt_date.today()
+                for c_id in cust_ids:
+                    saldo = float(customer_saldo_map.get(c_id, 0.0) or 0.0)
+                    n_sales = int(customer_sales_count_map.get(c_id, 0) or 0)
+                    last_dt = last_sale_map.get(c_id)
+                    oldest_due = oldest_due_map.get(c_id)
+                    dias_deuda = 0
+                    try:
+                        if saldo > 1e-9 and oldest_due:
+                            dias_deuda = max(0, int((now - oldest_due).days))
+                    except Exception:
+                        dias_deuda = 0
+
+                    sc_over = int(sc_overdue_by_customer.get(c_id, 0) or 0)
+
+                    tags: list[str] = []
+                    if installments_enabled:
+                        if sc_over >= inst_critical_count:
+                            tags.append('sc_critico')
+                        elif sc_over >= inst_overdue_count:
+                            tags.append('sc_vencido')
+                    if saldo > 1e-9:
+                        if dias_deuda >= debt_critical_days:
+                            tags.append('cc_critica')
+                        elif dias_deuda >= debt_overdue_days:
+                            tags.append('cc_vencida')
+
+                    inactive = False
+                    try:
+                        if not last_dt:
+                            inactive = True
+                        else:
+                            inactive = ((now - last_dt).days > recent_days)
+                    except Exception:
+                        inactive = False
+
+                    if inactive:
+                        tags.append('inactivo')
+                    else:
+                        if n_sales >= best_min_purchases:
+                            tags.append('mejor_cliente')
+                        elif n_sales >= freq_min_purchases:
+                            tags.append('frecuente')
+                        else:
+                            tags.append('ocasional')
+
+                    lbls: list[str] = []
+                    for t in tags:
+                        if t == 'sc_critico':
+                            lbls.append(labels.get('installments_critical') or 'Sistema de Cuotas Crítico')
+                        elif t == 'sc_vencido':
+                            lbls.append(labels.get('installments_overdue') or 'Sistema de Cuotas Vencido')
+                        elif t == 'cc_critica':
+                            lbls.append(labels.get('debtor_critical') or 'CC Vencida Crítica')
+                        elif t == 'cc_vencida':
+                            lbls.append(labels.get('debtor') or 'CC Vencida')
+                        elif t == 'mejor_cliente':
+                            lbls.append(labels.get('best') or 'Mejor cliente')
+                        elif t == 'frecuente':
+                            lbls.append(labels.get('freq') or 'Frecuente')
+                        elif t == 'ocasional':
+                            lbls.append(labels.get('occasional') or 'Ocasional')
+                        elif t == 'inactivo':
+                            lbls.append(labels.get('inactive') or 'Inactivo')
+                    customer_clasificacion_tags_map[c_id] = tags
+                    customer_clasificacion_map[c_id] = ' | '.join([x for x in lbls if x])
+
+                    primary_order = ['cc_critica', 'cc_vencida', 'sc_critico', 'sc_vencido', 'mejor_cliente', 'frecuente', 'ocasional', 'inactivo']
+                    primary_tag = ''
+                    for p in primary_order:
+                        if p in tags:
+                            primary_tag = p
+                            break
+                    primary_label = ''
+                    if primary_tag == 'sc_critico':
+                        primary_label = labels.get('installments_critical') or 'Sistema de Cuotas Crítico'
+                    elif primary_tag == 'sc_vencido':
+                        primary_label = labels.get('installments_overdue') or 'Sistema de Cuotas Vencido'
+                    elif primary_tag == 'cc_critica':
+                        primary_label = labels.get('debtor_critical') or 'CC Vencida Crítica'
+                    elif primary_tag == 'cc_vencida':
+                        primary_label = labels.get('debtor') or 'CC Vencida'
+                    elif primary_tag == 'mejor_cliente':
+                        primary_label = labels.get('best') or 'Mejor cliente'
+                    elif primary_tag == 'frecuente':
+                        primary_label = labels.get('freq') or 'Frecuente'
+                    elif primary_tag == 'ocasional':
+                        primary_label = labels.get('occasional') or 'Ocasional'
+                    elif primary_tag == 'inactivo':
+                        primary_label = labels.get('inactive') or 'Inactivo'
+                    customer_clasificacion_primary_tag_map[c_id] = primary_tag
+                    customer_clasificacion_primary_map[c_id] = primary_label
+            except Exception:
+                customer_clasificacion_map = {}
+                customer_clasificacion_tags_map = {}
+                customer_clasificacion_primary_map = {}
+                customer_clasificacion_primary_tag_map = {}
+    except Exception:
+        customers_map = {}
+        customer_saldo_map = {}
+        customer_sales_count_map = {}
+        customer_clasificacion_map = {}
+        customer_clasificacion_tags_map = {}
+        customer_clasificacion_primary_map = {}
+        customer_clasificacion_primary_tag_map = {}
+
+    cmv_by_ticket: dict[str, float] = {}
+    try:
+        tickets = sorted({str(getattr(r, 'ticket', '') or '').strip() for r in rows if str(getattr(r, 'ticket', '') or '').strip()})
+        if tickets:
+            for (tk, tot) in (
+                db.session.query(InventoryMovement.sale_ticket, func.sum(InventoryMovement.total_cost))
+                .filter(InventoryMovement.company_id == cid)
+                .filter(InventoryMovement.type == 'sale')
+                .filter(InventoryMovement.sale_ticket.in_(tickets))
+                .group_by(InventoryMovement.sale_ticket)
+                .all()
+            ):
+                k = str(tk or '').strip()
+                if k:
+                    try:
+                        cmv_by_ticket[k] = float(tot or 0.0)
+                    except Exception:
+                        cmv_by_ticket[k] = 0.0
+    except Exception:
+        cmv_by_ticket = {}
 
     users_map: dict[int, str] = {}
     try:
@@ -1216,7 +2060,25 @@ def list_sales():
                 'url': '',
             }
 
-    return jsonify({'ok': True, 'items': [_serialize_sale(r, related=related_map.get(int(r.id)), users_map=users_map) for r in rows]})
+    return jsonify({
+        'ok': True,
+        'items': [
+            _serialize_sale(
+                r,
+                related=related_map.get(int(r.id)),
+                users_map=users_map,
+                customers_map=customers_map,
+                customer_saldo_map=customer_saldo_map,
+                customer_sales_count_map=customer_sales_count_map,
+                customer_clasificacion_map=customer_clasificacion_map,
+                customer_clasificacion_tags_map=customer_clasificacion_tags_map,
+                customer_clasificacion_primary_map=customer_clasificacion_primary_map,
+                customer_clasificacion_primary_tag_map=customer_clasificacion_primary_tag_map,
+                cmv_by_ticket=cmv_by_ticket,
+            )
+            for r in rows
+        ],
+    })
 
 
 @bp.get('/api/sales/<ticket>')
@@ -1941,7 +2803,20 @@ def _apply_inventory_for_sale(*, sale_ticket: str, sale_date: dt_date, items: Li
             continue
 
         if bool(getattr(prod, 'stock_ilimitado', False)):
-            # Stock ilimitado: no validar ni afectar lotes/movimientos.
+            # Stock ilimitado: no afecta lotes, pero registramos CMV por referencia para reportes.
+            ref_cost = getattr(prod, 'costo_unitario_referencia', None)
+            unit_cost = float(ref_cost) if ref_cost is not None else 0.0
+            db.session.add(InventoryMovement(
+                company_id=cid,
+                movement_date=sale_date,
+                type='sale',
+                sale_ticket=sale_ticket,
+                product_id=pid,
+                lot_id=None,
+                qty_delta=-qty,
+                unit_cost=unit_cost,
+                total_cost=qty * unit_cost,
+            ))
             continue
 
         if direction == 'in':
@@ -2288,6 +3163,7 @@ def _next_exchange_ticket() -> str:
 @module_required('sales')
 def create_sale():
     _ensure_sale_employee_columns()
+    _ensure_sale_cmv_flags_columns()
     _ensure_installment_plan_columns()
     payload = request.get_json(silent=True) or {}
     sale_date = _parse_date_iso(payload.get('fecha') or payload.get('date'), dt_date.today())
@@ -2657,6 +3533,17 @@ def create_sale():
             current_app.logger.exception('Failed to apply inventory for sale')
             db.session.rollback()
             return jsonify({'ok': False, 'error': 'inventory_apply_failed', 'message': str(e)}), 400
+
+        try:
+            incomplete, reason = _compute_sale_cmv_incomplete(cid=cid, items=items_list)
+            row.cmv_incomplete = bool(incomplete)
+            row.cmv_incomplete_reason = str(reason or '').strip() or None
+        except Exception:
+            try:
+                row.cmv_incomplete = False
+                row.cmv_incomplete_reason = None
+            except Exception:
+                pass
 
         try:
             db.session.commit()

@@ -286,29 +286,48 @@
         </div>
         <table class="min-w-full divide-y divide-gray-200 text-xs">
             <thead class="bg-gray-50">
-                <tr class="text-xs">
-                    <th id="ventas-col-ticket-label" class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Ticket</th>
-                    <th class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Fecha <i class="fas fa-chevron-down ml-1 text-gray-400"></i></th>
-                    <th class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Cliente</th>
-                    <th class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Empleado responsable</th>
-                    <th class="px-3 py-2 text-right text-gray-600 font-semibold align-bottom">Total</th>
-                    <th class="px-3 py-2 text-center text-gray-600 font-semibold align-bottom">Pago <i class="fas fa-chevron-down ml-1 text-gray-400"></i></th>
-                    <th class="px-3 py-2 text-center text-gray-600 font-semibold align-bottom">Tipo <i class="fas fa-chevron-down ml-1 text-gray-400"></i></th>
-                    <th class="px-3 py-2 text-center text-gray-600 font-semibold align-bottom"></th>
+                <tr class="text-xs" data-sales-header-row="1">
+                    <th id="ventas-col-ticket-label" data-col-key="ticket" class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Ticket</th>
+                    <th data-col-key="fecha" class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Fecha <i class="fas fa-chevron-down ml-1 text-gray-400"></i></th>
+                    <th data-col-key="cliente" class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Cliente</th>
+                    <th data-col-key="empleado" class="px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Empleado responsable</th>
+                    <th data-col-key="total" class="px-3 py-2 text-right text-gray-600 font-semibold align-bottom">Total</th>
+                    <th data-col-key="pago" class="px-3 py-2 text-center text-gray-600 font-semibold align-bottom">Pago <i class="fas fa-chevron-down ml-1 text-gray-400"></i></th>
+                    <th data-col-key="tipo" class="px-3 py-2 text-center text-gray-600 font-semibold align-bottom">Tipo <i class="fas fa-chevron-down ml-1 text-gray-400"></i></th>
+                    <th data-col-key="productos" class="hidden px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Productos</th>
+                    <th data-col-key="cantidad_items" class="hidden px-3 py-2 text-right text-gray-600 font-semibold align-bottom">Artículos</th>
+                    <th data-col-key="descuento" class="hidden px-3 py-2 text-right text-gray-600 font-semibold align-bottom">Descuento</th>
+                    <th data-col-key="regalo" class="hidden px-3 py-2 text-center text-gray-600 font-semibold align-bottom">Regalo</th>
+                    <th data-col-key="observaciones" class="hidden px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Observaciones</th>
+                    <th data-col-key="margen_bruto" class="hidden px-3 py-2 text-right text-gray-600 font-semibold align-bottom">Margen bruto</th>
+                    <th data-col-key="cmv" class="hidden px-3 py-2 text-right text-gray-600 font-semibold align-bottom">CMV</th>
+                    <th data-col-key="cliente_direccion" class="hidden px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Dirección</th>
+                    <th data-col-key="cliente_email" class="hidden px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Email</th>
+                    <th data-col-key="cliente_telefono" class="hidden px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Teléfono</th>
+                    <th data-col-key="cliente_cumple" class="hidden px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Cumpleaños</th>
+                    <th data-col-key="cliente_clasificacion" class="hidden px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Clasificación</th>
+                    <th data-col-key="cliente_saldo_cc" class="hidden px-3 py-2 text-right text-gray-600 font-semibold align-bottom">Saldo CC</th>
+                    <th data-col-key="acciones" class="px-3 py-2 text-center text-gray-600 font-semibold align-bottom">
+                        <div class="relative inline-block text-left">
+                            <button id="btn-ventas-columns-menu" type="button" class="inline-flex items-center justify-center h-7 w-7 rounded-md border border-gray-200 bg-white hover:bg-gray-50" title="Personalizar columnas">
+                                <i class="fas fa-ellipsis-v text-gray-500"></i>
+                            </button>
+                        </div>
+                    </th>
                 </tr>
-                <tr class="text-[11px] bg-white align-middle">
-                    <th class="px-3 py-1">
+                <tr class="text-[11px] bg-white align-middle" data-sales-filter-row="1">
+                    <th data-col-key="ticket" class="px-3 py-1">
                         <input id="ventas-search-ticket" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="Buscar por ticket">
                     </th>
-                    <th class="px-3 py-1 text-left text-gray-400">
+                    <th data-col-key="fecha" class="px-3 py-1 text-left text-gray-400">
                         <div class="inline-block min-w-[110px] max-w-[140px] w-full">
                             <input type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 fecha-rango-input" placeholder="dd/mm/aaaa - dd/mm/aaaa">
                         </div>
                     </th>
-                    <th class="px-3 py-1">
+                    <th data-col-key="cliente" class="px-3 py-1">
                         <input id="ventas-search-cliente" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="Buscar por cliente">
                     </th>
-                    <th class="px-3 py-1">
+                    <th data-col-key="empleado" class="px-3 py-1">
                         <select id="ventas-filter-employee" class="hidden w-full px-2 py-0.5 border rounded-md text-xs text-gray-600">
                             <option value="">Todos</option>
                         </select>
@@ -322,8 +341,8 @@
                             </div>
                         </div>
                     </th>
-                    <th class="px-3 py-1"></th>
-                    <th class="px-3 py-1 text-center text-gray-400">
+                    <th data-col-key="total" class="px-3 py-1"></th>
+                    <th data-col-key="pago" class="px-3 py-1 text-center text-gray-400">
                         <select id="ventas-filter-pago" class="hidden w-full px-2 py-0.5 border rounded-md text-xs text-gray-600">
                             <option value="">Todas</option>
                             <option>Efectivo</option>
@@ -341,7 +360,7 @@
                             </div>
                         </div>
                     </th>
-                    <th class="px-3 py-1 text-center text-gray-400">
+                    <th data-col-key="tipo" class="px-3 py-1 text-center text-gray-400">
                         <select id="ventas-filter-tipo" class="hidden w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
                             <option value="">Todas</option>
                             <option>Venta completa</option>
@@ -359,7 +378,20 @@
                             </div>
                         </div>
                     </th>
-                    <th class="px-3 py-1"></th>
+                    <th data-col-key="productos" class="hidden px-3 py-1"></th>
+                    <th data-col-key="cantidad_items" class="hidden px-3 py-1"></th>
+                    <th data-col-key="descuento" class="hidden px-3 py-1"></th>
+                    <th data-col-key="regalo" class="hidden px-3 py-1"></th>
+                    <th data-col-key="observaciones" class="hidden px-3 py-1"></th>
+                    <th data-col-key="margen_bruto" class="hidden px-3 py-1"></th>
+                    <th data-col-key="cmv" class="hidden px-3 py-1"></th>
+                    <th data-col-key="cliente_direccion" class="hidden px-3 py-1"></th>
+                    <th data-col-key="cliente_email" class="hidden px-3 py-1"></th>
+                    <th data-col-key="cliente_telefono" class="hidden px-3 py-1"></th>
+                    <th data-col-key="cliente_cumple" class="hidden px-3 py-1"></th>
+                    <th data-col-key="cliente_clasificacion" class="hidden px-3 py-1"></th>
+                    <th data-col-key="cliente_saldo_cc" class="hidden px-3 py-1"></th>
+                    <th data-col-key="acciones" class="px-3 py-1"></th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-100">
@@ -368,6 +400,39 @@
                 </tr>
             </tbody>
         </table>
+    </div>
+
+    <!-- Personalizar columnas (drawer lateral) -->
+    <div id="modal-ventas-columns" class="fixed inset-0 z-[120] hidden" aria-hidden="true">
+        <div id="backdrop-ventas-columns" class="absolute left-0 right-0 bottom-0 bg-black/30" style="top: var(--app-header-height, 4rem);"></div>
+        <div id="ventas-columns-drawer" class="absolute right-0 bottom-0 w-full max-w-md bg-white shadow-xl flex flex-col" style="top: var(--app-header-height, 4rem); height: calc(100vh - var(--app-header-height, 4rem));">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <div class="text-sm font-semibold text-gray-900">Personalizar columnas</div>
+                    <div class="mt-1 text-xs text-gray-500">Elegí qué columnas ver en el historial y en qué orden.</div>
+                </div>
+                <button id="btn-close-ventas-columns" type="button" class="h-8 w-8 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white hover:bg-gray-50" title="Cerrar">
+                    <i class="fas fa-times text-gray-500"></i>
+                </button>
+            </div>
+
+            <div class="p-5 overflow-y-auto">
+                <div class="text-xs font-semibold text-gray-700">Columnas actuales</div>
+                <div class="mt-2 text-[11px] text-gray-500">Arrastrá para reordenar. Desmarcá para ocultar.</div>
+                <div id="ventas-columns-counter" class="mt-2 text-[11px] text-gray-600"></div>
+                <div id="ventas-columns-current" class="mt-3 space-y-2"></div>
+
+                <div class="mt-6 text-xs font-semibold text-gray-700">Columnas adicionales disponibles</div>
+                <div id="ventas-columns-extra" class="mt-3 space-y-2"></div>
+
+                <div id="ventas-columns-msg" class="mt-4 text-[11px] text-red-700"></div>
+            </div>
+
+            <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-between gap-2">
+                <button id="btn-ventas-columns-restore" type="button" class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Restaurar por defecto</button>
+                <button id="btn-ventas-columns-save" type="button" class="px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">Guardar configuración</button>
+            </div>
+        </div>
     </div>
 
     <div id="modal-export-ventas" class="hidden fixed inset-0 z-50">
@@ -1667,6 +1732,353 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnCuentaCorrienteCambio = document.getElementById('btn-cuenta-corriente-cambio');
     const historialTbody = historial ? historial.querySelector('tbody') : null;
 
+    const historialTable = document.querySelector('#historial-ventas table');
+    const historialHeadRow = historialTable ? historialTable.querySelector('thead tr[data-sales-header-row="1"]') : null;
+    const historialFilterRow = historialTable ? historialTable.querySelector('thead tr[data-sales-filter-row="1"]') : null;
+    const historialBaseHeadCells = {};
+    const historialBaseFilterCells = {};
+    try {
+        Array.from(historialHeadRow?.children || []).forEach(function (th) {
+            const k = String(th?.getAttribute('data-col-key') || '').trim();
+            if (k) historialBaseHeadCells[k] = th;
+        });
+        Array.from(historialFilterRow?.children || []).forEach(function (th) {
+            const k = String(th?.getAttribute('data-col-key') || '').trim();
+            if (k) historialBaseFilterCells[k] = th;
+        });
+    } catch (e) {}
+
+    const btnVentasColumnsMenu = document.getElementById('btn-ventas-columns-menu');
+    const modalVentasColumns = document.getElementById('modal-ventas-columns');
+    const backdropVentasColumns = document.getElementById('backdrop-ventas-columns');
+    const ventasColumnsDrawer = document.getElementById('ventas-columns-drawer');
+    const btnCloseVentasColumns = document.getElementById('btn-close-ventas-columns');
+    const ventasColumnsCurrent = document.getElementById('ventas-columns-current');
+    const ventasColumnsExtra = document.getElementById('ventas-columns-extra');
+    const ventasColumnsMsg = document.getElementById('ventas-columns-msg');
+    const btnVentasColumnsSave = document.getElementById('btn-ventas-columns-save');
+    const btnVentasColumnsRestore = document.getElementById('btn-ventas-columns-restore');
+    const ventasColumnsCounter = document.getElementById('ventas-columns-counter');
+
+    const ventasHistoryDefaultColumns = ['ticket', 'fecha', 'cliente', 'empleado', 'total', 'pago', 'tipo'];
+    let ventasHistoryColumns = ventasHistoryDefaultColumns.slice();
+    const ventasHistoryModuleKey = 'ventas_historial_movimientos';
+    const ventasHistoryMaxColumns = 10;
+    let ventasHistoryColumnsSaved = ventasHistoryDefaultColumns.slice();
+
+    let salesLastLoadError = '';
+
+    const ventasHistoryColumnDefs = [
+        { key: 'ticket', label: 'Ticket', group: 'actual' },
+        { key: 'fecha', label: 'Fecha', group: 'actual' },
+        { key: 'cliente', label: 'Cliente', group: 'actual' },
+        { key: 'empleado', label: 'Empleado', group: 'actual' },
+        { key: 'total', label: 'Total', group: 'actual' },
+        { key: 'pago', label: 'Pago', group: 'actual' },
+        { key: 'tipo', label: 'Tipo', group: 'actual' },
+        { key: 'productos', label: 'Productos', group: 'extra' },
+        { key: 'cantidad_items', label: 'Artículos', group: 'extra' },
+        { key: 'descuento', label: 'Descuento', group: 'extra' },
+        { key: 'regalo', label: 'Regalo', group: 'extra' },
+        { key: 'margen_bruto', label: 'Margen bruto', group: 'extra' },
+        { key: 'cmv', label: 'CMV del ticket', group: 'extra' },
+        { key: 'observaciones', label: 'Observaciones', group: 'extra' },
+        { key: 'cliente_direccion', label: 'Dirección', group: 'extra' },
+        { key: 'cliente_email', label: 'Email', group: 'extra' },
+        { key: 'cliente_telefono', label: 'Teléfono', group: 'extra' },
+        { key: 'cliente_cumple', label: 'Fecha de cumpleaños', group: 'extra' },
+        { key: 'cliente_clasificacion', label: 'Clasificación', group: 'extra' },
+        { key: 'cliente_saldo_cc', label: 'Saldo cuenta corriente', group: 'extra' },
+    ];
+
+    const ventasHistoryLabelByKey = {};
+    ventasHistoryColumnDefs.forEach(function (d) {
+        ventasHistoryLabelByKey[d.key] = d.label;
+    });
+
+    function apiGetVentasHistoryColumnsConfig() {
+        const q = '?module_key=' + encodeURIComponent(ventasHistoryModuleKey);
+        return fetch(apiPath('/sales/api/user-table-column-prefs' + q), { credentials: 'same-origin' })
+            .then(r => r.json())
+            .catch(() => ({ ok: false }));
+    }
+
+    function apiSaveVentasHistoryColumnsConfig(columns) {
+        return fetch(apiPath('/sales/api/user-table-column-prefs'), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                module_key: ventasHistoryModuleKey,
+                visible_columns: Array.isArray(columns) ? columns : [],
+            }),
+        }).then(r => r.json()).catch(() => ({ ok: false }));
+    }
+
+    function applyVentasColumnsDrawerPosition() {
+        try {
+            if (!modalVentasColumns || modalVentasColumns.classList.contains('hidden')) return;
+            const header = document.querySelector('[data-app-header="1"]')
+                || document.querySelector('header[data-app-header]')
+                || document.querySelector('header');
+            const hh = Math.max(0, Math.floor(header?.offsetHeight || 0));
+            const top = (hh ? (hh + 6) : 70);
+            const bottomPad = 12;
+            if (backdropVentasColumns) backdropVentasColumns.style.top = top + 'px';
+            if (ventasColumnsDrawer) {
+                ventasColumnsDrawer.style.top = top + 'px';
+                ventasColumnsDrawer.style.height = 'calc(100vh - ' + String(top + bottomPad) + 'px)';
+            }
+        } catch (e) {
+        }
+    }
+
+    function openVentasColumnsDrawer() {
+        if (!modalVentasColumns) return;
+        modalVentasColumns.classList.remove('hidden');
+        modalVentasColumns.setAttribute('aria-hidden', 'false');
+        applyVentasColumnsDrawerPosition();
+        try { requestAnimationFrame(applyVentasColumnsDrawerPosition); } catch (e) {}
+        renderVentasColumnsDrawer();
+    }
+
+    function closeVentasColumnsDrawer() {
+        if (!modalVentasColumns) return;
+        modalVentasColumns.classList.add('hidden');
+        modalVentasColumns.setAttribute('aria-hidden', 'true');
+        if (ventasColumnsMsg) ventasColumnsMsg.textContent = '';
+    }
+
+    function renderVentasColumnsDrawer() {
+        if (!ventasColumnsCurrent || !ventasColumnsExtra) return;
+        const selected = new Set(ventasHistoryColumns);
+        const defByKey = {};
+        ventasHistoryColumnDefs.forEach(d => { defByKey[d.key] = d; });
+
+        const currentList = ventasHistoryColumnDefs.filter(d => d.group === 'actual');
+        const extraList = ventasHistoryColumnDefs.filter(d => d.group === 'extra');
+
+        const makeItem = function (d, isSelected) {
+            const checked = isSelected ? 'checked' : '';
+            const drag = '<span class="cursor-grab text-gray-400 px-1" title="Arrastrar"><i class="fas fa-grip-vertical"></i></span>';
+            return ''
+                + '<div class="ventas-col-item flex items-center justify-between gap-2 p-2 rounded-lg border border-gray-200 bg-white" draggable="true" data-col-key="' + escapeHtml(d.key) + '">' 
+                +   '<label class="flex items-center gap-2 text-sm text-gray-800 select-none">'
+                +     drag
+                +     '<input type="checkbox" class="ventas-col-check" data-col-key="' + escapeHtml(d.key) + '" ' + checked + '>'
+                +     '<span class="text-[13px]">' + escapeHtml(d.label) + '</span>'
+                +   '</label>'
+                + '</div>';
+        };
+
+        const orderedCurrent = [];
+        ventasHistoryColumns.forEach(k => {
+            const d = defByKey[k];
+            if (d && d.group === 'actual') orderedCurrent.push(d);
+        });
+        currentList.forEach(d => {
+            if (!orderedCurrent.find(x => x.key === d.key)) orderedCurrent.push(d);
+        });
+
+        ventasColumnsCurrent.innerHTML = orderedCurrent.map(d => makeItem(d, selected.has(d.key))).join('');
+        ventasColumnsExtra.innerHTML = extraList.map(d => makeItem(d, selected.has(d.key))).join('');
+
+        if (ventasColumnsCounter) {
+            const n = selected.size;
+            ventasColumnsCounter.textContent = 'Columnas seleccionadas: ' + String(n) + '/' + String(ventasHistoryMaxColumns);
+            ventasColumnsCounter.className = 'mt-2 text-[11px] ' + (n > ventasHistoryMaxColumns ? 'text-red-700' : 'text-gray-600');
+        }
+
+        updateVentasColumnsSaveButtonState();
+
+        bindVentasColumnsDrawerEvents();
+    }
+
+    function updateVentasColumnsSaveButtonState() {
+        if (!btnVentasColumnsSave) return;
+        const cols = Array.isArray(ventasHistoryColumns) ? ventasHistoryColumns.slice() : [];
+        const valid = cols.length >= 1 && cols.length <= ventasHistoryMaxColumns;
+        const changed = JSON.stringify(cols) !== JSON.stringify(ventasHistoryColumnsSaved || []);
+        btnVentasColumnsSave.disabled = !(valid && changed);
+        btnVentasColumnsSave.classList.toggle('opacity-60', btnVentasColumnsSave.disabled);
+        btnVentasColumnsSave.classList.toggle('cursor-not-allowed', btnVentasColumnsSave.disabled);
+    }
+
+    function bindVentasColumnsDrawerEvents() {
+        const onToggle = function (ev) {
+            const el = ev.target;
+            const key = String(el?.getAttribute('data-col-key') || '').trim();
+            if (!key) return;
+            const base = ventasHistoryColumns.slice();
+            if (el.checked) {
+                if (!base.includes(key)) {
+                    if (base.length >= ventasHistoryMaxColumns) {
+                        el.checked = false;
+                        if (ventasColumnsMsg) ventasColumnsMsg.textContent = 'Máximo 10 columnas visibles. Desactivá una para agregar otra.';
+                        if (window.showAlertModal) showAlertModal('Máximo 10 columnas visibles. Desactivá una para agregar otra.', 'Atención', 'Límite de columnas');
+                        return;
+                    }
+                    base.push(key);
+                }
+                ventasHistoryColumns = base;
+            } else {
+                ventasHistoryColumns = base.filter(k => k !== key);
+            }
+            if (!ventasHistoryColumns.length) ventasHistoryColumns = ventasHistoryDefaultColumns.slice();
+            if (ventasColumnsMsg) ventasColumnsMsg.textContent = '';
+            renderVentasColumnsDrawer();
+        };
+
+        Array.from(modalVentasColumns?.querySelectorAll('.ventas-col-check') || []).forEach(chk => {
+            chk.addEventListener('change', onToggle);
+        });
+
+        let dragKey = '';
+        const onDragStart = function (e) {
+            dragKey = String(this.getAttribute('data-col-key') || '').trim();
+            try { e.dataTransfer.setData('text/plain', dragKey); } catch (err) {}
+            this.classList.add('ring-2', 'ring-indigo-200');
+        };
+        const onDragEnd = function () {
+            this.classList.remove('ring-2', 'ring-indigo-200');
+        };
+        const onDragOver = function (e) {
+            e.preventDefault();
+        };
+        const onDrop = function (e) {
+            e.preventDefault();
+            const targetKey = String(this.getAttribute('data-col-key') || '').trim();
+            const sourceKey = dragKey || (function(){ try { return String(e.dataTransfer.getData('text/plain') || '').trim(); } catch (err) { return ''; } })();
+            if (!sourceKey || !targetKey || sourceKey === targetKey) return;
+
+            const base = ventasHistoryColumns.slice();
+            const hasSource = base.includes(sourceKey);
+            const hasTarget = base.includes(targetKey);
+            if (!hasSource || !hasTarget) return;
+
+            const next = base.filter(k => k !== sourceKey);
+            const idx = next.indexOf(targetKey);
+            if (idx < 0) return;
+            next.splice(idx, 0, sourceKey);
+            ventasHistoryColumns = next;
+            renderVentasColumnsDrawer();
+        };
+
+        Array.from(modalVentasColumns?.querySelectorAll('.ventas-col-item[draggable="true"]') || []).forEach(it => {
+            it.addEventListener('dragstart', onDragStart);
+            it.addEventListener('dragend', onDragEnd);
+            it.addEventListener('dragover', onDragOver);
+            it.addEventListener('drop', onDrop);
+        });
+    }
+
+    function getVentasHistoryVisibleColumns() {
+        const raw = Array.isArray(ventasHistoryColumns) ? ventasHistoryColumns.slice() : [];
+        const out = [];
+        raw.forEach(function (k) {
+            const key = String(k || '').trim().toLowerCase();
+            if (!key) return;
+            if (!ventasHistoryColumnDefs.find(d => d.key === key)) return;
+            if (out.includes(key)) return;
+            out.push(key);
+        });
+        if (!out.length) return ventasHistoryDefaultColumns.slice();
+        return out.slice(0, ventasHistoryMaxColumns);
+    }
+
+    function rebuildVentasHistoryTableLayout() {
+        if (!historialHeadRow || !historialFilterRow) return;
+        const visible = getVentasHistoryVisibleColumns();
+
+        const clearRow = function (row) {
+            try {
+                while (row.firstChild) row.removeChild(row.firstChild);
+            } catch (e) {}
+        };
+
+        clearRow(historialHeadRow);
+        clearRow(historialFilterRow);
+
+        visible.forEach(function (k) {
+            const baseTh = historialBaseHeadCells[k];
+            if (baseTh) {
+                baseTh.classList.remove('hidden');
+                historialHeadRow.appendChild(baseTh);
+            } else {
+                const th = document.createElement('th');
+                th.setAttribute('data-col-key', k);
+                th.className = 'px-3 py-2 text-left text-gray-600 font-semibold align-bottom';
+                th.textContent = ventasHistoryLabelByKey[k] || k;
+                historialHeadRow.appendChild(th);
+            }
+
+            const baseFilter = historialBaseFilterCells[k];
+            if (baseFilter) {
+                baseFilter.classList.remove('hidden');
+                historialFilterRow.appendChild(baseFilter);
+            } else {
+                const th2 = document.createElement('th');
+                th2.setAttribute('data-col-key', k);
+                th2.className = 'px-3 py-1';
+                historialFilterRow.appendChild(th2);
+            }
+        });
+
+        const accionesTh = historialBaseHeadCells['acciones'];
+        const accionesFilter = historialBaseFilterCells['acciones'];
+        if (accionesTh) {
+            accionesTh.classList.remove('hidden');
+            historialHeadRow.appendChild(accionesTh);
+        }
+        if (accionesFilter) {
+            accionesFilter.classList.remove('hidden');
+            historialFilterRow.appendChild(accionesFilter);
+        }
+
+        const hideUnused = function (map) {
+            Object.keys(map || {}).forEach(function (k) {
+                if (k === 'acciones') return;
+                if (visible.includes(k)) return;
+                try { map[k].classList.add('hidden'); } catch (e) {}
+            });
+        };
+        hideUnused(historialBaseHeadCells);
+        hideUnused(historialBaseFilterCells);
+    }
+
+    function loadVentasHistoryColumnsConfig() {
+        return apiGetVentasHistoryColumnsConfig().then(function (res) {
+            if (!res || res.ok !== true || !Array.isArray(res.visible_columns)) {
+                ventasHistoryColumns = ventasHistoryDefaultColumns.slice();
+            } else {
+                const raw = res.visible_columns;
+                const seen = new Set();
+                const out = [];
+                raw.forEach(function (k) {
+                    const key = String(k || '').trim().toLowerCase();
+                    if (!key) return;
+                    if (!ventasHistoryColumnDefs.find(d => d.key === key)) return;
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    out.push(key);
+                });
+                ventasHistoryColumns = out.length ? out : ventasHistoryDefaultColumns.slice();
+            }
+
+            if (ventasHistoryColumns.length > ventasHistoryMaxColumns) {
+                ventasHistoryColumns = ventasHistoryColumns.slice(0, ventasHistoryMaxColumns);
+            }
+            ventasHistoryColumnsSaved = ventasHistoryColumns.slice();
+            rebuildVentasHistoryTableLayout();
+            renderHistorialFromCache();
+            applyVentasFilters();
+        }).catch(function () {
+            ventasHistoryColumns = ventasHistoryDefaultColumns.slice();
+            ventasHistoryColumnsSaved = ventasHistoryColumns.slice();
+            rebuildVentasHistoryTableLayout();
+        });
+    }
+
     let botonesProducto = document.querySelectorAll('.btn-producto');
 
     let saldoAFavor = 0;
@@ -2781,12 +3193,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 tr.setAttribute('data-precio', String(price.toFixed(2)));
                 tr.setAttribute('data-categoria', cat);
                 tr.setAttribute('data-codigo-interno', codigoInterno);
-                const stockCls = stockColorClass(stock);
+                const stockCls = stockClassForProduct(p, stock);
+                const stockLabel = stockLabelForProduct(p, stock);
                 tr.innerHTML = ''
                     + '<td class="px-2 py-2 text-gray-800">' + String(p?.name || 'Producto') + '</td>'
                     + '<td class="px-2 py-2 text-gray-500">' + (cat || '—') + '</td>'
                     + '<td class="px-2 py-2 text-right text-gray-900 font-medium">' + formatearMoneda(price) + '</td>'
-                    + '<td class="px-2 py-2 text-right ' + stockCls + ' font-medium">' + String((isNaN(stock) ? 0 : stock).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
+                    + '<td class="px-2 py-2 text-right ' + stockCls + ' font-medium"' + (p?.stock_ilimitado ? ' title="Stock indeterminado (no se controla ni se descuenta)"' : '') + '>' + stockLabel + '</td>'
                     + '<td class="px-2 py-2 text-center">'
                     + '  <button type="button" class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200" data-action="info" title="' + escapeHtml(infoTitle) + '">'
                     + '    <i class="fas fa-info-circle text-[12px]"></i>'
@@ -2847,12 +3260,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 tr.setAttribute('data-precio', String(price.toFixed(2)));
                 tr.setAttribute('data-categoria', cat);
                 tr.setAttribute('data-codigo-interno', codigoInterno);
-                const stockCls = stockColorClass(stock);
+                const stockCls = stockClassForProduct(p, stock);
+                const stockLabel = stockLabelForProduct(p, stock);
                 tr.innerHTML = ''
                     + '<td class="px-2 py-2 text-gray-800">' + String(p?.name || 'Producto') + '</td>'
                     + '<td class="px-2 py-2 text-gray-500">' + (cat || '—') + '</td>'
                     + '<td class="px-2 py-2 text-right text-gray-900 font-medium">' + formatearMoneda(price) + '</td>'
-                    + '<td class="px-2 py-2 text-right ' + stockCls + ' font-medium">' + String((isNaN(stock) ? 0 : stock).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
+                    + '<td class="px-2 py-2 text-right ' + stockCls + ' font-medium"' + (p?.stock_ilimitado ? ' title="Stock indeterminado (no se controla ni se descuenta)"' : '') + '>' + stockLabel + '</td>'
                     + '<td class="px-2 py-2 text-center">'
                     + '  <button type="button" class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200" data-action="info" title="' + escapeHtml(infoTitle) + '">'
                     + '    <i class="fas fa-info-circle text-[12px]"></i>'
@@ -3117,6 +3531,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // Si el usuario no seleccionó rango, traer historial completo (sin filtro por fecha)
 
+        salesLastLoadError = '';
         salesLoadPromise = apiListSales(range).then(items => {
             salesCache = Array.isArray(items) ? items : [];
             salesLoaded = true;
@@ -3124,6 +3539,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }).catch(() => {
             salesCache = [];
             salesLoaded = true;
+            salesLastLoadError = 'No se pudieron cargar los movimientos.';
             return [];
         });
         return salesLoadPromise;
@@ -3245,6 +3661,194 @@ document.addEventListener('DOMContentLoaded', function() {
         if (k === 'transferencia') return 'Transferencia';
         return String(v || '').trim() || 'Efectivo';
     }
+
+    function truncateText(s, n) {
+        const t = String(s || '').trim();
+        const lim = parseInt(n || 30, 10) || 30;
+        if (!t) return '';
+        if (t.length <= lim) return t;
+        return t.slice(0, Math.max(0, lim - 1)) + '…';
+    }
+
+    function fmtBirthDdMm(iso) {
+        const s = String(iso || '').trim();
+        if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
+        return s.slice(8, 10) + '/' + s.slice(5, 7);
+    }
+
+    function calcAgeFromIso(iso) {
+        const s = String(iso || '').trim();
+        if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+        const y = parseInt(s.slice(0, 4), 10);
+        const m = parseInt(s.slice(5, 7), 10);
+        const d = parseInt(s.slice(8, 10), 10);
+        if (!y || !m || !d) return null;
+        const now = new Date();
+        let age = now.getFullYear() - y;
+        const mm = now.getMonth() + 1;
+        const dd = now.getDate();
+        if (mm < m || (mm === m && dd < d)) age -= 1;
+        return age;
+    }
+
+    function badgeHtml(text, cls) {
+        const t = String(text || '').trim();
+        if (!t) return '';
+        const c = String(cls || '').trim() || 'bg-gray-50 text-gray-700 border-gray-100';
+        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full border text-[11px] font-medium ' + c + '">' + escapeHtml(t) + '</span>';
+    }
+
+    const SALES_COLUMNS = {
+        productos: {
+            render: function (s) {
+                try {
+                    const items = Array.isArray(s?.items) ? s.items : [];
+                    const lines = items
+                        .filter(it => String(it?.direction || 'out').trim().toLowerCase() === 'out')
+                        .map(function (it) {
+                            const nm = String(it?.nombre || 'Producto').trim() || 'Producto';
+                            const qty = parseFloat(it?.cantidad || 0) || 0;
+                            const q = (Math.round(qty * 100) / 100);
+                            if (!q || q === 1) return nm;
+                            return nm + ' x' + String(q);
+                        })
+                        .filter(Boolean);
+
+                    if (!lines.length) return { html: '—', title: '' };
+
+                    const html = '<div class="text-gray-700 whitespace-pre-line max-h-24 overflow-y-auto pr-1">' + escapeHtml(lines.join('\n')) + '</div>';
+                    return { html: html, title: '' };
+                } catch (e) {
+                    return { html: '—', title: '' };
+                }
+            }
+        },
+        cantidad_items: {
+            render: function (s) {
+                try {
+                    const items = Array.isArray(s?.items) ? s.items : [];
+                    const totalQty = items
+                        .filter(it => String(it?.direction || 'out').trim().toLowerCase() === 'out')
+                        .reduce(function (acc, it) { return acc + (parseFloat(it?.cantidad || 0) || 0); }, 0);
+                    const n = Math.round(totalQty * 100) / 100;
+                    return { html: escapeHtml(String(n || 0)), title: '' };
+                } catch (e) {
+                    return { html: '0', title: '' };
+                }
+            }
+        },
+        descuento: {
+            render: function (s) {
+                try {
+                    const pct = parseFloat(s?.discount_general_pct || 0) || 0;
+                    const amt = parseFloat(s?.discount_general_amount || 0) || 0;
+                    if (amt) return { html: escapeHtml(formatearMoneda(-Math.abs(amt))), title: '' };
+                    if (pct) return { html: escapeHtml(String(pct) + '%'), title: '' };
+                    return { html: '—', title: '' };
+                } catch (e) {
+                    return { html: '—', title: '' };
+                }
+            }
+        },
+        regalo: {
+            render: function (s) {
+                const ok = !!(s && s.is_gift);
+                if (!ok) return { html: '—', title: '' };
+                return { html: badgeHtml('Sí', 'bg-green-50 text-green-700 border-green-100'), title: '' };
+            }
+        },
+        observaciones: {
+            render: function (s) {
+                const txt = String(s?.notes_display || s?.notes || '').trim();
+                if (!txt) return { html: '—', title: '' };
+                return { html: escapeHtml(truncateText(txt, 30)), title: txt };
+            }
+        },
+        cmv: {
+            render: function (s) {
+                const v = (s?.cmv_total != null) ? (parseFloat(s?.cmv_total) || 0) : null;
+                const incomplete = !!(s && s.cmv_incomplete);
+                if (v == null) return { html: '—', title: '' };
+                const title = incomplete ? (String(s?.cmv_incomplete_reason || '').trim() || 'Sin costos cargados') : '';
+                return { html: escapeHtml(formatearMoneda(v)), title: title };
+            }
+        },
+        margen_bruto: {
+            render: function (s) {
+                const total = parseFloat(s?.total || 0) || 0;
+                let v = null;
+                try {
+                    if (s?.margen_bruto != null) v = parseFloat(s?.margen_bruto) || 0;
+                } catch (e) { v = null; }
+                const incomplete = !!(s && s.cmv_incomplete);
+                const title = incomplete ? (String(s?.cmv_incomplete_reason || '').trim() || 'Sin costos cargados') : '';
+                if (v == null) {
+                    return { html: escapeHtml(formatearMoneda(total)), title: 'Sin costos cargados' };
+                }
+                return { html: escapeHtml(formatearMoneda(v)), title: title };
+            }
+        },
+        cliente_direccion: { render: (s) => ({ html: escapeHtml(String(s?.customer_address || '—').trim() || '—'), title: '' }) },
+        cliente_email: {
+            render: function (s) {
+                const em = String(s?.customer_email || '').trim();
+                if (!em) return { html: '—', title: '' };
+                return { html: '<a class="text-indigo-700 hover:underline" href="mailto:' + escapeHtml(em) + '">' + escapeHtml(em) + '</a>', title: '' };
+            }
+        },
+        cliente_telefono: {
+            render: function (s) {
+                const ph = String(s?.customer_phone || '').trim();
+                if (!ph) return { html: '—', title: '' };
+                return { html: '<a class="text-indigo-700 hover:underline" href="tel:' + escapeHtml(ph) + '">' + escapeHtml(ph) + '</a>', title: '' };
+            }
+        },
+        cliente_cumple: {
+            render: function (s) {
+                const iso = String(s?.customer_birth_date || '').trim();
+                const ddmm = fmtBirthDdMm(iso);
+                if (!ddmm) return { html: '—', title: '' };
+                const age = calcAgeFromIso(iso);
+                const title = (age == null) ? '' : ('Cumple ' + String(age) + ' años');
+                return { html: escapeHtml(ddmm), title: title };
+            }
+        },
+        cliente_clasificacion: {
+            render: function (s) {
+                const primaryTag = String(s?.customer_clasificacion_primary_tag || '').trim();
+                const primaryLabel = String(s?.customer_clasificacion_primary || '').trim();
+                const txt = String(s?.customer_clasificacion || '').trim();
+                if (!primaryTag && !primaryLabel && !txt) return { html: '—', title: '' };
+
+                const badgeFor = function (k) {
+                    const key = String(k || '').trim();
+                    if (key === 'sc_critico') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-600 text-white text-[11px] font-medium">Sistema de Cuotas Crítico</span>';
+                    if (key === 'sc_vencido') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-medium">Sistema de Cuotas Vencido</span>';
+                    if (key === 'cc_critica') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-600 text-white text-[11px] font-medium">CC Vencida Crítica</span>';
+                    if (key === 'cc_vencida') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-medium">CC Vencida</span>';
+                    if (key === 'mejor_cliente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium">Mejor cliente</span>';
+                    if (key === 'frecuente') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-medium">Frecuente</span>';
+                    if (key === 'ocasional') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 text-[11px] font-medium">Ocasional</span>';
+                    if (key === 'inactivo') return '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">Inactivo</span>';
+                    return '';
+                };
+
+                if (primaryTag) {
+                    const b = badgeFor(primaryTag);
+                    if (b) return { html: b, title: (primaryLabel || txt) };
+                }
+                if (primaryLabel) return { html: badgeHtml(primaryLabel, 'bg-gray-50 text-gray-700 border-gray-100'), title: (primaryLabel || txt) };
+                return { html: escapeHtml(txt), title: txt };
+            }
+        },
+        cliente_saldo_cc: {
+            render: function (s) {
+                const v = parseFloat(s?.customer_saldo_cc || 0) || 0;
+                const cls = (v > 0) ? 'text-red-700' : (v < 0) ? 'text-blue-700' : 'text-green-700';
+                return { html: '<span class="font-medium ' + cls + '">' + escapeHtml(formatearMoneda(v)) + '</span>', title: '' };
+            }
+        },
+    };
 
     function renderVentasMultiMenu(filterKey, itemsEl, labelEl) {
         const f = ventasMultiFilters[filterKey];
@@ -3392,7 +3996,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         if (!list.length) {
-            historialTbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-sm text-gray-500">Todavía no hay movimientos.</td></tr>';
+            const cols = getVentasHistoryVisibleColumns();
+            const colspan = cols.length + 1;
+            if (salesLastLoadError) {
+                historialTbody.innerHTML = '<tr><td colspan="' + String(colspan) + '" class="px-4 py-6 text-center text-sm text-red-700">' + escapeHtml(salesLastLoadError) + '</td></tr>';
+            } else {
+                historialTbody.innerHTML = '<tr><td colspan="' + String(colspan) + '" class="px-4 py-6 text-center text-sm text-gray-500">Todavía no hay movimientos.</td></tr>';
+            }
             return;
         }
 
@@ -3471,18 +4081,62 @@ document.addEventListener('DOMContentLoaded', function() {
                     : '';
                 ticketCellHtml = '<span>' + String(ticket || '—') + '</span>' + warn;
             }
-            const ticketCellClass = ventasGiftOnly ? 'px-3 py-2' : 'px-3 py-2 text-gray-500';
-            tr.innerHTML = ''
-                + '<td class="' + ticketCellClass + '">' + ticketCellHtml + '</td>'
-                + '<td class="px-3 py-2 text-gray-500">' + formatFechaDisplay(s?.fecha || '—') + '</td>'
-                + '<td class="px-3 py-2 text-gray-500">' + String(s?.customer_name || '—') + '</td>'
-                + '<td class="px-3 py-2 text-gray-500">' + String(s?.responsible_name || s?.employee_name || '—') + '</td>'
-                + '<td class="px-3 py-2 text-right text-gray-500">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>'
-                + '<td class="px-3 py-2 text-center text-gray-500">' + displayPaymentMethod(s?.payment_method) + '</td>'
-                + '<td class="px-3 py-2 text-center">' + statusHtml + '</td>'
-                + '<td class="px-3 py-2 text-center">' + historialAccionesHtml(ticket) + '</td>';
+
+            const visible = getVentasHistoryVisibleColumns();
+            const cells = [];
+            visible.forEach(function (k) {
+                if (k === 'ticket') {
+                    const ticketCellClass = ventasGiftOnly ? 'px-3 py-2' : 'px-3 py-2 text-gray-500';
+                    cells.push('<td data-col-key="ticket" class="' + ticketCellClass + '">' + ticketCellHtml + '</td>');
+                    return;
+                }
+                if (k === 'fecha') {
+                    cells.push('<td data-col-key="fecha" class="px-3 py-2 text-gray-500">' + formatFechaDisplay(s?.fecha || '—') + '</td>');
+                    return;
+                }
+                if (k === 'cliente') {
+                    cells.push('<td data-col-key="cliente" class="px-3 py-2 text-gray-500">' + escapeHtml(String(s?.customer_name || '—')) + '</td>');
+                    return;
+                }
+                if (k === 'empleado') {
+                    cells.push('<td data-col-key="empleado" class="px-3 py-2 text-gray-500">' + escapeHtml(String(s?.responsible_name || s?.employee_name || '—')) + '</td>');
+                    return;
+                }
+                if (k === 'total') {
+                    cells.push('<td data-col-key="total" class="px-3 py-2 text-right text-gray-500">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>');
+                    return;
+                }
+                if (k === 'pago') {
+                    cells.push('<td data-col-key="pago" class="px-3 py-2 text-center text-gray-500">' + escapeHtml(displayPaymentMethod(s?.payment_method)) + '</td>');
+                    return;
+                }
+                if (k === 'tipo') {
+                    cells.push('<td data-col-key="tipo" class="px-3 py-2 text-center">' + statusHtml + '</td>');
+                    return;
+                }
+
+                const def = SALES_COLUMNS[k];
+                if (def && typeof def.render === 'function') {
+                    const out = def.render(s) || {};
+                    const html = (out && typeof out.html === 'string') ? out.html : '—';
+                    const title = (out && typeof out.title === 'string') ? out.title : '';
+                    const cls = (k === 'cantidad_items' || k === 'descuento' || k === 'margen_bruto' || k === 'cmv' || k === 'cliente_saldo_cc')
+                        ? 'px-3 py-2 text-right text-gray-500'
+                        : (k === 'regalo')
+                            ? 'px-3 py-2 text-center'
+                            : 'px-3 py-2 text-gray-500';
+                    cells.push('<td data-col-key="' + escapeHtml(k) + '" class="' + cls + '"' + (title ? (' title="' + escapeHtml(title) + '"') : '') + '>' + html + '</td>');
+                    return;
+                }
+
+                cells.push('<td data-col-key="' + escapeHtml(k) + '" class="px-3 py-2 text-gray-500">—</td>');
+            });
+            cells.push('<td data-col-key="acciones" class="px-3 py-2 text-center">' + historialAccionesHtml(ticket) + '</td>');
+            tr.innerHTML = cells.join('');
             historialTbody.appendChild(tr);
         });
+
+        rebuildVentasHistoryTableLayout();
     }
 
     function initSalesEmployeesSelectors() {
@@ -3521,7 +4175,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function initHistorialVentas() {
         try {
-            if (historialTbody) historialTbody.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-sm text-gray-500">Cargando movimientos…</td></tr>';
+            if (historialTbody) {
+                const cols = getVentasHistoryVisibleColumns();
+                const colspan = cols.length + 1;
+                historialTbody.innerHTML = '<tr><td colspan="' + String(colspan) + '" class="px-4 py-6 text-center text-sm text-gray-500">Cargando movimientos…</td></tr>';
+            }
         } catch (e) {
         }
 
@@ -3539,6 +4197,69 @@ document.addEventListener('DOMContentLoaded', function() {
         if (res && typeof res.then === 'function') return res.then(apply);
         apply(res);
         return null;
+    }
+
+    function initVentasHistoryColumnsUi() {
+        if (btnVentasColumnsMenu) {
+            btnVentasColumnsMenu.addEventListener('click', function (e) {
+                try { e.preventDefault(); } catch (ex) {}
+                try { e.stopPropagation(); } catch (ex) {}
+                openVentasColumnsDrawer();
+            });
+        }
+        if (btnCloseVentasColumns) btnCloseVentasColumns.addEventListener('click', closeVentasColumnsDrawer);
+        if (backdropVentasColumns) backdropVentasColumns.addEventListener('click', closeVentasColumnsDrawer);
+
+        document.addEventListener('keydown', function (e) {
+            if (!modalVentasColumns || modalVentasColumns.classList.contains('hidden')) return;
+            if (e.key === 'Escape') {
+                closeVentasColumnsDrawer();
+            }
+        });
+
+        const maybeReposition = function () {
+            try {
+                if (!modalVentasColumns || modalVentasColumns.classList.contains('hidden')) return;
+                applyVentasColumnsDrawerPosition();
+            } catch (e) {}
+        };
+        window.addEventListener('resize', maybeReposition);
+        window.addEventListener('scroll', maybeReposition, { passive: true });
+
+        if (btnVentasColumnsRestore) {
+            btnVentasColumnsRestore.addEventListener('click', function () {
+                ventasHistoryColumns = ventasHistoryDefaultColumns.slice();
+                renderVentasColumnsDrawer();
+                rebuildVentasHistoryTableLayout();
+                renderHistorialFromCache();
+                applyVentasFilters();
+            });
+        }
+
+        if (btnVentasColumnsSave) {
+            btnVentasColumnsSave.addEventListener('click', function () {
+                if (ventasColumnsMsg) ventasColumnsMsg.textContent = '';
+                const cols = Array.isArray(ventasHistoryColumns) ? ventasHistoryColumns.slice() : [];
+                apiSaveVentasHistoryColumnsConfig(cols).then(function (res) {
+                    if (!res || res.ok !== true) {
+                        const msg = String(res?.message || '').trim() || 'No se pudo guardar la configuración.';
+                        if (ventasColumnsMsg) ventasColumnsMsg.textContent = msg;
+                        if (window.showAlertModal) showAlertModal(msg, 'Error', 'Operación fallida');
+                        return;
+                    }
+
+                    ventasHistoryColumnsSaved = cols.slice();
+                    updateVentasColumnsSaveButtonState();
+                    closeVentasColumnsDrawer();
+                    if (window.showAlertModal) showAlertModal('Configuración guardada.', 'Éxito', '');
+                    loadVentasHistoryColumnsConfig();
+                }).catch(function () {
+                    if (ventasColumnsMsg) ventasColumnsMsg.textContent = 'No se pudo guardar la configuración.';
+                });
+            });
+        }
+
+        loadVentasHistoryColumnsConfig();
     }
     function applyVentasFilters() {
         if (!historial) return;
@@ -3980,6 +4701,31 @@ document.addEventListener('DOMContentLoaded', function() {
         return 'text-green-700';
     }
 
+    function stockLabelForProduct(p, stock) {
+        try {
+            if (p && (p.stock_ilimitado === true || p.stock_ilimitado === 1 || p.stock_ilimitado === '1')) {
+                return '∞';
+            }
+        } catch (e) {
+        }
+        try {
+            const v = (isNaN(stock) ? 0 : stock);
+            return String(v.toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+        } catch (e) {
+            return '0';
+        }
+    }
+
+    function stockClassForProduct(p, stock) {
+        try {
+            if (p && (p.stock_ilimitado === true || p.stock_ilimitado === 1 || p.stock_ilimitado === '1')) {
+                return 'text-gray-700';
+            }
+        } catch (e) {
+        }
+        return stockColorClass(stock);
+    }
+
     function renderVentaProductsView(data) {
         if (!gridProductos) return;
         const products = Array.isArray(data?.products) ? data.products : [];
@@ -4013,12 +4759,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 tr.setAttribute('data-categoria', cat);
                 tr.setAttribute('data-codigo-interno', codigoInterno);
 
-                const stockCls = stockColorClass(stock);
+                const stockCls = stockClassForProduct(p, stock);
+                const stockLabel = stockLabelForProduct(p, stock);
                 tr.innerHTML = ''
                     + '<td class="px-2 py-2 text-gray-800">' + String(p?.name || 'Producto') + '</td>'
                     + '<td class="px-2 py-2 text-gray-500">' + (cat || '—') + '</td>'
                     + '<td class="px-2 py-2 text-right text-gray-900 font-medium">' + formatearMoneda(displayPrice) + '</td>'
-                    + '<td class="px-2 py-2 text-right ' + stockCls + ' font-medium">' + String((isNaN(stock) ? 0 : stock).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
+                    + '<td class="px-2 py-2 text-right ' + stockCls + ' font-medium"' + (p?.stock_ilimitado ? ' title="Stock indeterminado (no se controla ni se descuenta)"' : '') + '>' + stockLabel + '</td>'
                     + '<td class="px-2 py-2 text-center">'
                     + '  <button type="button" class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200" data-action="info" title="' + escapeHtml(infoTitle) + '">'
                     + '    <i class="fas fa-info-circle text-[12px]"></i>'
@@ -4087,7 +4834,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     + '<div class="font-medium text-gray-800 truncate w-full">' + String(p?.name || 'Producto') + '</div>'
                     + '<div class="text-[11px] text-gray-500">' + String(p?.category?.name || p?.category_name || '') + '</div>'
                     + '<div class="mt-1 font-semibold text-sm text-gray-900">' + formatearMoneda(displayPrice) + '</div>'
-                    + '<div class="mt-1 text-[11px] ' + stockCls + '">Stock: ' + String((isNaN(stock) ? 0 : stock).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</div>';
+                    + '<div class="mt-1 text-[11px] ' + stockCls + '"' + (p?.stock_ilimitado ? ' title="Stock indeterminado (no se controla ni se descuenta)"' : '') + '>Stock: ' + stockLabel + '</div>';
                 gridProductos.appendChild(btn);
             });
             bindProductButtons();
@@ -4190,6 +4937,10 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const allowOutOfStock = !!(toggleVentaLibre?.checked || toggleVentaLibreTicket?.checked);
             if (!allowOutOfStock && productId) {
+                if (p && (p.stock_ilimitado === true || p.stock_ilimitado === 1 || p.stock_ilimitado === '1')) {
+                    // Stock indeterminado: no bloquear por falta de stock.
+                    // Continuar.
+                } else {
                 const lots = Array.isArray(ventaInvData?.lots) ? ventaInvData.lots : [];
                 const avail = stockDisponiblePorProducto(lots, productId);
                 if ((parseFloat(avail || 0) || 0) <= 0) {
@@ -4197,6 +4948,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (window.showAlertModal) window.showAlertModal(msg, 'Stock insuficiente', 'Inventario');
                     else alert(msg);
                     return;
+                }
                 }
             }
         } catch (e) {
@@ -7000,6 +7752,161 @@ document.addEventListener('DOMContentLoaded', function() {
         modalExportVentas.classList.add('hidden');
     }
 
+    function fmtFechaForExport(sale) {
+        try {
+            const iso = String(sale?.fecha || '').trim();
+            if (!iso) return '';
+            return formatFechaDisplay(iso);
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function getVentasFilteredSalesForExport() {
+        const sales = Array.isArray(salesCache) ? salesCache.slice() : [];
+        const qTic = String(inputSearchVentasTicket?.value || '').trim().toLowerCase();
+        const qCli = String(inputSearchVentasCliente?.value || '').trim().toLowerCase();
+
+        let fromTs = 0;
+        let toTs = 0;
+        const r = String(inputFechaRango?.value || '').trim();
+        if (r) {
+            const matches = r.match(/\b\d{2}\/\d{2}\/\d{4}\b/g) || [];
+            if (matches.length >= 2) {
+                const a = parseDateToTs(matches[0]);
+                const b = parseDateToTs(matches[1]);
+                if (a && b) {
+                    fromTs = Math.min(a, b);
+                    toTs = Math.max(a, b) + (24 * 60 * 60 * 1000 - 1);
+                }
+            } else if (matches.length === 1) {
+                const a = parseDateToTs(matches[0]);
+                if (a) {
+                    fromTs = a;
+                    toTs = a + (24 * 60 * 60 * 1000 - 1);
+                }
+            } else if (r.includes('-')) {
+                const parts = r.split('-').map(x => x.trim());
+                if (parts.length >= 2) {
+                    const a = parseDateToTs(parts[0]);
+                    const b = parseDateToTs(parts[1]);
+                    if (a && b) {
+                        fromTs = Math.min(a, b);
+                        toTs = Math.max(a, b) + (24 * 60 * 60 * 1000 - 1);
+                    }
+                }
+            }
+        }
+
+        const toTsFromIso = function (iso) {
+            try {
+                const t = Date.parse(String(iso || '').trim());
+                return Number.isFinite(t) ? t : 0;
+            } catch (e) {
+                return 0;
+            }
+        };
+
+        return sales.filter(function (s) {
+            const st = String(s?.status || '').trim();
+            if (st === 'Reemplazada') return false;
+            if (ventasGiftOnly && !(s && s.is_gift)) return false;
+
+            const ticketNorm = String(s?.ticket || '').trim();
+            const gift = String(s?.gift_code || '').trim();
+            const ticketPrimary = ventasGiftOnly ? (gift || ticketNorm) : ticketNorm;
+            if (qTic) {
+                const primary = ticketPrimary.toLowerCase();
+                const alt = (ventasGiftOnly ? ticketNorm : gift).toLowerCase();
+                if (!primary.includes(qTic) && !alt.includes(qTic)) return false;
+            }
+
+            const cust = String(s?.customer_name || '').trim();
+            if (qCli && !cust.toLowerCase().includes(qCli)) return false;
+
+            const pay = String(s?.payment_method || 'Efectivo').trim();
+            const payKey = normPaymentMethodKey(pay);
+            if (!ventasMultiMatches(payKey, 'pago')) return false;
+
+            const tipoLabel = historialTipoLabelFromSale(s);
+            if (!ventasMultiMatches(tipoLabel, 'tipo')) return false;
+
+            const respId = String(s?.responsible_id || '').trim();
+            const empFallback = String(s?.employee_id || '').trim();
+            const empId = (respId || (empFallback ? ('e:' + empFallback) : '')) || '__EMPTY__';
+            if (!ventasMultiMatches(empId, 'employee')) return false;
+
+            if (fromTs && toTs) {
+                const ts = toTsFromIso(String(s?.fecha || '').trim());
+                if (!ts || ts < fromTs || ts > toTs) return false;
+            }
+            return true;
+        });
+    }
+
+    function getVentasExportColumns() {
+        const keys = getVentasHistoryVisibleColumns();
+        const cols = [];
+        keys.forEach(function (k) {
+            const label = String(ventasHistoryLabelByKey?.[k] || k).trim();
+            cols.push({ key: k, label: label });
+        });
+        return cols;
+    }
+
+    function ventasExportCellText(colKey, sale) {
+        const k = String(colKey || '').trim();
+        if (k === 'ticket') {
+            const ticketNorm = String(sale?.ticket || '').trim();
+            const gift = String(sale?.gift_code || '').trim();
+            return ventasGiftOnly ? (gift || ticketNorm) : ticketNorm;
+        }
+        if (k === 'fecha') return fmtFechaForExport(sale);
+        if (k === 'cliente') return String(sale?.customer_name || '—').trim() || '—';
+        if (k === 'empleado') return String(sale?.responsible_name || sale?.employee_name || '—').trim() || '—';
+        if (k === 'total') return formatearMoneda(parseFloat(sale?.total || 0) || 0);
+        if (k === 'pago') return displayPaymentMethod(sale?.payment_method);
+        if (k === 'tipo') return historialTipoLabelFromSale(sale) || '';
+
+        if (k === 'productos') {
+            const items = Array.isArray(sale?.items) ? sale.items : [];
+            const lines = items
+                .filter(it => String(it?.direction || 'out').trim().toLowerCase() === 'out')
+                .map(function (it) {
+                    const nm = String(it?.nombre || 'Producto').trim() || 'Producto';
+                    const qty = parseFloat(it?.cantidad || 0) || 0;
+                    const q = (Math.round(qty * 100) / 100);
+                    if (!q || q === 1) return nm;
+                    return nm + ' x' + String(q);
+                })
+                .filter(Boolean);
+            return lines.length ? lines.join('\n') : '—';
+        }
+
+        if (k === 'cliente_clasificacion') {
+            const p = String(sale?.customer_clasificacion_primary || '').trim();
+            return p || '—';
+        }
+
+        const def = SALES_COLUMNS[k];
+        if (def && typeof def.render === 'function') {
+            const out = def.render(sale) || {};
+            const title = (out && typeof out.title === 'string') ? out.title : '';
+            const html = (out && typeof out.html === 'string') ? out.html : '';
+            const txt = (function () {
+                try {
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = html;
+                    return (tmp.textContent || '').trim();
+                } catch (e) {
+                    return '';
+                }
+            })();
+            return txt || title || '—';
+        }
+        return '—';
+    }
+
     function escapeCsvCell(v) {
         const s = String(v ?? '');
         if (/[\n\r",;]/.test(s)) {
@@ -7008,44 +7915,13 @@ document.addEventListener('DOMContentLoaded', function() {
         return s;
     }
 
-    function getVentasVisibleRows() {
-        const tabla = document.querySelector('#historial-ventas table');
-        if (!tabla) return [];
-        const trs = Array.from(tabla.querySelectorAll('tbody tr'));
-        return trs
-            .filter(tr => !tr.classList.contains('hidden'))
-            .map(tr => {
-                const tds = Array.from(tr.querySelectorAll('td')).map(td => (td.textContent || '').trim());
-                const ticketNorm = String(tr.getAttribute('data-ticket') || '').trim();
-                const gift = String(tr.getAttribute('data-gift-code') || '').trim();
-                const ticketExport = ventasGiftOnly ? (gift || ticketNorm || (tds[0] || '')) : (ticketNorm || (tds[0] || ''));
-                const tipo = String(tr.getAttribute('data-type') || '').trim();
-                return {
-                    ticket: ticketExport,
-                    fecha: tds[1] || '',
-                    cliente: tds[2] || '',
-                    empleado: tds[3] || '',
-                    total: tds[4] || '',
-                    pago: tds[5] || '',
-                    estado: tipo || (tds[6] || '')
-                };
-            });
-    }
-
     function exportVentasCsv() {
-        const rows = getVentasVisibleRows();
-        const header = ['Ticket','Fecha','Cliente','Empleado responsable','Total','Pago','Tipo'];
+        const sales = getVentasFilteredSalesForExport();
+        const cols = getVentasExportColumns();
+        const header = cols.map(c => c.label);
         const lines = [header.map(escapeCsvCell).join(';')];
-        rows.forEach(r => {
-            lines.push([
-                r.ticket,
-                r.fecha,
-                r.cliente,
-                r.empleado,
-                r.total,
-                r.pago,
-                r.estado
-            ].map(escapeCsvCell).join(';'));
+        sales.forEach(s => {
+            lines.push(cols.map(c => ventasExportCellText(c.key, s)).map(escapeCsvCell).join(';'));
         });
         const blob = new Blob(["\ufeff" + lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement('a');
@@ -7058,21 +7934,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function exportVentasPdfPrint() {
-        const rows = getVentasVisibleRows();
+        const sales = getVentasFilteredSalesForExport();
+        const cols = getVentasExportColumns();
         const w = window.open('', '_blank');
         if (!w) return;
         const period = (inputFechaRango?.value || '').trim();
-        const htmlRows = rows.map(r => {
-            return ''
-                + '<tr>'
-                + '<td>' + r.ticket + '</td>'
-                + '<td>' + r.fecha + '</td>'
-                + '<td>' + r.cliente + '</td>'
-                + '<td>' + r.empleado + '</td>'
-                + '<td class="num">' + r.total + '</td>'
-                + '<td>' + r.pago + '</td>'
-                + '<td>' + r.estado + '</td>'
-                + '</tr>';
+        const ths = cols.map(function (c) {
+            const k = String(c.key || '').trim();
+            const num = (k === 'total' || k === 'cantidad_items' || k === 'descuento' || k === 'margen_bruto' || k === 'cmv' || k === 'cliente_saldo_cc');
+            return '<th' + (num ? ' class="num"' : '') + '>' + escapeHtml(c.label) + '</th>';
+        }).join('');
+
+        const htmlRows = sales.map(function (s) {
+            const tds = cols.map(function (c) {
+                const k = String(c.key || '').trim();
+                const num = (k === 'total' || k === 'cantidad_items' || k === 'descuento' || k === 'margen_bruto' || k === 'cmv' || k === 'cliente_saldo_cc');
+                const val = ventasExportCellText(k, s);
+                const safe = escapeHtml(String(val || ''));
+                return '<td' + (num ? ' class="num"' : '') + '>' + safe.replace(/\n/g, '<br/>') + '</td>';
+            }).join('');
+            return '<tr>' + tds + '</tr>';
         }).join('');
 
         const html = `
@@ -7100,7 +7981,7 @@ td.num,th.num{text-align:right}
 </div>
 <table>
   <thead><tr>
-    <th>Ticket</th><th>Fecha</th><th>Cliente</th><th>Empleado responsable</th><th class="num">Total</th><th>Pago</th><th>Tipo</th>
+    ${ths}
   </tr></thead>
   <tbody>
     ` + htmlRows + `
@@ -7853,6 +8734,7 @@ td.num,th.num{text-align:right}
 
     initSalesEmployeesSelectors();
     initHistorialVentas();
+    initVentasHistoryColumnsUi();
 
     // Confirmar productos del cambio (pasar a Paso 2 con saldo a favor)
     if (btnConfirmarCambio && vistaRealizarCambio && cambioPaso1 && cambioPaso2 && saldoAFavorEl) {

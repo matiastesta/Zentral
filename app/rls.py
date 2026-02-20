@@ -17,6 +17,8 @@ TENANT_TABLES = [
     'installment_plan',
     'installment',
     'calendar_user_config',
+    'sales_history_user_config',
+    'user_table_column_prefs',
     'cash_count',
     'customer',
     'employee',
