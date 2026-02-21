@@ -1707,8 +1707,8 @@ def list_sales():
             debt_critical_days = 60
             freq_min_purchases = 1
             best_min_purchases = 2
-            inst_overdue_count = 1
-            inst_critical_count = 3
+            inst_overdue_days = 7
+            inst_critical_days = 15
             labels = {
                 'best': 'Mejor cliente',
                 'freq': 'Frecuente',
@@ -1726,8 +1726,8 @@ def list_sales():
                     debt_critical_days = max(debt_overdue_days, int(crm_cfg.get('debt_critical_days') or debt_critical_days))
                     freq_min_purchases = max(1, int(crm_cfg.get('freq_min_purchases') or freq_min_purchases))
                     best_min_purchases = max(freq_min_purchases + 1, int(crm_cfg.get('best_min_purchases') or best_min_purchases))
-                    inst_overdue_count = max(1, int(crm_cfg.get('installments_overdue_count') or inst_overdue_count))
-                    inst_critical_count = max(inst_overdue_count + 1, int(crm_cfg.get('installments_critical_count') or inst_critical_count))
+                    inst_overdue_days = max(1, int(crm_cfg.get('installments_overdue_days') or inst_overdue_days))
+                    inst_critical_days = max(inst_overdue_days + 1, int(crm_cfg.get('installments_critical_days') or inst_critical_days))
                     lbl = crm_cfg.get('labels') if isinstance(crm_cfg.get('labels'), dict) else {}
                     for k in list(labels.keys()):
                         v = str(lbl.get(k) or '').strip()
@@ -1773,9 +1773,8 @@ def list_sales():
                 except Exception:
                     installments_enabled = False
 
-                sc_overdue_by_customer: dict[str, int] = {}
-                if installments_enabled:
-                    today = dt_date.today()
+                oldest_overdue_inst_due_by_customer: dict[str, dt_date] = {}
+                if installments_enabled and cust_ids:
                     try:
                         rows_inst = (
                             db.session.query(Installment, InstallmentPlan)
@@ -1795,7 +1794,9 @@ def list_sales():
                             continue
                         dd = getattr(inst, 'due_date', None)
                         if dd and dd < today:
-                            sc_overdue_by_customer[ccid] = int(sc_overdue_by_customer.get(ccid, 0) or 0) + 1
+                            prev = oldest_overdue_inst_due_by_customer.get(ccid)
+                            if prev is None or dd < prev:
+                                oldest_overdue_inst_due_by_customer[ccid] = dd
 
                 now = dt_date.today()
                 for c_id in cust_ids:
@@ -1810,13 +1811,19 @@ def list_sales():
                     except Exception:
                         dias_deuda = 0
 
-                    sc_over = int(sc_overdue_by_customer.get(c_id, 0) or 0)
+                    sc_overdue_days = 0
+                    try:
+                        od = oldest_overdue_inst_due_by_customer.get(c_id)
+                        if od:
+                            sc_overdue_days = max(0, int((now - od).days))
+                    except Exception:
+                        sc_overdue_days = 0
 
                     tags: list[str] = []
                     if installments_enabled:
-                        if sc_over >= inst_critical_count:
+                        if sc_overdue_days >= inst_critical_days:
                             tags.append('sc_critico')
-                        elif sc_over >= inst_overdue_count:
+                        elif sc_overdue_days >= inst_overdue_days:
                             tags.append('sc_vencido')
                     if saldo > 1e-9:
                         if dias_deuda >= debt_critical_days:
@@ -1864,7 +1871,7 @@ def list_sales():
                     customer_clasificacion_tags_map[c_id] = tags
                     customer_clasificacion_map[c_id] = ' | '.join([x for x in lbls if x])
 
-                    primary_order = ['cc_critica', 'cc_vencida', 'sc_critico', 'sc_vencido', 'mejor_cliente', 'frecuente', 'ocasional', 'inactivo']
+                    primary_order = ['sc_critico', 'sc_vencido', 'cc_critica', 'cc_vencida', 'mejor_cliente', 'frecuente', 'ocasional', 'inactivo']
                     primary_tag = ''
                     for p in primary_order:
                         if p in tags:
@@ -4207,9 +4214,6 @@ def pay_installment_plan(plan_id: int):
         return jsonify({'ok': False, 'error': 'db_error', 'message': str(e)}), 400
 
     return jsonify({'ok': True, 'payments': paid_sales})
-
-
-@bp.post('/api/installment-plans/<int:plan_id>/cancel')
 @login_required
 @module_required_any('sales', 'customers')
 def cancel_installment_plan(plan_id: int):
@@ -4233,27 +4237,6 @@ def cancel_installment_plan(plan_id: int):
     if st in ('pagado', 'paid'):
         return jsonify({'ok': False, 'error': 'plan_paid'}), 400
 
-    # Registrar en legajo: hoy el legajo muestra "Observaciones internas" desde Customer.notes.
-    try:
-        cust_id = str(getattr(plan, 'customer_id', '') or '').strip()
-    except Exception:
-        cust_id = ''
-
-    try:
-        cust_name = str(getattr(plan, 'customer_name', '') or '').strip()
-    except Exception:
-        cust_name = ''
-
-    try:
-        ticket_txt = str(getattr(plan, 'sale_ticket', '') or '').strip()
-    except Exception:
-        ticket_txt = ''
-
-    try:
-        plan_mode = str(getattr(plan, 'mode', '') or '').strip()
-    except Exception:
-        plan_mode = ''
-
     # Decidir si se puede borrar sin romper historial: si hay cuotas pagadas, mantener el plan cancelado.
     has_paid = False
     try:
@@ -4262,39 +4245,12 @@ def cancel_installment_plan(plan_id: int):
             if st_it == 'pagada':
                 has_paid = True
                 break
-            if getattr(it, 'paid_sale_id', None) is not None:
-                has_paid = True
-                break
     except Exception:
         has_paid = True
 
     try:
-        cust_row = None
-        if cust_id:
-            cust_row = db.session.query(Customer).filter(Customer.company_id == cid, Customer.id == cust_id).first()
-
-        stamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M')
-        base = f"[{stamp}] Plan de cuotas cancelado"
-        if ticket_txt:
-            base += f" (Ticket {ticket_txt})"
-        if plan_mode:
-            base += f" · Modo: {plan_mode}"
         if has_paid:
-            base += " · Se mantiene registro (había cuotas pagadas)."
-        else:
-            base += " · Plan eliminado."
-
-        if cust_row is not None:
-            prev = str(getattr(cust_row, 'notes', '') or '').strip()
-            cust_row.notes = (prev + ('\n' if prev else '') + base).strip()
-        else:
-            # Si por algún motivo no se puede resolver el cliente, no fallar la cancelación.
-            pass
-    except Exception:
-        current_app.logger.exception('Failed to append installment cancel note to customer notes')
-
-    try:
-        if has_paid:
+            # Keep paid installments for history; mark plan as cancelled.
             plan.status = 'cancelado'
         else:
             # Borrar cuotas y plan

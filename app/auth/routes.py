@@ -10,6 +10,37 @@ from app.db_context import apply_rls_context
 from app.models import Company, User
 
 
+def _first_allowed_module_url(user: User) -> str | None:
+    try:
+        if not user or not getattr(user, 'can', None):
+            return None
+    except Exception:
+        return None
+
+    order: list[tuple[str, str]] = [
+        ('dashboard', 'main.index'),
+        ('calendar', 'calendar.index'),
+        ('sales', 'sales.index'),
+        ('customers', 'customers.index'),
+        ('inventory', 'inventory.index'),
+        ('expenses', 'expenses.index'),
+        ('movements', 'movements.index'),
+        ('suppliers', 'suppliers.index'),
+        ('reports', 'reports.index'),
+        ('employees', 'employees.index'),
+        ('settings', 'settings.business_settings'),
+        ('user_settings', 'user_settings.index'),
+    ]
+
+    for perm_key, endpoint in order:
+        try:
+            if user.can(perm_key):
+                return url_for(endpoint)
+        except Exception:
+            continue
+    return None
+
+
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     """Vista de login temporal sin base de datos real.
@@ -17,9 +48,22 @@ def login():
     Por ahora solo muestra el formulario y, si se envía, redirige al índice
     sin validar credenciales ni crear sesión persistente.
     """
-    if current_user.is_authenticated and request.method == 'GET':
-        return redirect(url_for('main.index'))
     form = LoginForm()
+    if current_user.is_authenticated and request.method == 'GET':
+        try:
+            if getattr(current_user, 'role', '') == 'zentral_admin':
+                return redirect(url_for('superadmin.index'))
+        except Exception:
+            pass
+        next_url = _first_allowed_module_url(current_user)
+        if next_url:
+            return redirect(next_url)
+        try:
+            logout_user()
+        except Exception:
+            pass
+        flash('No tiene módulos asignados. Contacte al administrador.', 'error')
+        return render_template('auth/login.html', title='Iniciar Sesión', form=form)
     if current_user.is_authenticated and request.method == 'POST':
         try:
             logout_user()
@@ -132,7 +176,29 @@ def login():
             except Exception:
                 session.pop('auth_company_slug', None)
 
-        return redirect(url_for('main.index'))
+        try:
+            if getattr(user, 'role', '') == 'zentral_admin':
+                return redirect(url_for('superadmin.index'))
+        except Exception:
+            pass
+
+        next_url = _first_allowed_module_url(user)
+        if next_url:
+            return redirect(next_url)
+
+        try:
+            logout_user()
+        except Exception:
+            pass
+        try:
+            session.pop('auth_is_zentral_admin', None)
+            session.pop('auth_company_id', None)
+            session.pop('auth_company_slug', None)
+            session.pop('impersonate_company_id', None)
+        except Exception:
+            pass
+        flash('No tiene módulos asignados. Contacte al administrador.', 'error')
+        return render_template('auth/login.html', title='Iniciar Sesión', form=form)
     return render_template('auth/login.html', title='Iniciar Sesión', form=form)
 
 @bp.route('/logout')

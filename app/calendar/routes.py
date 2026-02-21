@@ -775,24 +775,24 @@ def _get_system_events(cfg_data: dict, start: date, end: date):
         if start <= today <= end:
             crm_cfg = _load_crm_config(cid)
             try:
-                inst_overdue_count = int((crm_cfg or {}).get('installments_overdue_count') or 1)
+                inst_overdue_days = int((crm_cfg or {}).get('installments_overdue_days') or 7)
             except Exception:
-                inst_overdue_count = 1
+                inst_overdue_days = 7
             try:
-                inst_critical_count = int((crm_cfg or {}).get('installments_critical_count') or 3)
+                inst_critical_days = int((crm_cfg or {}).get('installments_critical_days') or 15)
             except Exception:
-                inst_critical_count = 3
-            if inst_overdue_count < 1:
-                inst_overdue_count = 1
-            if inst_critical_count <= inst_overdue_count:
-                inst_critical_count = inst_overdue_count + 1
+                inst_critical_days = 15
+            if inst_overdue_days < 1:
+                inst_overdue_days = 1
+            if inst_critical_days <= inst_overdue_days:
+                inst_critical_days = inst_overdue_days + 1
 
             try:
                 overdue_rows = (
                     db.session.query(
                         InstallmentPlan.customer_id,
                         InstallmentPlan.customer_name,
-                        func.count(Installment.id).label('overdue_count'),
+                        func.min(Installment.due_date).label('oldest_due'),
                     )
                     .join(Installment, Installment.plan_id == InstallmentPlan.id)
                     .filter(InstallmentPlan.company_id == cid)
@@ -807,22 +807,25 @@ def _get_system_events(cfg_data: dict, start: date, end: date):
             except Exception:
                 overdue_rows = []
 
-            for cust_id, cust_name, overdue_count in (overdue_rows or []):
-                try:
-                    oc = int(overdue_count or 0)
-                except Exception:
-                    oc = 0
-                if oc <= 0:
+            for cust_id, cust_name, oldest_due in (overdue_rows or []):
+                if not oldest_due:
                     continue
 
-                is_critical = oc >= inst_critical_count
-                is_overdue = oc >= inst_overdue_count
+                days = 0
+                try:
+                    days = max(0, int((today - oldest_due).days))
+                except Exception:
+                    days = 0
+                if days <= 0:
+                    continue
+
+                is_critical = days >= inst_critical_days
+                is_overdue = days >= inst_overdue_days
                 if not is_critical and not is_overdue:
                     continue
 
                 cust = str(cust_name or '').strip() or str(cust_id or '').strip() or 'Cliente'
                 pr = 'critica' if is_critical else 'alta'
-                suffix = ('vencida' if oc == 1 else 'vencidas')
                 label = 'Cuotas vencidas críticas' if is_critical else 'Cuotas vencidas'
                 href = None
                 try:
@@ -832,8 +835,8 @@ def _get_system_events(cfg_data: dict, start: date, end: date):
                 except Exception:
                     href = None
                 _add(
-                    title=label + ' · Cliente: ' + cust + ' (' + str(oc) + ' ' + suffix + ')',
-                    description='Cliente: ' + cust + ' · ' + str(oc) + ' ' + suffix,
+                    title=label + ' · Cliente: ' + cust + ' (' + str(days) + ' días)',
+                    description='Cliente: ' + cust + ' · Días desde 1er vencimiento impago: ' + str(days),
                     d=today,
                     priority=pr,
                     source_module='cuotas',

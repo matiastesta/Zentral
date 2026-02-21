@@ -67,8 +67,12 @@ def _default_crm_config() -> dict:
         'debt_critical_days': 60,
         'freq_min_purchases': 1,
         'best_min_purchases': 2,
+        # Legacy (deprecated): thresholds by overdue installments count
         'installments_overdue_count': 1,
         'installments_critical_count': 3,
+        # New (source of truth): thresholds by days since first unpaid overdue installment
+        'installments_overdue_days': 7,
+        'installments_critical_days': 15,
         'labels': {
             'clas_title': 'Clasificación',
             'best': 'Mejor cliente',
@@ -99,7 +103,41 @@ def _load_crm_config(company_id: str) -> dict:
         return _default_crm_config()
 
     out = _default_crm_config()
-    out.update({k: parsed.get(k) for k in ['recent_days', 'debt_overdue_days', 'debt_critical_days', 'freq_min_purchases', 'best_min_purchases', 'installments_overdue_count', 'installments_critical_count']})
+    out.update({k: parsed.get(k) for k in [
+        'recent_days',
+        'debt_overdue_days',
+        'debt_critical_days',
+        'freq_min_purchases',
+        'best_min_purchases',
+        # Legacy keys
+        'installments_overdue_count',
+        'installments_critical_count',
+        # New keys
+        'installments_overdue_days',
+        'installments_critical_days',
+    ]})
+
+    # Migration/fallback: if days thresholds are missing, derive reasonable defaults.
+    try:
+        iod = out.get('installments_overdue_days')
+        icd = out.get('installments_critical_days')
+        if iod is None or icd is None:
+            # Keep historical behavior approximately: map count-thresholds to days.
+            # We prefer a conservative default that doesn't under-alert.
+            out['installments_overdue_days'] = 7
+            out['installments_critical_days'] = 15
+    except Exception:
+        out['installments_overdue_days'] = 7
+        out['installments_critical_days'] = 15
+
+    try:
+        out['installments_overdue_days'] = max(1, int(out.get('installments_overdue_days') or 7))
+    except Exception:
+        out['installments_overdue_days'] = 7
+    try:
+        out['installments_critical_days'] = max(int(out.get('installments_overdue_days') or 7) + 1, int(out.get('installments_critical_days') or 15))
+    except Exception:
+        out['installments_critical_days'] = max(int(out.get('installments_overdue_days') or 7) + 1, 15)
     lbl = parsed.get('labels') if isinstance(parsed.get('labels'), dict) else {}
     out['labels'] = {**out.get('labels', {}), **lbl}
     # Ensure legacy/subjective labels cannot leak back into the UI.
@@ -147,6 +185,17 @@ def _normalize_crm_config(payload: dict) -> dict:
     except Exception:
         pass
 
+    # New thresholds (days)
+    try:
+        base['installments_overdue_days'] = max(1, int(p.get('installments_overdue_days') or base.get('installments_overdue_days') or 7))
+    except Exception:
+        pass
+    try:
+        base['installments_critical_days'] = max(int(base.get('installments_overdue_days') or 7) + 1, int(p.get('installments_critical_days') or base.get('installments_critical_days') or 15))
+    except Exception:
+        pass
+
+    # Legacy thresholds (count) kept only for backward compatibility
     try:
         base['installments_overdue_count'] = max(1, int(p.get('installments_overdue_count') or base.get('installments_overdue_count') or 1))
     except Exception:
@@ -219,6 +268,21 @@ def installments_summary_api():
     if not _installments_enabled(company_id):
         return jsonify({'ok': True, 'enabled': False, 'items': []})
 
+    crm_cfg = None
+    try:
+        crm_cfg = _load_crm_config(company_id)
+    except Exception:
+        crm_cfg = None
+    inst_overdue_days = 7
+    inst_critical_days = 15
+    try:
+        if isinstance(crm_cfg, dict):
+            inst_overdue_days = max(1, int(crm_cfg.get('installments_overdue_days') or inst_overdue_days))
+            inst_critical_days = max(inst_overdue_days + 1, int(crm_cfg.get('installments_critical_days') or inst_critical_days))
+    except Exception:
+        inst_overdue_days = 7
+        inst_critical_days = 15
+
     ids_raw = request.args.get('customer_ids') or ''
     ids = [str(x).strip() for x in str(ids_raw).split(',') if str(x).strip()]
     if not ids:
@@ -235,7 +299,7 @@ def installments_summary_api():
             .filter(Installment.company_id == company_id)
             .filter(InstallmentPlan.company_id == company_id)
             .filter(InstallmentPlan.customer_id.in_(ids))
-            .filter(db.func.lower(InstallmentPlan.status) == 'activo')
+            .filter(db.func.lower(InstallmentPlan.status).in_(['activo', 'active', 'activa']))
             .filter(db.func.lower(Installment.status) != 'pagada')
             .all()
         )
@@ -261,28 +325,117 @@ def installments_summary_api():
                 'overdue_count': 0,
                 'pending_count': 0,
                 'next_due_date': None,
+                'next_future_due_date': None,
+                'oldest_overdue_date': None,
                 'pending_amount': 0.0,
             }
             by_customer[cid] = entry
         entry['pending_count'] += 1
         if overdue:
             entry['overdue_count'] += 1
+            if dd and (entry['oldest_overdue_date'] is None or dd < entry['oldest_overdue_date']):
+                entry['oldest_overdue_date'] = dd
         if amt > 0:
             entry['pending_amount'] += amt
         if dd and (entry['next_due_date'] is None or dd < entry['next_due_date']):
             entry['next_due_date'] = dd
+        if dd and dd >= today and (entry['next_future_due_date'] is None or dd < entry['next_future_due_date']):
+            entry['next_future_due_date'] = dd
 
     for cid in ids:
         entry = by_customer.get(cid)
         if not entry:
-            items.append({'customer_id': cid, 'overdue_count': 0, 'pending_count': 0, 'pending_amount': 0.0, 'next_due_date': None})
+            items.append({
+                'customer_id': cid,
+                'has_installments': False,
+                'overdue_installments_count': 0,
+                'overdue_days': 0,
+                'overdue_since': None,
+                'next_due_date': None,
+                'pending_balance': 0.0,
+                'status': 'SIN_SISTEMA',
+                'status_key': 'sin_sc',
+                'operational_has_arrears': False,
+                'operational_status_label': '—',
+                'crm_status_key': 'sin_sc',
+                'crm_status_label': 'Sin sistema de cuotas',
+                # Backward compatible keys:
+                'overdue_count': 0,
+                'pending_count': 0,
+                'pending_amount': 0.0,
+            })
         else:
+            overdue_count = int(entry.get('overdue_count') or 0)
+            pending_count = int(entry.get('pending_count') or 0)
+            pending_amount = float(entry.get('pending_amount') or 0.0)
+
+            oldest_overdue = entry.get('oldest_overdue_date')
+            overdue_since = oldest_overdue.isoformat() if oldest_overdue else None
+            overdue_days = 0
+            try:
+                if oldest_overdue:
+                    overdue_days = max(0, int((today - oldest_overdue).days))
+            except Exception:
+                overdue_days = 0
+
+            next_due = entry.get('next_future_due_date')
+            next_due_iso = next_due.isoformat() if next_due else None
+
+            # Operational state: any overdue installment => arrears
+            operational_has_arrears = bool(overdue_count >= 1)
+            operational_status_label = 'Con atraso' if operational_has_arrears else 'Al día'
+
+            status = 'SIN_SISTEMA'
+            if pending_count > 0:
+                if overdue_count >= 1:
+                    status = 'VENCIDO'
+                else:
+                    if next_due and next_due == today:
+                        status = 'VENCE_HOY'
+                    else:
+                        status = 'AL_DIA'
+
+            status_key = 'sin_sc'
+            if status == 'CRITICO':
+                status_key = 'critico'
+            elif status == 'VENCIDO':
+                status_key = 'vencido'
+            elif status == 'VENCE_HOY':
+                status_key = 'vence_hoy'
+            elif status == 'AL_DIA':
+                status_key = 'al_dia'
+
+            # CRM classification: thresholds from CRM config
+            crm_status_key = 'sin_sc'
+            crm_status_label = 'Sin sistema de cuotas'
+            if pending_count > 0:
+                crm_status_key = 'al_dia'
+                crm_status_label = 'Al día'
+                if overdue_days >= inst_critical_days:
+                    crm_status_key = 'critico'
+                    crm_status_label = 'Sistema de Cuotas Crítico'
+                elif overdue_days >= inst_overdue_days:
+                    crm_status_key = 'vencido'
+                    crm_status_label = 'Sistema de Cuotas Vencido'
+
             items.append({
                 'customer_id': entry['customer_id'],
-                'overdue_count': int(entry['overdue_count'] or 0),
-                'pending_count': int(entry['pending_count'] or 0),
-                'pending_amount': float(entry.get('pending_amount') or 0.0),
-                'next_due_date': entry['next_due_date'].isoformat() if entry.get('next_due_date') else None,
+                'has_installments': True,
+                'overdue_installments_count': overdue_count,
+                'overdue_days': overdue_days,
+                'overdue_since': overdue_since,
+                'next_due_date': next_due_iso,
+                'pending_balance': pending_amount,
+                'status': status,
+                'status_key': status_key,
+                'operational_has_arrears': operational_has_arrears,
+                'operational_status_label': operational_status_label,
+                'crm_status_key': crm_status_key,
+                'crm_status_label': crm_status_label,
+                # Backward compatible keys:
+                'overdue_count': overdue_count,
+                'pending_count': pending_count,
+                'pending_amount': pending_amount,
             })
     return jsonify({'ok': True, 'enabled': True, 'items': items})
 
