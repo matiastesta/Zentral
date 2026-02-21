@@ -1263,6 +1263,20 @@ document.addEventListener('DOMContentLoaded', function () {
         return { ts: d, text: safeStr(m[3]).trim() };
     }
 
+    function _notePreviewFromRawNotes(rawNotes) {
+        const raw = safeStr(rawNotes || '').trim();
+        if (!raw) return { text: '', ts: null };
+        const lines = raw.split(/\r?\n/).map(x => safeStr(x).trim()).filter(Boolean);
+        for (const l of lines) {
+            if (_isTechNoteLine(l)) continue;
+            const p = _parseNoteLine(l);
+            const txt = safeStr(p.text || '').trim();
+            if (txt) return { text: txt, ts: p.ts };
+        }
+        const p0 = _parseNoteLine(lines[0] || '');
+        return { text: safeStr(p0.text || '').trim(), ts: p0.ts };
+    }
+
     function _formatNoteLine(ts, text) {
         const stamp = (ts instanceof Date && !isNaN(ts.getTime())) ? ts : new Date();
         const y = stamp.getFullYear();
@@ -2612,6 +2626,41 @@ document.addEventListener('DOMContentLoaded', function () {
                 return total > 0;
             });
 
+            const salesByTicket = new Map();
+            try {
+                ensureArray(cacheSales).forEach(function (s) {
+                    const t = safeStr(s?.type || s?.sale_type).trim();
+                    if (t !== 'Venta') return;
+                    const tk = safeStr(s?.ticket).trim();
+                    if (!tk) return;
+                    if (!salesByTicket.has(tk)) salesByTicket.set(tk, s);
+                });
+            } catch (e) {}
+
+            function productsFromTicket(ticket) {
+                const tk = safeStr(ticket).trim();
+                if (!tk) return '';
+                const s = salesByTicket.get(tk) || null;
+                if (!s) return '';
+                const names = [];
+                try {
+                    ensureArray(s.items).forEach(function (it) {
+                        const dir = safeStr(it?.direction || 'out').trim().toLowerCase() || 'out';
+                        if (dir !== 'out') return;
+                        const nm = safeStr(it?.nombre || it?.product_name || '').trim();
+                        if (!nm) return;
+                        names.push(nm);
+                    });
+                } catch (e) {}
+                const uniq = [];
+                names.forEach(function (n) {
+                    if (!n) return;
+                    if (uniq.includes(n)) return;
+                    uniq.push(n);
+                });
+                return uniq.join(', ');
+            }
+
             const ccPays = pays.filter(s => safeStr(s?.type || s?.sale_type).trim() === 'CobroCC');
             const cuotaPays = pays.filter(s => safeStr(s?.type || s?.sale_type).trim() === 'CobroCuota');
             const ventaPays = pays.filter(s => safeStr(s?.type || s?.sale_type).trim() === 'CobroVenta');
@@ -2622,15 +2671,16 @@ document.addEventListener('DOMContentLoaded', function () {
             ccPays.forEach(s => {
                 const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
                 const fechaRaw = ts ? new Date(ts).toISOString().slice(0, 10) : '—';
+                const ref = parsePaymentReference(s?.notes);
+                const tk = safeStr(ref.refTicket || s?.ticket || '').trim();
+                const prods = productsFromTicket(tk);
+                const refFull = tk ? ('Ticket ' + tk + (prods ? (' – Productos: ' + prods) : '')) : '—';
                 rows.push({
                     sortTs: ts || 0,
                     dateRaw: fechaRaw,
                     type: 'Cobro CC',
-                    reference: (() => {
-                        const ref = parsePaymentReference(s?.notes);
-                        const tk = safeStr(ref.refTicket || s?.ticket || '').trim();
-                        return tk ? ('Venta #' + tk) : '—';
-                    })(),
+                    reference: refFull,
+                    reference_full: refFull,
                     method: safeStr(s?.payment_method || '—'),
                     amount: parseFloat(s?.total || 0) || 0,
                 });
@@ -2639,15 +2689,16 @@ document.addEventListener('DOMContentLoaded', function () {
             ventaPays.forEach(s => {
                 const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
                 const fechaRaw = ts ? new Date(ts).toISOString().slice(0, 10) : '—';
+                const ref = parsePaymentReference(s?.notes);
+                const tk = safeStr(ref.refTicket || s?.ticket || '').trim();
+                const prods = productsFromTicket(tk);
+                const refFull = tk ? ('Ticket ' + tk + (prods ? (' – Productos: ' + prods) : '')) : '—';
                 rows.push({
                     sortTs: ts || 0,
                     dateRaw: fechaRaw,
                     type: 'Cobro',
-                    reference: (() => {
-                        const ref = parsePaymentReference(s?.notes);
-                        const tk = safeStr(ref.refTicket || s?.ticket || '').trim();
-                        return tk ? ('Ticket ' + tk) : '—';
-                    })(),
+                    reference: refFull,
+                    reference_full: refFull,
                     method: safeStr(s?.payment_method || '—'),
                     amount: parseFloat(s?.total || 0) || 0,
                 });
@@ -2656,7 +2707,8 @@ document.addEventListener('DOMContentLoaded', function () {
             groupedCuotas.forEach(g => {
                 const sortTs = Date.parse(g.dateKey);
                 const isAdvance = (g.items.length > 1);
-                let refText = g.refTicket ? ('Ticket ' + g.refTicket) : '—';
+                const prods = productsFromTicket(g.refTicket);
+                let refText = g.refTicket ? ('Ticket ' + g.refTicket + (prods ? (' – Productos: ' + prods) : '')) : '—';
                 if (isAdvance) {
                     refText = refText + ' · ' + safeStr(g.items.length) + ' cuotas';
                 } else {
@@ -2672,6 +2724,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     dateRaw: g.dateKey,
                     type: 'Cuota',
                     reference: refText,
+                    reference_full: refText,
                     method: safeStr(g.payment_method || '—'),
                     amount: parseFloat(g.total || 0) || 0,
                 });
@@ -2691,7 +2744,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     tr.innerHTML = ''
                         + '<td class="px-3 py-2 text-sm text-gray-700">' + fecha + '</td>'
                         + '<td class="px-3 py-2 text-sm text-gray-700">' + safeStr(it.type) + '</td>'
-                        + '<td class="px-3 py-2 text-sm text-gray-700">' + safeStr(it.reference) + '</td>'
+                        + '<td class="px-3 py-2 text-sm text-gray-700"><div class="max-w-[420px] truncate" title="' + safeStr(it.reference_full || it.reference) + '">' + safeStr(it.reference) + '</div></td>'
                         + '<td class="px-3 py-2 text-sm text-gray-700">' + safeStr(it.method) + '</td>'
                         + '<td class="px-3 py-2 text-sm text-right text-gray-700">' + fmtMoney(parseFloat(it.amount || 0) || 0) + '</td>';
                     legajoPayments.appendChild(tr);
@@ -3836,7 +3889,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
-            const notas = truncateText(c.notes || '', 60) || '—';
+            const notePrev = _notePreviewFromRawNotes(c.notes || '');
+            const noteTxt = safeStr(notePrev.text || '').trim();
+            const notas = truncateText(noteTxt, 60) || '—';
+            const notasTitle = (notePrev.ts ? ('[' + _fmtArDateTime(notePrev.ts) + '] ') : '') + (noteTxt || '');
 
             const scSaldo = parseFloat(c.saldo_cuotas || 0) || 0;
             const isDebtor = (ccSaldo > 0.00001) || (scSaldo > 0.00001);
@@ -3850,17 +3906,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + monto + '</td>'
                 + '<td class="px-4 py-3 text-sm ' + ccClass + '">' + safeStr(ccStatusText) + '</td>'
                 + (INSTALLMENTS_ENABLED ? ('<td class="px-4 py-3 text-sm ' + scClass + '">' + safeStr(scStatusText) + '</td>') : '')
-                + '<td class="px-4 py-3 text-sm text-gray-700">' + safeStr(notas) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-700" title="' + safeStr(notasTitle) + '">' + safeStr(notas) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right">'
                 +   '<div class="relative inline-block text-left">'
-                +     '<button type="button" class="btn-cliente-menu inline-flex items-center justify-center h-8 w-8 rounded-full hover:bg-gray-100" data-id="' + safeStr(c.id) + '">' 
+                +     '<button type="button" class="btn-cliente-menu inline-flex items-center justify-center h-8 w-8 rounded-full hover:bg-gray-100" data-id="' + safeStr(c.id) + '">'
                 +       '<i class="fas fa-ellipsis-v text-gray-500 text-xs"></i>'
                 +     '</button>'
                 +     '<div class="menu-cliente-acciones hidden origin-top-right absolute right-0 mt-1 w-44 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">'
                 +       '<div class="py-1 text-[11px]">'
                 +         '<button type="button" class="w-full text-left px-3 py-2 text-blue-700 hover:bg-blue-50" data-action="legajo" data-id="' + safeStr(c.id) + '">Ver legajo</button>'
-                +         '<button type="button" class="w-full text-left px-3 py-2 text-blue-700 hover:bg-blue-50" data-action="delete" data-id="' + safeStr(c.id) + '">Eliminar</button>'
+                +         '<button type="button" class="w-full text-left px-3 py-2 text-blue-700 hover:bg-blue-50" data-action="edit" data-id="' + safeStr(c.id) + '">Editar</button>'
                 +         (isDebtor ? ('<button type="button" class="w-full text-left px-3 py-2 text-red-700 hover:bg-red-50" data-action="settle" data-id="' + safeStr(c.id) + '">Saldar deuda</button>') : '')
+                +         '<button type="button" class="w-full text-left px-3 py-2 text-red-700 hover:bg-red-50" data-action="delete" data-id="' + safeStr(c.id) + '">Eliminar</button>'
                 +       '</div>'
                 +     '</div>'
                 +   '</div>'

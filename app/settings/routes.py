@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from app.files.storage import upload_to_r2_and_create_asset
-from app.models import BusinessSettings, Installment, InstallmentPlan
+from app.models import BusinessSettings, Company, Installment, InstallmentPlan
 from app.permissions import module_required
 from app.settings import bp
 
@@ -23,6 +23,13 @@ def business_settings():
             bs = BusinessSettings.get_for_company(g.company_id)
             prev_installments_enabled = bool(getattr(bs, 'habilitar_sistema_cuotas', False))
             bs.name = (request.form.get('business_name') or '').strip() or bs.name
+            try:
+                c = db.session.get(Company, str(getattr(g, 'company_id', '') or '').strip())
+                if c and str(getattr(bs, 'name', '') or '').strip() and (str(getattr(c, 'name', '') or '').strip() != str(bs.name or '').strip()):
+                    c.name = str(bs.name or '').strip()
+                    db.session.add(c)
+            except Exception:
+                pass
             ind = (request.form.get('business_industry') or '').strip() or None
             if ind == 'Otro':
                 other = (request.form.get('business_industry_other') or '').strip()

@@ -12,44 +12,108 @@
     </div>
 </div>
 
-<div class="p-5 bg-white rounded-lg shadow">
+<div id="sa-root" class="p-5 bg-white rounded-lg shadow"
+     data-sort="{{ sort or '' }}"
+     data-dir="{{ dir or '' }}"
+     data-page="{{ page or 1 }}"
+     data-pages="{{ ((total or 0) + (per_page or 25) - 1) // (per_page or 25) if (per_page or 25) else 1 }}"
+     data-per-page="{{ per_page or 25 }}">
     <h2 class="text-lg font-medium text-gray-900 mb-3">Empresas</h2>
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Empresa</th>
-                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Plan</th>
-                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
+                        <div class="space-y-1">
+                            <div class="inline-flex items-center gap-2">
+                                <span>Empresa</span>
+                                <button id="sa-sort-name" type="button" class="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-gray-100" title="Ordenar">
+                                    <span id="sa-sort-name-icon" class="text-[10px] text-gray-500">▲▼</span>
+                                </button>
+                            </div>
+                            <div class="relative w-56">
+                                <span class="absolute inset-y-0 left-2 flex items-center text-gray-400 pointer-events-none">
+                                    <i class="fas fa-search text-xs"></i>
+                                </span>
+                                <input id="sa-filter-q" value="{{ q or '' }}" class="h-8 w-full pl-7 pr-2 text-xs border rounded-md bg-white text-gray-800" placeholder="Buscar empresa..." autocomplete="off">
+                            </div>
+                        </div>
+                    </th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
+                        <div class="space-y-1">
+                            <div>Plan</div>
+                            <div class="relative inline-block">
+                                <button id="sa-plans-btn" type="button" class="h-8 px-2 text-xs border rounded-md bg-white text-gray-800 inline-flex items-center gap-2">
+                                    <span id="sa-plans-label">Todos</span>
+                                    <i class="fas fa-chevron-down text-[10px] text-gray-500"></i>
+                                </button>
+                                <div id="sa-plans-menu" class="hidden absolute z-20 mt-1 w-56 p-2 bg-white border rounded-md shadow">
+                                    <div class="max-h-56 overflow-auto space-y-1">
+                                        {% for p in plans %}
+                                            <label class="flex items-center gap-2 px-1 py-1 text-xs text-gray-700">
+                                                <input class="sa-plan-opt" type="checkbox" value="{{ p }}" {% if selected_plans and (p in selected_plans) %}checked{% endif %}>
+                                                <span>{{ p }}</span>
+                                            </label>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="mt-2 flex items-center justify-between">
+                                        <button id="sa-plans-clear" type="button" class="text-xs text-gray-600 hover:underline">Limpiar</button>
+                                        <button id="sa-plans-apply" type="button" class="h-7 px-2 text-xs rounded-md bg-blue-600 text-white">Aplicar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
+                        <div class="space-y-1">
+                            <div>Estado</div>
+                            <select id="sa-filter-status" class="h-8 w-32 px-2 text-xs border rounded-md bg-white text-gray-800">
+                                <option value="" {% if not status %}selected{% endif %}>Todos</option>
+                                <option value="active" {% if status == 'active' %}selected{% endif %}>Activo</option>
+                                <option value="paused" {% if status == 'paused' %}selected{% endif %}>Pausado</option>
+                            </select>
+                        </div>
+                    </th>
+                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
+                        <div class="space-y-1">
+                            <div class="inline-flex items-center gap-2">
+                                <span>Fecha programada</span>
+                                <button id="sa-sort-sub" type="button" class="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-gray-100" title="Ordenar">
+                                    <span id="sa-sort-sub-icon" class="text-[10px] text-gray-500">▲▼</span>
+                                </button>
+                            </div>
+                        </div>
+                    </th>
                     <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody id="sa-companies-tbody" class="bg-white divide-y divide-gray-200">
                 {% for c in companies %}
                 <tr>
                     <td class="px-3 py-2">
-                        <div class="font-medium text-gray-900">{{ c.name }}</div>
+                        <div class="font-medium text-gray-900 truncate max-w-[240px]" title="{{ c.display_name if c.display_name is defined else c.name }}">{{ c.display_name if c.display_name is defined else c.name }}</div>
                     </td>
                     <td class="px-3 py-2 text-gray-700">{{ c.plan }}</td>
                     <td class="px-3 py-2">
                         {% if c.status == 'paused' %}
-                            <span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-red-50 text-red-700">paused</span>
+                            <span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-red-50 text-red-700">Pausado</span>
                         {% else %}
-                            <span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">active</span>
+                            <span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">Activo</span>
                         {% endif %}
                     </td>
+                    <td class="px-3 py-2">
+                        <input type="text" value="{{ c.subscription_ends_at.isoformat() if c.subscription_ends_at else '' }}" class="sa-sub-date js-flatpickr-date h-8 w-32 px-2 text-xs border rounded-md bg-white text-gray-800" placeholder="—" autocomplete="off">
+                    </td>
                     <td class="px-3 py-2 text-right">
-                        <div class="inline-flex flex-wrap items-center gap-2 whitespace-nowrap">
-                            <a href="{{ url_for('superadmin.company_overview', company_id=c.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Editar</a>
-                            <form method="post" action="{{ url_for('superadmin.impersonate_company', company_id=c.id) }}" class="inline">
-                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Soporte</button>
+                        <div class="inline-flex items-center gap-1 whitespace-nowrap flex-nowrap">
+                            <form method="post" action="{{ url_for('superadmin.schedule_pause_company', company_id=c.id) }}" class="inline sa-schedule-form">
+                                <input type="hidden" name="subscription_ends_at" value="{{ c.subscription_ends_at.isoformat() if c.subscription_ends_at else '' }}">
+                                <button type="submit" class="sa-btn-schedule inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-yellow-600 text-white hover:bg-yellow-700">Programar</button>
                             </form>
 
-                            <form method="post" action="{{ url_for('superadmin.schedule_pause_company', company_id=c.id) }}" class="inline">
-                                <div class="inline-flex items-center gap-2">
-                                    <input type="text" name="subscription_ends_at" value="{{ c.subscription_ends_at.isoformat() if c.subscription_ends_at else '' }}" class="js-flatpickr-date h-8 w-32 px-2 text-xs border rounded-md bg-white text-gray-800" placeholder="Vence" autocomplete="off">
-                                    <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-yellow-600 text-white hover:bg-yellow-700">Programar</button>
-                                </div>
+                            <a href="{{ url_for('superadmin.company_overview', company_id=c.id) }}" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Editar</a>
+                            <form method="post" action="{{ url_for('superadmin.impersonate_company', company_id=c.id) }}" class="inline">
+                                <button type="submit" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Soporte</button>
                             </form>
                             {% if c.pause_scheduled_for %}
                                 <form method="post" action="{{ url_for('superadmin.cancel_schedule_pause_company', company_id=c.id) }}" class="inline">
@@ -61,24 +125,32 @@
                                     <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700">Reactivar</button>
                                 </form>
                             {% else %}
-                                <form method="post" action="{{ url_for('superadmin.pause_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Pausar empresa" data-confirm-message="¿Querés pausar {{ c.name }}?" data-confirm-ok="Pausar" data-confirm-cancel="Cancelar">
+                                <form method="post" action="{{ url_for('superadmin.pause_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Pausar empresa" data-confirm-message="¿Querés pausar {{ c.display_name if c.display_name is defined else c.name }}?" data-confirm-ok="Pausar" data-confirm-cancel="Cancelar">
                                     <input type="hidden" name="reason" value="">
                                     <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700">Pausar</button>
                                 </form>
                             {% endif %}
-                            <form method="post" action="{{ url_for('superadmin.delete_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar empresa" data-confirm-message="Vas a eliminar {{ c.name }} y TODA su información. Esta acción no se puede deshacer." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
-                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
+                            <form method="post" action="{{ url_for('superadmin.delete_company', company_id=c.id) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar empresa" data-confirm-message="Vas a eliminar {{ c.display_name if c.display_name is defined else c.name }} y TODA su información. Esta acción no se puede deshacer." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
+                                <button type="submit" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
                             </form>
                         </div>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="4" class="px-3 py-4 text-center text-gray-500">No hay empresas todavía.</td>
+                    <td colspan="5" class="px-3 py-4 text-center text-gray-500">No hay empresas todavía.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+
+    <div class="mt-4 flex items-center justify-between text-xs text-gray-600">
+        <div id="sa-page-info">—</div>
+        <div class="flex items-center gap-2">
+            <button id="sa-btn-prev" type="button" class="h-8 px-3 rounded-md border bg-white hover:bg-gray-50">Anterior</button>
+            <button id="sa-btn-next" type="button" class="h-8 px-3 rounded-md border bg-white hover:bg-gray-50">Siguiente</button>
+        </div>
     </div>
 </div>
 
@@ -154,9 +226,10 @@
 
             <div class="border-t pt-4">
                 <div class="text-sm font-semibold text-gray-900 mb-2">Planes existentes</div>
+                <div id="sa-plans-msg" class="hidden text-xs px-3 py-2 rounded-md border"></div>
                 <div class="space-y-2">
                     {% for p in plans_rows %}
-                        <div class="flex items-center justify-between gap-2 p-2 rounded-md border">
+                        <div class="sa-plan-row flex items-center justify-between gap-2 p-2 rounded-md border" data-plan-code="{{ p.code }}">
                             <div class="text-sm">
                                 <div class="font-medium text-gray-900">{{ p.code }}</div>
                                 {% if p.active %}
@@ -167,13 +240,18 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 {% if p.active %}
-                                    <form method="post" action="{{ url_for('superadmin.plan_disable', plan_code=p.code) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar plan" data-confirm-message="Vas a eliminar el plan {{ p.code }}. No se podrá seleccionar para nuevas empresas." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
+                                    <form method="post" action="{{ url_for('superadmin.plan_disable', plan_code=p.code) }}" class="inline" data-confirm="1" data-confirm-title="Pausar plan" data-confirm-message="Vas a pausar el plan {{ p.code }}. No se podrá seleccionar para nuevas empresas." data-confirm-ok="Pausar" data-confirm-cancel="Cancelar">
+                                        <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Pausar</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('superadmin.plan_delete', plan_code=p.code) }}" class="inline js-plan-delete" data-confirm="1" data-confirm-title="Eliminar plan" data-confirm-message="¿Eliminar plan '{{ p.code }}'? Esta acción no se puede deshacer." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
                                         <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
                                     </form>
                                 {% else %}
-                                    <form method="post" action="{{ url_for('superadmin.plan_create') }}" class="inline">
-                                        <input type="hidden" name="plan_code" value="{{ p.code }}">
+                                    <form method="post" action="{{ url_for('superadmin.plan_enable', plan_code=p.code) }}" class="inline">
                                         <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Reactivar</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('superadmin.plan_delete', plan_code=p.code) }}" class="inline js-plan-delete" data-confirm="1" data-confirm-title="Eliminar plan" data-confirm-message="¿Eliminar plan '{{ p.code }}'? Esta acción no se puede deshacer." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
+                                        <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
                                     </form>
                                 {% endif %}
                             </div>
@@ -214,26 +292,108 @@ document.addEventListener('DOMContentLoaded', function () {
             try { planNewInput.focus(); } catch (e) { }
         }
     }
+    function openPlans() { if (plansModal) plansModal.classList.remove('hidden'); }
+    function closePlans() { if (plansModal) plansModal.classList.add('hidden'); }
     if (btnOpen) btnOpen.addEventListener('click', open);
     if (btnClose) btnClose.addEventListener('click', close);
-    if (btnOpenPlans) btnOpenPlans.addEventListener('click', function () {
-        if (plansModal) plansModal.classList.remove('hidden');
-    });
-    if (btnClosePlans) btnClosePlans.addEventListener('click', function () {
-        if (plansModal) plansModal.classList.add('hidden');
-    });
     if (modal) modal.addEventListener('click', function (e) {
         const el = e.target;
         if (el && el.getAttribute && el.getAttribute('data-close') === '1') close();
     });
+    if (btnOpenPlans) btnOpenPlans.addEventListener('click', openPlans);
+    if (btnClosePlans) btnClosePlans.addEventListener('click', closePlans);
     if (plansModal) plansModal.addEventListener('click', function (e) {
         const el = e.target;
-        if (el && el.getAttribute && el.getAttribute('data-close') === '1') {
-            plansModal.classList.add('hidden');
-        }
+        if (el && el.getAttribute && el.getAttribute('data-close') === '1') closePlans();
     });
     if (planSelect) planSelect.addEventListener('change', syncPlanNew);
     syncPlanNew();
+
+    const plansMsg = document.getElementById('sa-plans-msg');
+    function showPlansMsg(kind, text) {
+        if (!plansMsg) return;
+        const msg = String(text || '').trim();
+        if (!msg) {
+            plansMsg.classList.add('hidden');
+            return;
+        }
+        plansMsg.classList.remove('hidden');
+        plansMsg.textContent = msg;
+        plansMsg.classList.remove('bg-red-50', 'text-red-700', 'border-red-200');
+        plansMsg.classList.remove('bg-green-50', 'text-green-700', 'border-green-200');
+        plansMsg.classList.remove('bg-gray-50', 'text-gray-700', 'border-gray-200');
+        if (kind === 'error') {
+            plansMsg.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
+        } else if (kind === 'success') {
+            plansMsg.classList.add('bg-green-50', 'text-green-700', 'border-green-200');
+        } else {
+            plansMsg.classList.add('bg-gray-50', 'text-gray-700', 'border-gray-200');
+        }
+    }
+    async function confirmFromDataset(form) {
+        try {
+            const needs = String(form.getAttribute('data-confirm') || '').trim();
+            if (!needs) return true;
+            const title = String(form.getAttribute('data-confirm-title') || '').trim() || 'Confirmar';
+            const msg = String(form.getAttribute('data-confirm-message') || '').trim();
+            if (!msg) return true;
+            const okText = String(form.getAttribute('data-confirm-ok') || '').trim() || 'Confirmar';
+            const cancelText = String(form.getAttribute('data-confirm-cancel') || '').trim() || 'Cancelar';
+            if (window.confirmModal) {
+                return await window.confirmModal(msg, title, '', { okText: okText, cancelText: cancelText });
+            }
+            return window.confirm(title + (msg ? (': ' + msg) : ''));
+        } catch (e) {
+            return true;
+        }
+    }
+    if (plansModal) {
+        plansModal.addEventListener('submit', async function (e) {
+            const form = e.target;
+            if (!form || !form.classList || !form.classList.contains('js-plan-delete')) return;
+            e.preventDefault();
+            showPlansMsg('', '');
+            const ok = await confirmFromDataset(form);
+            if (!ok) return;
+
+            const url = String(form.getAttribute('action') || '');
+            fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            })
+                .then(r => r.json().then(d => ({ status: r.status, data: d })))
+                .then(function (res) {
+                    const st = res.status;
+                    const d = res.data || {};
+                    if (st === 409 && d && d.error === 'PLAN_IN_USE') {
+                        const count = parseInt(String(d.count || 0), 10) || 0;
+                        const comps = Array.isArray(d.companies) ? d.companies : [];
+                        let msg = 'No se puede eliminar este plan porque está asignado a ' + String(count) + ' empresas.';
+                        if (comps.length) {
+                            msg += ' Empresas: ' + comps.join(', ');
+                            if (count > comps.length) msg += ', ...';
+                        }
+                        msg += ' Para eliminarlo, primero cambiá el plan de esas empresas.';
+                        showPlansMsg('error', msg);
+                        return;
+                    }
+                    if (!d || d.ok !== true) {
+                        showPlansMsg('error', 'No se pudo eliminar el plan.');
+                        return;
+                    }
+                    const row = form.closest('.sa-plan-row');
+                    if (row) row.remove();
+                    showPlansMsg('success', 'Plan eliminado.');
+                })
+                .catch(function () {
+                    showPlansMsg('error', 'No se pudo eliminar el plan.');
+                });
+        });
+    }
 
     try {
         if (typeof flatpickr === 'function') {
@@ -257,6 +417,349 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     } catch (e) {
     }
+
+    const root = document.getElementById('sa-root');
+    const tbody = document.getElementById('sa-companies-tbody');
+    const filterQ = document.getElementById('sa-filter-q');
+    const filterStatus = document.getElementById('sa-filter-status');
+    const btnPlans = document.getElementById('sa-plans-btn');
+    const menuPlans = document.getElementById('sa-plans-menu');
+    const labelPlans = document.getElementById('sa-plans-label');
+    const btnPlansApply = document.getElementById('sa-plans-apply');
+    const btnPlansClear = document.getElementById('sa-plans-clear');
+    const btnSortName = document.getElementById('sa-sort-name');
+    const sortNameIcon = document.getElementById('sa-sort-name-icon');
+    const btnSortSub = document.getElementById('sa-sort-sub');
+    const sortIcon = document.getElementById('sa-sort-sub-icon');
+    const btnPrev = document.getElementById('sa-btn-prev');
+    const btnNext = document.getElementById('sa-btn-next');
+    const pageInfo = document.getElementById('sa-page-info');
+
+    let sortDir = String(root?.getAttribute('data-dir') || '').trim().toLowerCase();
+    let sortKey = String(root?.getAttribute('data-sort') || '').trim();
+    if (sortKey !== 'subscription_ends_at' && sortKey !== 'name') {
+        sortKey = '';
+        sortDir = '';
+    }
+
+    let currentPage = parseInt(String(root?.getAttribute('data-page') || '1'), 10) || 1;
+    let currentPages = parseInt(String(root?.getAttribute('data-pages') || '1'), 10) || 1;
+    const fixedPerPage = parseInt(String(root?.getAttribute('data-per-page') || '25'), 10) || 25;
+
+    function debounce(fn, ms) {
+        let t = null;
+        return function () {
+            const args = arguments;
+            clearTimeout(t);
+            t = setTimeout(function () { fn.apply(null, args); }, ms);
+        };
+    }
+
+    function getSelectedPlans() {
+        const opts = Array.from(document.querySelectorAll('input.sa-plan-opt'));
+        return opts.filter(o => !!o.checked).map(o => String(o.value || '').trim()).filter(Boolean);
+    }
+
+    function syncPlansLabel() {
+        const sel = getSelectedPlans();
+        if (!labelPlans) return;
+        if (!sel.length) {
+            labelPlans.textContent = 'Todos';
+            return;
+        }
+        if (sel.length === 1) {
+            labelPlans.textContent = sel[0];
+            return;
+        }
+        labelPlans.textContent = String(sel.length) + ' seleccionados';
+    }
+
+    function togglePlansMenu(open) {
+        if (!menuPlans) return;
+        const show = (open === true) ? true : (open === false) ? false : menuPlans.classList.contains('hidden');
+        menuPlans.classList.toggle('hidden', !show);
+        syncPlansLabel();
+    }
+
+    function _iconFor(key) {
+        if (!sortDir || sortKey !== key) return '▲▼';
+        if (sortDir === 'asc') return '▲';
+        if (sortDir === 'desc') return '▼';
+        return '▲▼';
+    }
+
+    function updateSortIcon() {
+        if (sortIcon) sortIcon.textContent = _iconFor('subscription_ends_at');
+        if (sortNameIcon) sortNameIcon.textContent = _iconFor('name');
+    }
+
+    function buildQuery(page) {
+        const params = new URLSearchParams();
+        const q = String(filterQ?.value || '').trim();
+        const st = String(filterStatus?.value || '').trim();
+        const plans = getSelectedPlans();
+        if (q) params.set('q', q);
+        if (plans.length) params.set('plans', plans.join(','));
+        if (st) params.set('status', st);
+        if (sortKey && sortDir) {
+            params.set('sort', sortKey);
+            params.set('dir', sortDir);
+        }
+        params.set('page', String(page || 1));
+        params.set('per_page', String(fixedPerPage));
+        return params;
+    }
+
+    function updatePagerUi() {
+        const p = currentPage;
+        const pages = currentPages;
+        if (pageInfo) pageInfo.textContent = 'Página ' + String(p) + ' de ' + String(pages);
+        if (btnPrev) btnPrev.disabled = (p <= 1);
+        if (btnNext) btnNext.disabled = (p >= pages);
+        if (btnPrev) btnPrev.classList.toggle('opacity-50', btnPrev.disabled);
+        if (btnNext) btnNext.classList.toggle('opacity-50', btnNext.disabled);
+        if (btnPrev) btnPrev.classList.toggle('cursor-not-allowed', btnPrev.disabled);
+        if (btnNext) btnNext.classList.toggle('cursor-not-allowed', btnNext.disabled);
+    }
+
+    function rowHtml(it) {
+        const status = String(it.status || '').trim().toLowerCase();
+        const nm = String(it.name || '');
+        const badge = (status === 'paused')
+            ? '<span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-red-50 text-red-700">Pausado</span>'
+            : '<span class="inline-flex items-center px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">Activo</span>';
+
+        const subIso = String(it.subscription_ends_at || '').trim();
+        const companyName = String(it.name || '');
+        const plan = String(it.plan || '');
+        const pauseScheduled = String(it.pause_scheduled_for || '').trim();
+
+        return ''
+            + '<tr>'
+            + '  <td class="px-3 py-2"><div class="font-medium text-gray-900 truncate max-w-[240px]" title="' + escapeHtml(nm) + '">' + escapeHtml(nm) + '</div></td>'
+            + '  <td class="px-3 py-2 text-gray-700">' + escapeHtml(String(it.plan || '')) + '</td>'
+            + '  <td class="px-3 py-2">' + badge + '</td>'
+            + '  <td class="px-3 py-2">'
+            + '    <input type="text" value="' + escapeHtml(String(it.subscription_ends_at || '')) + '" class="sa-sub-date js-flatpickr-date h-8 w-32 px-2 text-xs border rounded-md bg-white text-gray-800" placeholder="—" autocomplete="off">'
+            + '  </td>'
+            + '  <td class="px-3 py-2 text-right">'
+            + '    <div class="inline-flex items-center gap-1 whitespace-nowrap flex-nowrap">'
+            + '      <form method="post" action="/superadmin/companies/' + encodeURIComponent(String(it.id || '')) + '/schedule-pause" class="inline sa-schedule-form">'
+            + '        <input type="hidden" name="subscription_ends_at" value="' + escapeHtml(subIso) + '">'
+            + '        <button type="submit" class="sa-btn-schedule inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-yellow-600 text-white hover:bg-yellow-700">Programar</button>'
+            + '      </form>'
+            + '      <a href="/superadmin/companies/' + encodeURIComponent(String(it.id || '')) + '" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Editar</a>'
+            + '      <form method="post" action="/superadmin/companies/' + encodeURIComponent(String(it.id || '')) + '/impersonate" class="inline">'
+            + '        <button type="submit" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Soporte</button>'
+            + '      </form>'
+            + (pauseScheduled ? ('<form method="post" action="/superadmin/companies/' + encodeURIComponent(String(it.id || '')) + '/schedule-pause/cancel" class="inline">'
+            + '        <button type="submit" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-yellow-50 text-yellow-700 hover:bg-yellow-100">Cancelar</button>'
+            + '      </form>') : '')
+            + (status === 'paused'
+                ? ('<form method="post" action="/superadmin/companies/' + encodeURIComponent(String(it.id || '')) + '/reactivate" class="inline">'
+                    + '<button type="submit" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-green-600 text-white hover:bg-green-700">Reactivar</button>'
+                    + '</form>')
+                : ('<form method="post" action="/superadmin/companies/' + encodeURIComponent(String(it.id || '')) + '/pause" class="inline" data-confirm="1" data-confirm-title="Pausar empresa" data-confirm-message="¿Querés pausar ' + escapeHtml(nm) + '?" data-confirm-ok="Pausar" data-confirm-cancel="Cancelar">'
+                    + '<input type="hidden" name="reason" value="">'
+                    + '<button type="submit" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700">Pausar</button>'
+                    + '</form>'))
+            + '      <form method="post" action="/superadmin/companies/' + encodeURIComponent(String(it.id || '')) + '/delete" class="inline" data-confirm="1" data-confirm-title="Eliminar empresa" data-confirm-message="Vas a eliminar ' + escapeHtml(nm) + ' y TODA su información. Esta acción no se puede deshacer." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">'
+            + '        <button type="submit" class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>'
+            + '      </form>'
+            + '    </div>'
+            + '  </td>'
+            + '</tr>';
+    }
+
+    function escapeHtml(s) {
+        return String(s || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function initFlatpickrForRows() {
+        try {
+            if (typeof flatpickr !== 'function') return;
+            if (flatpickr && flatpickr.l10ns && flatpickr.l10ns.es) {
+                try { flatpickr.localize(flatpickr.l10ns.es); } catch (e) { }
+            }
+            document.querySelectorAll('.js-flatpickr-date').forEach(function (el) {
+                if (el._flatpickr) return;
+                try {
+                    flatpickr(el, {
+                        dateFormat: 'Y-m-d',
+                        altInput: true,
+                        altFormat: 'd/m/Y',
+                        allowInput: false,
+                        appendTo: document.body,
+                        disableMobile: true,
+                        locale: (flatpickr && flatpickr.l10ns && flatpickr.l10ns.es) ? flatpickr.l10ns.es : undefined,
+                    });
+                } catch (e) {
+                }
+            });
+        } catch (e) {
+        }
+    }
+
+    function renderEmpty() {
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">No hay resultados para los filtros actuales.</td></tr>';
+    }
+
+    function fetchAndRender(page) {
+        currentPage = parseInt(String(page || 1), 10) || 1;
+        const params = buildQuery(page);
+        const url = '/superadmin/api/companies?' + params.toString();
+        return fetch(url, { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(function (d) {
+                if (!d || d.ok !== true) {
+                    renderEmpty();
+                    return;
+                }
+                const items = Array.isArray(d.items) ? d.items : [];
+                currentPages = parseInt(String(d.pages || 1), 10) || 1;
+                if (!items.length) {
+                    renderEmpty();
+                } else if (tbody) {
+                    tbody.innerHTML = items.map(rowHtml).join('');
+                }
+                initFlatpickrForRows();
+                updateUrl(params);
+                updatePagerUi();
+            })
+            .catch(function () {
+                renderEmpty();
+            });
+    }
+
+    function getRowDateValueFromEl(el) {
+        try {
+            const tr = el.closest('tr');
+            if (!tr) return '';
+            const input = tr.querySelector('input.sa-sub-date');
+            if (!input) return '';
+            if (input._flatpickr && input._flatpickr.selectedDates && input._flatpickr.selectedDates.length) {
+                try {
+                    return input._flatpickr.formatDate(input._flatpickr.selectedDates[0], 'Y-m-d');
+                } catch (e) {
+                }
+            }
+            return String(input.value || '').trim();
+        } catch (e) {
+            return '';
+        }
+    }
+
+    if (tbody) {
+        tbody.addEventListener('submit', function (e) {
+            const form = e.target;
+            if (!form || !form.classList || !form.classList.contains('sa-schedule-form')) return;
+            try {
+                const v = getRowDateValueFromEl(form);
+                const hidden = form.querySelector('input[name="subscription_ends_at"]');
+                if (hidden) hidden.value = v;
+            } catch (err) {
+            }
+        });
+    }
+
+    function updateUrl(params) {
+        try {
+            const u = new URL(window.location.href);
+            u.search = params.toString();
+            window.history.replaceState({}, '', u.toString());
+        } catch (e) {
+        }
+    }
+
+    if (btnPlans) {
+        btnPlans.addEventListener('click', function () { togglePlansMenu(); });
+    }
+    if (btnPlansClear) {
+        btnPlansClear.addEventListener('click', function () {
+            document.querySelectorAll('input.sa-plan-opt').forEach(function (o) { o.checked = false; });
+            syncPlansLabel();
+        });
+    }
+    if (btnPlansApply) {
+        btnPlansApply.addEventListener('click', function () {
+            togglePlansMenu(false);
+            fetchAndRender(1);
+        });
+    }
+    document.addEventListener('click', function (e) {
+        const t = e.target;
+        if (!menuPlans || menuPlans.classList.contains('hidden')) return;
+        if (btnPlans && (btnPlans === t || btnPlans.contains(t))) return;
+        if (menuPlans === t || menuPlans.contains(t)) return;
+        togglePlansMenu(false);
+    });
+
+    if (filterStatus) {
+        filterStatus.addEventListener('change', function () { fetchAndRender(1); });
+    }
+
+    if (filterQ) {
+        filterQ.addEventListener('input', debounce(function () { fetchAndRender(1); }, 300));
+    }
+
+    if (btnPrev) {
+        btnPrev.addEventListener('click', function () {
+            if (currentPage <= 1) return;
+            fetchAndRender(currentPage - 1);
+        });
+    }
+    if (btnNext) {
+        btnNext.addEventListener('click', function () {
+            if (currentPage >= currentPages) return;
+            fetchAndRender(currentPage + 1);
+        });
+    }
+
+    if (btnSortSub) {
+        btnSortSub.addEventListener('click', function () {
+            if (sortKey !== 'subscription_ends_at') {
+                sortKey = 'subscription_ends_at';
+                sortDir = 'asc';
+            } else if (sortDir === 'asc') {
+                sortDir = 'desc';
+            } else if (sortDir === 'desc') {
+                sortKey = '';
+                sortDir = '';
+            } else {
+                sortDir = 'asc';
+            }
+            updateSortIcon();
+            fetchAndRender(1);
+        });
+    }
+
+    if (btnSortName) {
+        btnSortName.addEventListener('click', function () {
+            if (sortKey !== 'name') {
+                sortKey = 'name';
+                sortDir = 'asc';
+            } else if (sortDir === 'asc') {
+                sortDir = 'desc';
+            } else if (sortDir === 'desc') {
+                sortKey = '';
+                sortDir = '';
+            } else {
+                sortDir = 'asc';
+            }
+            updateSortIcon();
+            fetchAndRender(1);
+        });
+    }
+
+    syncPlansLabel();
+    updateSortIcon();
+    updatePagerUi();
 });
 </script>
 {% endblock %}

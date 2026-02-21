@@ -3,7 +3,7 @@
 {% block content %}
 <div class="mb-6 flex items-center justify-between">
     <div>
-        <h1 class="text-2xl font-bold text-gray-900">{{ company.name }}</h1>
+        <h1 class="text-2xl font-bold text-gray-900">{{ company_display_name if company_display_name is defined else company.name }}</h1>
         <p class="mt-1 text-sm text-gray-600">Panel de edición y gestión interna de la empresa.</p>
     </div>
     <div class="flex items-center gap-2">
@@ -17,7 +17,7 @@
     <div class="p-5 bg-white rounded-lg shadow lg:col-span-1">
         <h2 class="text-lg font-medium text-gray-900 mb-3">Datos empresa</h2>
         <div class="space-y-2 text-sm">
-            <div><span class="text-gray-500">Nombre:</span> <span class="font-medium text-gray-900">{{ company.name }}</span></div>
+            <div><span class="text-gray-500">Nombre:</span> <span class="font-medium text-gray-900">{{ company_display_name if company_display_name is defined else company.name }}</span></div>
             <div><span class="text-gray-500">Plan:</span> <span class="font-medium text-gray-900">{{ company.plan }}</span></div>
             <div><span class="text-gray-500">Estado:</span> <span class="font-medium text-gray-900">{{ company.status }}</span></div>
         </div>

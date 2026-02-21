@@ -2,10 +2,11 @@ import re
 from datetime import datetime, date
 import secrets
 import string
+from uuid import uuid4
 
 from flask import abort, current_app, flash, redirect, render_template, request, session, url_for, jsonify
 from flask_login import current_user, login_required
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 from app import db
 from app.models import (
@@ -32,6 +33,88 @@ from app.models import (
 )
 
 from app.superadmin import bp
+
+
+def _company_status_label(raw: str) -> str:
+    s = str(raw or '').strip().lower()
+    if s == 'paused':
+        return 'Pausado'
+    return 'Activo'
+
+
+def _fmt_ddmmyyyy(d: date) -> str:
+    try:
+        if not d:
+            return '-'
+        return d.strftime('%d/%m/%Y')
+    except Exception:
+        return '-'
+
+
+def _parse_int(v, fallback: int) -> int:
+    try:
+        return int(v)
+    except Exception:
+        return fallback
+
+
+def _query_companies(*, q: str, plans: list, status: str, sort: str, dirn: str):
+    query = db.session.query(Company)
+
+    term = str(q or '').strip()
+    if term:
+        like = f"%{term.lower()}%"
+        query = query.filter(func.lower(Company.name).like(like))
+
+    plan_list = [str(p or '').strip() for p in (plans or []) if str(p or '').strip()]
+    if plan_list:
+        query = query.filter(Company.plan.in_(plan_list))
+
+    st = str(status or '').strip().lower()
+    if st in ('active', 'paused'):
+        query = query.filter(Company.status == st)
+
+    sort_key = str(sort or '').strip()
+    sort_dir = str(dirn or '').strip().lower()
+    if sort_key == 'name' and sort_dir in ('asc', 'desc'):
+        if sort_dir == 'asc':
+            query = query.order_by(func.lower(Company.name).asc(), Company.id.asc())
+        else:
+            query = query.order_by(func.lower(Company.name).desc(), Company.id.asc())
+        return query
+    if sort_key == 'subscription_ends_at' and sort_dir in ('asc', 'desc'):
+        nulls_last = case((Company.subscription_ends_at.is_(None), 1), else_=0)
+        if sort_dir == 'asc':
+            query = query.order_by(nulls_last.asc(), Company.subscription_ends_at.asc(), Company.id.asc())
+        else:
+            query = query.order_by(nulls_last.asc(), Company.subscription_ends_at.desc(), Company.id.asc())
+        return query
+
+    return query.order_by(Company.created_at.desc())
+
+
+def _company_display_names(company_ids: list[str]) -> dict[str, str]:
+    ids = [str(x or '').strip() for x in (company_ids or []) if str(x or '').strip()]
+    if not ids:
+        return {}
+    try:
+        rows = (
+            db.session.query(BusinessSettings)
+            .filter(BusinessSettings.company_id.in_(ids))
+            .all()
+        )
+        out: dict[str, str] = {}
+        for r in (rows or []):
+            try:
+                cid = str(getattr(r, 'company_id', '') or '').strip()
+                nm = str(getattr(r, 'name', '') or '').strip()
+                if cid and nm:
+                    out[cid] = nm
+            except Exception:
+                continue
+        return out
+    except Exception:
+        return {}
 
 
 MODULE_KEYS = [
@@ -230,8 +313,121 @@ def plan_disable(plan_code: str):
             db.session.rollback()
         except Exception:
             pass
+        flash('No se pudo pausar el plan.', 'error')
+        return redirect(url_for('superadmin.index'))
+    flash('Plan pausado.', 'success')
+    return redirect(url_for('superadmin.index'))
+
+
+@bp.post('/plans/<plan_code>/enable')
+@login_required
+def plan_enable(plan_code: str):
+    _require_zentral_admin()
+    code = _normalize_code(plan_code)
+    if not code:
+        flash('Plan inválido.', 'error')
+        return redirect(url_for('superadmin.index'))
+    row = db.session.get(Plan, code)
+    if not row:
+        flash('Plan inválido.', 'error')
+        return redirect(url_for('superadmin.index'))
+    try:
+        row.active = True
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        flash('No se pudo reactivar el plan.', 'error')
+        return redirect(url_for('superadmin.index'))
+    flash('Plan reactivado.', 'success')
+    return redirect(url_for('superadmin.index'))
+
+
+def _wants_json_response() -> bool:
+    try:
+        accept = request.headers.get('Accept') or ''
+        if 'application/json' in accept:
+            return True
+        xr = request.headers.get('X-Requested-With') or ''
+        if str(xr).lower() == 'xmlhttprequest':
+            return True
+    except Exception:
+        return False
+    return False
+
+
+@bp.post('/plans/<plan_code>/delete')
+@login_required
+def plan_delete(plan_code: str):
+    _require_zentral_admin()
+    code = _normalize_code(plan_code)
+    if not code:
+        if _wants_json_response():
+            return jsonify({'ok': False, 'error': 'invalid_plan'}), 400
+        flash('Plan inválido.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    row = db.session.get(Plan, code)
+    if not row:
+        if _wants_json_response():
+            return jsonify({'ok': False, 'error': 'not_found'}), 404
+        flash('Plan inválido.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    try:
+        q = db.session.query(Company).filter(Company.plan == code)
+        count = int(q.order_by(None).with_entities(func.count()).scalar() or 0)
+        companies = []
+        try:
+            companies = [str(getattr(c, 'name', '') or '').strip() for c in (q.order_by(func.lower(Company.name).asc()).limit(5).all() or [])]
+            companies = [n for n in companies if n]
+        except Exception:
+            companies = []
+        if count > 0:
+            payload = {
+                'ok': False,
+                'error': 'PLAN_IN_USE',
+                'count': count,
+                'companies': companies,
+                'message': 'No se puede eliminar este plan porque está asignado a empresas.'
+            }
+            if _wants_json_response():
+                return jsonify(payload), 409
+            detail = f"No se puede eliminar este plan porque está asignado a {count} empresas."
+            if companies:
+                detail += ' Empresas: ' + ', '.join(companies)
+                if count > len(companies):
+                    detail += ', ...'
+            detail += ' Para eliminarlo, primero cambiá el plan de esas empresas.'
+            flash(detail, 'error')
+            return redirect(url_for('superadmin.index'))
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        if _wants_json_response():
+            return jsonify({'ok': False, 'error': 'internal_error'}), 500
+        flash('No se pudo validar el plan. Revisá los logs del servidor.', 'error')
+        return redirect(url_for('superadmin.index'))
+
+    try:
+        db.session.delete(row)
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        if _wants_json_response():
+            return jsonify({'ok': False, 'error': 'delete_failed'}), 500
         flash('No se pudo eliminar el plan.', 'error')
         return redirect(url_for('superadmin.index'))
+
+    if _wants_json_response():
+        return jsonify({'ok': True, 'deleted': code})
     flash('Plan eliminado.', 'success')
     return redirect(url_for('superadmin.index'))
 
@@ -277,18 +473,124 @@ def _ensure_company_role_exists(company_id: str, raw_role: str) -> str:
 @login_required
 def index():
     _require_zentral_admin()
-    companies = db.session.query(Company).order_by(Company.created_at.desc()).all()
-    plans = []
+    trace_id = uuid4().hex
     try:
-        plans = [p.code for p in (db.session.query(Plan).filter(Plan.active == True).order_by(Plan.code.asc()).all() or [])]
-    except Exception:
+        q = (request.args.get('q') or '').strip()
+        plans_raw = (request.args.get('plans') or '').strip()
+        plans_sel = [p for p in plans_raw.split(',') if p.strip()]
+        status = (request.args.get('status') or '').strip()
+        sort = (request.args.get('sort') or '').strip()
+        dirn = (request.args.get('dir') or '').strip()
+        page = max(1, _parse_int(request.args.get('page'), 1))
+        per_page = min(200, max(5, _parse_int(request.args.get('per_page'), 25)))
+
+        base_q = _query_companies(q=q, plans=plans_sel, status=status, sort=sort, dirn=dirn)
+        total = int(base_q.order_by(None).with_entities(func.count()).scalar() or 0)
+        offset = (page - 1) * per_page
+        companies = base_q.limit(per_page).offset(offset).all()
+
+        try:
+            name_map = _company_display_names([getattr(c, 'id', None) for c in (companies or [])])
+            for c in (companies or []):
+                try:
+                    cid = str(getattr(c, 'id', '') or '').strip()
+                    dn = str(name_map.get(cid, '') or '').strip()
+                    setattr(c, 'display_name', dn or str(getattr(c, 'name', '') or '').strip())
+                except Exception:
+                    pass
+        except Exception:
+            pass
         plans = []
-    plans_rows = []
-    try:
-        plans_rows = (db.session.query(Plan).order_by(Plan.code.asc()).all() or [])
-    except Exception:
+        try:
+            plans = [p.code for p in (db.session.query(Plan).filter(Plan.active == True).order_by(Plan.code.asc()).all() or [])]
+        except Exception:
+            plans = []
         plans_rows = []
-    return render_template('superadmin/index.html', title='Zentral Admin', companies=companies, plans=plans, plans_rows=plans_rows)
+        try:
+            plans_rows = (db.session.query(Plan).order_by(Plan.code.asc()).all() or [])
+        except Exception:
+            plans_rows = []
+        return render_template(
+            'superadmin/index.html',
+            title='Zentral Admin',
+            companies=companies,
+            plans=plans,
+            plans_rows=plans_rows,
+            total=total,
+            page=page,
+            per_page=per_page,
+            q=q,
+            selected_plans=plans_sel,
+            status=status,
+            sort=sort,
+            dir=dirn,
+        )
+    except Exception:
+        try:
+            current_app.logger.exception('Superadmin index failed trace_id=%s', trace_id)
+        except Exception:
+            pass
+        return render_template('errors/http_error.html', title='Error interno', code=500, trace_id=trace_id), 500
+
+
+@bp.get('/api/companies')
+@login_required
+def list_companies_api():
+    _require_zentral_admin()
+    trace_id = uuid4().hex
+    try:
+        q = (request.args.get('q') or '').strip()
+        plans_raw = (request.args.get('plans') or '').strip()
+        plans_sel = [p for p in plans_raw.split(',') if p.strip()]
+        status = (request.args.get('status') or '').strip()
+        sort = (request.args.get('sort') or '').strip()
+        dirn = (request.args.get('dir') or '').strip()
+
+        page = max(1, _parse_int(request.args.get('page'), 1))
+        per_page = min(200, max(5, _parse_int(request.args.get('per_page'), 25)))
+
+        base_q = _query_companies(q=q, plans=plans_sel, status=status, sort=sort, dirn=dirn)
+        total = int(base_q.order_by(None).with_entities(func.count()).scalar() or 0)
+        offset = (page - 1) * per_page
+        rows = base_q.limit(per_page).offset(offset).all()
+
+        name_map = {}
+        try:
+            name_map = _company_display_names([getattr(c, 'id', None) for c in (rows or [])])
+        except Exception:
+            name_map = {}
+
+        items = []
+        for c in (rows or []):
+            sub = getattr(c, 'subscription_ends_at', None)
+            cid = str(getattr(c, 'id', '') or '')
+            display_name = str(name_map.get(cid, '') or '').strip() or str(getattr(c, 'name', '') or '')
+            items.append({
+                'id': str(getattr(c, 'id', '') or ''),
+                'name': display_name,
+                'plan': str(getattr(c, 'plan', '') or ''),
+                'status': str(getattr(c, 'status', '') or ''),
+                'status_label': _company_status_label(getattr(c, 'status', '')),
+                'subscription_ends_at': sub.isoformat() if sub else '',
+                'subscription_ends_at_label': _fmt_ddmmyyyy(sub) if sub else '-',
+                'pause_scheduled_for': (getattr(c, 'pause_scheduled_for', None).isoformat() if getattr(c, 'pause_scheduled_for', None) else ''),
+            })
+
+        pages = int((total + per_page - 1) // per_page) if per_page else 1
+        return jsonify({
+            'ok': True,
+            'items': items,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'pages': pages,
+        })
+    except Exception:
+        try:
+            current_app.logger.exception('Superadmin companies api failed trace_id=%s', trace_id)
+        except Exception:
+            pass
+        return jsonify({'ok': False, 'error': 'internal_error', 'trace_id': trace_id}), 500
 
 
 @bp.get('/companies/<company_id>')
@@ -299,6 +601,14 @@ def company_overview(company_id: str):
     if not c:
         flash('Empresa inválida.', 'error')
         return redirect(url_for('superadmin.index'))
+
+    display_name = str(getattr(c, 'name', '') or '').strip()
+    try:
+        bs = BusinessSettings.get_for_company(str(getattr(c, 'id', '') or '').strip())
+        if bs and str(getattr(bs, 'name', '') or '').strip():
+            display_name = str(getattr(bs, 'name', '') or '').strip()
+    except Exception:
+        pass
 
     try:
         _ensure_default_roles(str(c.id))
@@ -326,8 +636,9 @@ def company_overview(company_id: str):
 
     return render_template(
         'superadmin/company_overview.html',
-        title=f'Editar · {c.name}',
+        title=f'Editar · {display_name}',
         company=c,
+        company_display_name=display_name,
         admin_user=admin_user,
         users=users,
         roles=roles,
@@ -375,6 +686,15 @@ def create_company():
     c = Company(name=name, slug=slug, plan=effective_plan, status='active', notes=notes)
     db.session.add(c)
     db.session.flush()
+
+    try:
+        bs = BusinessSettings.get_for_company(str(c.id))
+        if bs and str(getattr(bs, 'name', '') or '').strip() != str(name or '').strip():
+            bs.name = str(name or '').strip()
+            db.session.add(bs)
+            db.session.flush()
+    except Exception:
+        pass
 
     _ensure_default_roles(str(c.id))
 
@@ -424,6 +744,14 @@ def company_edit(company_id: str):
         flash('Empresa inválida.', 'error')
         return redirect(url_for('superadmin.index'))
 
+    display_name = str(getattr(c, 'name', '') or '').strip()
+    try:
+        bs = BusinessSettings.get_for_company(str(getattr(c, 'id', '') or '').strip())
+        if bs and str(getattr(bs, 'name', '') or '').strip():
+            display_name = str(getattr(bs, 'name', '') or '').strip()
+    except Exception:
+        bs = None
+
     admin_user = None
     try:
         if getattr(c, 'admin_user_id', None):
@@ -452,6 +780,13 @@ def company_edit(company_id: str):
             return redirect(url_for('superadmin.company_edit', company_id=c.id))
 
         c.name = name
+        try:
+            bs = BusinessSettings.get_for_company(str(getattr(c, 'id', '') or '').strip())
+            if bs:
+                bs.name = name
+                db.session.add(bs)
+        except Exception:
+            pass
         c.plan = effective_plan
         try:
             c.notes = notes
@@ -573,8 +908,9 @@ def company_edit(company_id: str):
 
     return render_template(
         'superadmin/company_edit.html',
-        title=f'Editar empresa · {c.name}',
+        title=f'Editar empresa · {display_name}',
         company=c,
+        company_display_name=display_name,
         admin_user=admin_user,
         plans=plans,
         plans_rows=plans_rows,
@@ -809,7 +1145,14 @@ def impersonate_company(company_id: str):
         flash('Empresa inválida.', 'error')
         return redirect(url_for('superadmin.index'))
     session['impersonate_company_id'] = str(c.id)
-    flash(f'Modo soporte activado para {c.name}.', 'success')
+    dn = str(getattr(c, 'name', '') or '').strip()
+    try:
+        bs = BusinessSettings.get_for_company(str(getattr(c, 'id', '') or '').strip())
+        if bs and str(getattr(bs, 'name', '') or '').strip():
+            dn = str(getattr(bs, 'name', '') or '').strip()
+    except Exception:
+        pass
+    flash(f'Modo soporte activado para {dn}.', 'success')
     return redirect(url_for('main.index'))
 
 

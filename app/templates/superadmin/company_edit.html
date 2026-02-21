@@ -16,7 +16,7 @@
     <form method="post" action="{{ url_for('superadmin.company_edit', company_id=company.id) }}" class="space-y-4">
         <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
-            <input name="company_name" class="w-full px-3 py-2 text-sm border rounded-md" value="{{ company.name }}" required>
+            <input name="company_name" class="w-full px-3 py-2 text-sm border rounded-md" value="{{ company_display_name if company_display_name is defined else company.name }}" required>
         </div>
         <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Plan</label>
@@ -103,13 +103,18 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 {% if p.active %}
-                                    <form method="post" action="{{ url_for('superadmin.plan_disable', plan_code=p.code) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar plan" data-confirm-message="Vas a eliminar el plan {{ p.code }}. No se podrá seleccionar para nuevas empresas." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
+                                    <form method="post" action="{{ url_for('superadmin.plan_disable', plan_code=p.code) }}" class="inline" data-confirm="1" data-confirm-title="Pausar plan" data-confirm-message="Vas a pausar el plan {{ p.code }}. No se podrá seleccionar para nuevas empresas." data-confirm-ok="Pausar" data-confirm-cancel="Cancelar">
+                                        <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Pausar</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('superadmin.plan_delete', plan_code=p.code) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar plan" data-confirm-message="¿Eliminar plan '{{ p.code }}'? Esta acción no se puede deshacer." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
                                         <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
                                     </form>
                                 {% else %}
-                                    <form method="post" action="{{ url_for('superadmin.plan_create') }}" class="inline">
-                                        <input type="hidden" name="plan_code" value="{{ p.code }}">
+                                    <form method="post" action="{{ url_for('superadmin.plan_enable', plan_code=p.code) }}" class="inline">
                                         <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200">Reactivar</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('superadmin.plan_delete', plan_code=p.code) }}" class="inline" data-confirm="1" data-confirm-title="Eliminar plan" data-confirm-message="¿Eliminar plan '{{ p.code }}'? Esta acción no se puede deshacer." data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
+                                        <button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-black">Eliminar</button>
                                     </form>
                                 {% endif %}
                             </div>

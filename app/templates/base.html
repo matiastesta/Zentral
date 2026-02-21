@@ -60,7 +60,7 @@
                     {% if current_user.is_authenticated and is_support_mode %}
                     <div class="inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-900 border border-yellow-200">
                         <i class="fas fa-headset mr-2"></i>
-                        Soporte: {{ support_company.name if support_company else '—' }}
+                        Soporte: {{ (business.name if business and business.name else (support_company.name if support_company else '—')) }}
                     </div>
                     <form method="post" action="{{ url_for('superadmin.clear_impersonation') }}" class="inline" data-confirm="1" data-confirm-title="Salir del modo soporte" data-confirm-message="Vas a volver al panel de Superadmin." data-confirm-ok="Salir" data-confirm-cancel="Cancelar">
                         <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md">
