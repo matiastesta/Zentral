@@ -2459,7 +2459,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function apiListProducts() {
-        return fetch('/inventory/api/products?limit=5000&active=1', { credentials: 'same-origin' })
+        return fetch('/inventory/api/products?limit=5000', { credentials: 'same-origin' })
             .then(function (r) {
                 if (!r || !r.ok) return [];
                 return r.json().then(
@@ -5806,12 +5806,26 @@ document.addEventListener('DOMContentLoaded', function () {
                     const err = String(res?.error || '').trim();
                     const msg = (err === 'category_required')
                         ? 'Seleccioná una categoría.'
+                        : (err === 'codigo_interno_active_exists')
+                            ? 'Ya existe un producto activo con ese código interno.'
+                            : (err === 'barcode_active_exists')
+                                ? 'Ya existe un producto activo con ese código de barras.'
+                                : (err === 'already_exists')
+                                    ? 'Ya existe un producto con esos datos.'
+                                    : (err === 'unique_violation')
+                                        ? 'No se pudo guardar: código interno o código de barras duplicado.'
                         : (err === 'method_locked')
                             ? 'La metodología no puede modificarse una vez que el producto tiene movimientos.'
                             : (editingProductId ? 'No se pudo editar el producto.' : 'No se pudo crear el producto.');
                     if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Operación fallida');
                     else alert(msg);
                     return;
+                }
+
+                if (!editingProductId && (res.restored === true || res.reactivated === true)) {
+                    const msg = 'Producto restaurado correctamente.';
+                    if (window.showAlertModal) window.showAlertModal(msg, 'Listo', 'Restauración');
+                    else alert(msg);
                 }
                 const item = res.item;
                 const pid = String(item?.id || editingProductId || '').trim();
