@@ -372,6 +372,9 @@ class Sale(db.Model):
     discount_general_pct = db.Column(db.Float, nullable=False, default=0.0)
     discount_general_amount = db.Column(db.Float, nullable=False, default=0.0)
 
+    general_surcharge_pct = db.Column(db.Float, nullable=False, default=0.0)
+    surcharge_general_amount = db.Column(db.Float, nullable=False, default=0.0)
+
     on_account = db.Column(db.Boolean, nullable=False, default=False)
     paid_amount = db.Column(db.Float, nullable=False, default=0.0)
     due_amount = db.Column(db.Float, nullable=False, default=0.0)

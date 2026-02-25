@@ -4,11 +4,11 @@ from datetime import timedelta
 import json
 from uuid import uuid4
 
-from flask import jsonify, render_template, request
-from flask_login import login_required
+from flask import current_app, flash, jsonify, render_template, request
+from flask_login import current_user, login_required
 
 from app import db
-from app.models import BusinessSettings, Customer, Installment, InstallmentPlan, SystemMeta
+from app.models import BusinessSettings, Customer, Installment, InstallmentPlan, Sale, SystemMeta
 from app.permissions import module_required, module_required_any
 from app.customers import bp
 
@@ -244,7 +244,87 @@ def _installments_enabled(company_id: str) -> bool:
 @module_required('customers')
 def index():
     """Listado básico de clientes (dummy)."""
-    return render_template("customers/list.html", title="Clientes")
+    try:
+        return render_template("customers/list.html", title="Clientes")
+    except Exception:
+        try:
+            try:
+                from flask import g
+
+                company_id = str(getattr(g, 'company_id', '') or '').strip()
+                company_slug = str(getattr(g, 'company_slug', '') or '').strip()
+            except Exception:
+                company_id = ''
+                company_slug = ''
+
+            try:
+                user_id = str(getattr(current_user, 'id', '') or '').strip()
+            except Exception:
+                user_id = ''
+            try:
+                user_email = str(getattr(current_user, 'email', '') or '').strip()
+            except Exception:
+                user_email = ''
+            try:
+                user_role = str(getattr(current_user, 'role', '') or '').strip()
+            except Exception:
+                user_role = ''
+
+            try:
+                args = dict(request.args or {})
+            except Exception:
+                args = {}
+
+            current_app.logger.exception(
+                "Fallo en /customers/index",
+                extra={
+                    'path': str(getattr(request, 'path', '') or ''),
+                    'query_args': args,
+                    'company_id': company_id,
+                    'company_slug': company_slug,
+                    'user_id': user_id,
+                    'user_email': user_email,
+                    'user_role': user_role,
+                },
+            )
+        except Exception:
+            pass
+
+        try:
+            role = str(getattr(current_user, 'role', '') or '').strip().lower()
+            if role in {'admin', 'zentral_admin'}:
+                flash('Error interno al cargar Clientes. Revisá los logs del servidor.', 'error')
+        except Exception:
+            pass
+
+        try:
+            # Degraded mode: avoid blocking navigation with a hard 500.
+            # Attempt to render the customers page *without* Flask context processors,
+            # which are a common source of 500s when tenant/user context is missing.
+            #
+            # NOTE: the customers/list.html page loads data via JS; rendering it is
+            # enough to unblock the user even if some server-side data is broken.
+            tmpl = current_app.jinja_env.get_template('customers/list.html')
+            html = tmpl.render(
+                title='Clientes',
+                # Safe defaults for common global context vars used in base.html
+                now=datetime.utcnow(),
+                business=None,
+                is_support_mode=False,
+                support_company=None,
+                subscription_days_left=None,
+                subscription_badge=None,
+                # Explicit degraded-mode hints (if template ignores them, harmless)
+                customers=[],
+                stats={},
+                error_banner='Se detectó un error cargando datos. Se cargó en modo seguro.',
+            )
+            return html, 200
+        except Exception:
+            try:
+                return render_template('errors/http_error.html', code=500, title='Error interno'), 200
+            except Exception:
+                return 'Error interno', 200
 
 
 @bp.get('/api/crm-config')
@@ -438,6 +518,176 @@ def installments_summary_api():
                 'pending_amount': pending_amount,
             })
     return jsonify({'ok': True, 'enabled': True, 'items': items})
+
+
+@bp.get('/api/customers/<customer_id>/debt-summary')
+@login_required
+@module_required('customers')
+def customer_debt_summary_api(customer_id):
+    cid = str(customer_id or '').strip()
+    company_id = _company_id()
+    if not company_id or not cid:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    row = db.session.query(Customer).filter(Customer.company_id == company_id, Customer.id == cid).first()
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    crm_cfg = None
+    try:
+        crm_cfg = _load_crm_config(company_id)
+    except Exception:
+        crm_cfg = None
+    overdue_days = 30
+    critical_days = 60
+    inst_overdue_days = 7
+    inst_critical_days = 15
+    try:
+        if isinstance(crm_cfg, dict):
+            overdue_days = max(1, int(crm_cfg.get('debt_overdue_days') or overdue_days))
+            critical_days = max(overdue_days, int(crm_cfg.get('debt_critical_days') or critical_days))
+            inst_overdue_days = max(1, int(crm_cfg.get('installments_overdue_days') or inst_overdue_days))
+            inst_critical_days = max(inst_overdue_days + 1, int(crm_cfg.get('installments_critical_days') or inst_critical_days))
+    except Exception:
+        overdue_days = 30
+        critical_days = 60
+        inst_overdue_days = 7
+        inst_critical_days = 15
+
+    today = dt_date.today()
+
+    cc_count = 0
+    cc_overdue_count = 0
+    cc_critical_count = 0
+    cc_total_balance = 0.0
+    cc_overdue_balance = 0.0
+    try:
+        q = (
+            db.session.query(Sale)
+            .filter(Sale.company_id == company_id)
+            .filter(Sale.customer_id == cid)
+            .filter(Sale.sale_type == 'Venta')
+            .filter(Sale.status != 'Reemplazada')
+            .filter(Sale.due_amount > 0)
+        )
+        rows = q.all() or []
+        cc_count = len(rows)
+        for s in rows:
+            due = 0.0
+            try:
+                due = float(getattr(s, 'due_amount', 0.0) or 0.0)
+            except Exception:
+                due = 0.0
+            cc_total_balance += max(0.0, due)
+
+            days = 0
+            try:
+                d = getattr(s, 'sale_date', None)
+                if d:
+                    days = max(0, int((today - d).days))
+            except Exception:
+                days = 0
+            if days >= overdue_days:
+                cc_overdue_count += 1
+                cc_overdue_balance += max(0.0, due)
+                if days >= critical_days:
+                    cc_critical_count += 1
+    except Exception:
+        cc_count = 0
+        cc_overdue_count = 0
+        cc_critical_count = 0
+        cc_total_balance = 0.0
+        cc_overdue_balance = 0.0
+
+    cc_status = 'AL_DIA'
+    if cc_total_balance > 0.00001:
+        cc_status = 'VENCIDA' if cc_overdue_count >= 1 else 'CON_SALDO'
+
+    cuotas_plan_count = 0
+    cuotas_overdue_plan_count = 0
+    cuotas_critical_plan_count = 0
+    cuotas_pending_total = 0.0
+    cuotas_next_due_date = None
+    cuotas_status = 'AL_DIA'
+    if _installments_enabled(company_id):
+        try:
+            rows = (
+                db.session.query(Installment, InstallmentPlan)
+                .join(InstallmentPlan, Installment.plan_id == InstallmentPlan.id)
+                .filter(Installment.company_id == company_id)
+                .filter(InstallmentPlan.company_id == company_id)
+                .filter(InstallmentPlan.customer_id == cid)
+                .filter(db.func.lower(InstallmentPlan.status).in_(['activo', 'active', 'activa']))
+                .filter(db.func.lower(Installment.status) != 'pagada')
+                .all()
+            )
+        except Exception:
+            rows = []
+
+        by_plan = {}
+        for it, plan in (rows or []):
+            pid = int(getattr(plan, 'id', 0) or 0)
+            if pid <= 0:
+                continue
+            entry = by_plan.get(pid)
+            if not entry:
+                entry = {'pending_amount': 0.0, 'oldest_overdue': None, 'next_future': None, 'has_overdue': False}
+                by_plan[pid] = entry
+            dd = getattr(it, 'due_date', None)
+            overdue = bool(dd and dd < today)
+            amt = 0.0
+            try:
+                amt = float(getattr(it, 'amount', 0.0) or 0.0)
+            except Exception:
+                amt = 0.0
+            if amt > 0:
+                entry['pending_amount'] += amt
+                cuotas_pending_total += amt
+            if overdue:
+                entry['has_overdue'] = True
+                if dd and (entry['oldest_overdue'] is None or dd < entry['oldest_overdue']):
+                    entry['oldest_overdue'] = dd
+            if dd and dd >= today and (entry['next_future'] is None or dd < entry['next_future']):
+                entry['next_future'] = dd
+
+        cuotas_plan_count = len(by_plan)
+        for entry in by_plan.values():
+            if entry.get('has_overdue'):
+                cuotas_overdue_plan_count += 1
+                od = entry.get('oldest_overdue')
+                try:
+                    if od is not None:
+                        days = max(0, int((today - od).days))
+                        if days >= inst_critical_days:
+                            cuotas_critical_plan_count += 1
+                except Exception:
+                    pass
+            nd = entry.get('next_future')
+            if nd and (cuotas_next_due_date is None or nd < cuotas_next_due_date):
+                cuotas_next_due_date = nd
+
+        if cuotas_plan_count <= 0 or cuotas_pending_total <= 0.00001:
+            cuotas_status = 'AL_DIA'
+        else:
+            cuotas_status = 'VENCIDO' if cuotas_overdue_plan_count >= 1 else 'CON_PENDIENTE'
+
+    payload = {
+        'ok': True,
+        'customer_id': cid,
+        'cc_count': int(cc_count),
+        'cc_overdue_count': int(cc_overdue_count),
+        'cc_critical_count': int(cc_critical_count),
+        'cc_total_balance': float(cc_total_balance or 0.0),
+        'cc_overdue_balance': float(cc_overdue_balance or 0.0),
+        'cc_status': cc_status,
+        'cuotas_plan_count': int(cuotas_plan_count),
+        'cuotas_overdue_plan_count': int(cuotas_overdue_plan_count),
+        'cuotas_critical_plan_count': int(cuotas_critical_plan_count),
+        'cuotas_pending_total': float(cuotas_pending_total or 0.0),
+        'cuotas_next_due_date': cuotas_next_due_date.isoformat() if cuotas_next_due_date else None,
+        'cuotas_status': cuotas_status,
+    }
+    return jsonify(payload)
 
 
 @bp.get('/api/customers/has_active_installments')

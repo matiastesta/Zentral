@@ -211,7 +211,13 @@
                                 <td class="px-3 py-2"></td>
                             </tr>
                             <tr>
-                                <td class="px-3 py-2 text-gray-800">(+) Cambios (devoluciones)</td>
+                                <td class="px-3 py-2 text-gray-800">(+) Recargos</td>
+                                <td class="px-3 py-2 text-right text-gray-800" id="eerr-row-surcharges">$0,00</td>
+                                <td class="px-3 py-2 text-right text-gray-500" id="eerr-row-surcharges-pct">—</td>
+                                <td class="px-3 py-2"></td>
+                            </tr>
+                            <tr>
+                                <td class="px-3 py-2 text-gray-800">(-) Cambios (devoluciones)</td>
                                 <td class="px-3 py-2 text-right text-gray-800" id="eerr-row-exchanges">$0,00</td>
                                 <td class="px-3 py-2 text-right text-gray-500" id="eerr-row-exchanges-pct">—</td>
                                 <td class="px-3 py-2"></td>
@@ -762,6 +768,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const rowGrossSalesPct = document.getElementById('eerr-row-gross-sales-pct');
     const rowDiscounts = document.getElementById('eerr-row-discounts');
     const rowDiscountsPct = document.getElementById('eerr-row-discounts-pct');
+    const rowSurcharges = document.getElementById('eerr-row-surcharges');
+    const rowSurchargesPct = document.getElementById('eerr-row-surcharges-pct');
     const rowExchanges = document.getElementById('eerr-row-exchanges');
     const rowExchangesPct = document.getElementById('eerr-row-exchanges-pct');
     const rowNetSales = document.getElementById('eerr-row-net-sales');
@@ -2672,8 +2680,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (rowGrossSales) rowGrossSales.textContent = formatMoneyARS(k.sales_gross);
         if (rowDiscounts) rowDiscounts.textContent = formatMoneyARS(-Math.abs(Number(k.discounts || 0)));
-        if (rowExchanges) rowExchanges.textContent = formatMoneyARS(Number(k.exchanges_total || 0));
+        if (rowSurcharges) rowSurcharges.textContent = formatMoneyARS(Math.abs(Number(k.surcharges || 0)));
+        if (rowExchanges) rowExchanges.textContent = formatMoneyARS(-Math.abs(Number(k.exchanges_total || 0)));
         if (rowNetSales) rowNetSales.textContent = formatMoneyARS(k.sales_net);
+
+        const baseForPct = Math.abs(Number(k.sales_net || 0)) > 0 ? Math.abs(Number(k.sales_net || 0)) : Math.abs(Number(k.sales_gross || 0));
+        if (rowSurchargesPct) rowSurchargesPct.textContent = formatPct(baseForPct ? (Math.abs(Number(k.surcharges || 0)) / baseForPct) * 100 : 0);
 
         if (rowCmv) rowCmv.textContent = formatMoneyARS(-Math.abs(Number(k.cmv || 0)));
         if (rowCmvPct) rowCmvPct.textContent = formatPct(Number(k.sales_net) ? (-Math.abs(Number(k.cmv || 0)) / Number(k.sales_net || 1)) * 100 : 0);

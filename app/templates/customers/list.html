@@ -1069,6 +1069,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnSettleTypeCc = document.getElementById('btn-settle-type-cc');
     const btnSettleTypeCuotas = document.getElementById('btn-settle-type-cuotas');
 
+    const settleCcSub = document.getElementById('settle-cc-sub');
+    const settleCcDetails = document.getElementById('settle-cc-details');
+    const settleCcBadge = document.getElementById('settle-cc-badge');
+    const settleCcDisabled = document.getElementById('settle-cc-disabled');
+
+    const settleCuotasSub = document.getElementById('settle-cuotas-sub');
+    const settleCuotasDetails = document.getElementById('settle-cuotas-details');
+    const settleCuotasBadge = document.getElementById('settle-cuotas-badge');
+    const settleCuotasDisabled = document.getElementById('settle-cuotas-disabled');
+
     const modalSettleCuotas = document.getElementById('modal-settle-installments');
     const btnCloseSettleCuotas = document.getElementById('btn-close-settle-cuotas');
     const btnCancelSettleCuotas = document.getElementById('btn-cancel-settle-cuotas');
@@ -3225,10 +3235,103 @@ document.addEventListener('DOMContentLoaded', function () {
         settlePendingCustomerForType = id;
         if (settleTypeSubtitle) settleTypeSubtitle.textContent = safeStr(c.full_name || 'Cliente');
 
-        try {
-            if (btnSettleTypeCc) btnSettleTypeCc.classList.toggle('hidden', !hasCc);
-            if (btnSettleTypeCuotas) btnSettleTypeCuotas.classList.toggle('hidden', !hasCuotas);
-        } catch (e) {}
+        function setCardEnabled(btn, enabled) {
+            if (!btn) return;
+            btn.disabled = !enabled;
+            btn.classList.toggle('opacity-50', !enabled);
+            btn.classList.toggle('cursor-not-allowed', !enabled);
+            btn.classList.toggle('hover:shadow-md', enabled);
+            btn.classList.toggle('hover:border-gray-300', enabled);
+        }
+
+        function renderBadge(el, variant, label) {
+            if (!el) return;
+            const v = safeStr(variant || '').toLowerCase();
+            el.classList.remove('hidden');
+            el.textContent = safeStr(label || '—');
+            el.className = 'text-[11px] px-2 py-0.5 rounded-full border';
+            if (v === 'success') el.className += ' bg-emerald-50 text-emerald-700 border-emerald-100';
+            else if (v === 'warning') el.className += ' bg-amber-50 text-amber-800 border-amber-100';
+            else if (v === 'danger') el.className += ' bg-rose-50 text-rose-700 border-rose-100';
+            else el.className += ' bg-gray-50 text-gray-600 border-gray-200';
+        }
+
+        function resetSummaryUi() {
+            if (settleCcSub) settleCcSub.textContent = '—';
+            if (settleCcDetails) settleCcDetails.textContent = '—';
+            if (settleCcBadge) settleCcBadge.classList.add('hidden');
+            if (settleCcDisabled) settleCcDisabled.classList.add('hidden');
+            if (settleCuotasSub) settleCuotasSub.textContent = '—';
+            if (settleCuotasDetails) settleCuotasDetails.textContent = '—';
+            if (settleCuotasBadge) settleCuotasBadge.classList.add('hidden');
+            if (settleCuotasDisabled) settleCuotasDisabled.classList.add('hidden');
+        }
+
+        resetSummaryUi();
+        setCardEnabled(btnSettleTypeCc, true);
+        setCardEnabled(btnSettleTypeCuotas, true);
+
+        fetch(apiPath('/customers/api/customers/' + encodeURIComponent(id) + '/debt-summary'), { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(function (res) {
+                if (!res || res.ok !== true) throw new Error('bad_response');
+
+                const ccCount = parseInt(res.cc_count || 0, 10) || 0;
+                const ccOver = parseInt(res.cc_overdue_count || 0, 10) || 0;
+                const ccCrit = parseInt(res.cc_critical_count || 0, 10) || 0;
+                const ccTotal = parseFloat(res.cc_total_balance || 0) || 0;
+                const ccOverBal = parseFloat(res.cc_overdue_balance || 0) || 0;
+                const ccStatus = safeStr(res.cc_status || 'AL_DIA').toUpperCase();
+
+                const cuotasCount = parseInt(res.cuotas_plan_count || 0, 10) || 0;
+                const cuotasOver = parseInt(res.cuotas_overdue_plan_count || 0, 10) || 0;
+                const cuotasPend = parseFloat(res.cuotas_pending_total || 0) || 0;
+                const cuotasNext = safeStr(res.cuotas_next_due_date || '').trim();
+                const cuotasStatus = safeStr(res.cuotas_status || 'AL_DIA').toUpperCase();
+
+                const ccSub = ccCount > 0
+                    ? (String(ccCount) + ' cuenta' + (ccCount === 1 ? '' : 's') + ' • ' + (ccCrit > 0 ? (String(ccCrit) + ' vencida crítica') : (String(ccOver) + ' vencida' + (ccOver === 1 ? '' : 's'))))
+                    : 'Sin cuentas abiertas';
+                if (settleCcSub) settleCcSub.textContent = ccSub;
+                if (settleCcDetails) settleCcDetails.textContent = (ccCount > 0) ? ('Saldo total: ' + fmtMoney(ccTotal) + ' • Vencido: ' + fmtMoney(ccOverBal)) : '—';
+
+                const ccEnabled = ccCount > 0;
+                setCardEnabled(btnSettleTypeCc, ccEnabled);
+                if (settleCcDisabled) settleCcDisabled.classList.toggle('hidden', ccEnabled);
+                if (ccEnabled) {
+                    if (ccStatus === 'AL_DIA') renderBadge(settleCcBadge, 'success', 'Al día');
+                    else if (ccStatus === 'CON_SALDO') renderBadge(settleCcBadge, 'warning', 'Con saldo');
+                    else renderBadge(settleCcBadge, 'danger', 'Vencida');
+                }
+
+                const cuotasSub = cuotasCount > 0
+                    ? (String(cuotasCount) + ' plan' + (cuotasCount === 1 ? '' : 'es') + ' • ' + String(cuotasOver) + ' vencido' + (cuotasOver === 1 ? '' : 's'))
+                    : 'Sin planes activos';
+                if (settleCuotasSub) settleCuotasSub.textContent = cuotasSub;
+                const nextDisp = cuotasNext ? ((window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') ? window.formatFechaDisplay(cuotasNext) : cuotasNext) : '—';
+                if (settleCuotasDetails) settleCuotasDetails.textContent = (cuotasCount > 0) ? ('Pendiente total: ' + fmtMoney(cuotasPend) + ' • Próx. venc.: ' + nextDisp) : '—';
+
+                const cuotasEnabled = cuotasCount > 0;
+                setCardEnabled(btnSettleTypeCuotas, cuotasEnabled);
+                if (settleCuotasDisabled) settleCuotasDisabled.classList.toggle('hidden', cuotasEnabled);
+                if (cuotasEnabled) {
+                    if (cuotasStatus === 'AL_DIA') renderBadge(settleCuotasBadge, 'success', 'Al día');
+                    else if (cuotasStatus === 'CON_PENDIENTE') renderBadge(settleCuotasBadge, 'warning', 'Pendiente');
+                    else renderBadge(settleCuotasBadge, 'danger', 'Vencido');
+                }
+            })
+            .catch(function () {
+                const ccEnabled = hasCc;
+                const cuotasEnabled = hasCuotas;
+                if (settleCcSub) settleCcSub.textContent = ccEnabled ? 'Cuenta corriente' : 'Sin cuentas abiertas';
+                if (settleCcDetails) settleCcDetails.textContent = '—';
+                if (settleCuotasSub) settleCuotasSub.textContent = cuotasEnabled ? 'Sistema de cuotas' : 'Sin planes activos';
+                if (settleCuotasDetails) settleCuotasDetails.textContent = '—';
+                setCardEnabled(btnSettleTypeCc, ccEnabled);
+                setCardEnabled(btnSettleTypeCuotas, cuotasEnabled);
+                if (settleCcDisabled) settleCcDisabled.classList.toggle('hidden', ccEnabled);
+                if (settleCuotasDisabled) settleCuotasDisabled.classList.toggle('hidden', cuotasEnabled);
+            });
 
         openModal(modalSettleType);
     }
@@ -4209,11 +4312,13 @@ document.addEventListener('DOMContentLoaded', function () {
         if (btnCloseSettleType) btnCloseSettleType.addEventListener('click', function () { closeModal(modalSettleType); });
         if (btnCancelSettleType) btnCancelSettleType.addEventListener('click', function () { closeModal(modalSettleType); });
         if (btnSettleTypeCc) btnSettleTypeCc.addEventListener('click', function () {
+            if (btnSettleTypeCc.disabled) return;
             const id = settlePendingCustomerForType;
             closeModal(modalSettleType);
             if (id) openSettleCcDebt(id);
         });
         if (btnSettleTypeCuotas) btnSettleTypeCuotas.addEventListener('click', function () {
+            if (btnSettleTypeCuotas.disabled) return;
             const id = settlePendingCustomerForType;
             closeModal(modalSettleType);
             if (id) openSettleCuotas(id);
@@ -4407,6 +4512,36 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             try {
+                if (filterScMenu && !filterScMenu.classList.contains('hidden')) {
+                    if (!filterScMenu.contains(t) && !filterScBtn.contains(t)) setDropdownOpen(filterScMenu, false);
+                }
+            } catch (e) {
+            }
+        });
+    }
+
+    applyCrmLabelsToUi(readCrmConfig());
+    Promise.resolve(refreshCrmCfgFromApi()).then(function () {
+        render();
+    });
+    initSorting();
+    initActions();
+    loadAll();
+
+    // Deep-link desde calendario
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const openId = safeStr(params.get('open_legajo'));
+        if (openId) {
+            const doOpen = function () {
+                openLegajo(openId);
+            };
+            setTimeout(doOpen, 0);
+        }
+    } catch (e) {
+    }
+});
+</script>
                 if (filterScMenu && !filterScMenu.classList.contains('hidden')) {
                     if (!filterScMenu.contains(t) && !filterScBtn.contains(t)) setDropdownOpen(filterScMenu, false);
                 }

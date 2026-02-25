@@ -1,6 +1,85 @@
 {% extends 'base.html' %}
 {% block title %}Ventas{% endblock %}
 {% block content %}
+<style>
+ .cart-horizontal-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+ }
+ .cart-table {
+  width: max-content !important;
+ }
+ .cart-table{
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+ }
+ .cart-table th,
+ .cart-table td{
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+ }
+ .cart-table td.col-name{
+  padding-right: 2px !important;
+  white-space: nowrap;
+  width: 1%;
+ }
+ .cart-table th.col-price,
+ .cart-table td.col-price,
+ .cart-table th.col-subt,
+ .cart-table td.col-subt{
+  width: 70px;
+ }
+ .cart-table th.col-qty,
+ .cart-table td.col-qty,
+ .cart-table th.col-disc,
+ .cart-table td.col-disc{
+  width: 55px;
+ }
+ .cart-table th.col-del,
+ .cart-table td.col-del{
+  width: 18px;
+  text-align: right !important;
+ }
+ .cart-table td .d-flex,
+ .cart-table td .form-group,
+ .cart-table td .input-group{
+  gap: 0 !important;
+  margin: 0 !important;
+  justify-content: flex-start !important;
+ }
+ /* Inputs del carrito: ancho fijo como el recuadro rojo */
+ .cart-table td.col-price input,
+ .cart-table td.col-qty input,
+ .cart-table td.col-disc input,
+ .cart-table td.col-subt input{
+   width: 70px;
+   min-width: 70px;
+   max-width: 70px;
+   box-sizing: border-box;
+   text-align: right;
+ }
+ .cart-table td.col-qty input,
+ .cart-table td.col-disc input{
+  width: 55px;
+  min-width: 55px;
+  max-width: 55px;
+ }
+ .cart-table td.col-price,
+ .cart-table td.col-qty,
+ .cart-table td.col-disc{
+  padding-right: 2px !important;
+ }
+
+ /* Realizar cambio: igualar densidad de filas a Nueva venta */
+ .change-products-table thead tr th,
+ .change-products-table tbody tr td{
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+  line-height: 1.25 !important;
+  vertical-align: middle !important;
+ }
+</style>
 <!-- HOME de Ventas: acciones principales + indicadores + historial -->
 <div id="ventas-home" class="space-y-6">
     <div class="flex items-center justify-between">
@@ -27,6 +106,11 @@
         'can_cash_withdrawal': (current_user.is_authenticated and (current_user.can('can_cash_withdrawal') or current_user.can('cash_withdrawals'))),
         'current_user_id': (current_user.id if current_user.is_authenticated else None),
         'current_user_label': (current_user.display_name or current_user.username or '')
+    }|tojson }}</script>
+
+    <script id="sales-step1-columns-bootstrap" type="application/json">{{ {
+        'business_id': (business.id if business else ''),
+        'current_user_id': (current_user.id if current_user.is_authenticated else None)
     }|tojson }}</script>
 
     <div id="modal-retiro-caja" class="hidden fixed inset-0 z-50" style="z-index: 70;">
@@ -149,7 +233,7 @@
     </div>
 
     <!-- Indicadores rápidos -->
-    <div id="kpi-section-sales" class="grid grid-cols-1 md:grid-cols-4 gap-2 items-stretch">
+    <div id="kpi-section-sales" class="grid grid-cols-1 md:grid-cols-5 gap-2 items-stretch">
         <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center">
             <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-indigo-50 text-indigo-700">
                 <i class="fas fa-cash-register"></i>
@@ -185,6 +269,16 @@
             <div>
                 <p id="kpi-label-promedio" class="text-xs uppercase tracking-wide text-gray-500">Ticket promedio</p>
                 <p id="kpi-ticket-promedio" class="text-lg font-semibold text-gray-900">$0,00</p>
+            </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-white shadow border border-gray-100 flex flex-col items-center justify-center text-center">
+            <div class="h-10 w-10 mb-2 flex items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                <i class="fas fa-plus-circle"></i>
+            </div>
+            <div>
+                <p id="kpi-label-recargos" class="text-xs uppercase tracking-wide text-gray-500">Recargos del día</p>
+                <p id="kpi-recargos-dia" class="text-lg font-semibold text-gray-900">$0,00</p>
             </div>
         </div>
     </div>
@@ -297,6 +391,7 @@
                     <th data-col-key="productos" class="hidden px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Productos</th>
                     <th data-col-key="cantidad_items" class="hidden px-3 py-2 text-right text-gray-600 font-semibold align-bottom">Artículos</th>
                     <th data-col-key="descuento" class="hidden px-3 py-2 text-right text-gray-600 font-semibold align-bottom">Descuento</th>
+                    <th data-col-key="recargo" class="hidden px-3 py-2 text-right text-gray-600 font-semibold align-bottom">Recargo</th>
                     <th data-col-key="regalo" class="hidden px-3 py-2 text-center text-gray-600 font-semibold align-bottom">Regalo</th>
                     <th data-col-key="observaciones" class="hidden px-3 py-2 text-left text-gray-600 font-semibold align-bottom">Observaciones</th>
                     <th data-col-key="margen_bruto" class="hidden px-3 py-2 text-right text-gray-600 font-semibold align-bottom">Margen bruto</th>
@@ -381,6 +476,7 @@
                     <th data-col-key="productos" class="hidden px-3 py-1"></th>
                     <th data-col-key="cantidad_items" class="hidden px-3 py-1"></th>
                     <th data-col-key="descuento" class="hidden px-3 py-1"></th>
+                    <th data-col-key="recargo" class="hidden px-3 py-1"></th>
                     <th data-col-key="regalo" class="hidden px-3 py-1"></th>
                     <th data-col-key="observaciones" class="hidden px-3 py-1"></th>
                     <th data-col-key="margen_bruto" class="hidden px-3 py-1"></th>
@@ -417,12 +513,12 @@
             </div>
 
             <div class="p-5 overflow-y-auto">
-                <div class="text-xs font-semibold text-gray-700">Columnas actuales</div>
+                <div class="text-xs font-semibold text-gray-700">Columnas seleccionadas</div>
                 <div class="mt-2 text-[11px] text-gray-500">Arrastrá para reordenar. Desmarcá para ocultar.</div>
                 <div id="ventas-columns-counter" class="mt-2 text-[11px] text-gray-600"></div>
                 <div id="ventas-columns-current" class="mt-3 space-y-2"></div>
 
-                <div class="mt-6 text-xs font-semibold text-gray-700">Columnas adicionales disponibles</div>
+                <div class="mt-6 text-xs font-semibold text-gray-700">Columnas disponibles</div>
                 <div id="ventas-columns-extra" class="mt-3 space-y-2"></div>
 
                 <div id="ventas-columns-msg" class="mt-4 text-[11px] text-red-700"></div>
@@ -525,7 +621,7 @@
             </div>
         </div>
     </div>
-    <div class="bg-white rounded-xl shadow p-4 space-y-4 text-sm">
+    <div class="rounded-xl p-4 space-y-4 text-sm">
         <!-- Indicador de pasos internos del flujo de cambio -->
         <div class="flex items-center justify-between mb-2">
             <div class="flex gap-1.5 flex-wrap text-[10px]">
@@ -536,7 +632,7 @@
         </div>
 
         <!-- Paso 1: selección de productos del cambio -->
-        <div id="cambio-paso1" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div id="cambio-paso1" class="realizar-cambio-layout grid grid-cols-1 md:grid-cols-3 gap-4">
             <!-- Catálogo para cambio -->
             <div class="md:col-span-2 p-4 bg-white rounded-lg shadow flex flex-col h-full">
                 <div class="mb-3 flex items-center justify-between gap-2">
@@ -559,7 +655,7 @@
                 </div>
 
                 <div id="tabla-productos-cambio-wrap" class="hidden overflow-y-auto" style="max-height: 380px;">
-                    <table class="w-full text-xs">
+                    <table class="change-products-table w-full text-xs">
                         <thead class="bg-gray-50 sticky top-0">
                             <tr>
                                 <th class="px-2 py-2 text-left text-gray-500 font-medium">Producto</th>
@@ -585,23 +681,25 @@
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-[10px] font-semibold uppercase tracking-wide">Cambio</span>
                 </div>
                 <div class="flex-1 overflow-y-auto overflow-x-hidden border border-gray-100 rounded-md mb-3 text-xs">
-                    <table id="tabla-carrito-cambio" class="w-full text-xs">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-2 py-1 text-left text-gray-500">Nombre</th>
-                                <th class="px-2 py-1 text-right text-gray-500">Precio</th>
-                                <th class="px-2 py-1 text-right text-gray-500">Unid.</th>
-                                <th class="px-2 py-1 text-right text-gray-500">Desc %</th>
-                                <th class="px-2 py-1 text-right text-gray-500">Subt.</th>
-                                <th class="px-1 py-1 text-center text-gray-500"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr id="carrito-cambio-empty-row">
-                                <td colspan="6" class="px-2 py-3 text-center text-gray-400 text-[11px]">Agregá aquí los {{ label_products|lower }} involucrados en el cambio. Más adelante se conectará con el stock real.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="cart-horizontal-scroll h-full">
+                        <table id="tabla-carrito-cambio" class="cart-table w-full text-xs">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-2 py-1 text-left text-gray-500">Nombre</th>
+                                    <th class="px-2 py-1 text-right text-gray-500 col-price">Precio</th>
+                                    <th class="px-2 py-1 text-right text-gray-500 col-qty">Unid.</th>
+                                    <th class="px-2 py-1 text-right text-gray-500 col-disc">Desc %</th>
+                                    <th class="px-2 py-1 text-right text-gray-500 col-subt">Subt.</th>
+                                    <th class="px-1 py-1 text-center text-gray-500 col-del"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr id="carrito-cambio-empty-row">
+                                    <td colspan="6" class="px-2 py-3 text-center text-gray-400 text-[11px]">Agregá aquí los {{ label_products|lower }} involucrados en el cambio. Más adelante se conectará con el stock real.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
                 <div class="space-y-1 text-xs">
                     <div class="flex justify-between font-semibold"><span>Total del cambio</span><span id="total-cambio">$0,00</span></div>
@@ -613,7 +711,7 @@
         </div>
 
         <!-- Paso 2: nueva venta con saldo a favor -->
-        <div id="cambio-paso2" class="grid grid-cols-1 md:grid-cols-3 gap-4 hidden">
+        <div id="cambio-paso2" class="realizar-cambio-layout grid grid-cols-1 md:grid-cols-3 gap-4 hidden">
             <!-- Catálogo para nueva venta -->
             <div class="md:col-span-2 p-4 bg-white rounded-lg shadow flex flex-col h-full">
                 <div class="mb-3 flex items-center justify-between gap-2">
@@ -636,7 +734,7 @@
                 </div>
 
                 <div id="tabla-productos-cambio-venta-wrap" class="hidden overflow-y-auto" style="max-height: 380px;">
-                    <table class="w-full text-xs">
+                    <table class="change-products-table w-full text-xs">
                         <thead class="bg-gray-50 sticky top-0">
                             <tr>
                                 <th class="px-2 py-2 text-left text-gray-500 font-medium">Producto</th>
@@ -661,27 +759,50 @@
                     <h2 class="text-sm font-medium text-gray-800">Nueva venta (con saldo a favor)</h2>
                 </div>
                 <div class="flex-1 overflow-y-auto overflow-x-hidden border border-gray-100 rounded-md mb-3 text-xs">
-                    <table id="tabla-carrito-cambio-venta" class="w-full text-xs">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-2 py-1 text-left text-gray-500">Nombre</th>
-                                <th class="px-2 py-1 text-right text-gray-500">Precio</th>
-                                <th class="px-2 py-1 text-right text-gray-500">Unid.</th>
-                                <th class="px-2 py-1 text-right text-gray-500">Desc %</th>
-                                <th class="px-2 py-1 text-right text-gray-500">Subt.</th>
-                                <th class="px-1 py-1 text-center text-gray-500"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr id="carrito-cambio-venta-empty-row">
-                                <td colspan="6" class="px-2 py-3 text-center text-gray-400 text-[11px]">Armá aquí la nueva compra usando el saldo a favor del cambio.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="cart-horizontal-scroll h-full">
+                        <table id="tabla-carrito-cambio-venta" class="cart-table w-full text-xs">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-2 py-1 text-left text-gray-500">Nombre</th>
+                                    <th class="px-2 py-1 text-right text-gray-500 col-price">Precio</th>
+                                    <th class="px-2 py-1 text-right text-gray-500 col-qty">Unid.</th>
+                                    <th class="px-2 py-1 text-right text-gray-500 col-disc">Desc %</th>
+                                    <th class="px-2 py-1 text-right text-gray-500 col-subt">Subt.</th>
+                                    <th class="px-1 py-1 text-center text-gray-500 col-del"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr id="carrito-cambio-venta-empty-row">
+                                    <td colspan="6" class="px-2 py-3 text-center text-gray-400 text-[11px]">Armá aquí la nueva compra usando el saldo a favor del cambio.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="space-y-1 text-xs">
+                <div class="space-y-2 text-xs">
                     <div class="flex justify-between"><span>Saldo a favor por cambio</span><span id="saldo-a-favor" class="font-semibold text-indigo-700">$0,00</span></div>
-                    <div class="flex justify-between"><span>Total nueva compra</span><span id="total-cambio-venta" class="font-semibold text-gray-900">$0,00</span></div>
+                    <div class="flex justify-between font-semibold"><span>Subtotal</span><span id="cambio-venta-subtotal">$0,00</span></div>
+                    <div class="flex justify-between"><span id="cambio-venta-desc-general-label">(-) Descuento general</span><span id="cambio-venta-desc-general-amount" class="text-gray-700">$0,00</span></div>
+                    <div class="flex justify-between items-center gap-2">
+                        <span>Descuento general</span>
+                        <div class="relative">
+                            <input id="cambio-venta-descuento-general" type="number" class="w-20 px-2 py-1 pr-5 border rounded-md text-right" placeholder="" min="0" max="100">
+                            <span class="absolute inset-y-0 right-2 flex items-center text-[11px] text-gray-500 pointer-events-none">%</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between"><span id="cambio-venta-recargo-general-label">(+) Recargo general</span><span id="cambio-venta-recargo-general-amount" class="text-gray-700">$0,00</span></div>
+                    <div class="flex justify-between items-center gap-2">
+                        <span>Recargo general</span>
+                        <div class="relative">
+                            <input id="cambio-venta-recargo-general" type="number" class="w-20 px-2 py-1 pr-5 border rounded-md text-right" placeholder="" min="0" max="200">
+                            <span class="absolute inset-y-0 right-2 flex items-center text-[11px] text-gray-500 pointer-events-none">%</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center gap-2 font-semibold">
+                        <span>Total</span>
+                        <input id="cambio-venta-total-final" type="text" class="w-32 px-2 py-1 border rounded-md text-right" value="$0,00">
+                    </div>
+                    <div class="hidden"><span id="total-cambio-venta">$0,00</span></div>
                     <div class="flex justify-between"><span>Diferencia a abonar</span><span id="diferencia-a-abonar" class="font-semibold text-gray-900">$0,00</span></div>
                 </div>
                 <button id="btn-confirmar-cambio-venta" class="mt-3 inline-flex items-center justify-center w-full px-3 py-2 text-xs font-medium text-white rounded-md" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">
@@ -865,7 +986,12 @@
                     <button id="btn-view-list" type="button" class="px-2.5 py-1 rounded-md border border-gray-200 bg-white text-gray-700 hover:bg-gray-100">Lista</button>
                     <button id="btn-view-grid" type="button" class="px-2.5 py-1 rounded-md border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100">Catálogo</button>
                 </div>
-                <div id="pills-categorias-venta" class="flex flex-wrap gap-2 text-xs"></div>
+                <div class="flex items-center gap-2">
+                    <div id="pills-categorias-venta" class="flex flex-wrap gap-2 text-xs"></div>
+                    <button id="btn-venta-step1-columns" type="button" class="hidden inline-flex items-center justify-center h-8 w-8 rounded-md border border-gray-200 bg-white hover:bg-gray-50" title="Personalizar columnas">
+                        <i class="fas fa-cog text-gray-500"></i>
+                    </button>
+                </div>
             </div>
 
             <!-- Buscador -->
@@ -908,20 +1034,44 @@
             <div id="tabla-productos-wrap" class="hidden overflow-y-auto" style="max-height: 380px;">
                 <table class="w-full text-xs">
                     <thead class="bg-gray-50 sticky top-0">
-                        <tr>
-                            <th class="px-2 py-2 text-left text-gray-500 font-medium">Producto</th>
-                            <th class="px-2 py-2 text-left text-gray-500 font-medium">Categoría</th>
-                            <th class="px-2 py-2 text-right text-gray-500 font-medium">Precio</th>
-                            <th class="px-2 py-2 text-right text-gray-500 font-medium">Stock</th>
-                            <th class="px-2 py-2 text-center text-gray-500 font-medium">Info</th>
-                        </tr>
+                        <tr id="venta-step1-products-head"></tr>
                     </thead>
                     <tbody id="tabla-productos-body" class="divide-y divide-gray-100">
                         <tr>
-                            <td colspan="5" class="px-3 py-4 text-sm text-gray-500">Cargando {{ label_products|lower }} del inventario...</td>
+                            <td colspan="4" class="px-3 py-4 text-sm text-gray-500">Cargando {{ label_products|lower }} del inventario...</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Personalizar columnas (Paso 1 Ventas: Lista) -->
+            <div id="modal-venta-step1-columns" class="fixed inset-0 isolate z-[300] hidden" aria-hidden="true">
+                <div id="backdrop-venta-step1-columns" class="absolute left-0 right-0 bottom-0 bg-black/30" style="top: var(--app-header-height, 4rem);"></div>
+                <div id="venta-step1-columns-drawer" class="absolute right-0 bottom-0 w-full max-w-md bg-white shadow-xl flex flex-col" style="top: var(--app-header-height, 4rem); height: calc(100vh - var(--app-header-height, 4rem));">
+                    <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+                        <div>
+                            <div class="text-sm font-semibold text-gray-900">Personalizar columnas</div>
+                            <div class="text-[12px] text-gray-500">Elegí qué columnas ver y en qué orden.</div>
+                        </div>
+                        <button id="btn-close-venta-step1-columns" type="button" class="h-8 w-8 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white hover:bg-gray-50" title="Cerrar">
+                            <i class="fas fa-times text-gray-500"></i>
+                        </button>
+                    </div>
+
+                    <div class="p-5 overflow-y-auto" style="max-height: calc(100vh - 170px);">
+                        <div class="text-xs font-semibold text-gray-700">Columnas</div>
+                        <div class="mt-1 text-[11px] text-gray-500">Arrastrá para reordenar. Desmarcá para ocultar.</div>
+                        <div id="venta-step1-columns-current" class="mt-3 space-y-2"></div>
+                        <div id="venta-step1-columns-counter" class="mt-2 text-[11px] text-gray-600"></div>
+
+                        <div id="venta-step1-columns-msg" class="mt-3 text-[11px] text-red-700"></div>
+                    </div>
+
+                    <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-between gap-2">
+                        <button id="btn-venta-step1-columns-restore" type="button" class="px-3 py-2 text-xs font-semibold rounded-md border border-gray-200 bg-white hover:bg-gray-50">Restaurar por defecto</button>
+                        <button id="btn-venta-step1-columns-save" type="button" class="px-3 py-2 text-xs font-semibold rounded-md text-white" style="background-color:#16a34a;">Guardar configuración</button>
+                    </div>
+                </div>
             </div>
 
             <input id="scanner-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="absolute -left-[9999px] -top-[9999px] opacity-0 pointer-events-none" aria-hidden="true">
@@ -936,35 +1086,46 @@
                 </div>
             </div>
 
-            <div class="p-4 bg-white rounded-lg shadow flex flex-col h-full">
+            <div id="venta-step1-cart-panel" class="p-4 bg-white rounded-lg shadow flex flex-col h-full">
                 <div class="flex items-center justify-center mb-2">
                     <h2 class="text-sm font-medium text-gray-800">Carrito</h2>
                 </div>
                 <div class="flex-1 overflow-y-auto overflow-x-hidden border border-gray-100 rounded-md mb-3 text-xs">
-                    <table id="tabla-carrito" class="w-full text-xs">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-2 py-1 text-left text-gray-500">Nombre</th>
-                            <th class="px-2 py-1 text-right text-gray-500">Precio</th>
-                            <th class="px-2 py-1 text-right text-gray-500">Unid.</th>
-                            <th class="px-2 py-1 text-right text-gray-500">Desc %</th>
-                            <th class="px-2 py-1 text-right text-gray-500">Subt.</th>
-                            <th class="px-1 py-1 text-center text-gray-500"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr id="carrito-empty-row">
-                            <td colspan="6" class="px-2 py-3 text-center text-gray-400 text-[11px]">Aquí se listarán los {{ label_products|lower }} que vayas seleccionando, junto con los descuentos por ítem. Más adelante lo conectaremos con el inventario real.</td>
-                        </tr>
-                    </tbody>
-                    </table>
+                    <div class="cart-horizontal-scroll h-full">
+                        <table id="tabla-carrito" class="cart-table w-full text-xs">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-2 py-1 text-left text-gray-500">Nombre</th>
+                                <th class="px-2 py-1 text-right text-gray-500">Precio</th>
+                                <th class="px-2 py-1 text-right text-gray-500">Unid.</th>
+                                <th class="px-2 py-1 text-right text-gray-500">Desc %</th>
+                                <th class="px-2 py-1 text-right text-gray-500">Subt.</th>
+                                <th class="px-1 py-1 text-center text-gray-500 col-del"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr id="carrito-empty-row">
+                                <td colspan="6" class="px-2 py-3 text-center text-gray-400 text-[11px]">Aquí se listarán los {{ label_products|lower }} que vayas seleccionando, junto con los descuentos por ítem. Más adelante lo conectaremos con el inventario real.</td>
+                            </tr>
+                        </tbody>
+                        </table>
+                    </div>
                 </div>
                 <div class="space-y-2 text-xs">
-                    <div class="flex justify-between font-semibold"><span>Total estimado</span><span id="total-estimado">$0,00</span></div>
+                    <div class="flex justify-between font-semibold"><span>Subtotal</span><span id="total-estimado">$0,00</span></div>
+                    <div class="flex justify-between"><span id="venta-desc-general-label">(-) Descuento general</span><span id="venta-desc-general-amount" class="text-gray-700">$0,00</span></div>
                     <div class="flex justify-between items-center gap-2">
                         <span>Descuento general</span>
                         <div class="relative">
                             <input id="ticket-descuento-general" type="number" class="w-20 px-2 py-1 pr-5 border rounded-md text-right" placeholder="" min="0" max="100">
+                            <span class="absolute inset-y-0 right-2 flex items-center text-[11px] text-gray-500 pointer-events-none">%</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between"><span id="venta-recargo-general-label">(+) Recargo general</span><span id="venta-recargo-general-amount" class="text-gray-700">$0,00</span></div>
+                    <div class="flex justify-between items-center gap-2">
+                        <span>Recargo general</span>
+                        <div class="relative">
+                            <input id="ticket-recargo-general" type="number" class="w-20 px-2 py-1 pr-5 border rounded-md text-right" placeholder="" min="0" max="200">
                             <span class="absolute inset-y-0 right-2 flex items-center text-[11px] text-gray-500 pointer-events-none">%</span>
                         </div>
                     </div>
@@ -1217,12 +1378,23 @@
             </div>
             <div class="p-4 bg-white rounded-lg border border-gray-100 flex flex-col justify-between text-sm lg:sticky lg:top-24 h-full">
                 <div class="space-y-1 text-xs">
-                    <div class="flex justify-between"><span>Total estimado</span><span id="ticket-descuentos-sidebar" class="font-semibold text-gray-900">$0,00</span></div>
+                    <div class="flex justify-between"><span>Subtotal</span><span id="ticket-descuentos-sidebar" class="font-semibold text-gray-900">$0,00</span></div>
+                    <div class="flex justify-between"><span id="venta-desc-general-label-paso2">(-) Descuento general</span><span id="venta-desc-general-amount-paso2" class="text-gray-700">$0,00</span></div>
                     <div class="flex justify-between items-center gap-2">
                         <span>Descuento general</span>
                         <div class="flex items-center gap-2">
                             <div class="relative">
                                 <input id="ticket-descuento-general-paso2" type="number" class="w-20 px-2 py-1 pr-5 border rounded-md text-right" placeholder="" min="0" max="100">
+                                <span class="absolute inset-y-0 right-2 flex items-center text-[11px] text-gray-500 pointer-events-none">%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between"><span id="venta-recargo-general-label-paso2">(+) Recargo general</span><span id="venta-recargo-general-amount-paso2" class="text-gray-700">$0,00</span></div>
+                    <div class="flex justify-between items-center gap-2">
+                        <span>Recargo general</span>
+                        <div class="flex items-center gap-2">
+                            <div class="relative">
+                                <input id="ticket-recargo-general-paso2" type="number" class="w-20 px-2 py-1 pr-5 border rounded-md text-right" placeholder="" min="0" max="200">
                                 <span class="absolute inset-y-0 right-2 flex items-center text-[11px] text-gray-500 pointer-events-none">%</span>
                             </div>
                         </div>
@@ -1339,6 +1511,85 @@ document.addEventListener('DOMContentLoaded', function() {
         INSTALLMENTS_ENABLED = !!(parsed && parsed.enabled);
     } catch (e) {
         INSTALLMENTS_ENABLED = false;
+    }
+
+    function initVentaStep1ColumnsUi() {
+        try { loadVentaStep1ColumnsConfig(); } catch (e) {}
+        if (btnVentaStep1Columns) {
+            btnVentaStep1Columns.classList.remove('hidden');
+            btnVentaStep1Columns.addEventListener('click', function (e) {
+                try { e.preventDefault(); } catch (ex) {}
+                try { e.stopPropagation(); } catch (ex) {}
+                openVentaStep1ColumnsDrawer();
+            });
+        }
+        if (btnCloseVentaStep1Columns) btnCloseVentaStep1Columns.addEventListener('click', closeVentaStep1ColumnsDrawer);
+        if (backdropVentaStep1Columns) backdropVentaStep1Columns.addEventListener('click', closeVentaStep1ColumnsDrawer);
+        document.addEventListener('keydown', function (e) {
+            if (!modalVentaStep1Columns || modalVentaStep1Columns.classList.contains('hidden')) return;
+            if (e.key === 'Escape') closeVentaStep1ColumnsDrawer();
+        });
+        const maybeReposition = function () {
+            try {
+                if (!modalVentaStep1Columns || modalVentaStep1Columns.classList.contains('hidden')) return;
+                applyVentaStep1ColumnsDrawerPosition();
+            } catch (e) {}
+        };
+        window.addEventListener('resize', maybeReposition);
+        window.addEventListener('scroll', maybeReposition, { passive: true });
+
+        if (btnVentaStep1ColumnsRestore) {
+            btnVentaStep1ColumnsRestore.addEventListener('click', function () {
+                ventaStep1ColumnsConfig = ventaStep1DefaultConfig.map(function (d) {
+                    return { key: d.key, label: d.label, visible: !!d.visible };
+                });
+                renderVentaStep1ColumnsDrawer();
+                rebuildVentaStep1ProductsTableLayout();
+                if (ventaInvData) renderVentaProductsView(ventaInvData);
+            });
+        }
+        if (btnVentaStep1ColumnsSave) {
+            btnVentaStep1ColumnsSave.addEventListener('click', function () {
+                if (ventaStep1ColumnsMsg) ventaStep1ColumnsMsg.textContent = '';
+                const cfg = Array.isArray(ventaStep1ColumnsConfig) ? ventaStep1ColumnsConfig.slice() : [];
+                const ok = saveVentaStep1ColumnsConfig(cfg);
+                if (!ok) {
+                    const msg = 'No se pudo guardar la configuración.';
+                    if (ventaStep1ColumnsMsg) ventaStep1ColumnsMsg.textContent = msg;
+                    if (window.showAlertModal) showAlertModal(msg, 'Error', 'Operación fallida');
+                    return;
+                }
+                ventaStep1ColumnsConfigSaved = cfg.map(function (d) {
+                    return { key: d.key, label: d.label, visible: !!d.visible };
+                });
+                updateVentaStep1ColumnsSaveButtonState();
+                closeVentaStep1ColumnsDrawer();
+                if (window.showAlertModal) showAlertModal('Configuración guardada.', 'Éxito', '');
+                rebuildVentaStep1ProductsTableLayout();
+                if (ventaInvData) renderVentaProductsView(ventaInvData);
+            });
+        }
+    }
+
+    function setCartGeneralSurchargePct(pct) {
+        let v = parseNumeroFlexible(String(pct || '0'));
+        if (!isFinite(v) || v < 0) v = 0;
+        if (v > 200) v = 200;
+        cartGeneralSurchargePct = v;
+        try {
+            const raw = (v > 0) ? formatearPctParaInputNumber200(v) : '';
+            if (inputRecargoGeneral && document.activeElement !== inputRecargoGeneral) inputRecargoGeneral.value = raw;
+            if (inputRecargoGeneralPaso2 && document.activeElement !== inputRecargoGeneralPaso2) inputRecargoGeneralPaso2.value = raw;
+        } catch (e) {
+        }
+    }
+
+    function formatearPctParaInputNumber200(n) {
+        const v = (typeof n === 'number') ? n : (parseFloat(String(n ?? '0').replace(',', '.')) || 0);
+        const x = (!isFinite(v) || v <= 0) ? 0 : Math.min(200, Math.max(0, v));
+        if (!x) return '';
+        const rounded = Math.round(x * 100) / 100;
+        return String(rounded).replace('.', '.');
     }
 
     const TENANT_PREFIX = ((window.location && window.location.pathname || '').match(/^\/c\/[^\/]+/) || [''])[0];
@@ -1612,8 +1863,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const gridProductos = document.getElementById('grid-productos');
     const tablaProductosWrap = document.getElementById('tabla-productos-wrap');
     const tablaProductosBody = document.getElementById('tabla-productos-body');
+    const ventaStep1ProductsHead = document.getElementById('venta-step1-products-head');
     const btnViewGrid = document.getElementById('btn-view-grid');
     const btnViewList = document.getElementById('btn-view-list');
+
+    const btnVentaStep1Columns = document.getElementById('btn-venta-step1-columns');
+    const modalVentaStep1Columns = document.getElementById('modal-venta-step1-columns');
+    const backdropVentaStep1Columns = document.getElementById('backdrop-venta-step1-columns');
+    const ventaStep1ColumnsDrawer = document.getElementById('venta-step1-columns-drawer');
+    const btnCloseVentaStep1Columns = document.getElementById('btn-close-venta-step1-columns');
+    const ventaStep1ColumnsCurrent = document.getElementById('venta-step1-columns-current');
+    const ventaStep1ColumnsMsg = document.getElementById('venta-step1-columns-msg');
+    const btnVentaStep1ColumnsSave = document.getElementById('btn-venta-step1-columns-save');
+    const btnVentaStep1ColumnsRestore = document.getElementById('btn-venta-step1-columns-restore');
+    const ventaStep1ColumnsCounter = document.getElementById('venta-step1-columns-counter');
+    const ventaStep1CartPanel = document.getElementById('venta-step1-cart-panel');
     const tablaProductosCambioWrap = document.getElementById('tabla-productos-cambio-wrap');
     const tablaProductosCambioBody = document.getElementById('tabla-productos-cambio-body');
     const btnViewGridCambio = document.getElementById('btn-view-grid-cambio');
@@ -1693,6 +1957,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const kpiLabelTicketsEl = document.getElementById('kpi-label-tickets');
     const kpiLabelItemsEl = document.getElementById('kpi-label-items');
     const kpiLabelPromedioEl = document.getElementById('kpi-label-promedio');
+    const kpiRecargosDiaEl = document.getElementById('kpi-recargos-dia');
+    const kpiLabelRecargosEl = document.getElementById('kpi-label-recargos');
     // Elementos específicos del flujo de cambio
     let botonesProductoCambio = [];
     const tablaCarritoCambio = document.getElementById('tabla-carrito-cambio');
@@ -1714,6 +1980,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const saldoAFavorEl = document.getElementById('saldo-a-favor');
     const totalCambioVentaEl = document.getElementById('total-cambio-venta');
     const diferenciaAbonarEl = document.getElementById('diferencia-a-abonar');
+    const cambioVentaSubtotalEl = document.getElementById('cambio-venta-subtotal');
+    const cambioVentaDescGeneralAmountEl = document.getElementById('cambio-venta-desc-general-amount');
+    const cambioVentaRecargoGeneralAmountEl = document.getElementById('cambio-venta-recargo-general-amount');
+    const inputCambioVentaDescuentoGeneral = document.getElementById('cambio-venta-descuento-general');
+    const inputCambioVentaRecargoGeneral = document.getElementById('cambio-venta-recargo-general');
+    const inputCambioVentaTotalFinal = document.getElementById('cambio-venta-total-final');
     const btnConfirmarCambioVenta = document.getElementById('btn-confirmar-cambio-venta');
     const resumenSaldoAFavorEl = document.getElementById('resumen-saldo-a-favor');
     const resumenTotalCambioVentaEl = document.getElementById('resumen-total-cambio-venta');
@@ -1779,6 +2051,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { key: 'productos', label: 'Productos', group: 'extra' },
         { key: 'cantidad_items', label: 'Artículos', group: 'extra' },
         { key: 'descuento', label: 'Descuento', group: 'extra' },
+        { key: 'recargo', label: 'Recargo', group: 'extra' },
         { key: 'regalo', label: 'Regalo', group: 'extra' },
         { key: 'margen_bruto', label: 'Margen bruto', group: 'extra' },
         { key: 'cmv', label: 'CMV del ticket', group: 'extra' },
@@ -1790,6 +2063,11 @@ document.addEventListener('DOMContentLoaded', function() {
         { key: 'cliente_clasificacion', label: 'Clasificación', group: 'extra' },
         { key: 'cliente_saldo_cc', label: 'Saldo cuenta corriente', group: 'extra' },
     ];
+
+    const ventasHistoryDefByKey = {};
+    ventasHistoryColumnDefs.forEach(function (d) {
+        ventasHistoryDefByKey[String(d.key || '').trim().toLowerCase()] = d;
+    });
 
     const ventasHistoryLabelByKey = {};
     ventasHistoryColumnDefs.forEach(function (d) {
@@ -1851,37 +2129,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderVentasColumnsDrawer() {
         if (!ventasColumnsCurrent || !ventasColumnsExtra) return;
-        const selected = new Set(ventasHistoryColumns);
-        const defByKey = {};
-        ventasHistoryColumnDefs.forEach(d => { defByKey[d.key] = d; });
-
-        const currentList = ventasHistoryColumnDefs.filter(d => d.group === 'actual');
-        const extraList = ventasHistoryColumnDefs.filter(d => d.group === 'extra');
+        const selectedKeys = Array.isArray(ventasHistoryColumns) ? ventasHistoryColumns.slice() : [];
+        const selected = new Set(selectedKeys);
 
         const makeItem = function (d, isSelected) {
             const checked = isSelected ? 'checked' : '';
-            const drag = '<span class="cursor-grab text-gray-400 px-1" title="Arrastrar"><i class="fas fa-grip-vertical"></i></span>';
+            const drag = '<span class="ventas-col-drag cursor-grab text-gray-400 px-1" title="Arrastrar"><i class="fas fa-grip-vertical"></i></span>';
             return ''
                 + '<div class="ventas-col-item flex items-center justify-between gap-2 p-2 rounded-lg border border-gray-200 bg-white" draggable="true" data-col-key="' + escapeHtml(d.key) + '">' 
                 +   '<label class="flex items-center gap-2 text-sm text-gray-800 select-none">'
                 +     drag
-                +     '<input type="checkbox" class="ventas-col-check" data-col-key="' + escapeHtml(d.key) + '" ' + checked + '>'
+                +     '<input type="checkbox" class="ventas-col-check" draggable="false" data-col-key="' + escapeHtml(d.key) + '" ' + checked + '>'
                 +     '<span class="text-[13px]">' + escapeHtml(d.label) + '</span>'
                 +   '</label>'
                 + '</div>';
         };
 
-        const orderedCurrent = [];
-        ventasHistoryColumns.forEach(k => {
-            const d = defByKey[k];
-            if (d && d.group === 'actual') orderedCurrent.push(d);
-        });
-        currentList.forEach(d => {
-            if (!orderedCurrent.find(x => x.key === d.key)) orderedCurrent.push(d);
-        });
+        const selectedDefs = selectedKeys
+            .map(function (k) { return ventasHistoryDefByKey[String(k || '').trim().toLowerCase()]; })
+            .filter(Boolean);
 
-        ventasColumnsCurrent.innerHTML = orderedCurrent.map(d => makeItem(d, selected.has(d.key))).join('');
-        ventasColumnsExtra.innerHTML = extraList.map(d => makeItem(d, selected.has(d.key))).join('');
+        const availableDefs = ventasHistoryColumnDefs
+            .filter(function (d) { return !selected.has(d.key); });
+
+        ventasColumnsCurrent.innerHTML = selectedDefs.map(function (d) { return makeItem(d, true); }).join('');
+        ventasColumnsExtra.innerHTML = availableDefs.map(function (d) { return makeItem(d, false); }).join('');
 
         if (ventasColumnsCounter) {
             const n = selected.size;
@@ -1935,12 +2207,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let dragKey = '';
         const onDragStart = function (e) {
+            try {
+                const ignore = e && e.target && (e.target.closest('input,button,a,select,textarea') != null);
+                if (ignore) {
+                    try { e.preventDefault(); } catch (ex) {}
+                    return;
+                }
+            } catch (ex) {
+            }
+
             dragKey = String(this.getAttribute('data-col-key') || '').trim();
-            try { e.dataTransfer.setData('text/plain', dragKey); } catch (err) {}
-            this.classList.add('ring-2', 'ring-indigo-200');
+            if (!dragKey) return;
+            try {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', dragKey);
+            } catch (err) {}
+            try {
+                this.classList.add('ring-2', 'ring-indigo-200');
+            } catch (err) {}
         };
         const onDragEnd = function () {
-            this.classList.remove('ring-2', 'ring-indigo-200');
+            try {
+                this.classList.remove('ring-2', 'ring-indigo-200');
+            } catch (err) {}
         };
         const onDragOver = function (e) {
             e.preventDefault();
@@ -1951,16 +2240,43 @@ document.addEventListener('DOMContentLoaded', function() {
             const sourceKey = dragKey || (function(){ try { return String(e.dataTransfer.getData('text/plain') || '').trim(); } catch (err) { return ''; } })();
             if (!sourceKey || !targetKey || sourceKey === targetKey) return;
 
-            const base = ventasHistoryColumns.slice();
-            const hasSource = base.includes(sourceKey);
-            const hasTarget = base.includes(targetKey);
-            if (!hasSource || !hasTarget) return;
+            const sourceKeyNorm = String(sourceKey || '').trim().toLowerCase();
+            const targetKeyNorm = String(targetKey || '').trim().toLowerCase();
 
-            const next = base.filter(k => k !== sourceKey);
-            const idx = next.indexOf(targetKey);
+            const base = ventasHistoryColumns
+                .slice()
+                .map(function (k) { return String(k || '').trim().toLowerCase(); })
+                .filter(Boolean);
+
+            const hasTarget = base.includes(targetKeyNorm);
+            if (!hasTarget) return;
+
+            const isValid = !!ventasHistoryDefByKey[sourceKeyNorm];
+            if (!isValid) return;
+
+            const hasSource = base.includes(sourceKeyNorm);
+            if (!hasSource) {
+                if (base.length >= ventasHistoryMaxColumns) {
+                    if (ventasColumnsMsg) ventasColumnsMsg.textContent = 'Máximo 10 columnas visibles. Desactivá una para agregar otra.';
+                    if (window.showAlertModal) showAlertModal('Máximo 10 columnas visibles. Desactivá una para agregar otra.', 'Atención', 'Límite de columnas');
+                    return;
+                }
+                const idx0 = base.indexOf(targetKeyNorm);
+                if (idx0 < 0) return;
+                const next0 = base.slice();
+                next0.splice(idx0, 0, sourceKeyNorm);
+                ventasHistoryColumns = next0;
+                if (ventasColumnsMsg) ventasColumnsMsg.textContent = '';
+                renderVentasColumnsDrawer();
+                return;
+            }
+
+            const next = base.filter(k => k !== sourceKeyNorm);
+            const idx = next.indexOf(targetKeyNorm);
             if (idx < 0) return;
-            next.splice(idx, 0, sourceKey);
+            next.splice(idx, 0, sourceKeyNorm);
             ventasHistoryColumns = next;
+            if (ventasColumnsMsg) ventasColumnsMsg.textContent = '';
             renderVentasColumnsDrawer();
         };
 
@@ -2085,9 +2401,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const inputDescuentoGeneral = document.getElementById('ticket-descuento-general');
     const inputDescuentoGeneralPaso2 = document.getElementById('ticket-descuento-general-paso2');
+    const inputRecargoGeneral = document.getElementById('ticket-recargo-general');
+    const inputRecargoGeneralPaso2 = document.getElementById('ticket-recargo-general-paso2');
     const inputTicketTotalFinal = document.getElementById('ticket-total-final');
     const ticketTotalSidebar = document.getElementById('ticket-total-sidebar');
     const ticketDescuentosSidebar = document.getElementById('ticket-descuentos-sidebar');
+    const ventaDescGeneralAmountEl = document.getElementById('venta-desc-general-amount');
+    const ventaDescGeneralLabelEl = document.getElementById('venta-desc-general-label');
+    const ventaRecargoGeneralAmountEl = document.getElementById('venta-recargo-general-amount');
+    const ventaRecargoGeneralLabelEl = document.getElementById('venta-recargo-general-label');
+    const ventaDescGeneralAmountPaso2El = document.getElementById('venta-desc-general-amount-paso2');
+    const ventaDescGeneralLabelPaso2El = document.getElementById('venta-desc-general-label-paso2');
+    const ventaRecargoGeneralAmountPaso2El = document.getElementById('venta-recargo-general-amount-paso2');
+    const ventaRecargoGeneralLabelPaso2El = document.getElementById('venta-recargo-general-label-paso2');
     const ccResumenPaso1 = document.getElementById('cc-resumen-paso1');
     const ccResumenPaso2 = document.getElementById('cc-resumen-paso2');
     const cuotasResumenPaso1 = document.getElementById('cuotas-resumen-paso1');
@@ -3578,12 +3904,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function historialTipoLabelFromSale(s) {
-        const tp = String(s?.type || s?.sale_type || 'Venta').trim() || 'Venta';
-        if (tp === 'Cambio') return 'Cambio';
+        const tpRaw = String(s?.type || s?.sale_type || 'Venta').trim();
+        const tp = tpRaw || 'Venta';
+        const tpLow = String(tp).toLowerCase();
+        if (tpLow === 'cambio' || tpLow.includes('cambio')) return 'Cambio';
         if (tp === 'CobroCC' || tp === 'CobroCuota' || tp === 'CobroVenta') return '';
 
-        // Hechos comerciales (Venta)
-        if (tp !== 'Venta') return '';
+        // Hechos comerciales (Venta): tolerar valores históricos (ej: "Venta completa").
+        if (!(tp === 'Venta' || tpLow.includes('venta'))) return '';
         const isInst = !!(s && (s.is_installments === true || s.is_installments === 1 || s.is_installments === '1'));
         if (isInst) return 'Venta SC';
 
@@ -3743,6 +4071,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     const pct = parseFloat(s?.discount_general_pct || 0) || 0;
                     const amt = parseFloat(s?.discount_general_amount || 0) || 0;
                     if (amt) return { html: escapeHtml(formatearMoneda(-Math.abs(amt))), title: '' };
+                    if (pct) return { html: escapeHtml(String(pct) + '%'), title: '' };
+                    return { html: '—', title: '' };
+                } catch (e) {
+                    return { html: '—', title: '' };
+                }
+            }
+        },
+        recargo: {
+            render: function (s) {
+                try {
+                    const pct = parseFloat(s?.general_surcharge_pct || s?.surcharge_general_pct || 0) || 0;
+                    const amt = parseFloat(s?.surcharge_general_amount || 0) || 0;
+                    if (amt) return { html: escapeHtml(formatearMoneda(Math.abs(amt))), title: '' };
                     if (pct) return { html: escapeHtml(String(pct) + '%'), title: '' };
                     return { html: '—', title: '' };
                 } catch (e) {
@@ -4341,7 +4682,10 @@ document.addEventListener('DOMContentLoaded', function() {
             tr.classList.toggle('hidden', !ok);
         });
 
-        initKpisFromSales();
+        try {
+            initKpisFromSales();
+        } catch (e) {
+        }
     }
 
     function initKpisFromSales() {
@@ -4410,6 +4754,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let total = 0;
             let itemsVendidos = 0;
             let tickets = 0;
+            let recargos = 0;
 
             sales.forEach(s => {
                 const st = String(s?.status || '').trim();
@@ -4452,6 +4797,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!isSaleForSalesKpis(s)) return;
 
                 total += (parseFloat(s?.total || '0') || 0);
+                recargos += (parseFloat(s?.surcharge_general_amount || 0) || 0);
                 tickets += 1;
                 const its = Array.isArray(s?.items) ? s.items : [];
                 its.forEach(it => {
@@ -4467,6 +4813,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (kpiTicketsDiaEl) kpiTicketsDiaEl.textContent = String(tickets);
             if (kpiItemsDiaEl) kpiItemsDiaEl.textContent = String(itemsVendidos);
             if (kpiTicketPromedioEl) kpiTicketPromedioEl.textContent = formatearMoneda(ticketProm);
+            if (kpiRecargosDiaEl) kpiRecargosDiaEl.textContent = formatearMoneda(recargos);
 
             const anyEmpFilter = (ventasMultiFilters.employee?.options || []).length > 0 && (ventasMultiFilters.employee?.selected || new Set()).size > 0 && (ventasMultiFilters.employee?.selected || new Set()).size < (ventasMultiFilters.employee?.options || []).length;
             if (anyEmpFilter) {
@@ -4474,16 +4821,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (kpiLabelTicketsEl) kpiLabelTicketsEl.textContent = 'Ventas realizadas por el empleado';
                 if (kpiLabelItemsEl) kpiLabelItemsEl.textContent = 'Artículos vendidos por el empleado';
                 if (kpiLabelPromedioEl) kpiLabelPromedioEl.textContent = 'Ticket promedio del empleado';
+                if (kpiLabelRecargosEl) kpiLabelRecargosEl.textContent = 'Recargos del empleado';
             } else if (r) {
                 if (kpiLabelVentasEl) kpiLabelVentasEl.textContent = 'Ventas del período';
                 if (kpiLabelTicketsEl) kpiLabelTicketsEl.textContent = 'Cantidad de ventas';
                 if (kpiLabelItemsEl) kpiLabelItemsEl.textContent = 'Cantidad de artículos vendidos';
                 if (kpiLabelPromedioEl) kpiLabelPromedioEl.textContent = 'Ticket promedio';
+                if (kpiLabelRecargosEl) kpiLabelRecargosEl.textContent = 'Recargos del período';
             } else {
                 if (kpiLabelVentasEl) kpiLabelVentasEl.textContent = 'Ventas';
                 if (kpiLabelTicketsEl) kpiLabelTicketsEl.textContent = 'Cantidad de movimientos';
                 if (kpiLabelItemsEl) kpiLabelItemsEl.textContent = 'Cantidad de artículos (neta)';
                 if (kpiLabelPromedioEl) kpiLabelPromedioEl.textContent = 'Ticket promedio';
+                if (kpiLabelRecargosEl) kpiLabelRecargosEl.textContent = 'Recargos';
             }
         };
         if (isPromise(res)) return res.then(apply);
@@ -4501,6 +4851,298 @@ document.addEventListener('DOMContentLoaded', function() {
     let ventaViewMode = 'list';
     let ventaSearchQuery = '';
     let ventaInvData = null;
+
+    const ventaStep1AllKeys = ['producto', 'categoria', 'precio', 'stock', 'codigo_interno', 'descripcion', 'proveedor', 'codigo_barras'];
+    const ventaStep1DefaultConfig = [
+        { key: 'producto', label: 'Producto', visible: true },
+        { key: 'categoria', label: 'Categoría', visible: true },
+        { key: 'precio', label: 'Precio', visible: true },
+        { key: 'stock', label: 'Stock', visible: true },
+        { key: 'codigo_interno', label: 'Código interno', visible: false },
+        { key: 'descripcion', label: 'Descripción', visible: false },
+        { key: 'proveedor', label: 'Proveedor', visible: false },
+        { key: 'codigo_barras', label: 'Código de barras', visible: false },
+    ];
+    let ventaStep1ColumnsConfig = ventaStep1DefaultConfig.map(x => ({ key: x.key, label: x.label, visible: !!x.visible }));
+    let ventaStep1ColumnsConfigSaved = ventaStep1ColumnsConfig.map(x => ({ key: x.key, label: x.label, visible: !!x.visible }));
+    const ventaStep1LabelByKey = {};
+    ventaStep1DefaultConfig.forEach(function (d) { ventaStep1LabelByKey[d.key] = d.label; });
+
+    let ventaStep1UserId = null;
+    let ventaStep1BusinessId = '';
+    try {
+        const boot = JSON.parse(document.getElementById('sales-step1-columns-bootstrap')?.textContent || '{}');
+        ventaStep1BusinessId = String(boot?.business_id || '').trim();
+        ventaStep1UserId = boot?.current_user_id ?? null;
+    } catch (e) {}
+
+    function getVentaStep1ColumnsStorageKey() {
+        const bid = ventaStep1BusinessId ? ventaStep1BusinessId : 'default';
+        const uid = (ventaStep1UserId != null) ? String(ventaStep1UserId) : 'anon';
+        return 'venta_step1_product_list_columns::' + bid + '::' + uid;
+    }
+
+    function loadVentaStep1ColumnsConfig() {
+        const key = getVentaStep1ColumnsStorageKey();
+        let rawCfg = null;
+        try {
+            const raw = window.localStorage.getItem(key);
+            if (raw) rawCfg = JSON.parse(raw);
+        } catch (e) {
+            rawCfg = null;
+        }
+
+        const defaultMap = {};
+        ventaStep1DefaultConfig.forEach(d => { defaultMap[d.key] = d; });
+
+        const next = [];
+
+        // Backward compatibility: previous format was an array of visible keys in order.
+        if (Array.isArray(rawCfg) && rawCfg.length && (typeof rawCfg[0] === 'string' || rawCfg.every(x => typeof x === 'string'))) {
+            const visibleOrder = [];
+            rawCfg.forEach(function (k) {
+                const kk = String(k || '').trim().toLowerCase();
+                if (!kk) return;
+                if (!defaultMap[kk]) return;
+                if (visibleOrder.includes(kk)) return;
+                visibleOrder.push(kk);
+            });
+            ventaStep1AllKeys.forEach(function (k) {
+                const vis = visibleOrder.includes(k);
+                const def = defaultMap[k];
+                next.push({ key: k, label: def.label, visible: vis });
+            });
+        } else if (Array.isArray(rawCfg) && rawCfg.length && typeof rawCfg[0] === 'object') {
+            const seen = new Set();
+            rawCfg.forEach(function (it) {
+                const kk = String(it?.key || '').trim().toLowerCase();
+                if (!kk) return;
+                if (!defaultMap[kk]) return;
+                if (seen.has(kk)) return;
+                seen.add(kk);
+                const def = defaultMap[kk];
+                next.push({ key: kk, label: def.label, visible: !!it?.visible });
+            });
+            ventaStep1AllKeys.forEach(function (k) {
+                if (seen.has(k)) return;
+                const def = defaultMap[k];
+                next.push({ key: k, label: def.label, visible: !!def.visible });
+            });
+        } else {
+            ventaStep1DefaultConfig.forEach(function (d) {
+                next.push({ key: d.key, label: d.label, visible: !!d.visible });
+            });
+        }
+
+        // Ensure at least 1 visible
+        const nvis = next.filter(x => !!x.visible).length;
+        if (nvis < 1) {
+            next.forEach(x => { x.visible = true; });
+        }
+
+        ventaStep1ColumnsConfig = next;
+        ventaStep1ColumnsConfigSaved = next.map(x => ({ key: x.key, label: x.label, visible: !!x.visible }));
+        rebuildVentaStep1ProductsTableLayout();
+    }
+
+    function saveVentaStep1ColumnsConfig(cfg) {
+        const key = getVentaStep1ColumnsStorageKey();
+        const arr = Array.isArray(cfg) ? cfg.slice() : [];
+        try {
+            window.localStorage.setItem(key, JSON.stringify(arr));
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function getVentaStep1VisibleColumns() {
+        const raw = Array.isArray(ventaStep1ColumnsConfig) ? ventaStep1ColumnsConfig.slice() : [];
+        const out = [];
+        raw.forEach(function (it) {
+            const key = String(it?.key || '').trim().toLowerCase();
+            if (!key) return;
+            if (ventaStep1AllKeys.indexOf(key) < 0) return;
+            if (!it?.visible) return;
+            if (out.includes(key)) return;
+            out.push(key);
+        });
+        if (!out.length) return ['producto'];
+        return out;
+    }
+
+    function rebuildVentaStep1ProductsTableLayout() {
+        if (!ventaStep1ProductsHead) return;
+        const visible = getVentaStep1VisibleColumns();
+
+        try {
+            while (ventaStep1ProductsHead.firstChild) ventaStep1ProductsHead.removeChild(ventaStep1ProductsHead.firstChild);
+        } catch (e) {}
+
+        visible.forEach(function (k) {
+            const th = document.createElement('th');
+            th.setAttribute('data-col-key', k);
+            let cls = 'px-2 py-2 text-left text-gray-500 font-medium';
+            if (k === 'precio' || k === 'stock') cls = 'px-2 py-2 text-right text-gray-500 font-medium';
+            th.className = cls;
+            th.textContent = ventaStep1LabelByKey[k] || k;
+            ventaStep1ProductsHead.appendChild(th);
+        });
+    }
+
+    function applyVentaStep1ProductsTableColspans() {
+        const visible = getVentaStep1VisibleColumns();
+        const n = visible.length || 1;
+        try {
+            const td = tablaProductosBody?.querySelector('tr td[colspan]');
+            if (td) td.setAttribute('colspan', String(n));
+        } catch (e) {}
+    }
+
+    function applyVentaStep1ColumnsDrawerPosition() {
+        try {
+            if (!modalVentaStep1Columns || modalVentaStep1Columns.classList.contains('hidden')) return;
+            const header = document.querySelector('[data-app-header="1"]')
+                || document.querySelector('header[data-app-header]')
+                || document.querySelector('header');
+            const hh = Math.max(0, Math.floor(header?.offsetHeight || 0));
+            const top = (hh ? (hh + 6) : 70);
+            const bottomPad = 12;
+            if (backdropVentaStep1Columns) backdropVentaStep1Columns.style.top = top + 'px';
+            if (ventaStep1ColumnsDrawer) {
+                ventaStep1ColumnsDrawer.style.top = top + 'px';
+                ventaStep1ColumnsDrawer.style.height = 'calc(100vh - ' + String(top + bottomPad) + 'px)';
+            }
+        } catch (e) {
+        }
+    }
+
+    function openVentaStep1ColumnsDrawer() {
+        if (!modalVentaStep1Columns) return;
+        try {
+            if (ventaStep1CartPanel) ventaStep1CartPanel.classList.add('invisible', 'pointer-events-none');
+        } catch (e) {}
+        modalVentaStep1Columns.classList.remove('hidden');
+        modalVentaStep1Columns.setAttribute('aria-hidden', 'false');
+        applyVentaStep1ColumnsDrawerPosition();
+        try { requestAnimationFrame(applyVentaStep1ColumnsDrawerPosition); } catch (e) {}
+        renderVentaStep1ColumnsDrawer();
+    }
+
+    function closeVentaStep1ColumnsDrawer() {
+        if (!modalVentaStep1Columns) return;
+        modalVentaStep1Columns.classList.add('hidden');
+        modalVentaStep1Columns.setAttribute('aria-hidden', 'true');
+        if (ventaStep1ColumnsMsg) ventaStep1ColumnsMsg.textContent = '';
+        try {
+            if (ventaStep1CartPanel) ventaStep1CartPanel.classList.remove('invisible', 'pointer-events-none');
+        } catch (e) {}
+    }
+
+    function updateVentaStep1ColumnsSaveButtonState() {
+        if (!btnVentaStep1ColumnsSave) return;
+        const cfg = Array.isArray(ventaStep1ColumnsConfig) ? ventaStep1ColumnsConfig.slice() : [];
+        const nvis = cfg.filter(x => !!x?.visible).length;
+        const valid = nvis >= 1;
+        const changed = JSON.stringify(cfg) !== JSON.stringify(ventaStep1ColumnsConfigSaved || []);
+        btnVentaStep1ColumnsSave.disabled = !(valid && changed);
+        btnVentaStep1ColumnsSave.classList.toggle('opacity-60', btnVentaStep1ColumnsSave.disabled);
+        btnVentaStep1ColumnsSave.classList.toggle('cursor-not-allowed', btnVentaStep1ColumnsSave.disabled);
+    }
+
+    function renderVentaStep1ColumnsDrawer() {
+        if (!ventaStep1ColumnsCurrent) return;
+        const cfg = Array.isArray(ventaStep1ColumnsConfig) ? ventaStep1ColumnsConfig.slice() : [];
+
+        const makeItem = function (d) {
+            const checked = d.visible ? 'checked' : '';
+            const drag = '<span class="cursor-grab text-gray-400 px-1" title="Arrastrar"><i class="fas fa-grip-vertical"></i></span>';
+            return ''
+                + '<div class="ventas-col-item flex items-center justify-between gap-2 p-2 rounded-lg border border-gray-200 bg-white" draggable="true" data-col-key="' + escapeHtml(d.key) + '">' 
+                +   '<label class="flex items-center gap-2 text-sm text-gray-800 select-none">'
+                +     drag
+                +     '<input type="checkbox" class="venta-step1-col-check" data-col-key="' + escapeHtml(d.key) + '" ' + checked + '>'
+                +     '<span class="text-[13px]">' + escapeHtml(d.label) + '</span>'
+                +   '</label>'
+                + '</div>';
+        };
+
+        ventaStep1ColumnsCurrent.innerHTML = cfg.map(d => makeItem(d)).join('');
+
+        if (ventaStep1ColumnsCounter) {
+            const n = cfg.filter(x => !!x?.visible).length;
+            ventaStep1ColumnsCounter.textContent = 'Columnas seleccionadas: ' + String(n) + '/8';
+            ventaStep1ColumnsCounter.className = 'mt-2 text-[11px] text-gray-600';
+        }
+
+        updateVentaStep1ColumnsSaveButtonState();
+        bindVentaStep1ColumnsDrawerEvents();
+    }
+
+    function bindVentaStep1ColumnsDrawerEvents() {
+        const onToggle = function (ev) {
+            const el = ev.target;
+            const key = String(el?.getAttribute('data-col-key') || '').trim();
+            if (!key) return;
+            const cfg = Array.isArray(ventaStep1ColumnsConfig) ? ventaStep1ColumnsConfig.slice() : [];
+            const next = cfg.map(function (it) {
+                if (String(it?.key || '').trim() !== key) return it;
+                return { key: it.key, label: it.label, visible: !!el.checked };
+            });
+            const nvis = next.filter(x => !!x?.visible).length;
+            if (nvis < 1) {
+                el.checked = true;
+                if (ventaStep1ColumnsMsg) ventaStep1ColumnsMsg.textContent = 'Debe haber al menos 1 columna visible.';
+                if (window.showAlertModal) showAlertModal('Debe haber al menos 1 columna visible.', 'Atención', 'Validación requerida');
+                return;
+            }
+            ventaStep1ColumnsConfig = next;
+            if (ventaStep1ColumnsMsg) ventaStep1ColumnsMsg.textContent = '';
+            renderVentaStep1ColumnsDrawer();
+        };
+
+        Array.from(modalVentaStep1Columns?.querySelectorAll('.venta-step1-col-check') || []).forEach(chk => {
+            chk.addEventListener('change', onToggle);
+        });
+
+        let dragKey = '';
+        const onDragStart = function (e) {
+            dragKey = String(this.getAttribute('data-col-key') || '').trim();
+            try { e.dataTransfer.setData('text/plain', dragKey); } catch (err) {}
+            this.classList.add('ring-2', 'ring-indigo-200');
+        };
+        const onDragEnd = function () {
+            this.classList.remove('ring-2', 'ring-indigo-200');
+        };
+        const onDragOver = function (e) {
+            e.preventDefault();
+        };
+        const onDrop = function (e) {
+            e.preventDefault();
+            const targetKey = String(this.getAttribute('data-col-key') || '').trim();
+            const sourceKey = dragKey || (function(){ try { return String(e.dataTransfer.getData('text/plain') || '').trim(); } catch (err) { return ''; } })();
+            if (!sourceKey || !targetKey || sourceKey === targetKey) return;
+
+            const base = Array.isArray(ventaStep1ColumnsConfig) ? ventaStep1ColumnsConfig.slice() : [];
+            const srcIdx = base.findIndex(x => String(x?.key || '').trim() === sourceKey);
+            const tgtIdx = base.findIndex(x => String(x?.key || '').trim() === targetKey);
+            if (srcIdx < 0 || tgtIdx < 0) return;
+
+            const moved = base.splice(srcIdx, 1)[0];
+            const newIdx = base.findIndex(x => String(x?.key || '').trim() === targetKey);
+            if (newIdx < 0) return;
+            base.splice(newIdx, 0, moved);
+            ventaStep1ColumnsConfig = base;
+            renderVentaStep1ColumnsDrawer();
+        };
+
+        Array.from(modalVentaStep1Columns?.querySelectorAll('.ventas-col-item[draggable="true"]') || []).forEach(it => {
+            it.addEventListener('dragstart', onDragStart);
+            it.addEventListener('dragend', onDragEnd);
+            it.addEventListener('dragover', onDragOver);
+            it.addEventListener('drop', onDrop);
+        });
+    }
     let cambioViewMode = 'list';
     let cambioSearchQuery = '';
     let cambioInvData = null;
@@ -4738,9 +5380,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 tablaProductosBody.innerHTML = '';
             }
             if (!products.length || !tablaProductosBody) {
-                if (tablaProductosBody) tablaProductosBody.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-sm text-gray-500">No hay productos en inventario.</td></tr>';
+                const ncols = getVentaStep1VisibleColumns().length || 1;
+                if (tablaProductosBody) tablaProductosBody.innerHTML = '<tr><td colspan="' + String(ncols) + '" class="px-3 py-4 text-sm text-gray-500">No hay productos en inventario.</td></tr>';
                 return;
             }
+            rebuildVentaStep1ProductsTableLayout();
             products.forEach(p => {
                 const stock = stockDisponiblePorProducto(lots, p?.id);
                 const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
@@ -4748,7 +5392,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const cat = String(p?.category?.name || p?.category_name || '').trim();
                 const codigoInterno = String(p?.codigo_interno || p?.internal_code || '').trim();
                 const desc = String(p?.description || '').trim();
-                const infoTitle = 'Código interno: ' + (codigoInterno || '—') + (desc ? ('\nDescripción: ' + desc) : '');
+                const proveedor = String(p?.primary_supplier_name || p?.supplier_name || '').trim();
+                const barcode = String(p?.barcode || '').trim();
 
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-indigo-50 cursor-pointer';
@@ -4761,24 +5406,36 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const stockCls = stockClassForProduct(p, stock);
                 const stockLabel = stockLabelForProduct(p, stock);
-                tr.innerHTML = ''
-                    + '<td class="px-2 py-2 text-gray-800">' + String(p?.name || 'Producto') + '</td>'
-                    + '<td class="px-2 py-2 text-gray-500">' + (cat || '—') + '</td>'
-                    + '<td class="px-2 py-2 text-right text-gray-900 font-medium">' + formatearMoneda(displayPrice) + '</td>'
-                    + '<td class="px-2 py-2 text-right ' + stockCls + ' font-medium"' + (p?.stock_ilimitado ? ' title="Stock indeterminado (no se controla ni se descuenta)"' : '') + '>' + stockLabel + '</td>'
-                    + '<td class="px-2 py-2 text-center">'
-                    + '  <button type="button" class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200" data-action="info" title="' + escapeHtml(infoTitle) + '">'
-                    + '    <i class="fas fa-info-circle text-[12px]"></i>'
-                    + '  </button>'
-                    + '</td>';
+                const visible = getVentaStep1VisibleColumns();
+                tr.innerHTML = visible.map(function (k) {
+                    if (k === 'producto') {
+                        return '<td class="px-2 py-2 text-gray-800">' + escapeHtml(String(p?.name || 'Producto')) + '</td>';
+                    }
+                    if (k === 'categoria') {
+                        return '<td class="px-2 py-2 text-gray-500">' + escapeHtml(cat || '—') + '</td>';
+                    }
+                    if (k === 'precio') {
+                        return '<td class="px-2 py-2 text-right text-gray-900 font-medium">' + formatearMoneda(displayPrice) + '</td>';
+                    }
+                    if (k === 'stock') {
+                        return '<td class="px-2 py-2 text-right ' + stockCls + ' font-medium"' + (p?.stock_ilimitado ? ' title="Stock indeterminado (no se controla ni se descuenta)"' : '') + '>' + escapeHtml(stockLabel) + '</td>';
+                    }
+                    if (k === 'codigo_interno') {
+                        return '<td class="px-2 py-2 text-gray-700">' + escapeHtml(codigoInterno || '—') + '</td>';
+                    }
+                    if (k === 'descripcion') {
+                        return '<td class="px-2 py-2 text-gray-500">' + escapeHtml(desc || '—') + '</td>';
+                    }
+                    if (k === 'proveedor') {
+                        return '<td class="px-2 py-2 text-gray-500">' + escapeHtml(proveedor || '—') + '</td>';
+                    }
+                    if (k === 'codigo_barras') {
+                        return '<td class="px-2 py-2 text-gray-700">' + escapeHtml(barcode || '—') + '</td>';
+                    }
+                    return '<td class="px-2 py-2"></td>';
+                }).join('');
 
                 tr.addEventListener('click', function (e) {
-                    const infoBtn = e && e.target ? e.target.closest('button[data-action="info"]') : null;
-                    if (infoBtn) {
-                        try { e.preventDefault(); } catch (ex) {}
-                        try { e.stopPropagation(); } catch (ex) {}
-                        return;
-                    }
                     agregarProductoDesdeEl(tr);
                 });
                 tr.addEventListener('keydown', function (e) {
@@ -4791,6 +5448,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 tablaProductosBody.appendChild(tr);
             });
+
+            applyVentaStep1ProductsTableColspans();
         } else {
             if (tablaProductosWrap) tablaProductosWrap.classList.add('hidden');
             gridProductos.classList.remove('hidden');
@@ -4800,42 +5459,46 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             products.forEach(p => {
-                const stock = stockDisponiblePorProducto(lots, p?.id);
-                const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
-                const displayPrice = price > 0 ? price : 0;
-                const codigoInterno = String(p?.codigo_interno || p?.internal_code || '').trim();
-                const desc = String(p?.description || '').trim();
-                const infoTitle = 'Código interno: ' + (codigoInterno || '—') + (desc ? ('\nDescripción: ' + desc) : '');
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'btn-producto relative flex flex-col items-start p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 text-left text-xs';
-                btn.setAttribute('data-product-id', String(p?.id || ''));
-                btn.setAttribute('data-nombre', String(p?.name || 'Producto'));
-                btn.setAttribute('data-precio', String(displayPrice.toFixed(2)));
-                btn.setAttribute('data-categoria', String(p?.category?.name || p?.category_name || ''));
-                btn.setAttribute('data-codigo-interno', codigoInterno);
-                const stockCls = stockColorClass(stock);
+                try {
+                    const stock = stockDisponiblePorProducto(lots, p?.id);
+                    const price = parseFloat(p?.sale_price || p?.price || 0) || 0;
+                    const displayPrice = price > 0 ? price : 0;
+                    const codigoInterno = String(p?.codigo_interno || p?.internal_code || '').trim();
+                    const desc = String(p?.description || '').trim();
+                    const infoTitle = 'Código interno: ' + (codigoInterno || '—') + (desc ? ('\nDescripción: ' + desc) : '');
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn-producto relative flex flex-col items-start p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 text-left text-xs';
+                    btn.setAttribute('data-product-id', String(p?.id || ''));
+                    btn.setAttribute('data-nombre', String(p?.name || 'Producto'));
+                    btn.setAttribute('data-precio', String(displayPrice.toFixed(2)));
+                    btn.setAttribute('data-categoria', String(p?.category?.name || p?.category_name || ''));
+                    btn.setAttribute('data-codigo-interno', codigoInterno);
+                    const stockCls = stockClassForProduct(p, stock);
+                    const stockLabel = stockLabelForProduct(p, stock);
 
-                const imgUrl = String(p?.image_url || '').trim();
-                const imgSrc = imgUrl || logoUrl;
-                const imgCls = imgUrl ? 'h-full w-full object-cover' : 'h-10';
-                const imgOnErr = "this.onerror=null;this.src='" + logoUrl + "';this.className='h-10';";
-                btn.innerHTML = ''
-                    + '<div class="absolute top-2 right-2">'
-                    + '  <span class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-white/80 border border-gray-200 text-gray-600 hover:bg-white cursor-help" data-action="info" title="' + escapeHtml(infoTitle) + '">'
-                    + '    <i class="fas fa-info-circle text-[12px]"></i>'
-                    + '  </span>'
-                    + '</div>'
-                    + '<div class="w-full mb-2 flex items-center justify-center">'
-                    + '  <div class="h-16 w-16 rounded-md bg-white border border-gray-200 flex items-center justify-center overflow-hidden">'
-                    + '    <img src="' + imgSrc + '" alt="" class="' + imgCls + '" onerror="' + imgOnErr + '">'
-                    + '  </div>'
-                    + '</div>'
-                    + '<div class="font-medium text-gray-800 truncate w-full">' + String(p?.name || 'Producto') + '</div>'
-                    + '<div class="text-[11px] text-gray-500">' + String(p?.category?.name || p?.category_name || '') + '</div>'
-                    + '<div class="mt-1 font-semibold text-sm text-gray-900">' + formatearMoneda(displayPrice) + '</div>'
-                    + '<div class="mt-1 text-[11px] ' + stockCls + '"' + (p?.stock_ilimitado ? ' title="Stock indeterminado (no se controla ni se descuenta)"' : '') + '>Stock: ' + stockLabel + '</div>';
-                gridProductos.appendChild(btn);
+                    const imgUrl = String(p?.image_url || '').trim();
+                    const imgSrc = imgUrl || logoUrl;
+                    const imgCls = imgUrl ? 'h-full w-full object-cover' : 'h-10';
+                    const imgOnErr = "this.onerror=null;this.src='" + logoUrl + "';this.className='h-10';";
+                    btn.innerHTML = ''
+                        + '<div class="absolute top-2 right-2">'
+                        + '  <span class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-white/80 border border-gray-200 text-gray-600 hover:bg-white cursor-help" data-action="info" title="' + escapeHtml(infoTitle) + '">'
+                        + '    <i class="fas fa-info-circle text-[12px]"></i>'
+                        + '  </span>'
+                        + '</div>'
+                        + '<div class="w-full mb-2 flex items-center justify-center">'
+                        + '  <div class="h-16 w-16 rounded-md bg-white border border-gray-200 flex items-center justify-center overflow-hidden">'
+                        + '    <img src="' + imgSrc + '" alt="" class="' + imgCls + '" onerror="' + imgOnErr + '">' 
+                        + '  </div>'
+                        + '</div>'
+                        + '<div class="font-medium text-gray-800 truncate w-full">' + String(p?.name || 'Producto') + '</div>'
+                        + '<div class="text-[11px] text-gray-500">' + String(p?.category?.name || p?.category_name || '') + '</div>'
+                        + '<div class="mt-1 font-semibold text-sm text-gray-900">' + formatearMoneda(displayPrice) + '</div>'
+                        + '<div class="mt-1 text-[11px] ' + stockCls + '"' + (p?.stock_ilimitado ? ' title="Stock indeterminado (no se controla ni se descuenta)"' : '') + '>Stock: ' + stockLabel + '</div>';
+                    gridProductos.appendChild(btn);
+                } catch (e) {
+                }
             });
             bindProductButtons();
         }
@@ -5781,18 +6444,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const productId = String(it?.product_id || it?.productId || '').trim();
         const precio = parseNumeroFlexible(it?.precio ?? it?.unit_price ?? it?.price ?? 0) || 0;
         const cantidad = parseNumeroFlexible(it?.cantidad ?? it?.qty ?? 1) || 0;
-        const descuento = parseNumeroFlexible(it?.descuento ?? it?.discount_pct ?? 0) || 0;
+        let descuento = parseNumeroFlexible(it?.descuento ?? it?.discount_pct ?? 0) || 0;
+        if (!descuento && cartGeneralDiscountPct > 0) descuento = cartGeneralDiscountPct;
         const subtotal = parseNumeroFlexible(it?.subtotal ?? 0) || ((precio * cantidad) * (1 - (Math.max(0, Math.min(100, descuento)) / 100)));
 
         const tr = document.createElement('tr');
         if (productId) tr.setAttribute('data-product-id', productId);
         tr.innerHTML = `
-            <td class="px-1 py-1 text-gray-700 truncate">${escapeHtml(nombre)}</td>
-            <td class="px-1 py-1 text-right text-gray-500"><input type="text" inputmode="decimal" class="input-precio w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
-            <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" step="1" class="input-cantidad w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${String(cantidad)}"></td>
-            <td class="px-1 py-1 text-right text-gray-500"><input type="text" inputmode="decimal" class="input-descuento w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${descuento ? formatearPct(descuento) : ''}"></td>
-            <td class="px-1 py-1 text-right text-gray-900 font-medium"><input type="text" inputmode="decimal" class="input-subtotal w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(subtotal)}"></td>
-            <td class="px-1 py-1 text-center">
+            <td class="px-1 py-1 text-gray-700 truncate col-name">${escapeHtml(nombre)}</td>
+            <td class="px-1 py-1 text-right text-gray-500 col-price"><input type="text" inputmode="decimal" class="input-precio cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
+            <td class="px-1 py-1 text-right text-gray-500 col-qty"><input type="number" min="0" step="1" class="input-cantidad cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${String(cantidad)}"></td>
+            <td class="px-1 py-1 text-right text-gray-500 col-disc"><input type="text" inputmode="decimal" class="input-descuento cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${descuento ? formatearPct(descuento) : ''}"></td>
+            <td class="px-1 py-1 text-right text-gray-900 font-medium col-subt"><input type="text" inputmode="decimal" class="input-subtotal cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(subtotal)}"></td>
+            <td class="px-1 py-1 col-del">
                 <button type="button" class="btn-eliminar-item inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-50 text-red-500 hover:bg-red-100">
                     <i class="fas fa-times text-[10px]"></i>
                 </button>
@@ -5855,6 +6519,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
+                const sp = parseFloat(sale.general_surcharge_pct || sale.surcharge_general_pct || sale.surcharge_pct || 0) || 0;
+                if (inputRecargoGeneral) inputRecargoGeneral.value = formatearPctParaInputNumber200(sp);
+                if (inputRecargoGeneralPaso2) inputRecargoGeneralPaso2.value = inputRecargoGeneral?.value || '';
+                try { setCartGeneralSurchargePct(sp); } catch (e) {}
+            } catch (e) {
+            }
+
+            try {
                 const cid = String(sale.customer_id || '').trim();
                 const cname = String(sale.customer_name || '').trim();
                 if (cid || cname) setSelectedCustomer({ id: cid, name: cname || cid });
@@ -5884,18 +6556,35 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (e) {
         }
         try {
-            // En el HTML actual, el id "ticket-descuentos-sidebar" se usa para mostrar "Total estimado".
-            // Mantenerlo consistente con el subtotal (antes de descuento general).
+            // En el HTML actual, el id "ticket-descuentos-sidebar" se usa para mostrar "Subtotal".
             if (ticketDescuentosSidebar) {
                 const est = parseFloat((t.subtotalConDescItem != null ? t.subtotalConDescItem : t.subtotal) || 0) || 0;
                 ticketDescuentosSidebar.textContent = formatearMoneda(est);
             }
         } catch (e) {
         }
+
+        try {
+            const pct = parseFloat(t.pct || 0) || 0;
+            const descAmt = Math.abs(parseFloat(t.descuento_items || 0) || 0);
+            const label = pct > 0 ? ('(-) Descuento general (' + String(pct) + '%)') : '(-) Descuento general';
+            if (ventaDescGeneralLabelPaso2El) ventaDescGeneralLabelPaso2El.textContent = label;
+            if (ventaDescGeneralAmountPaso2El) ventaDescGeneralAmountPaso2El.textContent = formatearMoneda(-descAmt);
+        } catch (e) {
+        }
+        try {
+            const spct = parseFloat(t.surcharge_pct || 0) || 0;
+            const sam = parseFloat(t.surcharge_amount || 0) || 0;
+            const label = spct > 0 ? ('(+) Recargo general (' + String(spct) + '%)') : '(+) Recargo general';
+            if (ventaRecargoGeneralLabelPaso2El) ventaRecargoGeneralLabelPaso2El.textContent = label;
+            if (ventaRecargoGeneralAmountPaso2El) ventaRecargoGeneralAmountPaso2El.textContent = formatearMoneda(Math.abs(sam));
+        } catch (e) {
+        }
     }
 
     function computeTicketTotals() {
         let subtotalConDescItem = 0;
+        let subtotalSinDesc = 0;
         try {
             const filas = tablaCarrito ? Array.from(tablaCarrito.querySelectorAll('tbody tr')) : [];
             filas.forEach(tr => {
@@ -5914,7 +6603,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!isFinite(descuento) || descuento < 0) descuento = 0;
                 if (descuento > 100) descuento = 100;
 
-                const sub = (precio * cantidad) * (1 - descuento / 100);
+                const base = (precio * cantidad);
+                if (isFinite(base)) subtotalSinDesc += base;
+                const sub = base * (1 - descuento / 100);
                 if (isFinite(sub)) subtotalConDescItem += sub;
 
                 // Mantener subtotal consistente si el usuario tocó precio/cantidad/desc
@@ -5926,34 +6617,45 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (e) {
         }
 
-        let pct = 0;
-        try {
-            const raw = String((inputDescuentoGeneralPaso2 && document.activeElement === inputDescuentoGeneralPaso2)
-                ? (inputDescuentoGeneralPaso2.value || '')
-                : (inputDescuentoGeneral?.value || '')
-            ).trim();
-            pct = parseNumeroFlexible(raw || '0');
-            if (!isFinite(pct) || pct < 0) pct = 0;
-            if (pct > 100) pct = 100;
-        } catch (e) {
-            pct = 0;
-        }
-
-        const descGeneral = subtotalConDescItem * (pct / 100);
-        const total = Math.max(0, subtotalConDescItem - descGeneral);
+        // Regla oficial:
+        // - Descuento general se distribuye a ítems (no se aplica como etapa separada).
+        // - Recargo general se aplica sobre el subtotal ya descontado por ítems.
+        const surchargePct = cartGeneralSurchargePct;
+        const surchargeAmount = Math.max(0, subtotalConDescItem) * (Math.max(0, Math.min(200, surchargePct)) / 100);
+        const total = Math.max(0, subtotalConDescItem) + surchargeAmount;
 
         try {
             window.ticketTotals = {
                 subtotal: subtotalConDescItem,
-                descuento: descGeneral,
+                descuento: 0,
                 total: total,
-                pct: pct,
+                pct: cartGeneralDiscountPct,
+                surcharge_pct: surchargePct,
+                surcharge_amount: surchargeAmount,
+                subtotal_sin_desc: subtotalSinDesc,
+                descuento_items: Math.max(0, subtotalSinDesc - subtotalConDescItem),
             };
         } catch (e) {
         }
 
         try {
             if (totalEstimadoEl) totalEstimadoEl.textContent = formatearMoneda(subtotalConDescItem);
+        } catch (e) {
+        }
+
+        try {
+            const descAmt = Math.max(0, subtotalSinDesc - subtotalConDescItem);
+            const pct = cartGeneralDiscountPct;
+            const label = pct > 0 ? ('(-) Descuento general (' + String(pct) + '%)') : '(-) Descuento general';
+            if (ventaDescGeneralLabelEl) ventaDescGeneralLabelEl.textContent = label;
+            if (ventaDescGeneralAmountEl) ventaDescGeneralAmountEl.textContent = formatearMoneda(-Math.abs(descAmt));
+        } catch (e) {
+        }
+        try {
+            const spct = cartGeneralSurchargePct;
+            const label = spct > 0 ? ('(+) Recargo general (' + String(spct) + '%)') : '(+) Recargo general';
+            if (ventaRecargoGeneralLabelEl) ventaRecargoGeneralLabelEl.textContent = label;
+            if (ventaRecargoGeneralAmountEl) ventaRecargoGeneralAmountEl.textContent = formatearMoneda(Math.abs(surchargeAmount));
         } catch (e) {
         }
         try {
@@ -5970,12 +6672,59 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (e) {
         }
 
+        try {
+            if (inputRecargoGeneralPaso2 && document.activeElement !== inputRecargoGeneralPaso2) {
+                inputRecargoGeneralPaso2.value = inputRecargoGeneral?.value || '';
+            }
+        } catch (e) {
+        }
+
         return {
             subtotalConDescItem,
-            pct,
-            descGeneral,
+            pct: cartGeneralDiscountPct,
+            descGeneral: 0,
+            surchargePct: cartGeneralSurchargePct,
+            surchargeAmount,
+            subtotalSinDesc,
             total,
         };
+    }
+
+    let cartGeneralDiscountPct = 0;
+    let cartGeneralSurchargePct = 0;
+
+    function setCartGeneralDiscountPct(pct) {
+        let v = parseNumeroFlexible(String(pct || '0'));
+        if (!isFinite(v) || v < 0) v = 0;
+        if (v > 100) v = 100;
+        cartGeneralDiscountPct = v;
+        try {
+            const raw = (v > 0) ? formatearPctParaInputNumber(v) : '';
+            if (inputDescuentoGeneral && document.activeElement !== inputDescuentoGeneral) inputDescuentoGeneral.value = raw;
+            if (inputDescuentoGeneralPaso2 && document.activeElement !== inputDescuentoGeneralPaso2) inputDescuentoGeneralPaso2.value = raw;
+        } catch (e) {
+        }
+    }
+
+    function applyGeneralDiscountToAllCartItems(pct) {
+        if (!tablaCarrito) {
+            setCartGeneralDiscountPct(pct);
+            return;
+        }
+        const rows = Array.from(tablaCarrito.querySelectorAll('tbody tr')).filter(tr => tr && tr.id !== 'carrito-empty-row');
+        if (!rows.length) {
+            setCartGeneralDiscountPct(pct);
+            computeTicketTotals();
+            return;
+        }
+        setCartGeneralDiscountPct(pct);
+        rows.forEach(tr => {
+            const inputDesc = tr.querySelector('.input-descuento');
+            if (!inputDesc) return;
+            inputDesc.value = (cartGeneralDiscountPct > 0) ? formatearPct(cartGeneralDiscountPct) : '';
+            recalcularFila(tr, 'otros');
+        });
+        computeTicketTotals();
     }
 
     // --- Carrito de cambio ---
@@ -6028,7 +6777,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Carrito de nueva venta con saldo a favor ---
     function actualizarTotalCambioVenta() {
         if (!tablaCarritoCambioVenta || !totalCambioVentaEl || !diferenciaAbonarEl) return;
-        let total = 0;
+        let subtotal = 0;
         const tbody = tablaCarritoCambioVenta.querySelector('tbody');
         if (!tbody) return;
         const filas = tbody.querySelectorAll('tr');
@@ -6038,20 +6787,31 @@ document.addEventListener('DOMContentLoaded', function() {
             hayItems = true;
             const inputSubtotal = tr.querySelector('.input-subtotal-cambio-venta');
             if (!inputSubtotal) return;
-            const subtotal = parseNumeroFlexible(inputSubtotal.value || '0');
-            if (isFinite(subtotal)) total += subtotal;
+            const subtotalFila = parseNumeroFlexible(inputSubtotal.value || '0');
+            if (isFinite(subtotalFila)) subtotal += subtotalFila;
         });
         const emptyRow = tbody.querySelector('#carrito-cambio-venta-empty-row');
         if (emptyRow) {
             if (hayItems) emptyRow.remove();
             else emptyRow.classList.remove('hidden');
         }
-        totalCambioVentaEl.textContent = formatearMoneda(total);
+        const descPct = Math.max(0, Math.min(100, parseNumeroFlexible(inputCambioVentaDescuentoGeneral?.value || '0') || 0));
+        const recPct = Math.max(0, Math.min(200, parseNumeroFlexible(inputCambioVentaRecargoGeneral?.value || '0') || 0));
+        const descAmount = subtotal * (descPct / 100);
+        const recAmount = subtotal * (recPct / 100);
+        const totalFinal = Math.max(0, subtotal - descAmount + recAmount);
+
+        try { if (cambioVentaSubtotalEl) cambioVentaSubtotalEl.textContent = formatearMoneda(subtotal); } catch (e) {}
+        try { if (cambioVentaDescGeneralAmountEl) cambioVentaDescGeneralAmountEl.textContent = formatearMoneda(descAmount); } catch (e) {}
+        try { if (cambioVentaRecargoGeneralAmountEl) cambioVentaRecargoGeneralAmountEl.textContent = formatearMoneda(recAmount); } catch (e) {}
+        try { if (inputCambioVentaTotalFinal) inputCambioVentaTotalFinal.value = formatearMoneda(totalFinal); } catch (e) {}
+
+        totalCambioVentaEl.textContent = formatearMoneda(totalFinal);
 
         // Calcular diferencia a abonar usando el saldo a favor
         let diferencia = 0;
-        if (total > saldoAFavor) {
-            diferencia = total - saldoAFavor;
+        if (totalFinal > saldoAFavor) {
+            diferencia = totalFinal - saldoAFavor;
         }
         diferenciaAbonarEl.textContent = formatearMoneda(diferencia);
 
@@ -6064,6 +6824,48 @@ document.addEventListener('DOMContentLoaded', function() {
             renderCambioTicketCartSummary();
         } catch (e) {
         }
+    }
+
+    function computeCambioVentaGeneralTotalsFromUi() {
+        let subtotal = 0;
+        try {
+            const t = String(cambioVentaSubtotalEl?.textContent || '').trim();
+            if (t) subtotal = parseNumeroFlexible(t) || 0;
+        } catch (e) {
+            subtotal = 0;
+        }
+        if (!subtotal) {
+            try {
+                const items = getCartItemsCambioVenta();
+                subtotal = items.reduce((acc, it) => acc + (parseFloat(it.subtotal || 0) || 0), 0);
+            } catch (e) {
+                subtotal = 0;
+            }
+        }
+        const discount_general_pct = Math.max(0, Math.min(100, parseNumeroFlexible(inputCambioVentaDescuentoGeneral?.value || '0') || 0));
+        const surcharge_general_pct = Math.max(0, Math.min(200, parseNumeroFlexible(inputCambioVentaRecargoGeneral?.value || '0') || 0));
+        const discount_general_amount = subtotal * (discount_general_pct / 100);
+        const surcharge_general_amount = subtotal * (surcharge_general_pct / 100);
+        const total_nueva_venta = Math.max(0, subtotal - discount_general_amount + surcharge_general_amount);
+        return {
+            subtotal_nueva_venta: subtotal,
+            discount_general_pct,
+            discount_general_amount,
+            surcharge_general_pct,
+            surcharge_general_amount,
+            total_nueva_venta,
+        };
+    }
+
+    if (inputCambioVentaDescuentoGeneral) {
+        inputCambioVentaDescuentoGeneral.addEventListener('input', function () {
+            actualizarTotalCambioVenta();
+        });
+    }
+    if (inputCambioVentaRecargoGeneral) {
+        inputCambioVentaRecargoGeneral.addEventListener('input', function () {
+            actualizarTotalCambioVenta();
+        });
     }
 
     function recalcularFila(tr, origen) {
@@ -6277,10 +7079,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let precio = parseNumeroFlexible(precioStr);
         const cantidad = 1;
-        const descuento = 0;
-        const subtotal = precio * cantidad;
+        const descuento = cartGeneralDiscountPct > 0 ? cartGeneralDiscountPct : 0;
+        const subtotal = (precio * cantidad) * (1 - (Math.max(0, Math.min(100, descuento)) / 100));
 
-        const descuentoValue = '';
+        const descuentoValue = descuento ? formatearPct(descuento) : '';
 
         const productId = (meta && meta.productId) ? String(meta.productId).trim() : '';
 
@@ -6315,12 +7117,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const tr = document.createElement('tr');
         if (productId) tr.setAttribute('data-product-id', productId);
         tr.innerHTML = `
-            <td class="px-1 py-1 text-gray-700 truncate">${nombre}</td>
-            <td class="px-1 py-1 text-right text-gray-500"><input type="text" inputmode="decimal" class="input-precio w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
-            <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" step="1" class="input-cantidad w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${cantidad}"></td>
-            <td class="px-1 py-1 text-right text-gray-500"><input type="text" inputmode="decimal" class="input-descuento w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${descuentoValue}"></td>
-            <td class="px-1 py-1 text-right text-gray-900 font-medium"><input type="text" inputmode="decimal" class="input-subtotal w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(subtotal)}"></td>
-            <td class="px-1 py-1 text-center">
+            <td class="px-1 py-1 text-gray-700 truncate col-name">${nombre}</td>
+            <td class="px-1 py-1 text-right text-gray-500 col-price"><input type="text" inputmode="decimal" class="input-precio cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
+            <td class="px-1 py-1 text-right text-gray-500 col-qty"><input type="number" min="0" step="1" class="input-cantidad cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${cantidad}"></td>
+            <td class="px-1 py-1 text-right text-gray-500 col-disc"><input type="text" inputmode="decimal" class="input-descuento cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${descuentoValue}"></td>
+            <td class="px-1 py-1 text-right text-gray-900 font-medium col-subt"><input type="text" inputmode="decimal" class="input-subtotal cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(subtotal)}"></td>
+            <td class="px-1 py-1 col-del">
                 <button type="button" class="btn-eliminar-item inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-50 text-red-500 hover:bg-red-100">
                     <i class="fas fa-times text-[10px]"></i>
                 </button>
@@ -6412,12 +7214,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const tr = document.createElement('tr');
         if (meta && meta.productId) tr.setAttribute('data-product-id', String(meta.productId));
         tr.innerHTML = `
-            <td class="px-1 py-1 text-gray-700 truncate">${nombre}</td>
-            <td class="px-1 py-1 text-right text-gray-500"><input type="text" inputmode="decimal" class="input-precio-cambio w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
-            <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" step="1" class="input-cantidad-cambio w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${cantidad}"></td>
-            <td class="px-1 py-1 text-right text-gray-500"><input type="text" inputmode="decimal" class="input-descuento-cambio w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearPct(descuento)}"></td>
-            <td class="px-1 py-1 text-right text-gray-900 font-medium"><input type="text" inputmode="decimal" class="input-subtotal-cambio w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(subtotal)}"></td>
-            <td class="px-1 py-1 text-center">
+            <td class="px-1 py-1 text-gray-700 truncate col-name">${nombre}</td>
+            <td class="px-1 py-1 text-right text-gray-500 col-price"><input type="text" inputmode="decimal" class="input-precio-cambio cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
+            <td class="px-1 py-1 text-right text-gray-500 col-qty"><input type="number" min="0" step="1" class="input-cantidad-cambio cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${cantidad}"></td>
+            <td class="px-1 py-1 text-right text-gray-500 col-disc"><input type="text" inputmode="decimal" class="input-descuento-cambio cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearPct(descuento)}"></td>
+            <td class="px-1 py-1 text-right text-gray-900 font-medium col-subt"><input type="text" inputmode="decimal" class="input-subtotal-cambio cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(subtotal)}"></td>
+            <td class="px-1 py-1 col-del">
                 <button type="button" class="btn-eliminar-item-cambio inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-50 text-red-500 hover:bg-red-100">
                     <i class="fas fa-times text-[10px]"></i>
                 </button>
@@ -6507,12 +7309,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const tr = document.createElement('tr');
         if (meta && meta.productId) tr.setAttribute('data-product-id', String(meta.productId));
         tr.innerHTML = `
-            <td class="px-1 py-1 text-gray-700 truncate">${nombre}</td>
-            <td class="px-1 py-1 text-right text-gray-500"><input type="text" inputmode="decimal" class="input-precio-cambio-venta w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
-            <td class="px-1 py-1 text-right text-gray-500"><input type="number" min="0" step="1" class="input-cantidad-cambio-venta w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${cantidad}"></td>
-            <td class="px-1 py-1 text-right text-gray-500"><input type="text" inputmode="decimal" class="input-descuento-cambio-venta w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearPct(descuento)}"></td>
-            <td class="px-1 py-1 text-right text-gray-900 font-medium"><input type="text" inputmode="decimal" class="input-subtotal-cambio-venta w-full px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(subtotal)}"></td>
-            <td class="px-1 py-1 text-center">
+            <td class="px-1 py-1 text-gray-700 truncate col-name">${nombre}</td>
+            <td class="px-1 py-1 text-right text-gray-500 col-price"><input type="text" inputmode="decimal" class="input-precio-cambio-venta cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
+            <td class="px-1 py-1 text-right text-gray-500 col-qty"><input type="number" min="0" step="1" class="input-cantidad-cambio-venta cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${cantidad}"></td>
+            <td class="px-1 py-1 text-right text-gray-500 col-disc"><input type="text" inputmode="decimal" class="input-descuento-cambio-venta cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearPct(descuento)}"></td>
+            <td class="px-1 py-1 text-right text-gray-900 font-medium col-subt"><input type="text" inputmode="decimal" class="input-subtotal-cambio-venta cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(subtotal)}"></td>
+            <td class="px-1 py-1 col-del">
                 <button type="button" class="btn-eliminar-item-cambio-venta inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-50 text-red-500 hover:bg-red-100">
                     <i class="fas fa-times text-[10px]"></i>
                 </button>
@@ -7277,6 +8079,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function resetVentaFlow() {
         clearCartVenta();
         if (inputDescuentoGeneral) inputDescuentoGeneral.value = '';
+        if (inputRecargoGeneral) inputRecargoGeneral.value = '';
+        if (inputRecargoGeneralPaso2) inputRecargoGeneralPaso2.value = '';
+        try { setCartGeneralDiscountPct(0); } catch (e) {}
+        try { setCartGeneralSurchargePct(0); } catch (e) {}
         if (inputClienteBusqueda) inputClienteBusqueda.value = '';
         if (ticketNotas) ticketNotas.value = '';
         if (ticketDiasCambio) ticketDiasCambio.value = '14';
@@ -8050,8 +8856,14 @@ td.num,th.num{text-align:right}
             editCambioVentaTicketId = null;
             editCambioVentaReturnTotal = 0;
             editCambioVentaReturnTicketId = '';
-            setCambioReturnOnlyMode(false);
-            setCambioVentaOnlyMode(false);
+            try {
+                if (typeof setCambioReturnOnlyMode === 'function') setCambioReturnOnlyMode(false);
+            } catch (e) {
+            }
+            try {
+                if (typeof setCambioVentaOnlyMode === 'function') setCambioVentaOnlyMode(false);
+            } catch (e) {
+            }
             showHomeAll();
             setEditState('');
             scrollAElemento(historial || home);
@@ -8240,6 +9052,8 @@ td.num,th.num{text-align:right}
                 total,
                 discount_general_pct: totals.pct,
                 discount_general_amount: totals.descGeneral,
+                surcharge_general_pct: totals.surchargePct,
+                surcharge_general_amount: totals.surchargeAmount,
                 items,
                 customer_id: selectedCustomer ? (selectedCustomer.id || '') : '',
                 customer_name: selectedCustomer ? (selectedCustomer.name || '') : '',
@@ -8312,6 +9126,10 @@ td.num,th.num{text-align:right}
 
                 clearCartVenta();
                 if (inputDescuentoGeneral) inputDescuentoGeneral.value = '';
+                if (inputRecargoGeneral) inputRecargoGeneral.value = '';
+                if (inputRecargoGeneralPaso2) inputRecargoGeneralPaso2.value = '';
+                try { setCartGeneralDiscountPct(0); } catch (e) {}
+                try { setCartGeneralSurchargePct(0); } catch (e) {}
                 if (inputClienteBusqueda) inputClienteBusqueda.value = '';
                 if (ticketNotas) ticketNotas.value = '';
                 selectedCustomer = null;
@@ -8564,6 +9382,7 @@ td.num,th.num{text-align:right}
 
     if (inputDescuentoGeneral) {
         inputDescuentoGeneral.addEventListener('input', function () {
+            try { setCartGeneralDiscountPct(String(inputDescuentoGeneral.value || '')); } catch (e) {}
             computeTicketTotals();
             try {
                 if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
@@ -8571,6 +9390,9 @@ td.num,th.num{text-align:right}
                 }
             } catch (e) {
             }
+        });
+        inputDescuentoGeneral.addEventListener('change', function () {
+            try { applyGeneralDiscountToAllCartItems(String(inputDescuentoGeneral.value || '')); } catch (e) {}
         });
         inputDescuentoGeneral.addEventListener('focus', function () {
             const v = String(inputDescuentoGeneral.value || '').trim();
@@ -8587,6 +9409,7 @@ td.num,th.num{text-align:right}
             if (inputDescuentoGeneralPaso2 && document.activeElement !== inputDescuentoGeneralPaso2) {
                 inputDescuentoGeneralPaso2.value = inputDescuentoGeneral.value;
             }
+            try { applyGeneralDiscountToAllCartItems(String(inputDescuentoGeneral.value || '')); } catch (e) {}
             computeTicketTotals();
             try {
                 if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
@@ -8602,6 +9425,7 @@ td.num,th.num{text-align:right}
             if (inputDescuentoGeneral && document.activeElement !== inputDescuentoGeneral) {
                 inputDescuentoGeneral.value = String(inputDescuentoGeneralPaso2.value || '');
             }
+            try { setCartGeneralDiscountPct(String(inputDescuentoGeneralPaso2.value || '')); } catch (e) {}
             computeTicketTotals();
             try {
                 if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
@@ -8609,6 +9433,9 @@ td.num,th.num{text-align:right}
                 }
             } catch (e) {
             }
+        });
+        inputDescuentoGeneralPaso2.addEventListener('change', function () {
+            try { applyGeneralDiscountToAllCartItems(String(inputDescuentoGeneralPaso2.value || '')); } catch (e) {}
         });
         inputDescuentoGeneralPaso2.addEventListener('focus', function () {
             const v = String(inputDescuentoGeneralPaso2.value || '').trim();
@@ -8623,8 +9450,86 @@ td.num,th.num{text-align:right}
                 inputDescuentoGeneralPaso2.value = formatearPctParaInputNumber(n);
             }
             if (inputDescuentoGeneral && document.activeElement !== inputDescuentoGeneral) {
-                inputDescuentoGeneral.value = inputDescuentoGeneralPaso2.value;
+                inputDescuentoGeneral.value = String(inputDescuentoGeneralPaso2.value || '');
             }
+            try { applyGeneralDiscountToAllCartItems(String(inputDescuentoGeneralPaso2.value || '')); } catch (e) {}
+            computeTicketTotals();
+            try {
+                if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
+                    renderTicketCartSummary();
+                }
+            } catch (e) {
+            }
+        });
+    }
+
+    if (inputRecargoGeneral) {
+        inputRecargoGeneral.addEventListener('input', function () {
+            try { setCartGeneralSurchargePct(String(inputRecargoGeneral.value || '')); } catch (e) {}
+            computeTicketTotals();
+            try {
+                if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
+                    renderTicketCartSummary();
+                }
+            } catch (e) {
+            }
+        });
+        inputRecargoGeneral.addEventListener('focus', function () {
+            const v = String(inputRecargoGeneral.value || '').trim();
+            if (v === '0' || v === '0.0' || v === '0.00') inputRecargoGeneral.value = '';
+        });
+        inputRecargoGeneral.addEventListener('blur', function () {
+            const v = String(inputRecargoGeneral.value || '').trim().replace(',', '.');
+            const n = parseFloat(v || '0') || 0;
+            if (!isFinite(n) || n <= 0) {
+                inputRecargoGeneral.value = '';
+            } else {
+                inputRecargoGeneral.value = formatearPctParaInputNumber200(n);
+            }
+            if (inputRecargoGeneralPaso2 && document.activeElement !== inputRecargoGeneralPaso2) {
+                inputRecargoGeneralPaso2.value = inputRecargoGeneral.value;
+            }
+            try { setCartGeneralSurchargePct(String(inputRecargoGeneral.value || '')); } catch (e) {}
+            computeTicketTotals();
+            try {
+                if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
+                    renderTicketCartSummary();
+                }
+            } catch (e) {
+            }
+        });
+    }
+
+    if (inputRecargoGeneralPaso2) {
+        inputRecargoGeneralPaso2.addEventListener('input', function () {
+            if (inputRecargoGeneral && document.activeElement !== inputRecargoGeneral) {
+                inputRecargoGeneral.value = String(inputRecargoGeneralPaso2.value || '');
+            }
+            try { setCartGeneralSurchargePct(String(inputRecargoGeneralPaso2.value || '')); } catch (e) {}
+            computeTicketTotals();
+            try {
+                if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
+                    renderTicketCartSummary();
+                }
+            } catch (e) {
+            }
+        });
+        inputRecargoGeneralPaso2.addEventListener('focus', function () {
+            const v = String(inputRecargoGeneralPaso2.value || '').trim();
+            if (v === '0' || v === '0.0' || v === '0.00') inputRecargoGeneralPaso2.value = '';
+        });
+        inputRecargoGeneralPaso2.addEventListener('blur', function () {
+            const v = String(inputRecargoGeneralPaso2.value || '').trim().replace(',', '.');
+            const n = parseFloat(v || '0') || 0;
+            if (!isFinite(n) || n <= 0) {
+                inputRecargoGeneralPaso2.value = '';
+            } else {
+                inputRecargoGeneralPaso2.value = formatearPctParaInputNumber200(n);
+            }
+            if (inputRecargoGeneral && document.activeElement !== inputRecargoGeneral) {
+                inputRecargoGeneral.value = String(inputRecargoGeneralPaso2.value || '');
+            }
+            try { setCartGeneralSurchargePct(String(inputRecargoGeneralPaso2.value || '')); } catch (e) {}
             computeTicketTotals();
             try {
                 if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
@@ -8637,19 +9542,14 @@ td.num,th.num{text-align:right}
 
     if (inputTicketTotalFinal) {
         inputTicketTotalFinal.addEventListener('input', function () {
-            const curr = computeTicketTotals();
-            const base = parseFloat(curr?.subtotalConDescItem || 0) || 0;
-            const desired = parseMoneda(inputTicketTotalFinal.value || '0');
-            if (!inputDescuentoGeneral || base <= 0) {
-                if (inputDescuentoGeneral) inputDescuentoGeneral.value = '';
-                return;
-            }
-            let pct = (1 - (desired / base)) * 100;
-            if (!isFinite(pct)) pct = 0;
-            if (pct < 0) pct = 0;
-            if (pct > 100) pct = 100;
-            inputDescuentoGeneral.value = formatearPct(pct);
+            // El total se calcula en base a descuentos por ítem. No recalcular el descuento general desde aquí.
             computeTicketTotals();
+            try {
+                if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
+                    renderTicketCartSummary();
+                }
+            } catch (e) {
+            }
         });
         inputTicketTotalFinal.addEventListener('blur', function () {
             computeTicketTotals();
@@ -8735,6 +9635,8 @@ td.num,th.num{text-align:right}
     initSalesEmployeesSelectors();
     initHistorialVentas();
     initVentasHistoryColumnsUi();
+
+    initVentaStep1ColumnsUi();
 
     // Confirmar productos del cambio (pasar a Paso 2 con saldo a favor)
     if (btnConfirmarCambio && vistaRealizarCambio && cambioPaso1 && cambioPaso2 && saldoAFavorEl) {
@@ -8855,7 +9757,13 @@ td.num,th.num{text-align:right}
                 const pago = getCambioPaymentMethod();
                 let notas = String(inputNotasCambio?.value || '').trim();
 
-                const newTotal = itemsOut.reduce((acc, it) => acc + (parseFloat(it.subtotal || 0) || 0), 0);
+                const cambioVentaTotals = computeCambioVentaGeneralTotalsFromUi();
+                const subtotalNuevaVenta = Math.max(0, parseFloat(cambioVentaTotals?.subtotal_nueva_venta || 0) || 0);
+                const newTotal = Math.max(0, parseFloat(cambioVentaTotals?.total_nueva_venta || 0) || 0);
+                const discountGeneralPct = Math.max(0, parseFloat(cambioVentaTotals?.discount_general_pct || 0) || 0);
+                const discountGeneralAmount = Math.max(0, parseFloat(cambioVentaTotals?.discount_general_amount || 0) || 0);
+                const surchargeGeneralPct = Math.max(0, parseFloat(cambioVentaTotals?.surcharge_general_pct || 0) || 0);
+                const surchargeGeneralAmount = Math.max(0, parseFloat(cambioVentaTotals?.surcharge_general_amount || 0) || 0);
                 const returnTotal = Math.max(0, parseFloat(editCambioVentaReturnTotal || 0) || 0);
 
                 const diffToPay = Math.max(0, newTotal - returnTotal);
@@ -8894,8 +9802,10 @@ td.num,th.num{text-align:right}
                     payment_method: pago,
                     notes: notas,
                     total: Math.abs(newTotal),
-                    discount_general_pct: 0,
-                    discount_general_amount: 0,
+                    discount_general_pct: discountGeneralPct,
+                    discount_general_amount: discountGeneralAmount,
+                    general_surcharge_pct: surchargeGeneralPct,
+                    surcharge_general_amount: surchargeGeneralAmount,
                     on_account: (dueForSale > 0),
                     paid_amount: paidForSale,
                     due_amount: dueForSale,
@@ -8904,6 +9814,7 @@ td.num,th.num{text-align:right}
                     ...getSelectedEmployeePayload(selectCambioEmployee),
                     exchange_return_total: returnTotal,
                     exchange_new_total: newTotal,
+                    exchange_new_subtotal: subtotalNuevaVenta,
                     is_gift: !!cambioIsGift,
                     gift_code: (cambioIsGift ? (String(giftCodeElCambio?.textContent || '').trim() || '') : ''),
                     items: itemsOut,
@@ -8956,7 +9867,13 @@ td.num,th.num{text-align:right}
             const notas = String(inputNotasCambio?.value || '').trim();
 
             const returnTotal = itemsIn.reduce((acc, it) => acc + (parseFloat(it.subtotal || 0) || 0), 0);
-            const newTotal = itemsOut.reduce((acc, it) => acc + (parseFloat(it.subtotal || 0) || 0), 0);
+            const cambioVentaTotals = computeCambioVentaGeneralTotalsFromUi();
+            const subtotalNuevaVenta = Math.max(0, parseFloat(cambioVentaTotals?.subtotal_nueva_venta || 0) || 0);
+            const newTotal = Math.max(0, parseFloat(cambioVentaTotals?.total_nueva_venta || 0) || 0);
+            const discountGeneralPct = Math.max(0, parseFloat(cambioVentaTotals?.discount_general_pct || 0) || 0);
+            const discountGeneralAmount = Math.max(0, parseFloat(cambioVentaTotals?.discount_general_amount || 0) || 0);
+            const surchargeGeneralPct = Math.max(0, parseFloat(cambioVentaTotals?.surcharge_general_pct || 0) || 0);
+            const surchargeGeneralAmount = Math.max(0, parseFloat(cambioVentaTotals?.surcharge_general_amount || 0) || 0);
             const diff = newTotal - returnTotal;
 
             const diffToPay = Math.max(0, diff);
@@ -8989,6 +9906,12 @@ td.num,th.num{text-align:right}
                 new_items: itemsOut,
                 return_total: returnTotal,
                 new_total: newTotal,
+                subtotal_nueva_venta: subtotalNuevaVenta,
+                total_nueva_venta: newTotal,
+                discount_general_pct: discountGeneralPct,
+                discount_general_amount: discountGeneralAmount,
+                general_surcharge_pct: surchargeGeneralPct,
+                surcharge_general_amount: surchargeGeneralAmount,
                 paid_amount: paidAmount,
                 due_amount: dueAmount,
                 is_gift: !!cambioIsGift,
@@ -9083,6 +10006,7 @@ td.num,th.num{text-align:right}
             scrollAElemento(vistaRealizarCambio);
         });
     }
+
 });
 </script>
 {% endblock %}

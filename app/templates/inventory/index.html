@@ -622,43 +622,8 @@
     <div id="panel-current">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Imagen</th>
-                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Producto</th>
-                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
-                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Stock</th>
-                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Costo prom.</th>
-                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Valor total</th>
-                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Código interno</th>
-                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">Estado</th>
-                    <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase"></th>
-                </tr>
-                <tr class="text-[11px] bg-white align-middle">
-                    <th class="px-4 py-1"></th>
-                    <th class="px-4 py-1">
-                        <input id="inv-q" type="text" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600" placeholder="Buscar producto">
-                    </th>
-                    <th class="px-4 py-1">
-                        <select id="inv-cat" class="w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
-                            <option value="">Todas</option>
-                        </select>
-                    </th>
-                    <th class="px-4 py-1"></th>
-                    <th class="px-4 py-1"></th>
-                    <th class="px-4 py-1"></th>
-                    <th class="px-4 py-1"></th>
-                    <th class="px-4 py-1"></th>
-                    <th class="px-4 py-1">
-                        <select id="inv-status" multiple size="1" class="w-28 max-w-[112px] px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white">
-                            <option value="">Todos</option>
-                            <option value="OK">OK</option>
-                            <option value="Reponer">Reponer</option>
-                            <option value="Crítico">Crítico</option>
-                            <option value="Inactivo">Inactivo</option>
-                        </select>
-                    </th>
-                    <th class="px-4 py-1"></th>
-                </tr>
+                <tr id="inv-current-products-head"></tr>
+                <tr id="inv-current-products-filters" class="text-[11px] bg-white align-middle"></tr>
             </thead>
             <tbody id="inv-tbody-current" class="bg-white divide-y divide-gray-200">
                 <tr>
@@ -666,6 +631,39 @@
                 </tr>
             </tbody>
         </table>
+    </div>
+
+    <!-- Personalizar columnas (drawer lateral) -->
+    <div id="modal-inv-columns" class="fixed inset-0 z-[120] hidden" aria-hidden="true">
+        <div id="backdrop-inv-columns" class="absolute left-0 right-0 bottom-0 bg-black/30" style="top: var(--app-header-height, 4rem);"></div>
+        <div id="inv-columns-drawer" class="absolute right-0 bottom-0 w-full max-w-md bg-white shadow-xl flex flex-col" style="top: var(--app-header-height, 4rem); height: calc(100vh - var(--app-header-height, 4rem));">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <div class="text-sm font-semibold text-gray-900">Personalizar columnas</div>
+                    <div class="mt-1 text-xs text-gray-500">Elegí qué columnas ver en el historial y en qué orden.</div>
+                </div>
+                <button id="btn-close-inv-columns" type="button" class="h-8 w-8 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white hover:bg-gray-50" title="Cerrar">
+                    <i class="fas fa-times text-gray-500"></i>
+                </button>
+            </div>
+
+            <div class="p-5 overflow-y-auto">
+                <div class="text-xs font-semibold text-gray-700">Columnas seleccionadas</div>
+                <div class="mt-2 text-[11px] text-gray-500">Arrastrá para reordenar. Desmarcá para ocultar.</div>
+                <div id="inv-columns-counter" class="mt-2 text-[11px] text-gray-600"></div>
+                <div id="inv-columns-current" class="mt-3 space-y-2"></div>
+
+                <div class="mt-6 text-xs font-semibold text-gray-700">Columnas disponibles</div>
+                <div id="inv-columns-extra" class="mt-3 space-y-2"></div>
+
+                <div id="inv-columns-msg" class="mt-4 text-[11px] text-red-700"></div>
+            </div>
+
+            <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-between gap-2">
+                <button id="btn-inv-columns-restore" type="button" class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Restaurar por defecto</button>
+                <button id="btn-inv-columns-save" type="button" class="px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;">Guardar configuración</button>
+            </div>
+        </div>
     </div>
 
     <div id="panel-lots" class="hidden">
@@ -1272,14 +1270,29 @@ document.addEventListener('DOMContentLoaded', function () {
     const panelCurrent = document.getElementById('panel-current');
     const panelLots = document.getElementById('panel-lots');
 
+    const invCurrentProductsHead = document.getElementById('inv-current-products-head');
+    const invCurrentProductsFilters = document.getElementById('inv-current-products-filters');
+
     const tbodyCurrent = document.getElementById('inv-tbody-current');
     const tbodyLots = document.getElementById('inv-tbody-lots');
 
-    const filterQ = document.getElementById('inv-q');
+    let filterQ = document.getElementById('inv-q');
     const filterQLots = document.getElementById('inv-q-lots');
-    const filterCat = document.getElementById('inv-cat');
-    const filterStatus = document.getElementById('inv-status');
+    let filterCat = document.getElementById('inv-cat');
+    let filterStatus = document.getElementById('inv-status');
     const filterLotsSup = document.getElementById('inv-lots-sup');
+
+    const btnInvColumnsMenu = document.getElementById('btn-inv-columns-menu');
+    const modalInvColumns = document.getElementById('modal-inv-columns');
+    const backdropInvColumns = document.getElementById('backdrop-inv-columns');
+    const invColumnsDrawer = document.getElementById('inv-columns-drawer');
+    const btnCloseInvColumns = document.getElementById('btn-close-inv-columns');
+    const invColumnsCurrent = document.getElementById('inv-columns-current');
+    const invColumnsExtra = document.getElementById('inv-columns-extra');
+    const invColumnsMsg = document.getElementById('inv-columns-msg');
+    const btnInvColumnsSave = document.getElementById('btn-inv-columns-save');
+    const btnInvColumnsRestore = document.getElementById('btn-inv-columns-restore');
+    const invColumnsCounter = document.getElementById('inv-columns-counter');
 
     const kpiStockValue = document.getElementById('kpi-stock-value');
     const kpiProducts = document.getElementById('kpi-products');
@@ -1413,6 +1426,423 @@ document.addEventListener('DOMContentLoaded', function () {
             if (prodLotDate) flatpickr(prodLotDate, commonOptsDmY);
             if (prodLotExp) flatpickr(prodLotExp, commonOptsDmY);
         }
+    } catch (e) {
+    }
+
+    const invCurrentDefaultColumns = ['imagen', 'producto', 'categoria', 'stock', 'costo_prom', 'valor_total', 'codigo_interno', 'estado'];
+    const invCurrentModuleKey = 'inventory_historial_movimientos_current';
+    const invCurrentMaxColumns = 10;
+
+    const invCurrentColumnDefs = [
+        { key: 'imagen', label: 'Imagen', group: 'actual' },
+        { key: 'producto', label: 'Producto', group: 'actual' },
+        { key: 'categoria', label: 'Categoría', group: 'actual' },
+        { key: 'stock', label: 'Stock', group: 'actual' },
+        { key: 'costo_prom', label: 'Costo prom.', group: 'actual' },
+        { key: 'valor_total', label: 'Valor total', group: 'actual' },
+        { key: 'codigo_interno', label: 'Código interno', group: 'actual' },
+        { key: 'estado', label: 'Estado', group: 'actual' },
+
+        { key: 'precio', label: 'Precio', group: 'extra' },
+        { key: 'codigo_barras', label: 'Código de barras', group: 'extra' },
+        { key: 'proveedor', label: 'Proveedor', group: 'extra' },
+        { key: 'descripcion', label: 'Descripción', group: 'extra' },
+        { key: 'vencimiento', label: 'Vencimiento', group: 'extra' },
+        { key: 'margen', label: 'Margen', group: 'extra' },
+        { key: 'margen_pct', label: '% Margen', group: 'extra' },
+        { key: 'notas', label: 'Notas', group: 'extra' },
+    ];
+    const invCurrentDefByKey = {};
+    invCurrentColumnDefs.forEach(function (d) { invCurrentDefByKey[d.key] = d; });
+
+    let invCurrentColumns = invCurrentDefaultColumns.slice();
+    let invCurrentColumnsSaved = invCurrentDefaultColumns.slice();
+
+    function apiGetInvCurrentColumnsConfig() {
+        const q = '?module_key=' + encodeURIComponent(invCurrentModuleKey);
+        return fetch('/sales/api/user-table-column-prefs' + q, { credentials: 'same-origin' })
+            .then(r => r.json())
+            .catch(() => ({ ok: false }));
+    }
+
+    function apiSaveInvCurrentColumnsConfig(columns) {
+        return fetch('/sales/api/user-table-column-prefs', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                module_key: invCurrentModuleKey,
+                visible_columns: Array.isArray(columns) ? columns : [],
+            }),
+        }).then(r => r.json()).catch(() => ({ ok: false }));
+    }
+
+    function getInvCurrentVisibleColumns() {
+        const raw = Array.isArray(invCurrentColumns) ? invCurrentColumns.slice() : [];
+        const out = [];
+        raw.forEach(function (k) {
+            const kk = String(k || '').trim().toLowerCase();
+            if (!kk) return;
+            if (!invCurrentDefByKey[kk]) return;
+            if (out.includes(kk)) return;
+            out.push(kk);
+        });
+        if (!out.length) return invCurrentDefaultColumns.slice();
+        return out;
+    }
+
+    function rebuildInvCurrentTableLayout() {
+        if (!invCurrentProductsHead || !invCurrentProductsFilters) return;
+        const visible = getInvCurrentVisibleColumns();
+
+        try { invCurrentProductsHead.innerHTML = ''; } catch (e) {}
+        try { invCurrentProductsFilters.innerHTML = ''; } catch (e) {}
+
+        const mkTh = function (text, cls, extraHtml) {
+            const th = document.createElement('th');
+            th.className = cls;
+            if (extraHtml) th.innerHTML = extraHtml;
+            else th.textContent = text;
+            return th;
+        };
+
+        const mkFilterTh = function (html) {
+            const th = document.createElement('th');
+            th.className = 'px-4 py-1';
+            if (html) th.innerHTML = html;
+            return th;
+        };
+
+        visible.forEach(function (k) {
+            const d = invCurrentDefByKey[k];
+            const base = 'px-4 py-3 text-xs font-medium tracking-wider text-gray-500 uppercase';
+            let cls = base + ' text-left';
+            if (k === 'stock' || k === 'costo_prom' || k === 'valor_total' || k === 'precio' || k === 'margen' || k === 'margen_pct') {
+                cls = base + ' text-right';
+            }
+            if (k === 'estado') cls = base + ' text-center';
+            invCurrentProductsHead.appendChild(mkTh(d?.label || k, cls));
+
+            if (k === 'producto') {
+                const th = mkFilterTh('');
+                let el = filterQ;
+                if (!el) {
+                    el = document.createElement('input');
+                    el.id = 'inv-q';
+                    el.type = 'text';
+                    el.className = 'w-full px-2 py-0.5 border rounded-md text-xs text-gray-600';
+                    el.placeholder = 'Buscar producto';
+                }
+                th.appendChild(el);
+                invCurrentProductsFilters.appendChild(th);
+                filterQ = el;
+                return;
+            }
+            if (k === 'categoria') {
+                const th = mkFilterTh('');
+                let el = filterCat;
+                if (!el) {
+                    el = document.createElement('select');
+                    el.id = 'inv-cat';
+                    el.className = 'w-full px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white';
+                    el.innerHTML = '<option value="">Todas</option>';
+                }
+                th.appendChild(el);
+                invCurrentProductsFilters.appendChild(th);
+                filterCat = el;
+                return;
+            }
+            if (k === 'estado') {
+                const th = mkFilterTh('');
+                let el = filterStatus;
+                if (!el) {
+                    el = document.createElement('select');
+                    el.id = 'inv-status';
+                    el.multiple = true;
+                    el.size = 1;
+                    el.className = 'w-28 max-w-[112px] px-2 py-0.5 border rounded-md text-xs text-gray-600 bg-white';
+                    el.innerHTML = ''
+                        + '<option value="">Todos</option>'
+                        + '<option value="OK">OK</option>'
+                        + '<option value="Reponer">Reponer</option>'
+                        + '<option value="Crítico">Crítico</option>'
+                        + '<option value="Inactivo">Inactivo</option>';
+                }
+                th.appendChild(el);
+                invCurrentProductsFilters.appendChild(th);
+                filterStatus = el;
+                return;
+            }
+            invCurrentProductsFilters.appendChild(mkFilterTh(''));
+        });
+
+        const actionsThHtml = ''
+            + '<div class="flex items-center justify-end gap-2">'
+            + '  <button id="btn-inv-columns-menu" type="button" class="inline-flex items-center justify-center h-7 w-7 rounded-md border border-gray-200 bg-white hover:bg-gray-50" title="Personalizar columnas">'
+            + '    <i class="fas fa-cog text-gray-500"></i>'
+            + '  </button>'
+            + '</div>';
+        invCurrentProductsHead.appendChild(mkTh('', 'px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase', actionsThHtml));
+        invCurrentProductsFilters.appendChild(mkFilterTh(''));
+
+        try {
+            const btn = document.getElementById('btn-inv-columns-menu');
+            if (btn) {
+                btn.addEventListener('click', function (e) {
+                    try { e.preventDefault(); } catch (ex) {}
+                    try { e.stopPropagation(); } catch (ex) {}
+                    openInvColumnsDrawer();
+                });
+            }
+        } catch (e) {}
+    }
+
+    function applyInvColumnsDrawerPosition() {
+        try {
+            if (!modalInvColumns || modalInvColumns.classList.contains('hidden')) return;
+            const header = document.querySelector('[data-app-header="1"]')
+                || document.querySelector('header[data-app-header]')
+                || document.querySelector('header');
+            const hh = Math.max(0, Math.floor(header?.offsetHeight || 0));
+            const top = (hh ? (hh + 6) : 70);
+            const bottomPad = 12;
+            if (backdropInvColumns) backdropInvColumns.style.top = top + 'px';
+            if (invColumnsDrawer) {
+                invColumnsDrawer.style.top = top + 'px';
+                invColumnsDrawer.style.height = 'calc(100vh - ' + String(top + bottomPad) + 'px)';
+            }
+        } catch (e) {
+        }
+    }
+
+    function openInvColumnsDrawer() {
+        if (!modalInvColumns) return;
+        modalInvColumns.classList.remove('hidden');
+        modalInvColumns.setAttribute('aria-hidden', 'false');
+        applyInvColumnsDrawerPosition();
+        try { requestAnimationFrame(applyInvColumnsDrawerPosition); } catch (e) {}
+        renderInvColumnsDrawer();
+    }
+
+    function closeInvColumnsDrawer() {
+        if (!modalInvColumns) return;
+        modalInvColumns.classList.add('hidden');
+        modalInvColumns.setAttribute('aria-hidden', 'true');
+        if (invColumnsMsg) invColumnsMsg.textContent = '';
+    }
+
+    function renderInvColumnsDrawer() {
+        if (!invColumnsCurrent || !invColumnsExtra) return;
+        const selectedKeys = getInvCurrentVisibleColumns();
+        const selected = new Set(selectedKeys);
+
+        const makeItem = function (d, isSelected) {
+            const checked = isSelected ? 'checked' : '';
+            const drag = '<span class="cursor-grab text-gray-400 px-1" title="Arrastrar"><i class="fas fa-grip-vertical"></i></span>';
+            return ''
+                + '<div class="inv-col-item flex items-center justify-between gap-2 p-2 rounded-lg border border-gray-200 bg-white" draggable="true" data-col-key="' + String(d.key) + '">' 
+                +   '<label class="flex items-center gap-2 text-sm text-gray-800 select-none">'
+                +     drag
+                +     '<input type="checkbox" class="inv-col-check" data-col-key="' + String(d.key) + '" ' + checked + '>'
+                +     '<span class="text-[13px]">' + String(d.label) + '</span>'
+                +   '</label>'
+                + '</div>';
+        };
+
+        const selectedDefs = selectedKeys
+            .map(function (k) { return invCurrentDefByKey[k]; })
+            .filter(Boolean);
+
+        const availableDefs = invCurrentColumnDefs
+            .filter(function (d) { return !selected.has(d.key); });
+
+        invColumnsCurrent.innerHTML = selectedDefs.map(function (d) { return makeItem(d, true); }).join('');
+        invColumnsExtra.innerHTML = availableDefs.map(function (d) { return makeItem(d, false); }).join('');
+
+        if (invColumnsCounter) {
+            const n = selected.size;
+            invColumnsCounter.textContent = 'Columnas seleccionadas: ' + String(n) + '/' + String(invCurrentMaxColumns);
+            invColumnsCounter.className = 'mt-2 text-[11px] ' + (n > invCurrentMaxColumns ? 'text-red-700' : 'text-gray-600');
+        }
+        updateInvColumnsSaveButtonState();
+        bindInvColumnsDrawerEvents();
+    }
+
+    function updateInvColumnsSaveButtonState() {
+        if (!btnInvColumnsSave) return;
+        const cols = getInvCurrentVisibleColumns();
+        const valid = cols.length >= 1 && cols.length <= invCurrentMaxColumns;
+        const changed = JSON.stringify(cols) !== JSON.stringify(invCurrentColumnsSaved || []);
+        btnInvColumnsSave.disabled = !(valid && changed);
+        btnInvColumnsSave.classList.toggle('opacity-60', btnInvColumnsSave.disabled);
+        btnInvColumnsSave.classList.toggle('cursor-not-allowed', btnInvColumnsSave.disabled);
+    }
+
+    function bindInvColumnsDrawerEvents() {
+        const onToggle = function (ev) {
+            const el = ev.target;
+            const key = String(el?.getAttribute('data-col-key') || '').trim();
+            if (!key) return;
+            const base = getInvCurrentVisibleColumns();
+            if (el.checked) {
+                if (!base.includes(key)) {
+                    if (base.length >= invCurrentMaxColumns) {
+                        el.checked = false;
+                        if (invColumnsMsg) invColumnsMsg.textContent = 'Máximo 10 columnas visibles. Desactivá una para agregar otra.';
+                        if (window.showAlertModal) window.showAlertModal('Máximo 10 columnas visibles. Desactivá una para agregar otra.', 'Atención', 'Límite de columnas');
+                        return;
+                    }
+                    base.push(key);
+                }
+                invCurrentColumns = base;
+            } else {
+                invCurrentColumns = base.filter(k => k !== key);
+            }
+            if (!invCurrentColumns.length) invCurrentColumns = invCurrentDefaultColumns.slice();
+            if (invColumnsMsg) invColumnsMsg.textContent = '';
+            renderInvColumnsDrawer();
+        };
+
+        Array.from(modalInvColumns?.querySelectorAll('.inv-col-check') || []).forEach(chk => {
+            chk.addEventListener('change', onToggle);
+        });
+
+        let dragKey = '';
+        const onDragStart = function (e) {
+            dragKey = String(this.getAttribute('data-col-key') || '').trim();
+            try { e.dataTransfer.setData('text/plain', dragKey); } catch (err) {}
+            this.classList.add('ring-2', 'ring-indigo-200');
+        };
+        const onDragEnd = function () {
+            this.classList.remove('ring-2', 'ring-indigo-200');
+        };
+        const onDragOver = function (e) { e.preventDefault(); };
+        const onDrop = function (e) {
+            e.preventDefault();
+            const targetKey = String(this.getAttribute('data-col-key') || '').trim();
+            const sourceKey = dragKey || (function(){ try { return String(e.dataTransfer.getData('text/plain') || '').trim(); } catch (err) { return ''; } })();
+            if (!sourceKey || !targetKey || sourceKey === targetKey) return;
+            const base = getInvCurrentVisibleColumns();
+            const hasTarget = base.includes(targetKey);
+            if (!hasTarget) return;
+
+            const isValid = !!invCurrentDefByKey[sourceKey];
+            if (!isValid) return;
+
+            const hasSource = base.includes(sourceKey);
+            if (!hasSource) {
+                if (base.length >= invCurrentMaxColumns) {
+                    if (invColumnsMsg) invColumnsMsg.textContent = 'Máximo 10 columnas visibles. Desactivá una para agregar otra.';
+                    if (window.showAlertModal) window.showAlertModal('Máximo 10 columnas visibles. Desactivá una para agregar otra.', 'Atención', 'Límite de columnas');
+                    return;
+                }
+                const idx0 = base.indexOf(targetKey);
+                if (idx0 < 0) return;
+                const next0 = base.slice();
+                next0.splice(idx0, 0, sourceKey);
+                invCurrentColumns = next0;
+                if (invColumnsMsg) invColumnsMsg.textContent = '';
+                renderInvColumnsDrawer();
+                return;
+            }
+
+            const next = base.filter(k => k !== sourceKey);
+            const idx = next.indexOf(targetKey);
+            if (idx < 0) return;
+            next.splice(idx, 0, sourceKey);
+            invCurrentColumns = next;
+            if (invColumnsMsg) invColumnsMsg.textContent = '';
+            renderInvColumnsDrawer();
+        };
+
+        Array.from(modalInvColumns?.querySelectorAll('.inv-col-item[draggable="true"]') || []).forEach(it => {
+            it.addEventListener('dragstart', onDragStart);
+            it.addEventListener('dragend', onDragEnd);
+            it.addEventListener('dragover', onDragOver);
+            it.addEventListener('drop', onDrop);
+        });
+    }
+
+    function initInvColumnsUi() {
+        if (btnCloseInvColumns) btnCloseInvColumns.addEventListener('click', closeInvColumnsDrawer);
+        if (backdropInvColumns) backdropInvColumns.addEventListener('click', closeInvColumnsDrawer);
+
+        document.addEventListener('keydown', function (e) {
+            if (!modalInvColumns || modalInvColumns.classList.contains('hidden')) return;
+            if (e.key === 'Escape') closeInvColumnsDrawer();
+        });
+
+        const maybeReposition = function () {
+            try {
+                if (!modalInvColumns || modalInvColumns.classList.contains('hidden')) return;
+                applyInvColumnsDrawerPosition();
+            } catch (e) {}
+        };
+        window.addEventListener('resize', maybeReposition);
+        window.addEventListener('scroll', maybeReposition, { passive: true });
+
+        if (btnInvColumnsRestore) {
+            btnInvColumnsRestore.addEventListener('click', function () {
+                invCurrentColumns = invCurrentDefaultColumns.slice();
+                renderInvColumnsDrawer();
+                rebuildInvCurrentTableLayout();
+                try {
+                    const vis = getVisibleRowsData();
+                    if (activeTab === 'current') renderCurrent(vis.filteredProducts);
+                } catch (e) {}
+            });
+        }
+
+        if (btnInvColumnsSave) {
+            btnInvColumnsSave.addEventListener('click', function () {
+                if (invColumnsMsg) invColumnsMsg.textContent = '';
+                const cols = getInvCurrentVisibleColumns();
+                apiSaveInvCurrentColumnsConfig(cols).then(function (res) {
+                    if (!res || res.ok !== true) {
+                        const msg = String(res?.message || '').trim() || 'No se pudo guardar la configuración.';
+                        if (invColumnsMsg) invColumnsMsg.textContent = msg;
+                        if (window.showAlertModal) window.showAlertModal(msg, 'Error', 'Operación fallida');
+                        return;
+                    }
+                    invCurrentColumnsSaved = cols.slice();
+                    updateInvColumnsSaveButtonState();
+                    closeInvColumnsDrawer();
+                    if (window.showAlertModal) window.showAlertModal('Configuración guardada.', 'Éxito', '');
+                    loadInvCurrentColumnsConfig();
+                }).catch(function () {
+                    if (invColumnsMsg) invColumnsMsg.textContent = 'No se pudo guardar la configuración.';
+                });
+            });
+        }
+    }
+
+    function loadInvCurrentColumnsConfig() {
+        apiGetInvCurrentColumnsConfig().then(function (res) {
+            const cols = (res && res.ok && Array.isArray(res.visible_columns)) ? res.visible_columns : [];
+            invCurrentColumns = (cols && cols.length) ? cols.slice() : invCurrentDefaultColumns.slice();
+            invCurrentColumnsSaved = invCurrentColumns.slice();
+            rebuildInvCurrentTableLayout();
+            try {
+                const vis = getVisibleRowsData();
+                if (activeTab === 'current') renderCurrent(vis.filteredProducts);
+            } catch (e) {}
+        }).catch(function () {
+            invCurrentColumns = invCurrentDefaultColumns.slice();
+            invCurrentColumnsSaved = invCurrentDefaultColumns.slice();
+            rebuildInvCurrentTableLayout();
+        });
+    }
+
+    try {
+        rebuildInvCurrentTableLayout();
+    } catch (e) {
+    }
+    try {
+        initInvColumnsUi();
+    } catch (e) {
+    }
+    try {
+        loadInvCurrentColumnsConfig();
     } catch (e) {
     }
 
@@ -4331,10 +4761,12 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderCurrent(filteredProducts) {
         if (!tbodyCurrent) return;
         if (!filteredProducts.length) {
-            tbodyCurrent.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados para los filtros actuales.</td></tr>';
+            const colspan = (getInvCurrentVisibleColumns().length || invCurrentDefaultColumns.length) + 1;
+            tbodyCurrent.innerHTML = '<tr><td colspan="' + String(colspan) + '" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados para los filtros actuales.</td></tr>';
             return;
         }
         tbodyCurrent.innerHTML = '';
+        const visible = getInvCurrentVisibleColumns();
         filteredProducts.forEach(({ p, m }) => {
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-gray-50';
@@ -4344,6 +4776,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 : ('<div class="h-9 w-9 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400"><i class="fas fa-image"></i></div>');
             const codigoInterno = String(p?.codigo_interno || p?.internal_code || '').trim();
             const isUnlimited = !!(p && (p.stock_ilimitado === true || p.stock_ilimitado === 1));
+
+            const priceRaw = parseNumeroSeguro(p?.sale_price || p?.price || 0);
+            const priceCell = priceRaw > 0 ? fmtMoneda(priceRaw) : '—';
+            const barcodeCell = esc(String(p?.barcode || '')) || '—';
+            const proveedorCell = esc(String(p?.primary_supplier_name || p?.supplier_name || '')) || '—';
+            const descCell = esc(String(p?.description || '')) || '—';
+            const notasCell = esc(String(p?.notes || p?.nota || p?.notas || '')) || '—';
+
+            let vencCell = '—';
+            try {
+                const pid = String(p?.id || '').trim();
+                const rel = (Array.isArray(cacheLots) ? cacheLots : []).filter(l => String(l?.product_id || '') === pid);
+                const dates = rel
+                    .filter(l => (parseNumeroSeguro(l?.qty_available) > 0) && String(l?.expiration_date || '').trim())
+                    .map(l => String(l.expiration_date))
+                    .sort();
+                if (dates.length) vencCell = fmtFecha(dates[0]);
+            } catch (e) {}
+
+            const avgCost = parseNumeroSeguro(m?.avg);
+            const margin = (priceRaw > 0 && avgCost > 0) ? (priceRaw - avgCost) : NaN;
+            const marginCell = (isFinite(margin)) ? fmtMoneda(margin) : '—';
+            const marginPct = (priceRaw > 0 && isFinite(margin)) ? ((margin / priceRaw) * 100) : NaN;
+            const marginPctCell = (isFinite(marginPct)) ? (String(marginPct.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '%') : '—';
 
             const unlimitedStockCell = '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-semibold" title="Stock sin control activo. No se descuenta en ventas y no participa en valorización.">∞ Indeterminado</span>';
 
@@ -4356,15 +4812,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? '<button type="button" class="w-full text-left px-3 py-2 text-xs text-gray-400 cursor-not-allowed" disabled title="Producto con stock indeterminado: no se pueden crear lotes.">Agregar lote</button>'
                 : '<button type="button" class="btn-add-lot-product w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Agregar lote</button>';
 
-            tr.innerHTML = ''
-                + '<td class="px-4 py-3 text-sm text-gray-700">' + imgCell + '</td>'
-                + '<td class="px-4 py-3 text-sm font-medium text-gray-900">' + esc(p.name) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(categoryLabel(p)) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-600">' + (isUnlimited ? unlimitedStockCell : fmtNumero(m.stock)) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right text-gray-600">' + (isUnlimited ? '—' : fmtMoneda(m.avg)) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right text-gray-600">' + (isUnlimited ? '—' : fmtMoneda(m.total)) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(codigoInterno || '—') + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-600">' + statusBadgeHtml(m.status) + '</td>'
+            const cellByKey = {
+                imagen: '<td class="px-4 py-3 text-sm text-gray-700">' + imgCell + '</td>',
+                producto: '<td class="px-4 py-3 text-sm font-medium text-gray-900">' + esc(p.name) + '</td>',
+                categoria: '<td class="px-4 py-3 text-sm text-gray-600">' + esc(categoryLabel(p)) + '</td>',
+                stock: '<td class="px-4 py-3 text-sm text-gray-600">' + (isUnlimited ? unlimitedStockCell : fmtNumero(m.stock)) + '</td>',
+                costo_prom: '<td class="px-4 py-3 text-sm text-right text-gray-600">' + (isUnlimited ? '—' : fmtMoneda(m.avg)) + '</td>',
+                valor_total: '<td class="px-4 py-3 text-sm text-right text-gray-600">' + (isUnlimited ? '—' : fmtMoneda(m.total)) + '</td>',
+                codigo_interno: '<td class="px-4 py-3 text-sm text-gray-600">' + esc(codigoInterno || '—') + '</td>',
+                estado: '<td class="px-4 py-3 text-sm text-gray-600">' + statusBadgeHtml(m.status) + '</td>',
+                precio: '<td class="px-4 py-3 text-sm text-right text-gray-600">' + priceCell + '</td>',
+                codigo_barras: '<td class="px-4 py-3 text-sm text-gray-600">' + barcodeCell + '</td>',
+                proveedor: '<td class="px-4 py-3 text-sm text-gray-600">' + proveedorCell + '</td>',
+                descripcion: '<td class="px-4 py-3 text-sm text-gray-600">' + descCell + '</td>',
+                vencimiento: '<td class="px-4 py-3 text-sm text-gray-600">' + vencCell + '</td>',
+                margen: '<td class="px-4 py-3 text-sm text-right text-gray-600">' + marginCell + '</td>',
+                margen_pct: '<td class="px-4 py-3 text-sm text-right text-gray-600">' + marginPctCell + '</td>',
+                notas: '<td class="px-4 py-3 text-sm text-gray-600">' + notasCell + '</td>',
+            };
+
+            const actionsCell = ''
                 + '<td class="px-4 py-3 text-right">'
                 + '  <div class="relative inline-flex">'
                 + '    <button type="button" class="btn-actions-toggle h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-600">'
@@ -4380,6 +4847,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '  </div>'
                 + '  </div>'
                 + '</td>';
+
+            tr.innerHTML = visible.map(function (k) { return cellByKey[k] || '<td class="px-4 py-3 text-sm text-gray-600">—</td>'; }).join('') + actionsCell;
 
             tbodyCurrent.appendChild(tr);
         });

@@ -7,6 +7,7 @@ from io import BytesIO
 from flask import current_app, g, jsonify, render_template, request, send_file
 from flask_login import login_required
 from sqlalchemy import and_
+from sqlalchemy.orm import selectinload
 
 from app import db
 from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Expense, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem
@@ -156,9 +157,17 @@ def eerr_api():
         d_from = d_from or dt_date(today.year, today.month, 1)
         d_to = d_to or today
 
+    try:
+        # Evitar 500 si Railway no tiene aún columnas nuevas (recargos)
+        from app.sales.routes import _ensure_sale_surcharge_columns as _ensure_sale_surcharge_cols
+        _ensure_sale_surcharge_cols()
+    except Exception:
+        pass
+
     # 1) Ventas válidas
     sales_q = (
         db.session.query(Sale)
+        .options(selectinload(Sale.items))
         .filter(Sale.company_id == cid)
         .filter(Sale.sale_date >= d_from)
         .filter(Sale.sale_date <= d_to)
@@ -167,8 +176,33 @@ def eerr_api():
     )
     sales_rows = sales_q.all()
 
-    gross_sales = sum(_num(r.total) for r in sales_rows)
-    discounts = sum(_num(r.discount_general_amount) for r in sales_rows)
+    # Definiciones contables:
+    # - Ventas brutas: sum(unit_price * qty) sin descuentos ni recargos.
+    # - Descuentos: sum(gross_item - subtotal_item) por ítem (descuento general está distribuido en ítems).
+    # - Recargos: sum(surcharge_general_amount) por ticket.
+    gross_sales = 0.0
+    discounts = 0.0
+    surcharges = 0.0
+    try:
+        for r in (sales_rows or []):
+            surcharges += _num(getattr(r, 'surcharge_general_amount', 0.0))
+            for it in (getattr(r, 'items', None) or []):
+                direction = str(getattr(it, 'direction', 'out') or 'out').strip().lower() or 'out'
+                if direction != 'out':
+                    continue
+                qty = _num(getattr(it, 'qty', 0.0))
+                unit_price = _num(getattr(it, 'unit_price', 0.0))
+                gross_line = unit_price * qty
+                sub_line = _num(getattr(it, 'subtotal', 0.0))
+                gross_sales += gross_line
+                d = gross_line - sub_line
+                if d > 0:
+                    discounts += d
+    except Exception:
+        # Fallback: si algo falla, mantener compatibilidad
+        gross_sales = sum(_num(r.total) for r in (sales_rows or []))
+        discounts = sum(_num(r.discount_general_amount) for r in (sales_rows or []))
+        surcharges = 0.0
 
     # 2) Cambios: se registran como Sale(sale_type='Cambio', status='Cambio', total negativo)
     exchange_q = (
@@ -181,7 +215,9 @@ def eerr_api():
     exchange_rows = exchange_q.all()
     exchange_total = sum(_num(r.total) for r in exchange_rows)  # normalmente negativo
 
-    net_sales = gross_sales + exchange_total
+    # Ventas netas = Ventas brutas - Descuentos + Recargos - Devoluciones
+    # exchange_total suele ser negativo, por eso se suma tal cual.
+    net_sales = gross_sales - discounts + surcharges + exchange_total
 
     # Desglose informativo de ventas (devengado)
     sales_contado = 0.0
@@ -260,6 +296,7 @@ def eerr_api():
         'sales_gross': round(gross_sales, 2),
         'sales_net': round(net_sales, 2),
         'discounts': round(discounts, 2),
+        'surcharges': round(surcharges, 2),
         'exchanges_total': round(exchange_total, 2),
         'sales_contado': round(sales_contado, 2),
         'sales_cc': round(sales_cc, 2),
@@ -857,8 +894,9 @@ def eerr_api():
             'pct_of_sales': 100.0,
             'children': [
                 {'key': 'ventas_brutas', 'label': 'Ventas brutas', 'amount': kpis['sales_gross']},
-                {'key': 'cambios', 'label': 'Cambios (devoluciones)', 'amount': kpis['exchanges_total']},
                 {'key': 'descuentos', 'label': 'Descuentos', 'amount': -abs(kpis['discounts'])},
+                {'key': 'recargos', 'label': 'Recargos', 'amount': abs(kpis['surcharges'])},
+                {'key': 'cambios', 'label': 'Cambios (devoluciones)', 'amount': -abs(kpis['exchanges_total']) if _num(kpis['exchanges_total']) > 0 else kpis['exchanges_total']},
             ],
         },
         {

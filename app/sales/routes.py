@@ -58,6 +58,7 @@ _VENTAS_HISTORIAL_ALLOWED_COLUMNS = {
     'productos',
     'cantidad_items',
     'descuento',
+    'recargo',
     'regalo',
     'margen_bruto',
     'cmv',
@@ -68,6 +69,40 @@ _VENTAS_HISTORIAL_ALLOWED_COLUMNS = {
     'cliente_cumple',
     'cliente_clasificacion',
     'cliente_saldo_cc',
+}
+
+
+def _default_inventory_current_columns() -> list[str]:
+    return [
+        'imagen',
+        'producto',
+        'categoria',
+        'stock',
+        'costo_prom',
+        'valor_total',
+        'codigo_interno',
+        'estado',
+    ]
+
+
+_INVENTORY_CURRENT_MODULE_KEY = 'inventory_historial_movimientos_current'
+_INVENTORY_CURRENT_ALLOWED_COLUMNS = {
+    'imagen',
+    'producto',
+    'categoria',
+    'stock',
+    'costo_prom',
+    'valor_total',
+    'codigo_interno',
+    'estado',
+    'precio',
+    'codigo_barras',
+    'proveedor',
+    'descripcion',
+    'vencimiento',
+    'margen',
+    'margen_pct',
+    'notas',
 }
 
 
@@ -91,6 +126,46 @@ def _filter_ventas_historial_visible_columns_for_load(cols_in: list) -> list[str
 
 def _default_ventas_historial_visible_columns() -> list[str]:
     return ['ticket', 'fecha', 'cliente', 'empleado', 'total', 'pago', 'tipo']
+
+
+def _filter_inventory_current_visible_columns_for_load(cols_in: list) -> list[str]:
+    cols = cols_in if isinstance(cols_in, list) else []
+    out: list[str] = []
+    for c in cols:
+        k = str(c or '').strip().lower()
+        if not k:
+            continue
+        if k not in _INVENTORY_CURRENT_ALLOWED_COLUMNS:
+            continue
+        if k not in out:
+            out.append(k)
+    if len(out) > 10:
+        out = out[:10]
+    if len(out) < 1:
+        out = _default_inventory_current_columns()
+    return out
+
+
+def _validate_inventory_current_visible_columns(cols_in: list) -> tuple[list[str] | None, str | None]:
+    cols = cols_in if isinstance(cols_in, list) else []
+    out: list[str] = []
+    unknown: list[str] = []
+    for c in cols:
+        k = str(c or '').strip().lower()
+        if not k:
+            continue
+        if k not in _INVENTORY_CURRENT_ALLOWED_COLUMNS:
+            unknown.append(k)
+            continue
+        if k not in out:
+            out.append(k)
+    if unknown:
+        return None, 'Columnas desconocidas.'
+    if len(out) < 1:
+        return None, 'Debe haber al menos 1 columna.'
+    if len(out) > 10:
+        return None, 'Máximo 10 columnas.'
+    return out, None
 
 
 def _ensure_user_table_column_prefs_table() -> None:
@@ -157,7 +232,7 @@ def _validate_ventas_historial_visible_columns(cols_in: list) -> tuple[list[str]
 
 @bp.get('/api/user-table-column-prefs')
 @login_required
-@module_required_any('sales', 'movements')
+@module_required_any('sales', 'movements', 'inventory')
 def get_user_table_column_prefs():
     _ensure_user_table_column_prefs_table()
     cid = _company_id()
@@ -180,6 +255,10 @@ def get_user_table_column_prefs():
         if not visible_columns:
             visible_columns = _default_ventas_historial_visible_columns()
         visible_columns = _filter_ventas_historial_visible_columns_for_load(visible_columns)
+    elif module_key == _INVENTORY_CURRENT_MODULE_KEY:
+        if not visible_columns:
+            visible_columns = _default_inventory_current_columns()
+        visible_columns = _filter_inventory_current_visible_columns_for_load(visible_columns)
 
     return jsonify({
         'ok': True,
@@ -191,7 +270,7 @@ def get_user_table_column_prefs():
 
 @bp.post('/api/user-table-column-prefs')
 @login_required
-@module_required_any('sales', 'movements')
+@module_required_any('sales', 'movements', 'inventory')
 def save_user_table_column_prefs():
     _ensure_user_table_column_prefs_table()
     cid = _company_id()
@@ -208,6 +287,11 @@ def save_user_table_column_prefs():
 
     if module_key == _VENTAS_HISTORIAL_MODULE_KEY:
         cols, err = _validate_ventas_historial_visible_columns(visible_columns_in)
+        if err:
+            return jsonify({'ok': False, 'message': err}), 400
+        visible_columns = cols or []
+    elif module_key == _INVENTORY_CURRENT_MODULE_KEY:
+        cols, err = _validate_inventory_current_visible_columns(visible_columns_in)
         if err:
             return jsonify({'ok': False, 'message': err}), 400
         visible_columns = cols or []
@@ -629,9 +713,78 @@ def _parse_date_iso(raw, fallback=None):
 
 def _company_id() -> str:
     try:
-        return str(getattr(g, 'company_id', '') or '').strip()
+        cid = str(getattr(g, 'company_id', '') or '').strip()
+        if cid:
+            return cid
     except Exception:
-        return ''
+        cid = ''
+
+    try:
+        from app.tenancy import effective_company_id
+
+        cid2 = str(effective_company_id() or '').strip()
+        if cid2:
+            return cid2
+    except Exception:
+        pass
+
+    try:
+        if getattr(current_user, 'is_authenticated', False):
+            cid3 = str(getattr(current_user, 'company_id', '') or '').strip()
+            if cid3:
+                return cid3
+    except Exception:
+        pass
+
+    try:
+        current_app.logger.warning('sales._company_id: missing company_id for request', extra={'path': str(getattr(request, 'path', '') or '')})
+    except Exception:
+        pass
+    return ''
+
+
+def _ensure_product_columns_for_sales() -> None:
+    """Failsafe para Postgres: asegura columnas mínimas en product para catálogo de ventas.
+
+    Motivo: si Railway no aplicó migraciones, /sales/api/products puede romper con
+    UndefinedColumn y el catálogo queda vacío.
+    """
+    try:
+        engine = db.engine
+        if str(engine.url.drivername).startswith('sqlite'):
+            return
+
+        insp = inspect(engine)
+        if 'product' not in set(insp.get_table_names() or []):
+            return
+
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('product') or [])}
+        stmts = []
+
+        if 'internal_code' not in cols:
+            stmts.append('ALTER TABLE product ADD COLUMN IF NOT EXISTS internal_code VARCHAR(64)')
+        if 'barcode' not in cols:
+            stmts.append('ALTER TABLE product ADD COLUMN IF NOT EXISTS barcode VARCHAR(64)')
+        if 'deleted_at' not in cols:
+            stmts.append('ALTER TABLE product ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP')
+        if 'stock_ilimitado' not in cols:
+            stmts.append('ALTER TABLE product ADD COLUMN IF NOT EXISTS stock_ilimitado BOOLEAN NOT NULL DEFAULT FALSE')
+        if 'image_filename' not in cols:
+            stmts.append('ALTER TABLE product ADD COLUMN IF NOT EXISTS image_filename VARCHAR(255)')
+        if 'image_file_id' not in cols:
+            stmts.append('ALTER TABLE product ADD COLUMN IF NOT EXISTS image_file_id VARCHAR(64)')
+
+        if not stmts:
+            return
+
+        with engine.begin() as conn:
+            for sql in stmts:
+                conn.execute(text(sql))
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to ensure product columns for sales')
+        except Exception:
+            pass
 
 
 def _ensure_sale_employee_columns() -> None:
@@ -666,6 +819,36 @@ def _ensure_sale_employee_columns() -> None:
                 conn.execute(text(sql))
     except Exception:
         current_app.logger.exception('Failed to ensure sale employee columns')
+
+
+def _ensure_sale_surcharge_columns() -> None:
+    """Failsafe para Postgres: asegura columnas general_surcharge_pct/surcharge_general_amount en sale."""
+    try:
+        engine = db.engine
+        if str(engine.url.drivername).startswith('sqlite'):
+            return
+
+        insp = inspect(engine)
+        if 'sale' not in set(insp.get_table_names() or []):
+            return
+
+        cols = {str(c.get('name') or '') for c in (insp.get_columns('sale') or [])}
+        stmts = []
+        if 'general_surcharge_pct' not in cols:
+            stmts.append('ALTER TABLE sale ADD COLUMN IF NOT EXISTS general_surcharge_pct FLOAT NOT NULL DEFAULT 0')
+        if 'surcharge_general_amount' not in cols:
+            stmts.append('ALTER TABLE sale ADD COLUMN IF NOT EXISTS surcharge_general_amount FLOAT NOT NULL DEFAULT 0')
+        if not stmts:
+            return
+
+        with engine.begin() as conn:
+            for sql in stmts:
+                conn.execute(text(sql))
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to ensure sale surcharge columns')
+        except Exception:
+            pass
 
 
 def _ensure_installment_plan_columns() -> None:
@@ -1298,6 +1481,8 @@ def _serialize_sale(
         'total': row.total,
         'discount_general_pct': row.discount_general_pct,
         'discount_general_amount': row.discount_general_amount,
+        'general_surcharge_pct': float(getattr(row, 'general_surcharge_pct', 0.0) or 0.0),
+        'surcharge_general_amount': float(getattr(row, 'surcharge_general_amount', 0.0) or 0.0),
         'cmv_total': cmv_total,
         'costo_total_ticket': costo_total_ticket,
         'margen_bruto': margen_bruto,
@@ -1506,6 +1691,10 @@ def _serialize_product_for_sales(p: Product):
         'codigo_interno': (p.internal_code or ''),
         'internal_code': (p.internal_code or ''),
         'barcode': (getattr(p, 'barcode', None) or ''),
+        'supplier_id': (getattr(p, 'primary_supplier_id', None) or ''),
+        'supplier_name': (getattr(p, 'primary_supplier_name', None) or ''),
+        'primary_supplier_id': (getattr(p, 'primary_supplier_id', None) or ''),
+        'primary_supplier_name': (getattr(p, 'primary_supplier_name', None) or ''),
         'description': (p.description or ''),
         'sale_price': p.sale_price,
         'stock_ilimitado': bool(getattr(p, 'stock_ilimitado', False)),
@@ -1597,6 +1786,7 @@ def _serialize_lot_for_sales(l: InventoryLot):
 @module_required_any('sales', 'customers', 'movements')
 def list_sales():
     _ensure_sale_employee_columns()
+    _ensure_sale_surcharge_columns()
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
     include_replaced = str(request.args.get('include_replaced') or '').strip() in ('1', 'true', 'True')
@@ -1647,7 +1837,11 @@ def list_sales():
     if exclude_cc:
         q = q.filter(Sale.sale_type != 'CobroCC')
     q = q.order_by(Sale.sale_date.desc(), Sale.id.desc()).limit(limit)
-    rows = q.all()
+    try:
+        rows = q.all()
+    except Exception:
+        current_app.logger.exception('Failed to list sales', extra={'company_id': cid, 'from': raw_from, 'to': raw_to, 'limit': limit})
+        return jsonify({'ok': False, 'error': 'db_error', 'items': []}), 500
 
     customers_map: dict[str, Customer] = {}
     customer_saldo_map: dict[str, float] = {}
@@ -2176,6 +2370,11 @@ def get_sale(ticket):
 @login_required
 @module_required('sales')
 def list_products_for_sales():
+    try:
+        _ensure_product_columns_for_sales()
+    except Exception:
+        pass
+
     qraw = str(request.args.get('q') or '').strip()
     limit = int(request.args.get('limit') or 500)
     if limit <= 0 or limit > 5000:
@@ -2186,19 +2385,26 @@ def list_products_for_sales():
     cid = _company_id()
     if not cid:
         return jsonify({'ok': True, 'items': [], 'has_more': False, 'next_offset': None})
-    q = (
-        db.session.query(Product)
-        .options(joinedload(Product.category))
-        .filter(Product.company_id == cid)
-        .filter(Product.active == True)  # noqa: E712
-        .filter(getattr(Product, 'deleted_at', None).is_(None) if hasattr(Product, 'deleted_at') else True)
-    )
-    if qraw:
-        like = f"%{qraw}%"
-        q = q.filter(or_(Product.name.ilike(like), Product.internal_code.ilike(like), Product.barcode.ilike(like)))
-    q = q.order_by(Product.name.asc(), Product.id.asc())
+    try:
+        q = (
+            db.session.query(Product)
+            .options(joinedload(Product.category))
+            .filter(Product.company_id == cid)
+            .filter(Product.active == True)  # noqa: E712
+            .filter(getattr(Product, 'deleted_at', None).is_(None) if hasattr(Product, 'deleted_at') else True)
+        )
+        if qraw:
+            like = f"%{qraw}%"
+            q = q.filter(or_(Product.name.ilike(like), Product.internal_code.ilike(like), Product.barcode.ilike(like)))
+        q = q.order_by(Product.name.asc(), Product.id.asc())
 
-    rows = q.offset(offset).limit(limit + 1).all()
+        rows = q.offset(offset).limit(limit + 1).all()
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to list products for sales', extra={'company_id': cid, 'q': qraw, 'limit': limit, 'offset': offset})
+        except Exception:
+            pass
+        rows = []
     has_more = len(rows) > limit
     if has_more:
         rows = rows[:limit]
@@ -2456,6 +2662,7 @@ def settle_cc_sale():
 @module_required('sales')
 def create_exchange():
     _ensure_sale_employee_columns()
+    _ensure_sale_surcharge_columns()
     payload = request.get_json(silent=True) or {}
     sale_date = _parse_date_iso(payload.get('fecha') or payload.get('date'), dt_date.today())
     payment_method = str(payload.get('payment_method') or 'Efectivo').strip() or 'Efectivo'
@@ -2501,6 +2708,11 @@ def create_exchange():
         return_total = abs(return_total)
     if new_total < 0:
         new_total = abs(new_total)
+
+    discount_general_pct = _num(payload.get('discount_general_pct'))
+    discount_general_amount = _num(payload.get('discount_general_amount'))
+    surcharge_general_pct = _num(payload.get('surcharge_general_pct') if payload.get('surcharge_general_pct') is not None else payload.get('general_surcharge_pct'))
+    surcharge_general_amount = _num(payload.get('surcharge_general_amount') if payload.get('surcharge_general_amount') is not None else payload.get('surcharge_amount'))
 
     diff_to_pay = max(0.0, float(new_total or 0.0) - float(return_total or 0.0))
     on_account = bool(payload.get('on_account'))
@@ -2578,8 +2790,10 @@ def create_exchange():
             payment_method=payment_method,
             notes=sale_notes,
             total=abs(new_total),
-            discount_general_pct=0.0,
-            discount_general_amount=0.0,
+            discount_general_pct=discount_general_pct,
+            discount_general_amount=discount_general_amount,
+            general_surcharge_pct=surcharge_general_pct,
+            surcharge_general_amount=surcharge_general_amount,
             on_account=(due_for_sale > 0),
             paid_amount=paid_for_sale,
             due_amount=due_for_sale,
@@ -3171,6 +3385,7 @@ def _next_exchange_ticket() -> str:
 @module_required('sales')
 def create_sale():
     _ensure_sale_employee_columns()
+    _ensure_sale_surcharge_columns()
     _ensure_sale_cmv_flags_columns()
     _ensure_installment_plan_columns()
     payload = request.get_json(silent=True) or {}
@@ -3203,6 +3418,8 @@ def create_sale():
     total_amount = _num(payload.get('total'))
     discount_general_pct = _num(payload.get('discount_general_pct'))
     discount_general_amount = _num(payload.get('discount_general_amount'))
+    surcharge_general_pct = _num(payload.get('surcharge_general_pct') if payload.get('surcharge_general_pct') is not None else payload.get('general_surcharge_pct'))
+    surcharge_general_amount = _num(payload.get('surcharge_general_amount') if payload.get('surcharge_general_amount') is not None else payload.get('surcharge_amount'))
 
     customer_id = str(payload.get('customer_id') or '').strip() or None
     customer_name = str(payload.get('customer_name') or '').strip() or None
@@ -3326,6 +3543,8 @@ def create_sale():
             total=total_amount,
             discount_general_pct=discount_general_pct,
             discount_general_amount=discount_general_amount,
+            general_surcharge_pct=surcharge_general_pct,
+            surcharge_general_amount=surcharge_general_amount,
             on_account=bool(on_account),
             paid_amount=paid_amount,
             due_amount=due_amount,
@@ -4276,6 +4495,7 @@ def cancel_installment_plan(plan_id: int):
 @module_required('sales')
 def update_sale(ticket):
     _ensure_sale_employee_columns()
+    _ensure_sale_surcharge_columns()
     t = str(ticket or '').strip()
     cid = _company_id()
     row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == t).first()
@@ -4311,6 +4531,14 @@ def update_sale(ticket):
     row.total = _num(payload.get('total'))
     row.discount_general_pct = _num(payload.get('discount_general_pct'))
     row.discount_general_amount = _num(payload.get('discount_general_amount'))
+    try:
+        row.general_surcharge_pct = _num(payload.get('surcharge_general_pct') if payload.get('surcharge_general_pct') is not None else payload.get('general_surcharge_pct'))
+    except Exception:
+        row.general_surcharge_pct = _num(payload.get('general_surcharge_pct'))
+    try:
+        row.surcharge_general_amount = _num(payload.get('surcharge_general_amount') if payload.get('surcharge_general_amount') is not None else payload.get('surcharge_amount'))
+    except Exception:
+        row.surcharge_general_amount = _num(payload.get('surcharge_general_amount'))
     row.on_account = bool(payload.get('on_account'))
     row.paid_amount = _num(payload.get('paid_amount'))
     row.due_amount = _num(payload.get('due_amount'))
