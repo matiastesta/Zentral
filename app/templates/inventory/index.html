@@ -20,6 +20,44 @@
     </div>
 </div>
 
+<div id="modal-product-image" class="hidden fixed inset-0 z-50" style="z-index: 70;" aria-hidden="true">
+    <div class="absolute inset-0 bg-black/50"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: calc(100vh - 2rem);">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Imagen del producto</h3>
+                    <p id="imgmodal-subtitle" class="text-xs text-gray-500"></p>
+                </div>
+                <button id="btn-close-imgmodal" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600" aria-label="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 min-h-0 overflow-y-auto p-5">
+                <div class="w-full flex items-center justify-center">
+                    <img id="imgmodal-preview" src="" alt="" class="hidden rounded-xl border border-gray-200 bg-gray-50" style="max-width: 90vw; max-height: 70vh; object-fit: contain;">
+                    <div id="imgmodal-placeholder" class="h-44 w-44 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400">
+                        <i class="fas fa-image text-2xl"></i>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <input id="imgmodal-file" type="file" accept="image/*" class="hidden">
+                    <div id="imgmodal-msg" class="text-xs text-gray-600"></div>
+                </div>
+            </div>
+
+            <div class="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+                <button id="btn-delete-imgmodal" type="button" class="hidden inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">Eliminar imagen</button>
+                <button id="btn-change-imgmodal" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cambiar imagen</button>
+                <button id="btn-save-imgmodal" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md opacity-50 cursor-not-allowed" style="background-color:#0d1067;" disabled>Guardar</button>
+                <button id="btn-cancel-imgmodal" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="modal-select-supplier" class="hidden fixed inset-0 z-50" style="z-index: 70;">
     <div class="absolute inset-0 bg-black/40"></div>
     <div class="relative h-full w-full flex items-center justify-center p-4">
@@ -1945,6 +1983,109 @@ document.addEventListener('DOMContentLoaded', function () {
     const fileImageEdit = document.getElementById('file-image-edit');
     const fileImage = document.getElementById('file-image');
 
+    const modalImg = document.getElementById('modal-product-image');
+    const imgModalSubtitle = document.getElementById('imgmodal-subtitle');
+    const imgModalPreview = document.getElementById('imgmodal-preview');
+    const imgModalPlaceholder = document.getElementById('imgmodal-placeholder');
+    const imgModalFile = document.getElementById('imgmodal-file');
+    const imgModalMsg = document.getElementById('imgmodal-msg');
+    const btnCloseImgModal = document.getElementById('btn-close-imgmodal');
+    const btnCancelImgModal = document.getElementById('btn-cancel-imgmodal');
+    const btnChangeImgModal = document.getElementById('btn-change-imgmodal');
+    const btnDeleteImgModal = document.getElementById('btn-delete-imgmodal');
+    const btnSaveImgModal = document.getElementById('btn-save-imgmodal');
+
+    let imgModalProductId = '';
+    let imgModalProductName = '';
+    let imgModalOriginalUrl = '';
+    let imgModalSelectedFile = null;
+    let imgModalObjectUrl = '';
+
+    function openImgModal(opts) {
+        const o = (opts && typeof opts === 'object') ? opts : {};
+        imgModalProductId = String(o.productId || '').trim();
+        imgModalProductName = String(o.name || '').trim();
+        imgModalOriginalUrl = String(o.imageUrl || '').trim();
+        imgModalSelectedFile = null;
+        if (imgModalObjectUrl) {
+            try { URL.revokeObjectURL(imgModalObjectUrl); } catch (e) {}
+            imgModalObjectUrl = '';
+        }
+        if (imgModalSubtitle) imgModalSubtitle.textContent = imgModalProductName || '';
+
+        const hasImg = !!imgModalOriginalUrl;
+        if (imgModalPreview) {
+            imgModalPreview.src = hasImg ? imgModalOriginalUrl : '';
+            imgModalPreview.classList.toggle('hidden', !hasImg);
+        }
+        if (imgModalPlaceholder) imgModalPlaceholder.classList.toggle('hidden', hasImg);
+        if (btnDeleteImgModal) btnDeleteImgModal.classList.toggle('hidden', !hasImg);
+        if (imgModalMsg) imgModalMsg.textContent = '';
+        if (imgModalFile) imgModalFile.value = '';
+        if (btnSaveImgModal) {
+            btnSaveImgModal.disabled = true;
+            btnSaveImgModal.classList.add('opacity-50');
+            btnSaveImgModal.classList.add('cursor-not-allowed');
+        }
+        abrirModal(modalImg, true);
+    }
+
+    function closeImgModal() {
+        imgModalProductId = '';
+        imgModalProductName = '';
+        imgModalOriginalUrl = '';
+        imgModalSelectedFile = null;
+        if (imgModalObjectUrl) {
+            try { URL.revokeObjectURL(imgModalObjectUrl); } catch (e) {}
+            imgModalObjectUrl = '';
+        }
+        if (imgModalFile) imgModalFile.value = '';
+        abrirModal(modalImg, false);
+    }
+
+    function setImgModalSaveEnabled(enabled) {
+        if (!btnSaveImgModal) return;
+        const ok = !!enabled;
+        btnSaveImgModal.disabled = !ok;
+        btnSaveImgModal.classList.toggle('opacity-50', !ok);
+        btnSaveImgModal.classList.toggle('cursor-not-allowed', !ok);
+    }
+
+    function handleImgModalFileSelected(file) {
+        imgModalSelectedFile = null;
+        if (imgModalMsg) imgModalMsg.textContent = '';
+        setImgModalSaveEnabled(false);
+        if (!file) return;
+
+        const maxBytes = 5 * 1024 * 1024;
+        if (!(file && file.type && String(file.type).startsWith('image/'))) {
+            if (imgModalMsg) imgModalMsg.textContent = 'Seleccioná un archivo de imagen.';
+            return;
+        }
+        if (file.size > maxBytes) {
+            if (imgModalMsg) imgModalMsg.textContent = 'La imagen es demasiado grande. Máximo 5MB.';
+            return;
+        }
+
+        imgModalSelectedFile = file;
+        if (imgModalObjectUrl) {
+            try { URL.revokeObjectURL(imgModalObjectUrl); } catch (e) {}
+            imgModalObjectUrl = '';
+        }
+        try {
+            imgModalObjectUrl = URL.createObjectURL(file);
+        } catch (e) {
+            imgModalObjectUrl = '';
+        }
+        const hasPreview = !!imgModalObjectUrl;
+        if (imgModalPreview) {
+            imgModalPreview.src = hasPreview ? imgModalObjectUrl : '';
+            imgModalPreview.classList.toggle('hidden', !hasPreview);
+        }
+        if (imgModalPlaceholder) imgModalPlaceholder.classList.toggle('hidden', hasPreview);
+        setImgModalSaveEnabled(true);
+    }
+
     const fileMethodView = document.getElementById('file-method-view');
     const fileMethod = document.getElementById('file-method');
     const fileMethodLockMsg = document.getElementById('file-method-lock-msg');
@@ -2945,6 +3086,13 @@ document.addEventListener('DOMContentLoaded', function () {
             method: 'POST',
             credentials: 'same-origin',
             body: fd
+        }).then(r => r.json());
+    }
+
+    function apiDeleteProductImage(productId) {
+        return fetch('/inventory/api/products/' + encodeURIComponent(String(productId)) + '/image', {
+            method: 'DELETE',
+            credentials: 'same-origin'
         }).then(r => r.json());
     }
 
@@ -4771,9 +4919,17 @@ document.addEventListener('DOMContentLoaded', function () {
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-gray-50';
             const imgUrl = String(p?.image_url || '').trim();
-            const imgCell = imgUrl
+            const imgCellInner = imgUrl
                 ? ('<img src="' + imgUrl + '" alt="" class="h-9 w-9 rounded-md object-cover border border-gray-200 bg-gray-50">')
                 : ('<div class="h-9 w-9 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400"><i class="fas fa-image"></i></div>');
+            const imgCell = ''
+                + '<button type="button" class="btn-product-image inline-flex items-center justify-center rounded-md hover:bg-gray-50"'
+                + ' data-product-id="' + String(p.id) + '"'
+                + ' data-product-name="' + esc(String(p?.name || '')) + '"'
+                + ' data-image-url="' + esc(imgUrl) + '"'
+                + ' aria-label="Ver imagen">'
+                + imgCellInner
+                + '</button>';
             const codigoInterno = String(p?.codigo_interno || p?.internal_code || '').trim();
             const isUnlimited = !!(p && (p.stock_ilimitado === true || p.stock_ilimitado === 1));
 
@@ -4851,6 +5007,32 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.innerHTML = visible.map(function (k) { return cellByKey[k] || '<td class="px-4 py-3 text-sm text-gray-600">—</td>'; }).join('') + actionsCell;
 
             tbodyCurrent.appendChild(tr);
+        });
+
+        Array.from(tbodyCurrent.querySelectorAll('.btn-product-image')).forEach(btn => {
+            if (btn.__imgBound) return;
+            btn.__imgBound = true;
+            btn.addEventListener('click', function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const pid = String(this.getAttribute('data-product-id') || '').trim();
+                if (!pid) return;
+                const nm = String(this.getAttribute('data-product-name') || '').trim();
+                const url = String(this.getAttribute('data-image-url') || '').trim();
+                if (!url) {
+                    const confirmFn = (window.confirmModal && typeof window.confirmModal === 'function')
+                        ? window.confirmModal
+                        : function (m) { return Promise.resolve(window.confirm(m)); };
+                    confirmFn('Este producto no tiene imagen. ¿Querés subir una ahora?', 'Sin imagen', 'Podés cargar una imagen desde el modal.', { okText: 'Subir', cancelText: 'Cancelar', okVariant: 'success' })
+                        .then(function (ok) {
+                            if (!ok) return;
+                            openImgModal({ productId: pid, name: nm, imageUrl: '' });
+                            try { btnChangeImgModal?.click(); } catch (e) {}
+                        });
+                    return;
+                }
+                openImgModal({ productId: pid, name: nm, imageUrl: url });
+            });
         });
 
         const closeAllMenus = function () {
@@ -6724,6 +6906,115 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btnSaveEditLot) btnSaveEditLot.addEventListener('click', saveEditLot);
     if (btnCancelEditLot) btnCancelEditLot.addEventListener('click', closeEditLot);
     if (btnCloseEditLot) btnCloseEditLot.addEventListener('click', closeEditLot);
+
+    if (btnCloseImgModal) btnCloseImgModal.addEventListener('click', closeImgModal);
+    if (btnCancelImgModal) btnCancelImgModal.addEventListener('click', closeImgModal);
+    if (btnDeleteImgModal) {
+        btnDeleteImgModal.addEventListener('click', function () {
+            const pid = String(imgModalProductId || '').trim();
+            if (!pid) return;
+
+            const confirmFn = (window.confirmModal && typeof window.confirmModal === 'function')
+                ? window.confirmModal
+                : function (m) { return Promise.resolve(window.confirm(m)); };
+
+            confirmFn('¿Querés eliminar la imagen de este producto?', 'Eliminar imagen', 'Vas a volver al estado sin imagen.', { okText: 'Eliminar', cancelText: 'Cancelar' })
+                .then(function (ok) {
+                    if (!ok) return;
+                    if (imgModalMsg) imgModalMsg.textContent = 'Eliminando…';
+                    setImgModalSaveEnabled(false);
+                    apiDeleteProductImage(pid).then(function (res) {
+                        if (!res || res.ok !== true || !res.item) {
+                            const msg = String(res?.error || 'No se pudo eliminar la imagen.');
+                            if (imgModalMsg) imgModalMsg.textContent = msg;
+                            return;
+                        }
+                        const item = res.item;
+                        cacheProducts = (Array.isArray(cacheProducts) ? cacheProducts : []).map(p => (String(p?.id) === String(item.id)) ? item : p);
+                        renderAll();
+
+                        imgModalOriginalUrl = '';
+                        imgModalSelectedFile = null;
+                        if (imgModalObjectUrl) {
+                            try { URL.revokeObjectURL(imgModalObjectUrl); } catch (e) {}
+                            imgModalObjectUrl = '';
+                        }
+                        if (imgModalFile) imgModalFile.value = '';
+                        if (imgModalPreview) {
+                            imgModalPreview.src = '';
+                            imgModalPreview.classList.add('hidden');
+                        }
+                        if (imgModalPlaceholder) imgModalPlaceholder.classList.remove('hidden');
+                        if (btnDeleteImgModal) btnDeleteImgModal.classList.add('hidden');
+                        if (imgModalMsg) imgModalMsg.textContent = '';
+                    }).catch(function () {
+                        if (imgModalMsg) imgModalMsg.textContent = 'No se pudo eliminar la imagen.';
+                    });
+                });
+        });
+    }
+    if (btnChangeImgModal && imgModalFile) {
+        btnChangeImgModal.addEventListener('click', function () {
+            if (!imgModalFile) return;
+            imgModalFile.click();
+        });
+    }
+    if (imgModalFile) {
+        imgModalFile.addEventListener('change', function () {
+            const f = (imgModalFile.files && imgModalFile.files.length) ? imgModalFile.files[0] : null;
+            handleImgModalFileSelected(f);
+        });
+    }
+    if (btnSaveImgModal) {
+        btnSaveImgModal.addEventListener('click', function () {
+            const pid = String(imgModalProductId || '').trim();
+            const file = imgModalSelectedFile;
+            if (!pid || !file) return;
+            setImgModalSaveEnabled(false);
+            if (imgModalMsg) imgModalMsg.textContent = 'Subiendo…';
+            apiUploadProductImage(pid, file).then(function (res) {
+                if (!res || res.ok !== true || !res.item) {
+                    const msg = String(res?.error || 'No se pudo subir la imagen.');
+                    if (imgModalMsg) imgModalMsg.textContent = msg;
+                    setImgModalSaveEnabled(true);
+                    return;
+                }
+                const item = res.item;
+                cacheProducts = (Array.isArray(cacheProducts) ? cacheProducts : []).map(p => (String(p?.id) === String(item.id)) ? item : p);
+                renderAll();
+                const u = String(item?.image_url || '').trim();
+                const bust = u ? (u + (u.includes('?') ? '&' : '?') + 'v=' + String(Date.now())) : '';
+                imgModalOriginalUrl = bust;
+                imgModalSelectedFile = null;
+                if (imgModalObjectUrl) {
+                    try { URL.revokeObjectURL(imgModalObjectUrl); } catch (e) {}
+                    imgModalObjectUrl = '';
+                }
+                if (imgModalFile) imgModalFile.value = '';
+                if (imgModalPreview) {
+                    imgModalPreview.src = bust;
+                    imgModalPreview.classList.toggle('hidden', !bust);
+                }
+                if (imgModalPlaceholder) imgModalPlaceholder.classList.toggle('hidden', !!bust);
+                if (imgModalMsg) imgModalMsg.textContent = 'Imagen actualizada.';
+                closeImgModal();
+                if (window.showAlertModal) window.showAlertModal('Ok imagen subida', 'Éxito', '');
+            }).catch(function () {
+                if (imgModalMsg) imgModalMsg.textContent = 'No se pudo subir la imagen.';
+                setImgModalSaveEnabled(true);
+            });
+        });
+    }
+    if (modalImg) {
+        modalImg.addEventListener('click', function (ev) {
+            const target = ev.target;
+            if (target && target === modalImg.firstElementChild) closeImgModal();
+        });
+    }
+    document.addEventListener('keydown', function (e) {
+        if (!modalImg || modalImg.classList.contains('hidden')) return;
+        if (e.key === 'Escape') closeImgModal();
+    });
 
     if (btnOpenAdjustLot) btnOpenAdjustLot.addEventListener('click', function () {
         if (!canAdjustLot) return;

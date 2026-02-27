@@ -2347,6 +2347,46 @@ def upload_product_image(product_id: int):
         return jsonify({'ok': False, 'error': 'upload_failed'}), 400
 
 
+@bp.delete('/api/products/<int:product_id>/image')
+@login_required
+@module_required('inventory')
+def delete_product_image(product_id: int):
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    row = db.session.query(Product).filter(Product.company_id == cid, Product.id == int(product_id)).first()
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    try:
+        img_asset_id = str(getattr(row, 'image_file_id', '') or '').strip()
+
+        row.image_file_id = None
+        row.image_filename = None
+
+        if img_asset_id:
+            db.session.query(FileAsset).filter(FileAsset.company_id == cid, FileAsset.id == img_asset_id).delete(synchronize_session=False)
+
+        db.session.commit()
+        return jsonify({'ok': True, 'item': _serialize_product(row)})
+    except Exception:
+        try:
+            current_app.logger.exception('Failed to delete product image')
+        except Exception:
+            pass
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return jsonify({'ok': False, 'error': 'db_error'}), 400
+
+
 @bp.delete('/api/products/<int:product_id>')
 @login_required
 @module_required('inventory')

@@ -1775,26 +1775,24 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             apiSettleDebt({
                 sale_id: cobroCtx.sale_id,
-                payment_method: method,
                 amount: amt,
                 date: date,
                 employee_id: employee_id,
                 employee_name: employee_name,
-            }).then(function (data) {
-                if (!data || data.ok !== true) {
+            }).then(function (res) {
+                if (!res || res.ok !== true) {
                     if (cobroError) {
-                        cobroError.querySelector('span').textContent = 'No se pudo registrar el cobro.';
+                        cobroError.querySelector('span').textContent = safeStr(res?.message || res?.error || 'No se pudo registrar el cobro.');
                         cobroError.classList.remove('hidden');
                     }
                     return;
                 }
-                const reload = readSales();
-                Promise.resolve(reload).then(function (sales) {
-                    cacheSales = ensureArray(sales);
-                    closeModal(modalCobro);
-                    closeModal(modalSettle);
-                    render();
-                    if (legajoCustomerId && legajoCustomerId === safeStr(cobroCtx.customer_id)) openLegajo(legajoCustomerId);
+                closeModal(modalCobro);
+                closeModal(modalSettle);
+                Promise.resolve(refreshSalesCache()).then(function () {
+                    try {
+                        if (legajoCustomerId && legajoCustomerId === safeStr(cobroCtx.customer_id)) openLegajo(legajoCustomerId);
+                    } catch (e) {}
                 });
             }).catch(function () {
                 if (cobroError) {
@@ -1802,10 +1800,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     cobroError.classList.remove('hidden');
                 }
             });
+            return;
         }
-    }
 
-    let installmentsSummaryByCustomerId = {};
+        return;
+    }
 
     let INSTALLMENTS_ENABLED = false;
     try {
@@ -2135,6 +2134,21 @@ document.addEventListener('DOMContentLoaded', function () {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         }).then(r => r.json());
+    }
+
+    function refreshSalesCache() {
+        return Promise.resolve(readSales()).then(function (items) {
+            cacheSales = dedupeSales(items);
+            const derived = computeDerived(cacheCustomers, cacheSales);
+            lastDerived = derived;
+            render();
+            try {
+                if (legajoCustomerId) openLegajo(legajoCustomerId);
+            } catch (e) {}
+            return true;
+        }).catch(function () {
+            return false;
+        });
     }
 
     function apiGetInstallmentPlans(customerId) {
@@ -3665,8 +3679,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!s) return false;
                 if (isPayment(s)) return false;
                 if (isInstallmentSale(s)) return false;
+                const st = safeStr(s?.status || '').trim();
+                if (st === 'Reemplazada') return false;
+                const tipo = safeStr(s?.type || s?.sale_type || '').trim();
+                if (tipo !== 'Venta') return false;
                 const due = parseFloat(s?.due_amount || 0) || 0;
-                return (!!s?.on_account) || (due > 0);
+                return (due > 0.00001);
             };
 
             const ccSales = salesFor.filter(isCcSale);
@@ -3913,7 +3931,19 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (e) {
         }
 
-        const derived = computeDerived(cacheCustomers, cacheSales);
+        let derived = [];
+        try {
+            derived = computeDerived(cacheCustomers, cacheSales);
+        } catch (e) {
+            try { console.error('Customers render failed (computeDerived)', e); } catch (err) {}
+            try {
+                const colCount = INSTALLMENTS_ENABLED ? 8 : 7;
+                tbody.innerHTML = '<tr><td colspan="' + String(colCount) + '" class="px-4 py-6 text-sm text-center text-gray-500">No se pudieron cargar los datos.</td></tr>';
+            } catch (err) {
+            }
+            return;
+        }
+
         lastDerived = derived;
         const filtered = applyFilters(derived);
         const sorted = sortRows(filtered);
@@ -4040,12 +4070,21 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         Promise.resolve(readCustomers())
             .then(function (customers) {
-                cacheCustomers = dedupeCustomers(customers);
-                cacheSales = [];
-                render();
+                try {
+                    cacheCustomers = dedupeCustomers(customers);
+                    cacheSales = [];
+                    render();
+                } catch (e) {
+                    try { console.error('Customers load failed (after readCustomers)', e); } catch (err) {}
+                    throw e;
+                }
                 return Promise.resolve(readSales())
                     .then(function (sales) {
-                        cacheSales = ensureArray(sales);
+                        try {
+                            cacheSales = ensureArray(sales);
+                        } catch (e) {
+                            cacheSales = [];
+                        }
                         if (INSTALLMENTS_ENABLED) {
                             try {
                                 const ids = ensureArray(cacheCustomers).map(c => safeStr(c.id)).filter(Boolean);
@@ -4058,20 +4097,24 @@ document.addEventListener('DOMContentLoaded', function () {
                                     }
                                     installmentsSummaryByCustomerId = map;
                                     render();
-                                }).catch(function () {
+                                }).catch(function (e) {
+                                    try { console.error('Customers installments summary failed', e); } catch (err) {}
                                     installmentsSummaryByCustomerId = {};
                                     render();
                                 });
                             } catch (e) {
+                                try { console.error('Customers installments summary setup failed', e); } catch (err) {}
                                 installmentsSummaryByCustomerId = {};
                             }
                         }
                         render();
                     })
-                    .catch(function () {
+                    .catch(function (e) {
+                        try { console.error('Customers load failed (readSales)', e); } catch (err) {}
                     });
             })
-            .catch(function () {
+            .catch(function (e) {
+                try { console.error('Customers loadAll failed', e); } catch (err) {}
                 try {
                     cacheCustomers = [];
                     cacheSales = [];
@@ -4541,35 +4584,5 @@ document.addEventListener('DOMContentLoaded', function () {
     } catch (e) {
     }
 });
-</script>
-                if (filterScMenu && !filterScMenu.classList.contains('hidden')) {
-                    if (!filterScMenu.contains(t) && !filterScBtn.contains(t)) setDropdownOpen(filterScMenu, false);
-                }
-            } catch (e) {
-            }
-        });
-    }
-
-    applyCrmLabelsToUi(readCrmConfig());
-    Promise.resolve(refreshCrmCfgFromApi()).then(function () {
-        render();
-    });
-    initSorting();
-    initActions();
-    loadAll();
-
-    // Deep-link desde calendario
-    try {
-        const params = new URLSearchParams(window.location.search);
-        const openId = safeStr(params.get('open_legajo'));
-        if (openId) {
-            const doOpen = function () {
-                openLegajo(openId);
-            };
-            setTimeout(doOpen, 0);
-        }
-    } catch (e) {
-    }
-});
-</script>
-{% endblock %}
+ </script>
+ {% endblock %}

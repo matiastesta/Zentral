@@ -7,7 +7,7 @@ import math
 import os
 import unicodedata
 
-from flask import current_app, g, jsonify, render_template, request, url_for
+from flask import abort, current_app, g, jsonify, render_template, request, url_for
 from flask_login import login_required, current_user
 
 from sqlalchemy import func, inspect, text, and_, or_
@@ -1324,6 +1324,391 @@ def index():
     return render_template('sales/list.html', title='Ventas')
 
 
+def _compute_related_for_row(row: Sale, cid: str) -> dict:
+    """Build related metadata for a Sale row (Venta/Cambio cross-link).
+
+    Kept small and local to avoid refactors: mirrors the logic used in get_sale().
+    """
+    try:
+        kind, tok = _parse_related_from_notes(getattr(row, 'notes', '') or '')
+    except Exception:
+        kind, tok = None, ''
+
+    rel_row = None
+    if tok and (not _is_tmp_related_ticket(tok)):
+        try:
+            rel_row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == tok).first()
+        except Exception:
+            current_app.logger.exception('Failed to load related sale by ticket')
+            rel_row = None
+
+    if not rel_row:
+        try:
+            rt = getattr(row, 'exchange_return_total', None)
+            nt = getattr(row, 'exchange_new_total', None)
+            if rt is not None and nt is not None:
+                qrel = (
+                    db.session.query(Sale)
+                    .filter(Sale.company_id == cid)
+                    .filter(Sale.id != row.id)
+                    .filter(Sale.sale_date == row.sale_date)
+                    .filter(Sale.exchange_return_total == rt)
+                    .filter(Sale.exchange_new_total == nt)
+                )
+                try:
+                    if row.created_by_user_id:
+                        qrel = qrel.filter(Sale.created_by_user_id == row.created_by_user_id)
+                except Exception:
+                    pass
+                try:
+                    if row.customer_id:
+                        qrel = qrel.filter(Sale.customer_id == row.customer_id)
+                    elif row.customer_name:
+                        qrel = qrel.filter(Sale.customer_name == row.customer_name)
+                except Exception:
+                    pass
+                if row.created_at:
+                    try:
+                        lo = row.created_at - timedelta(minutes=5)
+                        hi = row.created_at + timedelta(minutes=5)
+                        qrel = qrel.filter(Sale.created_at >= lo, Sale.created_at <= hi)
+                    except Exception:
+                        pass
+                rel_row = qrel.order_by(Sale.created_at.desc(), Sale.id.desc()).first()
+        except Exception:
+            current_app.logger.exception('Failed to load related sale by exchange fields')
+            rel_row = None
+
+    if rel_row:
+        rel_ticket = str(getattr(rel_row, 'ticket', '') or '').strip()
+        rel_type = str(getattr(rel_row, 'sale_type', '') or '').strip()
+        try:
+            rel_status = str(getattr(rel_row, 'status', '') or '').strip().lower()
+        except Exception:
+            rel_status = ''
+
+        if rel_status in {'voided', 'anulado', 'anulada'}:
+            return {
+                'ticket': rel_ticket,
+                'type': _related_type_slug(rel_type),
+                'label': 'Relacionado: Ticket anulado',
+                'url': '',
+            }
+        if _is_tmp_related_ticket(rel_ticket):
+            return {
+                'ticket': '',
+                'type': _related_type_slug(rel_type),
+                'label': _fallback_related_summary(rel_row),
+                'url': '',
+            }
+        return {
+            'ticket': rel_ticket,
+            'type': _related_type_slug(rel_type),
+            'label': _build_related_label(getattr(row, 'sale_type', ''), rel_type, rel_ticket),
+            'url': '',
+        }
+
+    has_rel_hint = bool(tok) or (
+        getattr(row, 'exchange_return_total', None) is not None and getattr(row, 'exchange_new_total', None) is not None
+    )
+    return {
+        'ticket': '',
+        'type': ('sale' if kind == 'venta' else 'change' if kind == 'cambio' else ''),
+        'label': 'Relacionado (no disponible)' if has_rel_hint else '',
+        'url': '',
+    }
+
+
+@bp.get('/changes/<int:change_id>')
+@login_required
+@module_required('sales')
+def change_detail(change_id: int):
+    """Read-only view for Cambio tickets."""
+    cid = _company_id()
+    try:
+        sid = int(change_id or 0)
+    except Exception:
+        sid = 0
+    if not cid or sid <= 0:
+        abort(404)
+
+    row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.id == sid).first()
+    if not row:
+        abort(404)
+    if str(getattr(row, 'sale_type', '') or '').strip() != 'Cambio':
+        abort(404)
+
+    related = _compute_related_for_row(row, cid)
+    item = _serialize_sale(row, related=related)
+
+    related_item = None
+    try:
+        rel_ticket = str((related or {}).get('ticket') or '').strip()
+        if rel_ticket and (not _is_tmp_related_ticket(rel_ticket)):
+            rel_row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == rel_ticket).first()
+            if rel_row is not None:
+                rel_meta = _compute_related_for_row(rel_row, cid)
+                related_item = _serialize_sale(rel_row, related=rel_meta)
+    except Exception:
+        related_item = None
+
+    return render_template('sales/change_detail.html', title='Cambio', item=item, related_item=related_item)
+
+
+@bp.get('/changes/by-ticket/<path:ticket>')
+@login_required
+@module_required('sales')
+def change_detail_by_ticket(ticket):
+    """Backward-compatible entrypoint: resolve by ticket and redirect to /changes/<id>."""
+    t = str(ticket or '').strip()
+    cid = _company_id()
+    if not cid or not t:
+        abort(404)
+    row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == t).first()
+    if not row:
+        abort(404)
+    if str(getattr(row, 'sale_type', '') or '').strip() != 'Cambio':
+        abort(404)
+    related = _compute_related_for_row(row, cid)
+    item = _serialize_sale(row, related=related)
+
+    related_item = None
+    try:
+        rel_ticket = str((related or {}).get('ticket') or '').strip()
+        if rel_ticket and (not _is_tmp_related_ticket(rel_ticket)):
+            rel_row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == rel_ticket).first()
+            if rel_row is not None:
+                rel_meta = _compute_related_for_row(rel_row, cid)
+                related_item = _serialize_sale(rel_row, related=rel_meta)
+    except Exception:
+        related_item = None
+
+    return render_template('sales/change_detail.html', title='Cambio', item=item, related_item=related_item)
+
+
+@bp.post('/changes/<int:change_id>/void')
+@login_required
+@module_required('sales')
+def void_change(change_id: int):
+    cid = _company_id()
+    try:
+        sid = int(change_id or 0)
+    except Exception:
+        sid = 0
+    if not cid or sid <= 0:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    role = str(getattr(current_user, 'role', '') or '').strip()
+    if role not in {'admin', 'company_admin', 'zentral_admin'}:
+        return jsonify({'ok': False, 'error': 'forbidden', 'message': 'No tenés permisos para anular cambios.'}), 403
+
+    row = (
+        db.session.query(Sale)
+        .filter(Sale.company_id == cid, Sale.id == sid)
+        .with_for_update()
+        .first()
+    )
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    if str(getattr(row, 'sale_type', '') or '').strip() != 'Cambio':
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    change_ticket = str(getattr(row, 'ticket', '') or '').strip()
+    if not change_ticket:
+        return jsonify({'ok': False, 'error': 'invalid', 'message': 'Ticket inválido.'}), 400
+
+    res = void_operation(change_ticket)
+    if not res.get('ok'):
+        return jsonify(res), 400
+    return jsonify(res)
+
+
+def void_operation(ticket: str) -> dict:
+    """Anulación bilateral y atómica.
+
+    - Si el ticket es Cambio, anula también la Venta relacionada (si existe).
+    - Si el ticket es Venta con Cambio relacionado, anula también el Cambio.
+    - Revierte stock de ambos.
+    - Limpia relación en notas y exchange fields.
+    """
+
+    t = str(ticket or '').strip()
+    cid = _company_id()
+    if not cid or not t:
+        return {'ok': False, 'error': 'not_found'}
+
+    now = datetime.utcnow()
+    uid = None
+    try:
+        uid = int(getattr(current_user, 'id', 0) or 0) or None
+    except Exception:
+        uid = None
+
+    try:
+        role = str(getattr(current_user, 'role', '') or '').strip()
+        if role not in {'admin', 'company_admin', 'zentral_admin'}:
+            return {'ok': False, 'error': 'forbidden', 'message': 'No tenés permisos para anular tickets.'}
+    except Exception:
+        return {'ok': False, 'error': 'forbidden', 'message': 'No tenés permisos para anular tickets.'}
+
+    def _is_voided(obj: Sale) -> bool:
+        try:
+            st = str(getattr(obj, 'status', '') or '').strip().lower()
+        except Exception:
+            st = ''
+        return st in {'voided', 'anulado', 'anulada'}
+
+    def _set_void_fields(obj: Sale) -> None:
+        try:
+            obj.status = 'voided'
+        except Exception:
+            pass
+        try:
+            if hasattr(obj, 'voided_at'):
+                obj.voided_at = now
+        except Exception:
+            pass
+        try:
+            if hasattr(obj, 'voided_by'):
+                obj.voided_by = uid
+        except Exception:
+            pass
+
+    def _clean_relation_notes(a: Sale, b_ticket: str) -> None:
+        if not a:
+            return
+        bt = str(b_ticket or '').strip()
+        if not bt:
+            return
+        try:
+            txt = str(getattr(a, 'notes', '') or '')
+        except Exception:
+            txt = ''
+        if not txt:
+            return
+        try:
+            txt2 = re.sub(r"^Relacionado\s+a\s+(?:venta|cambio)\s+%s\s*$" % re.escape(bt), "", txt, flags=re.IGNORECASE | re.MULTILINE)
+            txt2 = re.sub(r"\n{3,}", "\n\n", txt2).strip() or None
+            a.notes = txt2
+        except Exception:
+            pass
+
+    try:
+        # Lock primary ticket
+        row = (
+            db.session.query(Sale)
+            .filter(Sale.company_id == cid, Sale.ticket == t)
+            .with_for_update()
+            .first()
+        )
+        if not row:
+            return {'ok': False, 'error': 'not_found', 'message': 'Ticket no encontrado.'}
+
+        # Find related ticket (either direction) using existing resolver.
+        rel_info = None
+        rel_ticket = ''
+        related_sale = None
+        try:
+            rel_info = _compute_related_for_row(row, cid)
+            rel_ticket = str((rel_info or {}).get('ticket') or '').strip()
+        except Exception:
+            rel_ticket = ''
+
+        if rel_ticket and (not _is_tmp_related_ticket(rel_ticket)) and rel_ticket != t:
+            related_sale = (
+                db.session.query(Sale)
+                .filter(Sale.company_id == cid, Sale.ticket == rel_ticket)
+                .with_for_update()
+                .first()
+            )
+
+        # Idempotent: if both are already voided, succeed.
+        if _is_voided(row) and (related_sale is None or _is_voided(related_sale)):
+            out = [t]
+            if related_sale is not None:
+                try:
+                    rt = str(getattr(related_sale, 'ticket', '') or '').strip()
+                    if rt and rt not in out:
+                        out.append(rt)
+                except Exception:
+                    pass
+            return {'ok': True, 'voided_tickets': out}
+
+        # Revert inventory for both (only if not already voided).
+        if not _is_voided(row):
+            _revert_inventory_for_ticket(t)
+        if related_sale is not None and (not _is_voided(related_sale)):
+            rt = str(getattr(related_sale, 'ticket', '') or '').strip()
+            if rt and rt != t:
+                _revert_inventory_for_ticket(rt)
+
+        # Clean relation notes both ways (best-effort).
+        if related_sale is not None:
+            _clean_relation_notes(row, str(getattr(related_sale, 'ticket', '') or '').strip())
+            _clean_relation_notes(related_sale, t)
+        else:
+            # If no related row loaded but notes have relation line, clean generic relation line.
+            try:
+                txt = str(getattr(row, 'notes', '') or '')
+                txt2 = re.sub(r"^Relacionado\s+a\s+(?:venta|cambio)\s+[^\n\r]+\s*$", "", txt, flags=re.IGNORECASE | re.MULTILINE)
+                txt2 = re.sub(r"\n{3,}", "\n\n", txt2).strip() or None
+                row.notes = txt2
+            except Exception:
+                pass
+
+        # Clear exchange fields both ways so no residual pairing stays.
+        try:
+            row.exchange_return_total = None
+            row.exchange_new_total = None
+        except Exception:
+            pass
+        try:
+            if related_sale is not None:
+                related_sale.exchange_return_total = None
+                related_sale.exchange_new_total = None
+        except Exception:
+            pass
+
+        _set_void_fields(row)
+        if related_sale is not None:
+            _set_void_fields(related_sale)
+
+        db.session.commit()
+
+        out = [t]
+        if related_sale is not None:
+            try:
+                rt = str(getattr(related_sale, 'ticket', '') or '').strip()
+                if rt and rt not in out:
+                    out.append(rt)
+            except Exception:
+                pass
+        return {'ok': True, 'voided_tickets': out}
+
+    except Exception as e:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            current_app.logger.exception('void_operation failed', extra={'company_id': cid, 'ticket': t})
+        except Exception:
+            pass
+        return {'ok': False, 'error': 'void_failed', 'message': str(e)}
+
+
+@bp.post('/api/sales/<ticket>/void')
+@login_required
+@module_required('sales')
+def void_sale(ticket):
+    t = str(ticket or '').strip()
+    res = void_operation(t)
+    if not res.get('ok'):
+        code = 403 if res.get('error') == 'forbidden' else 404 if res.get('error') == 'not_found' else 400
+        return jsonify(res), code
+    return jsonify(res)
+
+
 def _serialize_sale(
     row: Sale,
     related: dict = None,
@@ -1790,6 +2175,7 @@ def list_sales():
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
     include_replaced = str(request.args.get('include_replaced') or '').strip() in ('1', 'true', 'True')
+    include_voided = str(request.args.get('include_voided') or '').strip() in ('1', 'true', 'True')
     exclude_cc = str(request.args.get('exclude_cc') or '').strip() in ('1', 'true', 'True')
     limit = int(request.args.get('limit') or 300)
     if limit <= 0 or limit > 20000:
@@ -1834,6 +2220,8 @@ def list_sales():
         q = q.filter(Sale.sale_date <= d_to)
     if not include_replaced:
         q = q.filter(Sale.status != 'Reemplazada')
+    if not include_voided:
+        q = q.filter(Sale.status.notin_(['Anulado', 'voided']))
     if exclude_cc:
         q = q.filter(Sale.sale_type != 'CobroCC')
     q = q.order_by(Sale.sale_date.desc(), Sale.id.desc()).limit(limit)
@@ -2971,7 +3359,20 @@ def _cash_expected_now(cid: str, d: dt_date) -> float:
     ventas = _cash_sales_total(cid, d)
     egresos = _cash_expenses_total(cid, d)
     retiros = _cash_withdrawals_total(cid, d)
-    return float((ventas or 0.0) - (egresos or 0.0) - (retiros or 0.0))
+    total = float((ventas or 0.0) - (egresos or 0.0) - (retiros or 0.0))
+    try:
+        current_app.logger.info(
+            'cash_count expected_now cid=%s date=%s ventas_efectivo=%s egresos_efectivo=%s retiros_efectivo=%s total=%s',
+            str(cid),
+            (d.isoformat() if d else None),
+            float(ventas or 0.0),
+            float(egresos or 0.0),
+            float(retiros or 0.0),
+            float(total or 0.0),
+        )
+    except Exception:
+        pass
+    return total
 
 
 def _last_cash_event_now(cid: str, d: dt_date):
@@ -4503,6 +4904,12 @@ def update_sale(ticket):
         return jsonify({'ok': False, 'error': 'not_found'}), 404
 
     try:
+        if str(getattr(row, 'sale_type', '') or '').strip() == 'Cambio':
+            return jsonify({'ok': False, 'error': 'locked', 'message': 'Los tickets de cambio son de solo lectura.'}), 403
+    except Exception:
+        pass
+
+    try:
         st = str(getattr(row, 'sale_type', '') or '').strip()
         notes = str(getattr(row, 'notes', '') or '')
         if st in ('AjusteInvCosto', 'IngresoAjusteInv') or ('AdjustmentId:' in notes):
@@ -4610,6 +5017,12 @@ def delete_sale(ticket):
     row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == t).first()
     if not row:
         return jsonify({'ok': False, 'error': 'not_found', 'message': 'Ticket no encontrado.'}), 404
+
+    try:
+        if str(getattr(row, 'sale_type', '') or '').strip() == 'Cambio':
+            return jsonify({'ok': False, 'error': 'locked', 'message': 'Los tickets de cambio son de solo lectura.'}), 403
+    except Exception:
+        pass
 
     try:
         st = str(getattr(row, 'sale_type', '') or '').strip()
@@ -4819,8 +5232,8 @@ def _cash_sales_total(cid: str, d: dt_date) -> float:
             .filter(Sale.company_id == cid)
             .filter(Sale.sale_date == d)
             .filter(Sale.payment_method == 'Efectivo')
-            .filter(Sale.status != 'Reemplazada')
-            .filter(Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota', 'Cambio', 'Devolucion', 'Devolución', 'Pago']))
+            .filter(Sale.status == 'Completada')
+            .filter(Sale.sale_type == 'Venta')
         )
         return float(q.scalar() or 0.0)
     except Exception:
@@ -4835,6 +5248,17 @@ def _cash_expenses_total(cid: str, d: dt_date) -> float:
             .filter(Expense.expense_date == d)
             .filter(Expense.payment_method == 'Efectivo')
         )
+        # Algunos schemas tienen status / tipo. Si existen, filtramos.
+        try:
+            if hasattr(Expense, 'status'):
+                q = q.filter(Expense.status == 'completado')
+        except Exception:
+            pass
+        try:
+            if hasattr(Expense, 'expense_type'):
+                q = q.filter(func.lower(Expense.expense_type) == 'egreso')
+        except Exception:
+            pass
         return float(q.scalar() or 0.0)
     except Exception:
         return 0.0
@@ -4851,6 +5275,49 @@ def _cash_withdrawals_total(cid: str, d: dt_date) -> float:
         return float(q.scalar() or 0.0)
     except Exception:
         return 0.0
+
+
+@bp.get('/api/cash-count/calc')
+@login_required
+@module_required('sales')
+def cash_count_calc_api():
+    raw = (request.args.get('date') or '').strip()
+    try:
+        d = dt_date.fromisoformat(raw) if raw else dt_date.today()
+    except Exception:
+        d = dt_date.today()
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    ventas = _cash_sales_total(cid, d)
+    egresos = _cash_expenses_total(cid, d)
+    retiros = _cash_withdrawals_total(cid, d)
+    total = float((ventas or 0.0) - (retiros or 0.0) - (egresos or 0.0))
+
+    try:
+        current_app.logger.info(
+            'cash_count calc_api cid=%s date=%s ventas_efectivo=%s retiros_efectivo=%s egresos_efectivo=%s total=%s',
+            str(cid),
+            (d.isoformat() if d else None),
+            float(ventas or 0.0),
+            float(retiros or 0.0),
+            float(egresos or 0.0),
+            float(total or 0.0),
+        )
+    except Exception:
+        pass
+
+    return jsonify({
+        'ok': True,
+        'date': d.isoformat(),
+        'company_id': str(cid),
+        'ventas_efectivo': _round2(ventas),
+        'retiros_efectivo': _round2(retiros),
+        'egresos_efectivo': _round2(egresos),
+        'efectivo_dia_calculado': _round2(total),
+    })
 
 
 @bp.get('/api/cash-register/status')

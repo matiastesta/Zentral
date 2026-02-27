@@ -521,6 +521,7 @@
                 const o = (opts && typeof opts === 'object') ? opts : {};
                 const okLabel = String(o.okText || 'Confirmar');
                 const cancelLabel = String(o.cancelText || 'Cancelar');
+                const okVariant = String(o.okVariant || '').trim().toLowerCase();
                 if (!els.modal || !els.message || !els.title) {
                     return Promise.resolve(window.confirm(ttl + (msg ? (': ' + msg) : '')));
                 }
@@ -529,6 +530,23 @@
                 els.message.textContent = msg;
                 if (els.btnOk) els.btnOk.textContent = okLabel;
                 if (els.btnCancel) els.btnCancel.textContent = cancelLabel;
+
+                try {
+                    if (els.btnOk) {
+                        const btn = els.btnOk;
+                        btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                        btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                        btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                        if (okVariant === 'success' || okVariant === 'green') {
+                            btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                        } else if (okVariant === 'primary' || okVariant === 'brand' || okVariant === 'indigo') {
+                            btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                        } else {
+                            btn.classList.add('bg-red-600', 'hover:bg-red-700');
+                        }
+                    }
+                } catch (e) {
+                }
                 els.modal.classList.remove('hidden');
                 return new Promise(function (resolve) {
                     confirmPromiseResolve = resolve;

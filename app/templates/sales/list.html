@@ -1513,6 +1513,130 @@ document.addEventListener('DOMContentLoaded', function() {
         INSTALLMENTS_ENABLED = false;
     }
 
+    function scrollAElemento(target) {
+        let el = null;
+        try {
+            if (!target) {
+                el = document.querySelector('#historial-movimientos') || document.querySelector('.historial') || null;
+            } else if (typeof target === 'string') {
+                el = document.querySelector(target);
+            } else if (target && typeof target === 'object' && target.nodeType === 1) {
+                el = target;
+            } else {
+                el = document.querySelector('#historial-movimientos') || document.querySelector('.historial') || null;
+            }
+        } catch (e) {
+            el = null;
+        }
+        if (!el || typeof el.scrollIntoView !== 'function') return;
+        try {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (e) {
+            try {
+                el.scrollIntoView(true);
+            } catch (err) {
+            }
+        }
+    }
+
+    var voidingSaleTickets = (window.__salesVoidingSaleTickets && window.__salesVoidingSaleTickets instanceof Set)
+        ? window.__salesVoidingSaleTickets
+        : (window.__salesVoidingSaleTickets = new Set());
+
+    function voidSaleByTicket(ticket) {
+        const t = String(ticket || '').trim();
+        if (!t) return;
+        if (voidingSaleTickets.has(t)) return;
+        const opened = confirmVoidSale(t);
+        if (!opened && !modalDeleteTicket) return;
+        voidingSaleTickets.add(t);
+
+        if (!modalDeleteTicket || !btnConfirmDeleteTicket) {
+            if (!opened) return;
+            apiVoidSale(t).then(function (res) {
+                if (!res || res.ok !== true) {
+                    const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo anular la venta.';
+                    showAlertModal(msg, 'Error', 'Operación fallida');
+                    return;
+                }
+                const vt = (res && Array.isArray(res.voided_tickets)) ? res.voided_tickets : [];
+                const sset = new Set(vt.map(x => String(x || '').trim()).filter(Boolean));
+                if (sset.size) {
+                    salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => !sset.has(String(s?.ticket || '').trim()));
+                } else {
+                    salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => String(s?.ticket || '').trim() !== t);
+                }
+                renderHistorialFromCache();
+                applyVentasFilters();
+                initKpisFromSales();
+                recalcularArqueoAutomatico();
+            }).finally(function () {
+                try { voidingSaleTickets.delete(t); } catch (e) {}
+            });
+            return;
+        }
+
+        if (btnConfirmDeleteTicket) {
+            btnConfirmDeleteTicket.disabled = false;
+            btnConfirmDeleteTicket.onclick = function () {
+                if (deleteTicketState === 'success' || deleteTicketState === 'error') {
+                    closeDeleteTicketModal();
+                    return;
+                }
+                if (deleteTicketState !== 'confirm') return;
+                btnConfirmDeleteTicket.disabled = true;
+                apiVoidSale(t).then(function (res) {
+                    if (!res || res.ok !== true) {
+                        const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo anular la venta.';
+                        setDeleteTicketModalState('error', { message: msg });
+                        return;
+                    }
+                    const vt = (res && Array.isArray(res.voided_tickets)) ? res.voided_tickets : [];
+                    const sset = new Set(vt.map(x => String(x || '').trim()).filter(Boolean));
+                    if (sset.size) {
+                        salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => !sset.has(String(s?.ticket || '').trim()));
+                    } else {
+                        salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => String(s?.ticket || '').trim() !== t);
+                    }
+                    renderHistorialFromCache();
+                    applyVentasFilters();
+                    initKpisFromSales();
+                    recalcularArqueoAutomatico();
+                    scrollAElemento(historial || home);
+                    setDeleteTicketModalState('success');
+                }).catch(function () {
+                    setDeleteTicketModalState('error', { message: 'No se pudo anular la venta.' });
+                }).finally(function () {
+                    try { voidingSaleTickets.delete(t); } catch (e) {}
+                    if (btnConfirmDeleteTicket) btnConfirmDeleteTicket.disabled = false;
+                });
+            };
+        }
+    }
+
+    // Deep-link: abrir ticket desde querystring (?open_ticket=#C0001 / #0045)
+    try {
+        const params = new URLSearchParams(window.location.search || '');
+        const openTicketRaw = String(params.get('open_ticket') || '').trim();
+        if (openTicketRaw) {
+            Promise.resolve(apiGetSale(openTicketRaw)).then(function (sale) {
+                if (!sale) {
+                    openEditTicket(openTicketRaw);
+                    return;
+                }
+                try {
+                    const tp = String(sale?.type || sale?.sale_type || '').trim();
+                    if (tp === 'Cambio') openChangeReadonly(sale?.id);
+                    else openEditTicket(String(sale?.ticket || openTicketRaw));
+                } catch (e) {
+                    openEditTicket(String(sale?.ticket || openTicketRaw));
+                }
+            }).catch(function () {
+                openEditTicket(openTicketRaw);
+            });
+        }
+    } catch (e) {}
+
     function initVentaStep1ColumnsUi() {
         try { loadVentaStep1ColumnsConfig(); } catch (e) {}
         if (btnVentaStep1Columns) {
@@ -1599,6 +1723,25 @@ document.addEventListener('DOMContentLoaded', function() {
         if (s.startsWith('/c/')) return s;
         if (!TENANT_PREFIX) return s;
         return TENANT_PREFIX + s;
+    }
+
+    function navPath(p) {
+        return apiPath(p);
+    }
+
+    function openChangeReadonly(changeId) {
+        const id = parseInt(String(changeId || '').trim(), 10) || 0;
+        if (id <= 0) return;
+        window.location.href = navPath('/sales/changes/' + encodeURIComponent(String(id)));
+    }
+
+    function apiVoidChange(changeId) {
+        const id = parseInt(String(changeId || '').trim(), 10) || 0;
+        if (id <= 0) return Promise.resolve({ ok: false, error: 'invalid' });
+        return fetchJsonSafe(apiPath('/sales/changes/' + encodeURIComponent(String(id)) + '/void'), {
+            method: 'POST',
+            credentials: 'same-origin',
+        });
     }
 
     function isPromise(v) {
@@ -3682,6 +3825,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function historialAccionesHtml(ticket) {
         const t = String(ticket || '').trim();
+        const row = findSaleInCache(t);
+        const tp = String(row?.type || row?.sale_type || 'Venta').trim().toLowerCase();
+        const isCambio = (tp === 'cambio') || tp.includes('cambio');
+        const label = isCambio ? 'Ver detalle (solo lectura)' : 'Ver / editar ticket';
+        const changeId = parseInt(String(row?.id || 0), 10) || 0;
+        const voidBtn = (isCambio && changeId > 0)
+            ? ('<button type="button" class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 opcion-void-cambio" data-change-id="' + String(changeId) + '" data-ticket="' + t + '">Anular cambio</button>')
+            : '';
+        const voidSaleBtn = (!isCambio)
+            ? ('<button type="button" class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 opcion-void-venta" data-ticket="' + t + '">Anular venta</button>')
+            : '';
+        const delBtn = '';
         return ''
             + '<div class="relative inline-block text-left">'
             +   '<button type="button" class="btn-mov-menu inline-flex items-center justify-center h-7 w-7 rounded-full hover:bg-gray-100" data-ticket="' + t + '">' 
@@ -3689,8 +3844,10 @@ document.addEventListener('DOMContentLoaded', function() {
             +   '</button>'
             +   '<div class="menu-mov-acciones hidden origin-top-right absolute right-0 mt-1 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">'
             +     '<div class="py-1 text-[11px]">'
-            +       '<button type="button" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 opcion-ver-ticket" data-ticket="' + t + '">Ver / editar ticket</button>'
-            +       '<button type="button" class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 opcion-eliminar-ticket" data-ticket="' + t + '">Eliminar ticket</button>'
+            +       '<button type="button" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 opcion-ver-ticket" data-ticket="' + t + '" data-open-mode="' + (isCambio ? 'readonly' : 'edit') + '" data-change-id="' + String(changeId) + '">' + label + '</button>'
+            +       voidBtn
+            +       voidSaleBtn
+            +       delBtn
             +     '</div>'
             +   '</div>'
             + '</div>';
@@ -3844,6 +4001,15 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }).catch(function () {
             return { ok: false, error: 'network' };
+        });
+    }
+
+    function apiVoidSale(ticket) {
+        const t = String(ticket || '').trim();
+        if (!t) return Promise.resolve({ ok: false, error: 'invalid' });
+        return fetchJsonSafe(apiPath('/sales/api/sales/' + encodeURIComponent(t) + '/void'), {
+            method: 'POST',
+            credentials: 'same-origin',
         });
     }
 
@@ -4354,6 +4520,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const isGift = !!(s && s.is_gift);
             const giftCode = String(s?.gift_code || '');
             tr.setAttribute('data-ticket', ticket);
+            tr.setAttribute('data-fecha', String(s?.fecha || '').trim());
+            tr.setAttribute('data-cliente', String(s?.customer_name || '').trim());
+            tr.setAttribute('data-pago-key', normPaymentMethodKey(String(s?.payment_method || '').trim()));
             tr.setAttribute('data-is-gift', isGift ? '1' : '0');
             tr.setAttribute('data-gift-code', giftCode);
             tr.setAttribute('data-employee-id', String(s?.employee_id || '').trim());
@@ -4645,18 +4814,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         rows.forEach(tr => {
-            const tds = tr.querySelectorAll('td');
-            if (!tds || tds.length < 7) return;
             const isGiftRow = String(tr.getAttribute('data-is-gift') || '') === '1';
 
-            const vTicketNorm = String(tr.getAttribute('data-ticket') || tds[0]?.textContent || '').trim();
+            const vTicketNorm = String(tr.getAttribute('data-ticket') || '').trim();
             const vGift = String(tr.getAttribute('data-gift-code') || '').trim();
             const vTicketPrimary = ventasGiftOnly ? (vGift || vTicketNorm) : vTicketNorm;
-            const vFecha = String(tds[1]?.textContent || '').trim();
-            const vCliente = String(tds[2]?.textContent || '').trim();
-            const vPago = String(tds[5]?.textContent || '').trim();
-            const vPagoKey = normPaymentMethodKey(vPago);
-            const vEstado = String(tds[6]?.textContent || '').trim();
+            const vFechaIso = String(tr.getAttribute('data-fecha') || '').trim();
+            const vCliente = String(tr.getAttribute('data-cliente') || '').trim();
+            const vPagoKey = String(tr.getAttribute('data-pago-key') || '').trim();
             const vTipoNorm = String(tr.getAttribute('data-type') || '').trim();
             const vRespId = String(tr.getAttribute('data-responsible-id') || '').trim();
             const vEmpFallback = String(tr.getAttribute('data-employee-id') || '').trim();
@@ -4675,7 +4840,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (ok && !ventasMultiMatches(vEmpId, 'employee')) ok = false;
 
             if (ok && fromTs && toTs) {
-                const ts = parseDateToTs(vFecha);
+                const ts = parseDateToTs(vFechaIso);
                 if (!ts || ts < fromTs || ts > toTs) ok = false;
             }
 
@@ -6142,6 +6307,43 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         try {
+            const fecha = String(document.getElementById('fecha-arqueo')?.value || '').trim();
+            if (fecha) {
+                fetch(apiPath('/sales/api/cash-count/calc?date=' + encodeURIComponent(fecha)), { credentials: 'same-origin' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data || data.ok !== true) throw new Error('calc_failed');
+                        const efectivo = parseMonedaARSInput(data.efectivo_dia_calculado ?? 0) || 0;
+                        setAndValidate(efectivo);
+                        try {
+                            const el = document.getElementById('msg-arqueo-retiros');
+                            if (el) {
+                                const sumRetiros = parseMonedaARSInput(data.retiros_efectivo ?? 0) || 0;
+                                if (sumRetiros > 0) {
+                                    el.textContent = 'Retiros de caja: ' + formatearMoneda(sumRetiros);
+                                    el.classList.remove('hidden');
+                                } else {
+                                    el.classList.add('hidden');
+                                }
+                            }
+                        } catch (e) {}
+                    })
+                    .catch(() => {
+                        // Fallback legacy (cache local) por si el endpoint falla en algún deploy viejo.
+                        try {
+                            const res = calcularEfectivoDelDiaDesdeHistorial();
+                            if (isPromise(res)) {
+                                Promise.resolve(res).then(setAndValidate).catch(function () { setAndValidate(0); });
+                                return;
+                            }
+                            setAndValidate(res);
+                        } catch (e) {
+                            setAndValidate(0);
+                        }
+                    });
+                return;
+            }
+
             const res = calcularEfectivoDelDiaDesdeHistorial();
             if (isPromise(res)) {
                 Promise.resolve(res).then(setAndValidate).catch(function () { setAndValidate(0); });
@@ -6444,8 +6646,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const productId = String(it?.product_id || it?.productId || '').trim();
         const precio = parseNumeroFlexible(it?.precio ?? it?.unit_price ?? it?.price ?? 0) || 0;
         const cantidad = parseNumeroFlexible(it?.cantidad ?? it?.qty ?? 1) || 0;
-        let descuento = parseNumeroFlexible(it?.descuento ?? it?.discount_pct ?? 0) || 0;
-        if (!descuento && cartGeneralDiscountPct > 0) descuento = cartGeneralDiscountPct;
+        const rawDesc = (it?.descuento ?? it?.discount_pct);
+        let descuento = null;
+        if (rawDesc !== null && rawDesc !== undefined && String(rawDesc).trim() !== '') {
+            const n = parseNumeroFlexible(rawDesc);
+            if (isFinite(n) && n > 0) descuento = n;
+        }
         const subtotal = parseNumeroFlexible(it?.subtotal ?? 0) || ((precio * cantidad) * (1 - (Math.max(0, Math.min(100, descuento)) / 100)));
 
         const tr = document.createElement('tr');
@@ -6454,7 +6660,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <td class="px-1 py-1 text-gray-700 truncate col-name">${escapeHtml(nombre)}</td>
             <td class="px-1 py-1 text-right text-gray-500 col-price"><input type="text" inputmode="decimal" class="input-precio cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
             <td class="px-1 py-1 text-right text-gray-500 col-qty"><input type="number" min="0" step="1" class="input-cantidad cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${String(cantidad)}"></td>
-            <td class="px-1 py-1 text-right text-gray-500 col-disc"><input type="text" inputmode="decimal" class="input-descuento cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${descuento ? formatearPct(descuento) : ''}"></td>
+            <td class="px-1 py-1 text-right text-gray-500 col-disc"><input type="text" inputmode="decimal" class="input-descuento cart-num px-1 py-0.5 border rounded text-right text-[11px]" placeholder="%" value="${(descuento && descuento > 0) ? formatearPct(descuento) : ''}"></td>
             <td class="px-1 py-1 text-right text-gray-900 font-medium col-subt"><input type="text" inputmode="decimal" class="input-subtotal cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(subtotal)}"></td>
             <td class="px-1 py-1 col-del">
                 <button type="button" class="btn-eliminar-item inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-50 text-red-500 hover:bg-red-100">
@@ -6468,17 +6674,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const inputCantidad = tr.querySelector('.input-cantidad');
         const inputDescuento = tr.querySelector('.input-descuento');
         const inputSubtotal = tr.querySelector('.input-subtotal');
-        [
-            { el: inputPrecio, origen: 'precio' },
-            { el: inputCantidad, origen: 'cantidad' },
-            { el: inputDescuento, origen: 'descuento' },
-            { el: inputSubtotal, origen: 'subtotal' },
-        ].forEach(({ el, origen }) => {
-            if (!el) return;
-            el.addEventListener('input', function () {
-                recalcularFila(tr, origen === 'subtotal' ? 'subtotal' : 'otros');
+        if (inputPrecio) inputPrecio.addEventListener('input', function () { recalcularFila(tr, 'otros'); });
+        if (inputCantidad) inputCantidad.addEventListener('input', function () { recalcularFila(tr, 'otros'); });
+        if (inputSubtotal) inputSubtotal.addEventListener('input', function () { recalcularFila(tr, 'subtotal'); });
+        if (inputDescuento) {
+            inputDescuento.addEventListener('input', function () {
+                recalcularFila(tr, 'otros', { formatDesc: false });
             });
-        });
+            inputDescuento.addEventListener('blur', function () {
+                recalcularFila(tr, 'otros', { formatDesc: true });
+            });
+        }
     }
 
     function setPaymentMethodUi(method) {
@@ -6498,6 +6704,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 showAlertModal('No se pudo cargar el ticket ' + t + '.', 'Error', 'Operación fallida');
                 return;
             }
+
+            try {
+                const tp = String(sale?.type || sale?.sale_type || '').trim();
+                if (tp === 'Cambio') {
+                    openChangeReadonly(sale?.id);
+                    return;
+                }
+            } catch (e) {}
 
             showFlujo();
             setEditState(t);
@@ -6868,17 +7082,64 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function recalcularFila(tr, origen) {
+    function parsePctInputLoose(raw) {
+        try {
+            const s0 = String(raw || '').trim();
+            if (!s0) return null;
+            const s = s0
+                .replace(/\s+/g, '')
+                .replace(/%/g, '')
+                .replace(/,/g, '.')
+                .replace(/[^0-9.\-]/g, '');
+            if (!s || s === '-' || s === '.' || s === '-.' || s === '.-') return null;
+            const n = Number(s);
+            if (!Number.isFinite(n)) return null;
+            return n;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function clampPct(n) {
+        try {
+            const v = Number(n);
+            if (!Number.isFinite(v)) return 0;
+            return Math.max(0, Math.min(100, v));
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    function formatPctCompact(n) {
+        try {
+            const v = Number(n);
+            if (!Number.isFinite(v) || v <= 0) return '';
+            const rounded = Math.round(v * 100) / 100;
+            if (Math.abs(rounded - Math.round(rounded)) < 1e-9) return String(Math.round(rounded));
+            let s = String(rounded);
+            if (s.includes('e') || s.includes('E')) s = String(v.toFixed(2));
+            s = s.replace(/\.?0+$/g, '');
+            return s.replace(/\./g, ',');
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function recalcularFila(tr, origen, opts) {
         const inputPrecio = tr.querySelector('.input-precio');
         const inputCantidad = tr.querySelector('.input-cantidad');
         const inputDescuento = tr.querySelector('.input-descuento');
         const inputSubtotal = tr.querySelector('.input-subtotal');
         if (!inputPrecio || !inputCantidad || !inputDescuento || !inputSubtotal) return;
 
+        const o = (opts && typeof opts === 'object') ? opts : {};
+        const formatDesc = (o.formatDesc !== false);
+
         let precio = parseNumeroFlexible(inputPrecio.value || '0');
         let cantidad = parseNumeroFlexible(inputCantidad.value || '0');
         const rawDesc = String(inputDescuento.value || '');
-        let descuento = parseNumeroFlexible(rawDesc || '0');
+        const hasDesc = !!rawDesc.trim();
+        let descuento = hasDesc ? (parsePctInputLoose(rawDesc) ?? 0) : 0;
         let subtotal = parseNumeroFlexible(inputSubtotal.value || '0');
 
         if (precio < 0) precio = 0;
@@ -6890,21 +7151,26 @@ document.addEventListener('DOMContentLoaded', function() {
             // Ajustar descuento según subtotal editado
             const ratio = subtotal / base;
             descuento = Math.max(0, Math.min(100, (1 - ratio) * 100));
-            if (isFinite(descuento)) {
-                inputDescuento.value = formatearPct(descuento);
-            } else {
-                inputDescuento.value = '';
+            if (formatDesc) {
+                if (isFinite(descuento)) {
+                    inputDescuento.value = formatPctCompact(descuento);
+                } else {
+                    inputDescuento.value = '';
+                }
             }
         } else {
             // Ajustar subtotal según precio, cantidad o descuento
-            if (descuento < 0) descuento = 0;
-            if (descuento > 100) descuento = 100;
+            descuento = clampPct(descuento);
             subtotal = base * (1 - descuento / 100);
             inputSubtotal.value = formatearNumero(subtotal);
-            if (isFinite(descuento)) {
-                inputDescuento.value = formatearPct(descuento);
-            } else {
-                inputDescuento.value = '';
+            if (formatDesc) {
+                if (!hasDesc) {
+                    inputDescuento.value = '';
+                } else if (isFinite(descuento)) {
+                    inputDescuento.value = formatPctCompact(descuento);
+                } else {
+                    inputDescuento.value = '';
+                }
             }
         }
 
@@ -6925,7 +7191,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const nombre = (tr.querySelector('td')?.textContent || '').trim();
             const precio = parseNumeroFlexible(tr.querySelector('.input-precio')?.value || '0') || 0;
             const cantidad = parseNumeroFlexible(tr.querySelector('.input-cantidad')?.value || '0') || 0;
-            const descuento = parseNumeroFlexible(tr.querySelector('.input-descuento')?.value || '0') || 0;
+            const rawDesc = String(tr.querySelector('.input-descuento')?.value || '').trim();
+            const descuento = rawDesc ? (parseNumeroFlexible(rawDesc) || 0) : null;
             const subtotal = parseNumeroFlexible(tr.querySelector('.input-subtotal')?.value || '0') || 0;
             const productId = tr.getAttribute('data-product-id') || '';
             return { nombre, precio, cantidad, descuento, subtotal, product_id: productId };
@@ -7120,7 +7387,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <td class="px-1 py-1 text-gray-700 truncate col-name">${nombre}</td>
             <td class="px-1 py-1 text-right text-gray-500 col-price"><input type="text" inputmode="decimal" class="input-precio cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(precio)}"></td>
             <td class="px-1 py-1 text-right text-gray-500 col-qty"><input type="number" min="0" step="1" class="input-cantidad cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${cantidad}"></td>
-            <td class="px-1 py-1 text-right text-gray-500 col-disc"><input type="text" inputmode="decimal" class="input-descuento cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${descuentoValue}"></td>
+            <td class="px-1 py-1 text-right text-gray-500 col-disc"><input type="text" inputmode="decimal" class="input-descuento cart-num px-1 py-0.5 border rounded text-right text-[11px]" placeholder="%" value="${descuentoValue}"></td>
             <td class="px-1 py-1 text-right text-gray-900 font-medium col-subt"><input type="text" inputmode="decimal" class="input-subtotal cart-num px-1 py-0.5 border rounded text-right text-[11px]" value="${formatearNumero(subtotal)}"></td>
             <td class="px-1 py-1 col-del">
                 <button type="button" class="btn-eliminar-item inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-50 text-red-500 hover:bg-red-100">
@@ -7136,29 +7403,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const inputDescuento = tr.querySelector('.input-descuento');
         const inputSubtotal = tr.querySelector('.input-subtotal');
 
-        [
-            { el: inputPrecio, origen: 'precio' },
-            { el: inputCantidad, origen: 'cantidad' },
-            { el: inputDescuento, origen: 'descuento' },
-            { el: inputSubtotal, origen: 'subtotal' },
-        ].forEach(({ el, origen }) => {
-            if (!el) return;
-            el.addEventListener('input', function () {
-                recalcularFila(tr, origen === 'subtotal' ? 'subtotal' : 'otros');
-            });
-        });
-
-        // UX para el descuento: limpiar 0.00 al enfocar y restaurar si queda vacío
+        if (inputPrecio) inputPrecio.addEventListener('input', function () { recalcularFila(tr, 'otros'); });
+        if (inputCantidad) inputCantidad.addEventListener('input', function () { recalcularFila(tr, 'otros'); });
+        if (inputSubtotal) inputSubtotal.addEventListener('input', function () { recalcularFila(tr, 'subtotal'); });
         if (inputDescuento) {
-            inputDescuento.addEventListener('focus', function() {
-                if (inputDescuento.value === '0.00' || inputDescuento.value === '0' || inputDescuento.value === '0.0') {
-                    inputDescuento.value = '';
-                }
+            inputDescuento.addEventListener('input', function () {
+                recalcularFila(tr, 'otros', { formatDesc: false });
             });
-            inputDescuento.addEventListener('blur', function() {
-                if (inputDescuento.value.trim() !== '') {
-                    recalcularFila(tr, 'otros');
-                }
+            inputDescuento.addEventListener('blur', function () {
+                recalcularFila(tr, 'otros', { formatDesc: true });
             });
         }
 
@@ -8304,23 +8557,70 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnCloseDeleteTicket = document.getElementById('btn-close-delete-ticket');
 
     let deleteTicketCurrent = '';
+    let deleteTicketMode = 'delete';
+    let voidChangeCurrentId = 0;
+    let voidChangeRelatedTicket = '';
+    let voidSaleCurrentTicket = '';
+    let voidSaleRelatedTicket = '';
     let deleteTicketState = 'confirm';
 
     function setDeleteTicketModalState(state, opts) {
         deleteTicketState = String(state || 'confirm');
         const o = opts || {};
         if (deleteTicketState === 'confirm') {
-            if (modalDeleteTicketTitle) modalDeleteTicketTitle.textContent = 'Eliminar ticket';
-            if (modalDeleteTicketSubtitle) modalDeleteTicketSubtitle.textContent = 'Esta acción es irreversible. Se eliminarán la venta y todos sus registros asociados (movimientos, cuenta corriente/cuotas) y se revertirá el stock.';
+            if (deleteTicketMode === 'void_change') {
+                if (modalDeleteTicketTitle) modalDeleteTicketTitle.textContent = 'Anular cambio';
+                if (modalDeleteTicketSubtitle) {
+                    if (voidChangeRelatedTicket) {
+                        modalDeleteTicketSubtitle.textContent = 'Esta acción es irreversible. Se anulará el cambio y también la venta relacionada. Se revertirá el stock de ambos tickets.';
+                    } else {
+                        modalDeleteTicketSubtitle.textContent = 'Esta acción es irreversible. Se anulará el cambio y también la venta relacionada (si existe). Se revertirá el stock de ambos tickets.';
+                    }
+                }
+            } else if (deleteTicketMode === 'void_sale') {
+                if (modalDeleteTicketTitle) modalDeleteTicketTitle.textContent = 'Anular venta';
+                if (modalDeleteTicketSubtitle) {
+                    if (voidSaleRelatedTicket) {
+                        modalDeleteTicketSubtitle.textContent = 'Esta acción es irreversible. Se anulará la venta y también el cambio relacionado. Se revertirá el stock de ambos tickets.';
+                    } else {
+                        modalDeleteTicketSubtitle.textContent = 'Esta acción es irreversible. Se anulará la venta y se revertirá el stock del ticket.';
+                    }
+                }
+            } else {
+                if (modalDeleteTicketTitle) modalDeleteTicketTitle.textContent = 'Eliminar ticket';
+                if (modalDeleteTicketSubtitle) modalDeleteTicketSubtitle.textContent = 'Esta acción es irreversible. Se eliminarán la venta y todos sus registros asociados (movimientos, cuenta corriente/cuotas) y se revertirá el stock.';
+            }
             if (modalDeleteTicketBody && deleteTicketLabel) {
-                modalDeleteTicketBody.innerHTML = '<div class="text-sm text-gray-700 text-center">¿Confirmás eliminar el ticket <span id="delete-ticket-label" class="font-semibold"></span>?</div>';
+                if (deleteTicketMode === 'void_change') {
+                    if (voidChangeRelatedTicket) {
+                        modalDeleteTicketBody.innerHTML = '<div class="text-sm text-gray-700 text-center">¿Confirmás anular el cambio <span id="delete-ticket-label" class="font-semibold"></span> y también la venta relacionada <span class="font-semibold">' + escapeHtml(voidChangeRelatedTicket) + '</span>?</div>';
+                    } else {
+                        modalDeleteTicketBody.innerHTML = '<div class="text-sm text-gray-700 text-center">¿Confirmás anular el cambio <span id="delete-ticket-label" class="font-semibold"></span> y su venta relacionada?</div>';
+                    }
+                } else if (deleteTicketMode === 'void_sale') {
+                    if (voidSaleRelatedTicket) {
+                        modalDeleteTicketBody.innerHTML = '<div class="text-sm text-gray-700 text-center">¿Confirmás anular la venta <span id="delete-ticket-label" class="font-semibold"></span> y también el cambio relacionado <span class="font-semibold">' + escapeHtml(voidSaleRelatedTicket) + '</span>?</div>';
+                    } else {
+                        modalDeleteTicketBody.innerHTML = '<div class="text-sm text-gray-700 text-center">¿Confirmás anular la venta <span id="delete-ticket-label" class="font-semibold"></span>?</div>';
+                    }
+                } else {
+                    modalDeleteTicketBody.innerHTML = '<div class="text-sm text-gray-700 text-center">¿Confirmás eliminar el ticket <span id="delete-ticket-label" class="font-semibold"></span>?</div>';
+                }
                 const lbl = modalDeleteTicketBody.querySelector('#delete-ticket-label');
                 if (lbl) lbl.textContent = String(deleteTicketCurrent || '').trim();
             }
             if (btnCancelDeleteTicket) btnCancelDeleteTicket.classList.remove('hidden');
             if (btnConfirmDeleteTicket) {
-                btnConfirmDeleteTicket.textContent = 'Eliminar';
-                btnConfirmDeleteTicket.className = 'inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md';
+                if (deleteTicketMode === 'void_change') {
+                    btnConfirmDeleteTicket.textContent = 'Anular';
+                    btnConfirmDeleteTicket.className = 'inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md';
+                } else if (deleteTicketMode === 'void_sale') {
+                    btnConfirmDeleteTicket.textContent = 'Anular';
+                    btnConfirmDeleteTicket.className = 'inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md';
+                } else {
+                    btnConfirmDeleteTicket.textContent = 'Eliminar';
+                    btnConfirmDeleteTicket.className = 'inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md';
+                }
                 btnConfirmDeleteTicket.disabled = false;
             }
             return;
@@ -8355,6 +8655,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!modalDeleteTicket) return;
         modalDeleteTicket.classList.add('hidden');
         deleteTicketCurrent = '';
+        deleteTicketMode = 'delete';
+        voidChangeCurrentId = 0;
+        voidChangeRelatedTicket = '';
+        voidSaleCurrentTicket = '';
+        voidSaleRelatedTicket = '';
         deleteTicketState = 'confirm';
     }
 
@@ -8362,8 +8667,58 @@ document.addEventListener('DOMContentLoaded', function() {
         const t = String(ticket || '').trim();
         if (!t) return false;
         deleteTicketCurrent = t;
+        deleteTicketMode = 'delete';
+        voidChangeCurrentId = 0;
         if (!modalDeleteTicket) {
             return window.confirm('¿Seguro que querés eliminar el ticket ' + t + '?');
+        }
+        setDeleteTicketModalState('confirm');
+        modalDeleteTicket.classList.remove('hidden');
+        return true;
+    }
+
+    function confirmVoidSale(ticket) {
+        const t = String(ticket || '').trim();
+        if (!t) return false;
+        deleteTicketCurrent = t;
+        deleteTicketMode = 'void_sale';
+        voidChangeCurrentId = 0;
+        voidSaleCurrentTicket = t;
+        voidSaleRelatedTicket = '';
+        try {
+            const row = findSaleInCache(t);
+            const relT = String(row?.related_ticket || '').trim();
+            if (relT && !/(_tmp_|__tmp__)/i.test(relT)) voidSaleRelatedTicket = relT;
+        } catch (e) {}
+        if (!modalDeleteTicket) {
+            if (voidSaleRelatedTicket) {
+                return window.confirm('¿Confirmás anular la venta ' + t + ' y también el cambio relacionado ' + voidSaleRelatedTicket + '? Se revertirá el stock de ambos tickets.');
+            }
+            return window.confirm('¿Confirmás anular la venta ' + t + '? Se revertirá el stock del ticket.');
+        }
+        setDeleteTicketModalState('confirm');
+        modalDeleteTicket.classList.remove('hidden');
+        return true;
+    }
+
+    function confirmVoidChange(changeId, ticket) {
+        const id = parseInt(String(changeId || '').trim(), 10) || 0;
+        const t = String(ticket || '').trim();
+        if (id <= 0 || !t) return false;
+        deleteTicketCurrent = t;
+        deleteTicketMode = 'void_change';
+        voidChangeCurrentId = id;
+        voidChangeRelatedTicket = '';
+        try {
+            const row = findSaleInCache(t);
+            const relT = String(row?.related_ticket || '').trim();
+            if (relT && !/(_tmp_|__tmp__)/i.test(relT)) voidChangeRelatedTicket = relT;
+        } catch (e) {}
+        if (!modalDeleteTicket) {
+            if (voidChangeRelatedTicket) {
+                return window.confirm('¿Confirmás anular el cambio ' + t + ' y también la venta relacionada ' + voidChangeRelatedTicket + '? Se revertirá el stock de ambos tickets.');
+            }
+            return window.confirm('¿Confirmás anular el cambio ' + t + ' y su venta relacionada? Se revertirá el stock de ambos tickets.');
         }
         setDeleteTicketModalState('confirm');
         modalDeleteTicket.classList.remove('hidden');
@@ -8398,6 +8753,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const deletingTickets = (window.__salesDeletingTickets && window.__salesDeletingTickets instanceof Set)
         ? window.__salesDeletingTickets
         : (window.__salesDeletingTickets = new Set());
+
+    const voidingChangeIds = (window.__salesVoidingChangeIds && window.__salesVoidingChangeIds instanceof Set)
+        ? window.__salesVoidingChangeIds
+        : (window.__salesVoidingChangeIds = new Set());
 
     function deleteTicketById(ticket) {
         const t = String(ticket || '').trim();
@@ -8492,6 +8851,78 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function voidChangeById(changeId, ticket) {
+        const id = parseInt(String(changeId || '').trim(), 10) || 0;
+        const t = String(ticket || '').trim();
+        if (id <= 0 || !t) return;
+        if (voidingChangeIds.has(String(id))) return;
+        const opened = confirmVoidChange(id, t);
+        if (!opened && !modalDeleteTicket) return;
+        voidingChangeIds.add(String(id));
+
+        if (!modalDeleteTicket || !btnConfirmDeleteTicket) {
+            if (!opened) return;
+            apiVoidChange(id).then(function (res) {
+                if (!res || res.ok !== true) {
+                    const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo anular el cambio.';
+                    showAlertModal(msg, 'Error', 'Operación fallida');
+                    return;
+                }
+                const vt = (res && Array.isArray(res.voided_tickets)) ? res.voided_tickets : [];
+                const sset = new Set(vt.map(x => String(x || '').trim()).filter(Boolean));
+                if (sset.size) {
+                    salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => !sset.has(String(s?.ticket || '').trim()));
+                } else {
+                    salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => String(s?.ticket || '').trim() !== t);
+                }
+                renderHistorialFromCache();
+                applyVentasFilters();
+                initKpisFromSales();
+                recalcularArqueoAutomatico();
+            }).finally(function () {
+                try { voidingChangeIds.delete(String(id)); } catch (e) {}
+            });
+            return;
+        }
+
+        if (btnConfirmDeleteTicket) {
+            btnConfirmDeleteTicket.disabled = false;
+            btnConfirmDeleteTicket.onclick = function () {
+                if (deleteTicketState === 'success' || deleteTicketState === 'error') {
+                    closeDeleteTicketModal();
+                    return;
+                }
+                if (deleteTicketState !== 'confirm') return;
+                btnConfirmDeleteTicket.disabled = true;
+                apiVoidChange(id).then(function (res) {
+                    if (!res || res.ok !== true) {
+                        const msg = (res && (res.message || res.error)) ? String(res.message || res.error) : 'No se pudo anular el cambio.';
+                        setDeleteTicketModalState('error', { message: msg });
+                        return;
+                    }
+                    const vt = (res && Array.isArray(res.voided_tickets)) ? res.voided_tickets : [];
+                    const sset = new Set(vt.map(x => String(x || '').trim()).filter(Boolean));
+                    if (sset.size) {
+                        salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => !sset.has(String(s?.ticket || '').trim()));
+                    } else {
+                        salesCache = (Array.isArray(salesCache) ? salesCache : []).filter(s => String(s?.ticket || '').trim() !== t);
+                    }
+                    renderHistorialFromCache();
+                    applyVentasFilters();
+                    initKpisFromSales();
+                    recalcularArqueoAutomatico();
+                    scrollAElemento(historial || home);
+                    setDeleteTicketModalState('success');
+                }).catch(function () {
+                    setDeleteTicketModalState('error', { message: 'No se pudo anular el cambio.' });
+                }).finally(function () {
+                    try { voidingChangeIds.delete(String(id)); } catch (e) {}
+                    if (btnConfirmDeleteTicket) btnConfirmDeleteTicket.disabled = false;
+                });
+            };
+        }
+    }
+
     // Cerrar menús al hacer clic fuera
     document.addEventListener('click', function () {
         cerrarTodosLosMenusMov();
@@ -8515,13 +8946,41 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('click', function (e) {
         const btnVer = e.target.closest('.opcion-ver-ticket');
         const btnEliminar = e.target.closest('.opcion-eliminar-ticket');
-        if (!btnVer && !btnEliminar) return;
+        const btnVoid = e.target.closest('.opcion-void-cambio');
+        const btnVoidSale = e.target.closest('.opcion-void-venta');
+        if (!btnVer && !btnEliminar && !btnVoid && !btnVoidSale) return;
         e.stopPropagation();
-        const ticket = (btnVer || btnEliminar).getAttribute('data-ticket') || '';
+        const ticket = (btnVer || btnEliminar || btnVoid || btnVoidSale).getAttribute('data-ticket') || '';
 
         if (btnVer) {
             cerrarTodosLosMenusMov();
-            openEditTicket(ticket);
+            const mode = String(btnVer.getAttribute('data-open-mode') || '').trim();
+            if (mode === 'readonly') {
+                const cid = parseInt(String(btnVer.getAttribute('data-change-id') || ''), 10) || 0;
+                if (cid > 0) openChangeReadonly(cid);
+                else {
+                    const row = findSaleInCache(ticket);
+                    const rid = parseInt(String(row?.id || 0), 10) || 0;
+                    if (rid > 0) openChangeReadonly(rid);
+                }
+            }
+            else openEditTicket(ticket);
+            return;
+        }
+
+        if (btnVoid) {
+            cerrarTodosLosMenusMov();
+            const cid = parseInt(String(btnVoid.getAttribute('data-change-id') || ''), 10) || 0;
+            if (cid <= 0) return;
+            voidChangeById(cid, ticket);
+            return;
+        }
+
+        if (btnVoidSale) {
+            cerrarTodosLosMenusMov();
+            const t = String(btnVoidSale.getAttribute('data-ticket') || '').trim();
+            if (!t) return;
+            voidSaleByTicket(t);
             return;
         }
 
