@@ -7,10 +7,11 @@ from io import BytesIO
 from flask import current_app, g, jsonify, render_template, request, send_file
 from flask_login import login_required
 from sqlalchemy import and_
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import selectinload
 
 from app import db
-from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Expense, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem
+from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Expense, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem, SalePayment
 from app.permissions import module_required
 from app.reports import bp
 
@@ -37,6 +38,65 @@ def _company_id() -> str:
         return str(getattr(g, 'company_id', '') or '').strip()
     except Exception:
         return ''
+
+
+def _ensure_sale_payments_table_reports() -> None:
+    # Reports no deben romper si no está la tabla.
+    try:
+        engine = db.engine
+        insp = db.inspect(engine)
+        tables = set(insp.get_table_names() or [])
+        if 'sale_payment' in tables:
+            return
+        db.metadata.create_all(bind=engine, tables=[SalePayment.__table__])
+    except Exception:
+        pass
+
+
+def _sales_by_payment_method_breakdown(*, cid: str, d_from: dt_date, d_to: dt_date) -> dict:
+    # Preferimos sale_payment (pagos mixtos). Fallback a Sale.payment_method si la tabla no existe.
+    try:
+        rows = (
+            db.session.query(SalePayment.method, db.func.coalesce(db.func.sum(SalePayment.amount), 0.0))
+            .join(Sale, and_(Sale.id == SalePayment.sale_id, Sale.company_id == SalePayment.company_id))
+            .filter(Sale.company_id == cid)
+            .filter(SalePayment.company_id == cid)
+            .filter(Sale.sale_date >= d_from)
+            .filter(Sale.sale_date <= d_to)
+            .filter(Sale.sale_type == 'Venta')
+            .filter(db.func.lower(Sale.status).like('completad%'))
+            .group_by(SalePayment.method)
+            .all()
+        )
+        out = {}
+        for pm, amt in (rows or []):
+            key = (str(pm or '').strip() or '—')
+            out[key] = round(_num(amt), 2)
+        return out
+    except ProgrammingError:
+        # Tabla inexistente u otro problema de schema.
+        pass
+    except Exception:
+        pass
+
+    out = {}
+    try:
+        rows = (
+            db.session.query(Sale.payment_method, db.func.coalesce(db.func.sum(Sale.total), 0.0))
+            .filter(Sale.company_id == cid)
+            .filter(Sale.sale_date >= d_from)
+            .filter(Sale.sale_date <= d_to)
+            .filter(Sale.sale_type == 'Venta')
+            .filter(db.func.lower(Sale.status).like('completad%'))
+            .group_by(Sale.payment_method)
+            .all()
+        )
+        for pm, amt in (rows or []):
+            key = (str(pm or '').strip() or '—')
+            out[key] = round(_num(amt), 2)
+    except Exception:
+        out = {}
+    return out
 
 
 def _load_crm_config(company_id: str) -> dict:
@@ -420,23 +480,7 @@ def eerr_api():
         series = []
 
     # 6) Breakdowns
-    sales_by_payment = {}
-    try:
-        rows = (
-            db.session.query(Sale.payment_method, db.func.coalesce(db.func.sum(Sale.total), 0.0))
-            .filter(Sale.company_id == cid)
-            .filter(Sale.sale_date >= d_from)
-            .filter(Sale.sale_date <= d_to)
-            .filter(Sale.sale_type == 'Venta')
-            .filter(db.func.lower(Sale.status).like('completad%'))
-            .group_by(Sale.payment_method)
-            .all()
-        )
-        for pm, amt in (rows or []):
-            key = (str(pm or '').strip() or '—')
-            sales_by_payment[key] = round(_num(amt), 2)
-    except Exception:
-        sales_by_payment = {}
+    sales_by_payment = _sales_by_payment_method_breakdown(cid=cid, d_from=d_from, d_to=d_to)
 
     exchanges_by_payment = {}
     try:
@@ -2879,21 +2923,49 @@ def lookup_payment_methods_api():
     if not cid:
         return jsonify({'ok': True, 'items': []})
 
-    query = db.session.query(Sale.payment_method).filter(Sale.company_id == cid).distinct().order_by(Sale.payment_method.asc())
-    rows = query.limit(400).all()
     items = []
-    for (pm,) in (rows or []):
-        s = str(pm or '').strip()
-        if not s:
-            continue
-        s_norm = s.lower()
-        if s_norm in ('ajuste interno', 'ajuste', 'interno', 'reversión', 'reversion'):
-            continue
-        if q and q not in s.lower():
-            continue
-        items.append({'id': s, 'label': s})
-        if len(items) >= limit:
-            break
+    try:
+        rows = (
+            db.session.query(SalePayment.method)
+            .filter(SalePayment.company_id == cid)
+            .distinct()
+            .order_by(SalePayment.method.asc())
+            .limit(400)
+            .all()
+        )
+        for (pm,) in (rows or []):
+            s = str(pm or '').strip()
+            if not s:
+                continue
+            if q and q not in s.lower():
+                continue
+            items.append({'id': s, 'label': s})
+            if len(items) >= limit:
+                break
+    except Exception:
+        try:
+            rows = (
+                db.session.query(Sale.payment_method)
+                .filter(Sale.company_id == cid)
+                .distinct()
+                .order_by(Sale.payment_method.asc())
+                .limit(400)
+                .all()
+            )
+        except Exception:
+            rows = []
+        for (pm,) in (rows or []):
+            s = str(pm or '').strip()
+            if not s:
+                continue
+            s_norm = s.lower()
+            if s_norm in ('ajuste interno', 'ajuste', 'interno', 'reversión', 'reversion'):
+                continue
+            if q and q not in s.lower():
+                continue
+            items.append({'id': s, 'label': s})
+            if len(items) >= limit:
+                break
 
     return jsonify({'ok': True, 'items': items})
 

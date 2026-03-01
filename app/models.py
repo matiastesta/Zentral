@@ -403,6 +403,22 @@ class Sale(db.Model):
     )
 
     items = db.relationship('SaleItem', backref='sale', cascade='all, delete-orphan', lazy=True)
+    payments = db.relationship('SalePayment', backref='sale', cascade='all, delete-orphan', lazy=True)
+
+
+class SalePayment(db.Model):
+    __tablename__ = 'sale_payment'
+
+    id = db.Column(db.Integer, primary_key=True)
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sale.id'), nullable=False, index=True)
+    method = db.Column(db.String(32), nullable=False)
+    amount = db.Column(db.Float, nullable=False, default=0.0)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('company_id', 'sale_id', 'method', name='uq_sale_payment_company_sale_method'),
+    )
 
 
 class SaleItem(db.Model):

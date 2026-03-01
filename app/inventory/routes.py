@@ -100,27 +100,32 @@ def _ensure_product_unique_name_category_active_index() -> None:
         engine = db.engine
         if 'product' not in set(inspect(engine).get_table_names() or []):
             return
-        sql = None
-        if str(engine.url.drivername).startswith('sqlite'):
-            sql = (
-                'CREATE UNIQUE INDEX IF NOT EXISTS uq_product_company_category_name_active '
-                'ON product(company_id, category_id, lower(trim(name))) '
-                'WHERE deleted_at IS NULL'
-            )
-        else:
-            sql = (
-                'CREATE UNIQUE INDEX IF NOT EXISTS uq_product_company_category_name_active '
-                'ON product(company_id, category_id, lower(trim(name))) '
-                'WHERE deleted_at IS NULL'
-            )
+        # El nombre NO es único: permitir duplicados por nombre dentro de la misma categoría.
+        sqls = [
+            'DROP INDEX IF EXISTS uq_product_company_category_name_active',
+        ]
         with engine.begin() as conn:
-            conn.execute(text(sql))
+            for sql in sqls:
+                conn.execute(text(sql))
     except Exception:
         pass
 
 
+def _normalize_codigo_interno(raw: str) -> str:
+    s = str(raw or '')
+    # Quitar espacios invisibles / whitespace y normalizar para comparar.
+    try:
+        s = unicodedata.normalize('NFKC', s)
+    except Exception:
+        pass
+    s = s.strip()
+    s = ''.join(s.split())
+    s = s.upper()
+    return s
+
+
 def _ensure_product_unique_code_active_indexes() -> None:
-    """Unicidad correcta: solo para productos NO eliminados (deleted_at IS NULL)."""
+    """Unicidad correcta: solo para productos activos (active=1/true) y NO eliminados (deleted_at IS NULL)."""
     try:
         engine = db.engine
         insp = inspect(engine)
@@ -137,16 +142,21 @@ def _ensure_product_unique_code_active_indexes() -> None:
         except Exception:
             pass
 
+        is_sqlite = str(engine.url.drivername).startswith('sqlite')
+        where_active = 'active = 1' if is_sqlite else 'active = true'
+        # Si ya existían índices con otra condición, los recreamos.
         sqls = [
+            'DROP INDEX IF EXISTS ux_product_company_internal_code_active',
+            'DROP INDEX IF EXISTS ux_product_company_barcode_active',
             (
                 'CREATE UNIQUE INDEX IF NOT EXISTS ux_product_company_internal_code_active '
-                'ON product(company_id, internal_code) '
-                'WHERE deleted_at IS NULL AND internal_code IS NOT NULL'
+                'ON product(company_id, upper(trim(internal_code))) '
+                'WHERE deleted_at IS NULL AND ' + where_active + ' AND internal_code IS NOT NULL'
             ),
             (
                 'CREATE UNIQUE INDEX IF NOT EXISTS ux_product_company_barcode_active '
                 'ON product(company_id, barcode) '
-                'WHERE deleted_at IS NULL AND barcode IS NOT NULL'
+                'WHERE deleted_at IS NULL AND ' + where_active + ' AND barcode IS NOT NULL'
             ),
         ]
         with engine.begin() as conn:
@@ -345,6 +355,15 @@ def tryDeleteProduct(product_id: int, company_id: str) -> dict:
                 row.deleted_at = datetime.utcnow()
         except Exception:
             pass
+        # Liberar códigos para permitir reutilización aun con constraints legacy.
+        try:
+            row.internal_code = None
+        except Exception:
+            pass
+        try:
+            row.barcode = None
+        except Exception:
+            pass
         db.session.commit()
         return {'ok': True, 'deleted': True, 'kind': 'soft', 'had_history': True}
 
@@ -402,6 +421,7 @@ def _find_product_by_name(company_id: str, name: str, preferred_category_id: Opt
         db.session.query(Product)
         .filter(Product.company_id == cid)
         .filter(Product.deleted_at.is_(None))
+        .filter(Product.active == True)  # noqa: E712
         .filter(func.lower(func.trim(Product.name)) == raw.lower())
     )
 
@@ -411,14 +431,7 @@ def _find_product_by_name(company_id: str, name: str, preferred_category_id: Opt
         except Exception:
             cat_id = None
         if cat_id is not None:
-            q = q.order_by(
-                case((Product.category_id == cat_id, 1), else_=0).desc(),
-                Product.active.desc(),
-                Product.id.asc(),
-            )
-            return q.first()
-
-    q = q.order_by(Product.active.desc(), Product.id.asc())
+            q = q.filter(Product.category_id == cat_id)
     return q.first()
 
 
@@ -544,10 +557,6 @@ def _generate_unique_internal_code() -> str:
         if not exists:
             return code
     return uuid4().hex[:_CODIGO_INTERNO_AUTO_LEN].upper()
-
-
-def _normalize_codigo_interno(raw: str) -> str:
-    return str(raw or '').strip().upper()
 
 
 def _validate_codigo_interno_or_raise(code: str) -> str:
@@ -2050,12 +2059,12 @@ def create_product():
 
     codigo_interno_raw = None
     if 'codigo_interno' in payload:
-        codigo_interno_raw = str(payload.get('codigo_interno') or '').strip()
+        codigo_interno_raw = str(payload.get('codigo_interno') or '')
     elif 'internal_code' in payload:
-        codigo_interno_raw = str(payload.get('internal_code') or '').strip()
+        codigo_interno_raw = str(payload.get('internal_code') or '')
     internal_code = None
     if codigo_interno_raw:
-        internal_code = _validate_codigo_interno_or_raise(codigo_interno_raw)
+        internal_code = _validate_codigo_interno_or_raise(_normalize_codigo_interno(codigo_interno_raw))
 
     barcode_raw = str(payload.get('barcode') or '').strip() or None
 
@@ -2067,13 +2076,16 @@ def create_product():
     if internal_code:
         existing_by_ci_active = (
             db.session.query(Product)
-            .filter(Product.company_id == cid, Product.internal_code == internal_code)
+            .filter(Product.company_id == cid)
+            .filter(func.upper(func.trim(Product.internal_code)) == internal_code)
             .filter(Product.deleted_at.is_(None))
+            .filter(Product.active == True)  # noqa: E712
             .first()
         )
         existing_by_ci_deleted = (
             db.session.query(Product)
-            .filter(Product.company_id == cid, Product.internal_code == internal_code)
+            .filter(Product.company_id == cid)
+            .filter(func.upper(func.trim(Product.internal_code)) == internal_code)
             .filter(Product.deleted_at.isnot(None))
             .order_by(Product.deleted_at.desc(), Product.id.desc())
             .first()
@@ -2084,6 +2096,7 @@ def create_product():
             db.session.query(Product)
             .filter(Product.company_id == cid, Product.barcode == barcode_raw)
             .filter(Product.deleted_at.is_(None))
+            .filter(Product.active == True)  # noqa: E712
             .first()
         )
         existing_by_bc_deleted = (
@@ -2099,7 +2112,7 @@ def create_product():
     if existing_by_ci_deleted is not None and existing_by_bc_deleted is not None and int(existing_by_ci_deleted.id) != int(existing_by_bc_deleted.id):
         return jsonify({'ok': False, 'error': 'code_barcode_conflict'}), 400
 
-    # 1) Si ya existe un producto NO eliminado con mismo código o barcode, bloquear (aunque esté inactivo).
+    # 1) Si ya existe un producto ACTIVO (y no eliminado) con mismo código o barcode, bloquear.
     if existing_by_ci_active is not None:
         return jsonify({'ok': False, 'error': 'codigo_interno_active_exists'}), 409
     if existing_by_bc_active is not None:
@@ -2107,8 +2120,6 @@ def create_product():
 
     # 2) Si existe un producto eliminado (soft delete) con mismo código/barcode, restaurar.
     restore_target = existing_by_ci_deleted or existing_by_bc_deleted
-    if restore_target is None:
-        restore_target = _find_deleted_product_by_name(cid, name, preferred_category_id=category.id)
 
     if restore_target is not None and getattr(restore_target, 'deleted_at', None) is not None:
         restore_target.deleted_at = None
@@ -2149,10 +2160,6 @@ def create_product():
             db.session.rollback()
             return jsonify({'ok': False, 'error': 'db_error'}), 400
         return jsonify({'ok': True, 'restored': True, 'item': _serialize_product(restore_target)})
-
-    # 3) Si existe por nombre pero NO está eliminado, bloquear (evita duplicados por UX / confusión).
-    if _find_product_by_name(cid, name, preferred_category_id=category.id) is not None:
-        return jsonify({'ok': False, 'error': 'already_exists'}), 409
 
     if not internal_code:
         internal_code = _generate_codigo_interno(cid, name, str(getattr(category, 'name', '') or '').strip() or 'GEN')
@@ -2233,12 +2240,16 @@ def update_product(product_id: int):
     row.sale_price = _num(payload.get('sale_price') if payload.get('sale_price') is not None else row.sale_price)
     if payload.get('codigo_interno') is not None or payload.get('internal_code') is not None:
         raw_ci = payload.get('codigo_interno') if payload.get('codigo_interno') is not None else payload.get('internal_code')
-        raw_ci = str(raw_ci or '').strip()
+        raw_ci = str(raw_ci or '')
         if raw_ci:
-            next_ci = _validate_codigo_interno_or_raise(raw_ci)
+            next_ci = _validate_codigo_interno_or_raise(_normalize_codigo_interno(raw_ci))
             exists = (
                 db.session.query(Product.id)
-                .filter(Product.company_id == row.company_id, Product.internal_code == next_ci, Product.id != row.id)
+                .filter(Product.company_id == row.company_id)
+                .filter(Product.id != row.id)
+                .filter(func.upper(func.trim(Product.internal_code)) == next_ci)
+                .filter(Product.deleted_at.is_(None))
+                .filter(Product.active == True)  # noqa: E712
                 .first()
                 is not None
             )
@@ -2254,6 +2265,8 @@ def update_product(product_id: int):
             exists = (
                 db.session.query(Product.id)
                 .filter(Product.company_id == row.company_id, Product.barcode == next_bc, Product.id != row.id)
+                .filter(Product.deleted_at.is_(None))
+                .filter(Product.active == True)  # noqa: E712
                 .first()
                 is not None
             )
@@ -2298,7 +2311,18 @@ def update_product(product_id: int):
     if payload.get('min_stock') is not None:
         row.min_stock = _num(payload.get('min_stock'))
     if payload.get('active') is not None:
-        row.active = bool(payload.get('active'))
+        next_active = bool(payload.get('active'))
+        row.active = next_active
+        if not next_active:
+            # Liberar códigos para permitir reutilización aun con constraints legacy.
+            try:
+                row.internal_code = None
+            except Exception:
+                pass
+            try:
+                row.barcode = None
+            except Exception:
+                pass
 
     _ensure_codigo_interno(row)
     db.session.commit()

@@ -10,12 +10,13 @@ import unicodedata
 from flask import abort, current_app, g, jsonify, render_template, request, url_for
 from flask_login import login_required, current_user
 
-from sqlalchemy import func, inspect, text, and_, or_
+from sqlalchemy import func, inspect, text, and_, or_, false
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import selectinload, joinedload
 
 from app import db
-from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Expense, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem, SalesHistoryUserConfig, User, UserTableColumnPrefs
+from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Expense, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem, SalePayment, SalesHistoryUserConfig, User, UserTableColumnPrefs
 from app.permissions import module_required, module_required_any
 from app.sales import bp
 
@@ -354,7 +355,6 @@ def _ensure_sales_history_user_config_table() -> None:
                     company_id VARCHAR(36) NOT NULL,
                     user_id INTEGER NOT NULL,
                     config_json TEXT NOT NULL DEFAULT '{}',
-                    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
                     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
                 )
                 """
@@ -909,6 +909,116 @@ def _ensure_installments_tables() -> None:
             current_app.logger.exception('Failed to ensure installments tables')
     except Exception:
         current_app.logger.exception('Failed to ensure installments tables')
+
+
+def _ensure_sale_payments_table() -> None:
+    try:
+        engine = db.engine
+        insp = inspect(engine)
+        try:
+            tables = set(insp.get_table_names() or [])
+        except Exception:
+            tables = set()
+        if 'sale_payment' in tables:
+            return
+        try:
+            db.metadata.create_all(bind=engine, tables=[SalePayment.__table__])
+            # Backfill mínimo: ventas viejas sin registros en sale_payment.
+            # Solo en Postgres; en sqlite se deja sin backfill.
+            try:
+                if not str(engine.url.drivername).startswith('sqlite'):
+                    with engine.begin() as conn:
+                        conn.execute(text(
+                            """
+                            INSERT INTO sale_payment (company_id, sale_id, method, amount, created_at)
+                            SELECT
+                                s.company_id,
+                                s.id,
+                                CASE
+                                    WHEN lower(s.payment_method) LIKE '%efectiv%' THEN 'cash'
+                                    WHEN lower(s.payment_method) LIKE '%transfer%' THEN 'transfer'
+                                    WHEN lower(s.payment_method) LIKE '%debit%' OR lower(s.payment_method) LIKE '%debito%' THEN 'debit'
+                                    WHEN lower(s.payment_method) LIKE '%credit%' OR lower(s.payment_method) LIKE '%credito%' THEN 'credit'
+                                    ELSE lower(s.payment_method)
+                                END AS method,
+                                CASE
+                                    WHEN COALESCE(s.on_account, false) = true OR COALESCE(s.is_installments, false) = true THEN COALESCE(s.paid_amount, 0)
+                                    ELSE COALESCE(s.total, 0)
+                                END AS amount,
+                                NOW() AS created_at
+                            FROM sale s
+                            WHERE s.sale_type = 'Venta'
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM sale_payment sp
+                                  WHERE sp.company_id = s.company_id AND sp.sale_id = s.id
+                              )
+                            """
+                        ))
+            except Exception:
+                try:
+                    current_app.logger.exception('Failed to backfill sale_payment rows')
+                except Exception:
+                    pass
+        except Exception:
+            current_app.logger.exception('Failed to ensure sale_payment table')
+    except Exception:
+        current_app.logger.exception('Failed to ensure sale_payment table')
+
+
+def _canonical_payment_method_key(raw: str) -> str:
+    s = str(raw or '').strip().lower()
+    if not s:
+        return ''
+    try:
+        s = unicodedata.normalize('NFD', s)
+        s = ''.join(ch for ch in s if not unicodedata.combining(ch))
+    except Exception:
+        s = str(raw or '').strip().lower()
+
+    if s in {'cash', 'efectivo'} or 'efectiv' in s:
+        return 'cash'
+    if s in {'transfer', 'transferencia'} or 'transfer' in s:
+        return 'transfer'
+    if s in {'debit', 'debito', 'débito'} or 'debit' in s:
+        return 'debit'
+    if s in {'credit', 'credito', 'crédito'} or 'credit' in s:
+        return 'credit'
+    return s
+
+
+def _parse_payments_payload(payload: dict) -> list[dict]:
+    raw = payload.get('payments')
+    arr = raw if isinstance(raw, list) else []
+    out: list[dict] = []
+    seen: set[str] = set()
+    for it in arr:
+        d = it if isinstance(it, dict) else {}
+        mk = _canonical_payment_method_key(d.get('method'))
+        if not mk:
+            continue
+        if mk in seen:
+            raise ValueError('methods_duplicate')
+        seen.add(mk)
+        amt = _num(d.get('amount'))
+        try:
+            if not math.isfinite(float(amt)):
+                raise ValueError('amount_invalid')
+        except Exception:
+            raise ValueError('amount_invalid')
+        if float(amt) < 0:
+            raise ValueError('amount_negative')
+        out.append({'method': mk, 'amount': float(amt)})
+    return out
+
+
+def _sum_payments(payments: list[dict]) -> float:
+    s = 0.0
+    for p in (payments or []):
+        try:
+            s += float(p.get('amount') or 0.0)
+        except Exception:
+            continue
+    return float(s)
 
 
 def _ensure_sale_ticket_numbering() -> None:
@@ -1574,6 +1684,88 @@ def void_operation(ticket: str) -> dict:
         except Exception:
             pass
 
+    def _normalize_ref_ticket(tok: str) -> str:
+        s = str(tok or '').strip()
+        if not s:
+            return ''
+        return '#' + s.lstrip('#')
+
+    def _extract_ref_from_notes(txt: str) -> str:
+        try:
+            note = str(txt or '')
+        except Exception:
+            note = ''
+        if not note:
+            return ''
+        m = re.search(r"Ticket\s*(?:original\s*)?#\s*(#+?\w+)", note, re.IGNORECASE)
+        ref = (m.group(1) if (m and m.group(1)) else '').strip()
+        return _normalize_ref_ticket(ref) if ref else ''
+
+    def _void_associated_payment_tickets(*, base_ticket: str) -> list[str]:
+        """Void Cobro* tickets linked by notes to the given base ticket.
+
+        This keeps Movimientos consistent: no Cobro* active without its Venta.
+        """
+        base_norm = _normalize_ref_ticket(base_ticket)
+        if not base_norm:
+            return []
+        out: list[str] = []
+        try:
+            payments = (
+                db.session.query(Sale)
+                .filter(Sale.company_id == cid)
+                .filter(Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota']))
+                .filter(Sale.notes.isnot(None))
+                .filter(Sale.notes.ilike('%Ticket%'))
+                .with_for_update()
+                .all()
+            )
+        except Exception:
+            payments = []
+
+        for pay in (payments or []):
+            try:
+                pt = str(getattr(pay, 'ticket', '') or '').strip()
+            except Exception:
+                pt = ''
+            if not pt:
+                continue
+
+            ref = _extract_ref_from_notes(str(getattr(pay, 'notes', '') or ''))
+            if not ref or ref != base_norm:
+                continue
+
+            # Best-effort revert side-effects for CC/cuotas so the financial state is coherent.
+            try:
+                st_pay = str(getattr(pay, 'sale_type', '') or '').strip()
+            except Exception:
+                st_pay = ''
+            if st_pay == 'CobroCC':
+                try:
+                    orig = (
+                        db.session.query(Sale)
+                        .filter(Sale.company_id == cid, Sale.ticket == base_norm)
+                        .with_for_update()
+                        .first()
+                    )
+                    if orig:
+                        amt = abs(float(getattr(pay, 'total', 0.0) or 0.0))
+                        orig.paid_amount = max(0.0, float(orig.paid_amount or 0.0) - amt)
+                        orig.due_amount = max(0.0, float(orig.due_amount or 0.0) + amt)
+                        orig.on_account = bool(orig.due_amount and float(orig.due_amount or 0.0) > 0)
+                except Exception:
+                    current_app.logger.exception('Failed to revert CobroCC side-effects on void')
+            if st_pay == 'CobroCuota':
+                try:
+                    _revert_installment_payment_by_sale_id(cid=cid, paid_sale_id=int(getattr(pay, 'id', 0) or 0))
+                except Exception:
+                    current_app.logger.exception('Failed to revert CobroCuota side-effects on void')
+
+            if not _is_voided(pay):
+                _set_void_fields(pay)
+            out.append(pt)
+        return out
+
     def _clean_relation_notes(a: Sale, b_ticket: str) -> None:
         if not a:
             return
@@ -1673,6 +1865,18 @@ def void_operation(ticket: str) -> dict:
         if related_sale is not None:
             _set_void_fields(related_sale)
 
+        # Also void payment tickets (Movimientos) that reference this ticket.
+        voided_payments = []
+        try:
+            st_main = str(getattr(row, 'sale_type', '') or '').strip()
+        except Exception:
+            st_main = ''
+        if st_main not in ('CobroVenta', 'CobroCC', 'CobroCuota'):
+            try:
+                voided_payments = _void_associated_payment_tickets(base_ticket=t)
+            except Exception:
+                current_app.logger.exception('Failed to void associated payment tickets')
+
         db.session.commit()
 
         out = [t]
@@ -1683,6 +1887,10 @@ def void_operation(ticket: str) -> dict:
                     out.append(rt)
             except Exception:
                 pass
+        if voided_payments:
+            for pt in voided_payments:
+                if pt and pt not in out:
+                    out.append(pt)
         return {'ok': True, 'voided_tickets': out}
 
     except Exception as e:
@@ -1709,19 +1917,7 @@ def void_sale(ticket):
     return jsonify(res)
 
 
-def _serialize_sale(
-    row: Sale,
-    related: dict = None,
-    users_map: dict | None = None,
-    customers_map: dict | None = None,
-    customer_saldo_map: dict | None = None,
-    customer_sales_count_map: dict | None = None,
-    customer_clasificacion_map: dict | None = None,
-    customer_clasificacion_tags_map: dict | None = None,
-    customer_clasificacion_primary_map: dict | None = None,
-    customer_clasificacion_primary_tag_map: dict | None = None,
-    cmv_by_ticket: dict | None = None,
-):
+def _serialize_sale(row: Sale, related: dict | None = None, users_map: dict | None = None, customers_map: dict | None = None, customer_saldo_map: dict | None = None, customer_sales_count_map: dict | None = None, customer_clasificacion_map: dict | None = None, customer_clasificacion_tags_map: dict | None = None, customer_clasificacion_primary_map: dict | None = None, customer_clasificacion_primary_tag_map: dict | None = None, cmv_by_ticket: dict | None = None) -> dict:
     has_venta_libre = False
     venta_libre_count = 0
     try:
@@ -1842,6 +2038,50 @@ def _serialize_sale(
     except Exception:
         display_ticket = str(getattr(row, 'ticket', '') or '').strip()
 
+    payments_out: list[dict] = []
+    try:
+        for p in (getattr(row, 'payments', None) or []):
+            mk = _canonical_payment_method_key(getattr(p, 'method', None))
+            if not mk:
+                continue
+            payments_out.append({'method': mk, 'amount': float(getattr(p, 'amount', 0.0) or 0.0)})
+    except Exception:
+        payments_out = []
+
+    # Para cobros (CobroVenta/CobroCC/CobroCuota), el desglose real suele estar en la venta original.
+    # Si el cobro no tiene sale_payment, intentamos leer el ticket referenciado en la nota.
+    try:
+        st_pay = str(getattr(row, 'sale_type', '') or '').strip()
+        if (not payments_out) and st_pay in ('CobroVenta', 'CobroCC', 'CobroCuota'):
+            txt = str(getattr(row, 'notes', '') or '')
+            mref = re.search(r"Ticket\s*(?:original\s*)?#\s*(#?\w+)", txt, re.IGNORECASE)
+            ref_ticket = ''
+            if mref and mref.group(1):
+                tok = str(mref.group(1) or '').strip()
+                if tok.startswith('#'):
+                    tok = tok[1:]
+                if tok:
+                    ref_ticket = '#' + tok
+            if ref_ticket:
+                cid = str(getattr(row, 'company_id', '') or '').strip()
+                src = (
+                    db.session.query(Sale)
+                    .options(selectinload(Sale.payments))
+                    .filter(Sale.company_id == cid, Sale.ticket == ref_ticket)
+                    .first()
+                )
+                if src is not None:
+                    tmp: list[dict] = []
+                    for p in (getattr(src, 'payments', None) or []):
+                        mk = _canonical_payment_method_key(getattr(p, 'method', None))
+                        if not mk:
+                            continue
+                        tmp.append({'method': mk, 'amount': float(getattr(p, 'amount', 0.0) or 0.0)})
+                    if tmp:
+                        payments_out = tmp
+    except Exception:
+        pass
+
     return {
         'id': row.id,
         'ticket': row.ticket,
@@ -1851,6 +2091,7 @@ def _serialize_sale(
         'type': row.sale_type,
         'status': row.status,
         'payment_method': row.payment_method,
+        'payments': payments_out,
         'notes': row.notes or '',
 
         'notes_display': _sanitize_notes_for_display(row.notes or ''),
@@ -2172,14 +2413,51 @@ def _serialize_lot_for_sales(l: InventoryLot):
 def list_sales():
     _ensure_sale_employee_columns()
     _ensure_sale_surcharge_columns()
+    try:
+        _ensure_sale_payments_table()
+    except Exception:
+        # No interrumpir el historial si la tabla no se puede asegurar en runtime.
+        pass
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
+    raw_payment_method = str(request.args.get('payment_method') or '').strip()
     include_replaced = str(request.args.get('include_replaced') or '').strip() in ('1', 'true', 'True')
     include_voided = str(request.args.get('include_voided') or '').strip() in ('1', 'true', 'True')
     exclude_cc = str(request.args.get('exclude_cc') or '').strip() in ('1', 'true', 'True')
     limit = int(request.args.get('limit') or 300)
     if limit <= 0 or limit > 20000:
         limit = 300
+
+    def _normalize_payment_method_filter(raw: str) -> tuple[str, list[str]]:
+        k = str(raw or '').strip().lower()
+        if not k:
+            return '', []
+
+        aliases = {
+            'cash': ['cash', 'efectivo', 'Efectivo'],
+            'efectivo': ['cash', 'efectivo', 'Efectivo'],
+            'transfer': ['transfer', 'transferencia', 'Transferencia'],
+            'transferencia': ['transfer', 'transferencia', 'Transferencia'],
+            'debit': ['debit', 'debito', 'débito', 'Débito'],
+            'debito': ['debit', 'debito', 'débito', 'Débito'],
+            'débito': ['debit', 'debito', 'débito', 'Débito'],
+            'credit': ['credit', 'credito', 'crédito', 'Crédito'],
+            'credito': ['credit', 'credito', 'crédito', 'Crédito'],
+            'crédito': ['credit', 'credito', 'crédito', 'Crédito'],
+        }
+        if k in aliases:
+            vals = aliases[k]
+            key = vals[0]
+            legacy = [v for v in vals[1:] if v]
+            return key, legacy
+
+        # Si ya viene como key esperada (cash/transfer/debit/credit)
+        if k in ('cash', 'transfer', 'debit', 'credit'):
+            return k, [raw]
+
+        return k, [raw]
+
+    filter_payment_key, filter_payment_legacy = _normalize_payment_method_filter(raw_payment_method)
 
     d_from = _parse_date_iso(raw_from, None)
     d_to = _parse_date_iso(raw_to, None)
@@ -2209,11 +2487,17 @@ def list_sales():
     except Exception:
         # No interrumpir el listado si la auto-corrección falla.
         pass
-    q = (
-        db.session.query(Sale)
-        .options(selectinload(Sale.items))
-        .filter(Sale.company_id == cid)
-    )
+    def _base_query(include_payments: bool):
+        opts = [selectinload(Sale.items)]
+        if include_payments:
+            opts.append(selectinload(Sale.payments))
+        return (
+            db.session.query(Sale)
+            .options(*opts)
+            .filter(Sale.company_id == cid)
+        )
+
+    q = _base_query(True)
     if d_from:
         q = q.filter(Sale.sale_date >= d_from)
     if d_to:
@@ -2224,12 +2508,69 @@ def list_sales():
         q = q.filter(Sale.status.notin_(['Anulado', 'voided']))
     if exclude_cc:
         q = q.filter(Sale.sale_type != 'CobroCC')
+
+    # Filtro por medio de pago:
+    # - Nuevo: pertenencia a SalePayment.method (pagos mixtos)
+    # - Legacy: Sale.payment_method == X (ventas viejas sin sale_payment)
+    if filter_payment_key:
+        q = (
+            q.outerjoin(
+                SalePayment,
+                and_(SalePayment.company_id == cid, SalePayment.sale_id == Sale.id),
+            )
+            .filter(
+                or_(
+                    SalePayment.method == filter_payment_key,
+                    Sale.payment_method == filter_payment_key,
+                    Sale.payment_method.in_(filter_payment_legacy) if filter_payment_legacy else false(),
+                )
+            )
+            .distinct()
+        )
+
     q = q.order_by(Sale.sale_date.desc(), Sale.id.desc()).limit(limit)
     try:
         rows = q.all()
+    except ProgrammingError as e:
+        # Fallback para DBs viejas: si sale_payment no existe todavía, listamos sin payments.
+        msg = str(getattr(e, 'orig', e) or '')
+        if 'sale_payment' in msg or 'does not exist' in msg or 'UndefinedTable' in msg:
+            try:
+                q2 = _base_query(False)
+                if d_from:
+                    q2 = q2.filter(Sale.sale_date >= d_from)
+                if d_to:
+                    q2 = q2.filter(Sale.sale_date <= d_to)
+                if not include_replaced:
+                    q2 = q2.filter(Sale.status != 'Reemplazada')
+                if not include_voided:
+                    q2 = q2.filter(Sale.status.notin_(['Anulado', 'voided']))
+                if exclude_cc:
+                    q2 = q2.filter(Sale.sale_type != 'CobroCC')
+                if filter_payment_key:
+                    q2 = q2.filter(
+                        or_(
+                            Sale.payment_method == filter_payment_key,
+                            Sale.payment_method.in_(filter_payment_legacy) if filter_payment_legacy else false(),
+                        )
+                    )
+                rows = q2.order_by(Sale.sale_date.desc(), Sale.id.desc()).limit(limit).all()
+                for r in (rows or []):
+                    try:
+                        r.__dict__['payments'] = []
+                    except Exception:
+                        pass
+            except Exception:
+                current_app.logger.exception('Failed to list sales (fallback no payments)', extra={'company_id': cid, 'from': raw_from, 'to': raw_to, 'limit': limit})
+                return jsonify({'ok': False, 'error': 'db_error', 'items': []}), 500
+        else:
+            current_app.logger.exception('Failed to list sales', extra={'company_id': cid, 'from': raw_from, 'to': raw_to, 'limit': limit})
+            return jsonify({'ok': False, 'error': 'db_error', 'items': []}), 500
     except Exception:
         current_app.logger.exception('Failed to list sales', extra={'company_id': cid, 'from': raw_from, 'to': raw_to, 'limit': limit})
         return jsonify({'ok': False, 'error': 'db_error', 'items': []}), 500
+
+    cmv_by_ticket: dict[str, float] = {}
 
     customers_map: dict[str, Customer] = {}
     customer_saldo_map: dict[str, float] = {}
@@ -2483,33 +2824,6 @@ def list_sales():
                 customer_clasificacion_tags_map = {}
                 customer_clasificacion_primary_map = {}
                 customer_clasificacion_primary_tag_map = {}
-    except Exception:
-        customers_map = {}
-        customer_saldo_map = {}
-        customer_sales_count_map = {}
-        customer_clasificacion_map = {}
-        customer_clasificacion_tags_map = {}
-        customer_clasificacion_primary_map = {}
-        customer_clasificacion_primary_tag_map = {}
-
-    cmv_by_ticket: dict[str, float] = {}
-    try:
-        tickets = sorted({str(getattr(r, 'ticket', '') or '').strip() for r in rows if str(getattr(r, 'ticket', '') or '').strip()})
-        if tickets:
-            for (tk, tot) in (
-                db.session.query(InventoryMovement.sale_ticket, func.sum(InventoryMovement.total_cost))
-                .filter(InventoryMovement.company_id == cid)
-                .filter(InventoryMovement.type == 'sale')
-                .filter(InventoryMovement.sale_ticket.in_(tickets))
-                .group_by(InventoryMovement.sale_ticket)
-                .all()
-            ):
-                k = str(tk or '').strip()
-                if k:
-                    try:
-                        cmv_by_ticket[k] = float(tot or 0.0)
-                    except Exception:
-                        cmv_by_ticket[k] = 0.0
     except Exception:
         cmv_by_ticket = {}
 
@@ -2916,6 +3230,13 @@ def settle_cc_sale():
     sale_id = payload.get('sale_id')
     ticket = str(payload.get('ticket') or '').strip()
     payment_method = str(payload.get('payment_method') or 'Efectivo').strip() or 'Efectivo'
+    payments = None
+    try:
+        payments = _parse_payments_payload(payload)
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+    except Exception:
+        payments = None
     amount_raw = payload.get('amount')
 
     cid = _company_id()
@@ -3054,6 +3375,13 @@ def create_exchange():
     payload = request.get_json(silent=True) or {}
     sale_date = _parse_date_iso(payload.get('fecha') or payload.get('date'), dt_date.today())
     payment_method = str(payload.get('payment_method') or 'Efectivo').strip() or 'Efectivo'
+    payments = None
+    try:
+        payments = _parse_payments_payload(payload)
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+    except Exception:
+        payments = None
     notes = str(payload.get('notes') or '').strip() or None
 
     cid = _company_id()
@@ -3103,6 +3431,19 @@ def create_exchange():
     surcharge_general_amount = _num(payload.get('surcharge_general_amount') if payload.get('surcharge_general_amount') is not None else payload.get('surcharge_amount'))
 
     diff_to_pay = max(0.0, float(new_total or 0.0) - float(return_total or 0.0))
+
+    # Validación pagos múltiples para el cambio: se valida contra la diferencia a abonar.
+    # Si diff_to_pay == 0, permitir no enviar payments.
+    if payments is not None:
+        expected = float(diff_to_pay or 0.0)
+        total_pays = _sum_payments(payments)
+        if expected <= 0.00001:
+            # Si no hay monto a cobrar, ignorar payments (pero mantenerlo permitido si llega vacío).
+            if abs(float(total_pays)) > 0.01:
+                return jsonify({'ok': False, 'error': 'payments_sum_mismatch'}), 400
+        else:
+            if abs(float(expected) - float(total_pays)) > 0.01:
+                return jsonify({'ok': False, 'error': 'payments_sum_mismatch'}), 400
     on_account = bool(payload.get('on_account'))
     paid_amount = _num(payload.get('paid_amount'))
     if paid_amount < 0:
@@ -3192,6 +3533,22 @@ def create_exchange():
             exchange_return_total=return_total,
             exchange_new_total=new_total,
         )
+
+        if payments is not None:
+            try:
+                sale_row.payments = []
+                for p in (payments or []):
+                    sale_row.payments.append(SalePayment(
+                        company_id=cid,
+                        method=str(p.get('method') or '').strip(),
+                        amount=float(p.get('amount') or 0.0),
+                    ))
+                if len(payments) == 1:
+                    sale_row.payment_method = str(payments[0].get('method') or payment_method)
+                elif len(payments) >= 2:
+                    sale_row.payment_method = ' + '.join([str(x.get('method')) for x in payments])
+            except Exception:
+                current_app.logger.exception('Failed to attach sale payments (exchange flow)')
 
         try:
             from flask_login import current_user
@@ -3307,24 +3664,35 @@ def _next_ticket():
 
 
 def _num(v):
+    if v is None:
+        return 0.0
     try:
         return float(v)
     except Exception:
-        current_app.logger.exception('Failed to convert value to float')
+        try:
+            current_app.logger.exception('Failed to convert value to float')
+        except Exception:
+            pass
         return 0.0
 
 
 def _last_cash_event_sale(cid: str, d: dt_date):
     try:
-        return (
+        q = (
             db.session.query(func.max(Sale.updated_at))
+            .outerjoin(SalePayment, and_(SalePayment.company_id == cid, SalePayment.sale_id == Sale.id))
             .filter(Sale.company_id == cid)
             .filter(Sale.sale_date == d)
-            .filter(Sale.payment_method == 'Efectivo')
-            .filter(Sale.status != 'Reemplazada')
-            .filter(Sale.sale_type.in_(['CobroVenta', 'CobroCC', 'CobroCuota', 'Cambio', 'Devolucion', 'Devolución', 'Pago']))
-            .scalar()
+            .filter(Sale.status.notin_(['Reemplazada', 'voided', 'Anulado']))
+            .filter(Sale.sale_type.in_(['Venta', 'CobroVenta', 'CobroCC', 'CobroCuota', 'Cambio', 'Devolucion', 'Devolución', 'Pago']))
+            .filter(
+                or_(
+                    SalePayment.method == 'cash',
+                    Sale.payment_method == 'Efectivo',
+                )
+            )
         )
+        return q.scalar()
     except Exception:
         return None
 
@@ -3612,6 +3980,24 @@ def _delete_sale_full(*, cid: str, ticket: str, visited: set[str]):
         current_app.logger.exception('Failed to parse related ticket from notes')
         related_ticket = ''
 
+    # Eliminar en forma bidireccional: si borran un Cobro* desde Movimientos,
+    # también debe borrarse la Venta/Cambio referenciado por nota "Ticket #XXXX".
+    try:
+        st_row = str(getattr(row, 'sale_type', '') or '').strip()
+    except Exception:
+        st_row = ''
+    if st_row in ('CobroVenta', 'CobroCC', 'CobroCuota'):
+        try:
+            note = str(getattr(row, 'notes', '') or '')
+            m = re.search(r"Ticket\s*(?:original\s*)?#\s*(#+?\w+)", note, re.IGNORECASE)
+            ref = (m.group(1) if (m and m.group(1)) else '').strip()
+        except Exception:
+            ref = ''
+        if ref:
+            ref = '#' + ref.lstrip('#')
+        if ref and ref != t:
+            related_ticket = ref
+
     try:
         if str(getattr(row, 'sale_type', '') or '').strip() == 'CobroCC':
             note = str(getattr(row, 'notes', '') or '').strip()
@@ -3687,13 +4073,13 @@ def _delete_sale_full(*, cid: str, ticket: str, visited: set[str]):
             for pay in (payments or []):
                 try:
                     note = str(getattr(pay, 'notes', '') or '')
-                    m = re.search(r"Ticket\s*(?:original\s*)?#\s*(#?\w+)", note, re.IGNORECASE)
+                    m = re.search(r"Ticket\s*(?:original\s*)?#\s*(#+?\w+)", note, re.IGNORECASE)
                     ref = (m.group(1) if (m and m.group(1)) else '').strip()
                 except Exception:
                     ref = ''
 
-                if ref and not ref.startswith('#'):
-                    ref = '#' + ref
+                if ref:
+                    ref = '#' + ref.lstrip('#')
 
                 if not ref or ref != t_norm:
                     continue
@@ -3789,11 +4175,20 @@ def create_sale():
     _ensure_sale_surcharge_columns()
     _ensure_sale_cmv_flags_columns()
     _ensure_installment_plan_columns()
+    _ensure_sale_payments_table()
     payload = request.get_json(silent=True) or {}
     sale_date = _parse_date_iso(payload.get('fecha') or payload.get('date'), dt_date.today())
     sale_type = str(payload.get('type') or 'Venta').strip() or 'Venta'
     status = str(payload.get('status') or ('Cambio' if sale_type == 'Cambio' else 'Completada')).strip() or 'Completada'
     payment_method = str(payload.get('payment_method') or 'Efectivo').strip() or 'Efectivo'
+
+    payments = None
+    try:
+        payments = _parse_payments_payload(payload)
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+    except Exception:
+        payments = None
 
     inst_raw = payload.get('installments')
     inst = inst_raw if isinstance(inst_raw, dict) else {}
@@ -3831,6 +4226,15 @@ def create_sale():
     on_account = bool(payload.get('on_account'))
     paid_amount = _num(payload.get('paid_amount'))
     due_amount = _num(payload.get('due_amount'))
+
+    # Validación pagos múltiples
+    if payments is not None and str(sale_type or '').strip() == 'Venta':
+        expected = float(total_amount or 0.0)
+        if bool(on_account) or bool(inst_enabled):
+            expected = float(paid_amount or 0.0)
+        total_pays = _sum_payments(payments)
+        if abs(float(expected) - float(total_pays)) > 0.01:
+            return jsonify({'ok': False, 'error': 'payments_sum_mismatch'}), 400
 
     # Normalización:
     # - Movimientos (Ingresos) se basa en tickets CobroVenta/CobroCC/CobroCuota.
@@ -3925,12 +4329,17 @@ def create_sale():
     row = None
     payment_sale = None
     cash_payment_sale = None
+    attempted_ticket = None
+    suggested_ticket = None
+
     attempts = 0
+    max_attempts = 30
     base_n = _next_ticket_number(cid)
-    while attempts < 10:
-        n = base_n + attempts
+    while attempts < max_attempts:
+        n = int(base_n or 1) + int(attempts)
         attempts += 1
         tk = _format_ticket_number(n)
+        attempted_ticket = tk
 
         row = Sale(
             ticket=tk,
@@ -3956,6 +4365,22 @@ def create_sale():
             exchange_return_total=exchange_return_total,
             exchange_new_total=exchange_new_total,
         )
+
+        if payments is not None and str(sale_type or '').strip() == 'Venta':
+            try:
+                row.payments = []
+                for p in (payments or []):
+                    row.payments.append(SalePayment(
+                        company_id=cid,
+                        method=str(p.get('method') or '').strip(),
+                        amount=float(p.get('amount') or 0.0),
+                    ))
+                if len(payments) == 1:
+                    row.payment_method = str(payments[0].get('method') or payment_method)
+                elif len(payments) >= 2:
+                    row.payment_method = ' + '.join([str(x.get('method')) for x in payments])
+            except Exception:
+                current_app.logger.exception('Failed to attach sale payments')
         if inst_enabled:
             try:
                 row.is_installments = True
@@ -3994,7 +4419,22 @@ def create_sale():
         try:
             db.session.flush()
         except IntegrityError:
-            db.session.rollback()
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            row = None
+            try:
+                _ensure_sale_ticket_numbering()
+            except Exception:
+                pass
+            try:
+                base_n = _next_ticket_number(cid)
+                suggested_ticket = _format_ticket_number(int(base_n or 1))
+            except Exception:
+                base_n = int(base_n or 1) + 1
+                suggested_ticket = _format_ticket_number(int(base_n or 1))
+            attempts = 0
             continue
         except Exception as e:
             current_app.logger.exception('Failed to flush sale')
@@ -4342,13 +4782,24 @@ def create_sale():
             payload_out = {'ok': True, 'item': _serialize_sale(row), 'payment': _serialize_sale(payment_sale)}
             if cash_payment_sale is not None:
                 payload_out['cash_payment'] = _serialize_sale(cash_payment_sale)
-            return jsonify(payload_out)
+            return jsonify(payload_out), 201
         payload_out = {'ok': True, 'item': _serialize_sale(row)}
         if cash_payment_sale is not None:
             payload_out['cash_payment'] = _serialize_sale(cash_payment_sale)
-        return jsonify(payload_out)
+        return jsonify(payload_out), 201
 
-    return jsonify({'ok': False, 'error': 'ticket_duplicate', 'message': 'No se pudo registrar la venta: ticket duplicado.'}), 400
+    if suggested_ticket is None:
+        try:
+            suggested_ticket = _format_ticket_number(int(_next_ticket_number(cid) or 1))
+        except Exception:
+            suggested_ticket = None
+    return jsonify({
+        'ok': False,
+        'error': 'ticket_duplicate',
+        'message': 'No se pudo registrar la venta: ticket duplicado.',
+        'attempted_ticket': attempted_ticket,
+        'suggested_ticket': suggested_ticket,
+    }), 409
 
 
 @bp.get('/api/installment-plans')
@@ -4897,6 +5348,7 @@ def cancel_installment_plan(plan_id: int):
 def update_sale(ticket):
     _ensure_sale_employee_columns()
     _ensure_sale_surcharge_columns()
+    _ensure_sale_payments_table()
     t = str(ticket or '').strip()
     cid = _company_id()
     row = db.session.query(Sale).filter(Sale.company_id == cid, Sale.ticket == t).first()
@@ -4922,6 +5374,13 @@ def update_sale(ticket):
     sale_type = str(payload.get('type') or row.sale_type).strip() or row.sale_type
     status = str(payload.get('status') or row.status).strip() or row.status
     payment_method = str(payload.get('payment_method') or row.payment_method).strip() or row.payment_method
+    payments = None
+    try:
+        payments = _parse_payments_payload(payload)
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+    except Exception:
+        payments = None
 
     # Revertimos impacto de inventario anterior para recalcular con los nuevos items
     try:
@@ -4960,6 +5419,30 @@ def update_sale(ticket):
 
     row.exchange_return_total = (None if payload.get('exchange_return_total') is None else _num(payload.get('exchange_return_total')))
     row.exchange_new_total = (None if payload.get('exchange_new_total') is None else _num(payload.get('exchange_new_total')))
+
+    if payments is not None and str(sale_type or '').strip() == 'Venta':
+        expected = float(row.total or 0.0)
+        if bool(row.on_account):
+            expected = float(row.paid_amount or 0.0)
+        total_pays = _sum_payments(payments)
+        if abs(float(expected) - float(total_pays)) > 0.01:
+            db.session.rollback()
+            return jsonify({'ok': False, 'error': 'payments_sum_mismatch'}), 400
+
+        try:
+            row.payments = []
+            for p in (payments or []):
+                row.payments.append(SalePayment(
+                    company_id=cid,
+                    method=str(p.get('method') or '').strip(),
+                    amount=float(p.get('amount') or 0.0),
+                ))
+            if len(payments) == 1:
+                row.payment_method = str(payments[0].get('method') or payment_method)
+            elif len(payments) >= 2:
+                row.payment_method = ' + '.join([str(x.get('method')) for x in payments])
+        except Exception:
+            current_app.logger.exception('Failed to update sale payments')
 
     is_gift = bool(payload.get('is_gift'))
     gift_code = str(payload.get('gift_code') or '').strip() or None
@@ -5227,15 +5710,32 @@ def _round2(v: float) -> float:
 
 def _cash_sales_total(cid: str, d: dt_date) -> float:
     try:
-        q = (
-            db.session.query(func.coalesce(func.sum(Sale.total), 0.0))
+        # Fuente de verdad: SalePayment.method (pagos mixtos). Para ventas legacy sin SalePayment,
+        # usar Sale.payment_method == 'Efectivo'.
+        q_pay = (
+            db.session.query(func.coalesce(func.sum(SalePayment.amount), 0.0))
+            .select_from(Sale)
+            .join(SalePayment, and_(SalePayment.company_id == cid, SalePayment.sale_id == Sale.id))
             .filter(Sale.company_id == cid)
             .filter(Sale.sale_date == d)
-            .filter(Sale.payment_method == 'Efectivo')
             .filter(Sale.status == 'Completada')
-            .filter(Sale.sale_type == 'Venta')
+            .filter(Sale.sale_type.in_(['Venta', 'CobroVenta', 'CobroCC', 'CobroCuota']))
+            .filter(SalePayment.method == 'cash')
         )
-        return float(q.scalar() or 0.0)
+        total_pay = float(q_pay.scalar() or 0.0)
+
+        q_legacy = (
+            db.session.query(func.coalesce(func.sum(Sale.total), 0.0))
+            .outerjoin(SalePayment, and_(SalePayment.company_id == cid, SalePayment.sale_id == Sale.id))
+            .filter(Sale.company_id == cid)
+            .filter(Sale.sale_date == d)
+            .filter(Sale.status == 'Completada')
+            .filter(Sale.sale_type.in_(['Venta', 'CobroVenta', 'CobroCC', 'CobroCuota']))
+            .filter(SalePayment.id.is_(None))
+            .filter(Sale.payment_method == 'Efectivo')
+        )
+        total_legacy = float(q_legacy.scalar() or 0.0)
+        return float(total_pay + total_legacy)
     except Exception:
         return 0.0
 

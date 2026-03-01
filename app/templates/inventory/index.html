@@ -4773,7 +4773,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const filteredProducts = products
             .filter(p => {
                 const isInactive = (p && p.active === false);
-                if (q && !String(p.name || '').toLowerCase().includes(q)) return false;
+                if (q) {
+                    const nm = String(p?.name || '').toLowerCase();
+                    const desc = String(p?.description || p?.descripcion || '').toLowerCase();
+                    const ic = String(p?.codigo_interno || p?.internal_code || p?.internalCode || '').toLowerCase();
+                    if (!nm.includes(q) && !desc.includes(q) && !ic.includes(q)) return false;
+                }
                 if (cat && categoryLabel(p) !== cat) return false;
 
                 const metrics = compute(p);
@@ -4794,7 +4799,12 @@ document.addEventListener('DOMContentLoaded', function () {
             .filter(l => {
                 const p = products.find(x => String(x.id) === String(l.product_id));
                 if (!p) return false;
-                if (q && !String(p.name || '').toLowerCase().includes(q)) return false;
+                if (q) {
+                    const nm = String(p?.name || '').toLowerCase();
+                    const desc = String(p?.description || p?.descripcion || '').toLowerCase();
+                    const ic = String(p?.codigo_interno || p?.internal_code || p?.internalCode || '').toLowerCase();
+                    if (!nm.includes(q) && !desc.includes(q) && !ic.includes(q)) return false;
+                }
                 if (lotsSupQ && !String(l?.supplier_name || '').toLowerCase().includes(lotsSupQ)) return false;
                 return true;
             })

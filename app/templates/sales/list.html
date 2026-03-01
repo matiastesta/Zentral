@@ -837,19 +837,19 @@
                             <label class="block text-xs font-medium text-gray-600 mb-1">Forma de pago</label>
                             <div class="grid grid-cols-2 grid-rows-2 gap-2 text-xs h-full items-stretch">
                                 <label class="flex items-center justify-center text-center gap-2 px-2 py-3 rounded-md border border-gray-200 bg-gray-50 cursor-pointer w-full h-full">
-                                    <input type="radio" name="cambio_forma_pago" class="text-indigo-600" checked>
+                                    <input type="checkbox" name="cambio_forma_pago" value="Efectivo" class="text-indigo-600 cambio-payment-method-checkbox" checked>
                                     <span><i class="fas fa-money-bill-wave mr-1 text-green-500"></i>Efectivo</span>
                                 </label>
                                 <label class="flex items-center justify-center text-center gap-2 px-2 py-3 rounded-md border border-gray-200 bg-gray-50 cursor-pointer w-full h-full">
-                                    <input type="radio" name="cambio_forma_pago" class="text-indigo-600">
+                                    <input type="checkbox" name="cambio_forma_pago" value="Transferencia" class="text-indigo-600 cambio-payment-method-checkbox">
                                     <span><i class="fas fa-exchange-alt mr-1 text-blue-500"></i>Transferencia</span>
                                 </label>
                                 <label class="flex items-center justify-center text-center gap-2 px-2 py-3 rounded-md border border-gray-200 bg-gray-50 cursor-pointer w-full h-full">
-                                    <input type="radio" name="cambio_forma_pago" class="text-indigo-600">
+                                    <input type="checkbox" name="cambio_forma_pago" value="Débito" class="text-indigo-600 cambio-payment-method-checkbox">
                                     <span><i class="fas fa-credit-card mr-1 text-purple-500"></i>Débito</span>
                                 </label>
                                 <label class="flex items-center justify-center text-center gap-2 px-2 py-3 rounded-md border border-gray-200 bg-gray-50 cursor-pointer w-full h-full">
-                                    <input type="radio" name="cambio_forma_pago" class="text-indigo-600">
+                                    <input type="checkbox" name="cambio_forma_pago" value="Crédito" class="text-indigo-600 cambio-payment-method-checkbox">
                                     <span><i class="fas fa-credit-card mr-1 text-indigo-500"></i>Crédito</span>
                                 </label>
                             </div>
@@ -949,9 +949,42 @@
 
                 <div class="p-4 bg-white rounded-lg border border-gray-100 flex flex-col justify-between text-sm lg:sticky lg:top-24 h-full">
                     <div class="space-y-1 text-xs">
-                        <div class="flex justify-between"><span>Saldo a favor</span><span id="resumen-saldo-a-favor" class="font-semibold text-indigo-700">$0,00</span></div>
+                        <div class="flex justify-between"><span>Subtotal</span><span id="cambio-ticket-subtotal" class="font-semibold text-gray-900">$0,00</span></div>
+                        <div class="flex justify-between"><span id="cambio-venta-desc-general-label-paso3">(-) Descuento general</span><span id="cambio-venta-desc-general-amount-paso3" class="text-gray-700">$0,00</span></div>
+                        <div class="flex justify-between items-center gap-2">
+                            <span>Descuento general</span>
+                            <div class="flex items-center gap-2">
+                                <div class="relative">
+                                    <input id="cambio-ticket-descuento-general-paso3" type="number" class="w-20 px-2 py-1 pr-5 border rounded-md text-right" placeholder="" min="0" max="100">
+                                    <span class="absolute inset-y-0 right-2 flex items-center text-[11px] text-gray-500 pointer-events-none">%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between"><span id="cambio-venta-recargo-general-label-paso3">(+) Recargo general</span><span id="cambio-venta-recargo-general-amount-paso3" class="text-gray-700">$0,00</span></div>
+                        <div class="flex justify-between items-center gap-2">
+                            <span>Recargo general</span>
+                            <div class="flex items-center gap-2">
+                                <div class="relative">
+                                    <input id="cambio-ticket-recargo-general-paso3" type="number" class="w-20 px-2 py-1 pr-5 border rounded-md text-right" placeholder="" min="0" max="200">
+                                    <span class="absolute inset-y-0 right-2 flex items-center text-[11px] text-gray-500 pointer-events-none">%</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="flex justify-between"><span>Total nueva compra</span><span id="resumen-total-cambio-venta" class="font-semibold text-gray-900">$0,00</span></div>
+                        <div class="flex justify-between"><span>Saldo a favor</span><span id="resumen-saldo-a-favor" class="font-semibold text-indigo-700">$0,00</span></div>
                         <div class="flex justify-between"><span>Diferencia a abonar</span><span id="resumen-diferencia-a-abonar" class="font-semibold text-gray-900">$0,00</span></div>
+
+                        <div id="cambio-payments-detail" class="hidden mt-3 pt-3 border-t border-gray-100">
+                            <div class="text-xs font-semibold text-gray-800">Detalle de pagos</div>
+                            <div id="cambio-payments-detail-rows" class="mt-2 space-y-2"></div>
+                            <div class="mt-2 space-y-1 text-[11px]">
+                                <div class="flex justify-between"><span>Total a cobrar ahora:</span><span id="cambio-payments-total-now" class="font-semibold text-gray-900">$0,00</span></div>
+                                <div class="flex justify-between"><span>Sumatoria pagos:</span><span id="cambio-payments-total-sum" class="font-semibold text-gray-900">$0,00</span></div>
+                                <div class="flex justify-between"><span>Diferencia:</span><span id="cambio-payments-total-diff" class="font-semibold text-gray-900">$0,00</span></div>
+                                <div id="cambio-payments-detail-msg" class="hidden text-red-700 font-semibold"></div>
+                            </div>
+                        </div>
                     </div>
                     <button id="btn-confirmar-cambio-final" class="w-full mt-3 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">
                         Confirmar ticket y registrar
@@ -1164,7 +1197,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Fecha del ticket</label>
-                            <input id="ticket-fecha" type="date" class="w-full px-3 py-2 text-sm border rounded-md" value="{{ now.strftime('%Y-%m-%d') }}">
+                            <input id="ticket-fecha" type="date" class="w-full px-3 py-2 text-sm border rounded-md" value="">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Días de cambio</label>
@@ -1175,19 +1208,19 @@
                         <label class="block text-xs font-medium text-gray-600 mb-1">Forma de pago</label>
                         <div class="grid grid-cols-2 grid-rows-2 gap-2 text-xs h-full items-stretch">
                             <label class="flex items-center justify-center text-center gap-2 px-2 py-3 rounded-md border border-gray-200 bg-gray-50 cursor-pointer w-full h-full">
-                                <input type="radio" name="forma_pago" value="Efectivo" class="text-indigo-600" checked>
+                                <input type="checkbox" name="forma_pago" value="Efectivo" class="text-indigo-600 payment-method-checkbox" checked>
                                 <span><i class="fas fa-money-bill-wave mr-1 text-green-500"></i>Efectivo</span>
                             </label>
                             <label class="flex items-center justify-center text-center gap-2 px-2 py-3 rounded-md border border-gray-200 bg-gray-50 cursor-pointer w-full h-full">
-                                <input type="radio" name="forma_pago" value="Transferencia" class="text-indigo-600">
+                                <input type="checkbox" name="forma_pago" value="Transferencia" class="text-indigo-600 payment-method-checkbox">
                                 <span><i class="fas fa-exchange-alt mr-1 text-blue-500"></i>Transferencia</span>
                             </label>
                             <label class="flex items-center justify-center text-center gap-2 px-2 py-3 rounded-md border border-gray-200 bg-gray-50 cursor-pointer w-full h-full">
-                                <input type="radio" name="forma_pago" value="Débito" class="text-indigo-600">
+                                <input type="checkbox" name="forma_pago" value="Débito" class="text-indigo-600 payment-method-checkbox">
                                 <span><i class="fas fa-credit-card mr-1 text-purple-500"></i>Débito</span>
                             </label>
                             <label class="flex items-center justify-center text-center gap-2 px-2 py-3 rounded-md border border-gray-200 bg-gray-50 cursor-pointer w-full h-full">
-                                <input type="radio" name="forma_pago" value="Crédito" class="text-indigo-600">
+                                <input type="checkbox" name="forma_pago" value="Crédito" class="text-indigo-600 payment-method-checkbox">
                                 <span><i class="fas fa-credit-card mr-1 text-indigo-500"></i>Crédito</span>
                             </label>
                         </div>
@@ -1402,11 +1435,22 @@
                     <div class="flex justify-between"><span>Total</span><span id="ticket-total-sidebar" class="font-semibold text-gray-900">$0,00</span></div>
                     <div id="cc-resumen-paso2" class="hidden text-[11px] text-gray-600 text-right"></div>
                     <div id="cuotas-resumen-paso2" class="hidden text-[11px] text-gray-600 text-right"></div>
+
+                    <div id="payments-detail" class="hidden mt-3 pt-3 border-t border-gray-100">
+                        <div class="text-xs font-semibold text-gray-800">Detalle de pagos</div>
+                        <div id="payments-detail-rows" class="mt-2 space-y-2"></div>
+                        <div class="mt-2 space-y-1 text-[11px]">
+                            <div class="flex justify-between"><span>Total a cobrar ahora:</span><span id="payments-total-now" class="font-semibold text-gray-900">$0,00</span></div>
+                            <div class="flex justify-between"><span>Sumatoria pagos:</span><span id="payments-total-sum" class="font-semibold text-gray-900">$0,00</span></div>
+                            <div class="flex justify-between"><span>Diferencia:</span><span id="payments-total-diff" class="font-semibold text-gray-900">$0,00</span></div>
+                            <div id="payments-detail-msg" class="hidden text-red-700 font-semibold"></div>
+                        </div>
+                    </div>
                 </div>
                 <button id="btn-imprimir-ticket" type="button" class="w-full mt-3 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100" data-business-name="{{ business.name if business else '' }}">
                     Imprimir ticket
                 </button>
-                <button id="btn-confirmar-venta" class="w-full mt-3 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">
+                <button id="btn-confirmar-venta" type="button" class="w-full mt-3 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">
                     Confirmar ticket y registrar
                 </button>
             </div>
@@ -1928,7 +1972,11 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (e) {
         }
         try { placeVentaStepsPills(2); } catch (e) {}
-        try { if (panelPagoCliente) panelPagoCliente.classList.remove('hidden'); } catch (e) {}
+        try {
+            const p = document.getElementById('panel-pago-cliente');
+            if (p) p.classList.remove('hidden');
+        } catch (e) {}
+        try { if (typeof syncInstallmentsButtonVisibility === 'function') syncInstallmentsButtonVisibility(); } catch (e) {}
         try { computeTicketTotals(); } catch (e) {}
         try { renderTicketCartItemsFromMainCart(); } catch (e) {}
         try { renderTicketCartSummary(); } catch (e) {}
@@ -2561,6 +2609,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const ccResumenPaso2 = document.getElementById('cc-resumen-paso2');
     const cuotasResumenPaso1 = document.getElementById('cuotas-resumen-paso1');
     const cuotasResumenPaso2 = document.getElementById('cuotas-resumen-paso2');
+    const paymentsDetail = document.getElementById('payments-detail');
+    const paymentsDetailRows = document.getElementById('payments-detail-rows');
+    const paymentsTotalNowEl = document.getElementById('payments-total-now');
+    const paymentsTotalSumEl = document.getElementById('payments-total-sum');
+    const paymentsTotalDiffEl = document.getElementById('payments-total-diff');
+    const paymentsDetailMsg = document.getElementById('payments-detail-msg');
     const inputClienteBusqueda = document.getElementById('ticket-cliente-busqueda');
     const ddCliente = document.getElementById('ticket-cliente-dd');
     const btnPagoCompleto = document.getElementById('btn-pago-completo');
@@ -2972,10 +3026,646 @@ document.addEventListener('DOMContentLoaded', function() {
     let ventaPaidAmount = 0;
     let ventaUseInstallments = false;
 
+    const paymentMethodOrder = ['Efectivo', 'Transferencia', 'Débito', 'Crédito'];
+    const paymentMethodLabels = {
+        Efectivo: 'Efectivo',
+        Transferencia: 'Transferencia',
+        'Débito': 'Débito',
+        Débito: 'Débito',
+        Crédito: 'Crédito',
+        'Crédito': 'Crédito'
+    };
+    const paymentAmounts = {};
+    const paymentTouched = {};
+    let prevPaymentSelectionCount = 0;
+    let lastRenderedPaymentMethodsKey = '';
+
+    // Estado multipago para flujo de cambio (Paso 3)
+    const cambioPaymentAmounts = {};
+    const cambioPaymentTouched = {};
+    let lastRenderedCambioPaymentMethodsKey = '';
+
+    function canonicalPaymentMethodLabel(raw) {
+        const s = String(raw || '').trim();
+        if (!s) return '';
+        return String(paymentMethodLabels[s] || s);
+    }
+
+    function getSelectedPaymentMethods() {
+        const els = Array.from(document.querySelectorAll('input[name="forma_pago"].payment-method-checkbox'));
+        const selected = els.filter(el => !!el.checked).map(el => canonicalPaymentMethodLabel(el.value)).filter(Boolean);
+        const out = [];
+        const seen = new Set();
+        paymentMethodOrder.forEach(m => {
+            if (selected.includes(m) && !seen.has(m)) {
+                seen.add(m);
+                out.push(m);
+            }
+        });
+        selected.forEach(m => {
+            if (!seen.has(m)) {
+                seen.add(m);
+                out.push(m);
+            }
+        });
+        return out;
+    }
+
+    function getSingleSelectedPaymentMethodOrDefault() {
+        const ms = getSelectedPaymentMethods();
+        return String(ms[0] || 'Efectivo');
+    }
+
+    function parsePaymentAmountFromInputValue(raw) {
+        const s0 = String(raw || '').trim();
+        if (!s0) return null;
+        let n = parseMoneyInputARS(s0);
+        if (!isFinite(n) || n < 0) return null;
+        return n;
+    }
+
+    function normalizeDigitsOnly(raw) {
+        return String(raw || '').replace(/[^\d]/g, '');
+    }
+
+    function parseDigitsToAmount(rawDigits) {
+        const s = normalizeDigitsOnly(rawDigits);
+        if (!s) return null;
+        const n = parseInt(s, 10);
+        if (!isFinite(n) || n < 0) return null;
+        return n;
+    }
+
+    function setInputValuePreserveCursor(inp, nextValue) {
+        try {
+            const start = inp.selectionStart;
+            const end = inp.selectionEnd;
+            inp.value = nextValue;
+            if (typeof start === 'number' && typeof end === 'number') {
+                const pos = Math.min(nextValue.length, start);
+                inp.setSelectionRange(pos, pos);
+            }
+        } catch (e) {
+            try { inp.value = nextValue; } catch (err) {}
+        }
+    }
+
+    function computeMontoACobrarAhora(totalTicket) {
+        const total = parseFloat(totalTicket || 0) || 0;
+        if (ventaUseInstallments) {
+            try {
+                const mode = getCuotasMode();
+                if (mode === 'fixed') {
+                    const cnt = Math.max(1, Math.min(24, parseInt(String(cuotasCount?.value || '1'), 10) || 1));
+                    return cnt > 0 ? (total / cnt) : total;
+                }
+            } catch (e) {}
+            return total;
+        }
+        if (ventaOnAccount) {
+            const paid = parseFloat(ventaPaidAmount || 0) || 0;
+            return Math.max(0, Math.min(total, paid));
+        }
+        return total;
+    }
+
+    function renderPaymentsDetailForSelected(totalNow) {
+        const methods = getSelectedPaymentMethods();
+        const show = methods.length >= 2;
+        if (!show || !paymentsDetailRows) return;
+
+        const methodsKey = methods.join('|');
+        const shouldRerender = (methodsKey !== lastRenderedPaymentMethodsKey);
+        if (shouldRerender) {
+            lastRenderedPaymentMethodsKey = methodsKey;
+
+            // Reconstruir SOLO cuando cambian los medios, no al tipear.
+            paymentsDetailRows.innerHTML = '';
+            methods.forEach(function (m) {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between gap-2';
+                row.setAttribute('data-method-row', m);
+
+                const label = document.createElement('div');
+                label.className = 'text-[11px] text-gray-700 font-medium';
+                label.textContent = m;
+
+                const inp = document.createElement('input');
+                inp.type = 'text';
+                inp.setAttribute('inputmode', 'numeric');
+                inp.className = 'payment-amount-input w-28 px-2 py-1.5 text-xs border rounded-md text-right';
+                inp.setAttribute('data-method', m);
+                inp.placeholder = '';
+
+                // valor crudo (solo dígitos) en foco; formateado al salir
+                const rawDigits = normalizeDigitsOnly(paymentAmounts[m] == null ? '' : paymentAmounts[m]);
+                inp.value = rawDigits;
+
+                inp.addEventListener('focus', function () {
+                    const mm = canonicalPaymentMethodLabel(this.getAttribute('data-method'));
+                    const raw = normalizeDigitsOnly(paymentAmounts[mm] == null ? '' : paymentAmounts[mm]);
+                    try { this.value = raw; } catch (e) {}
+                });
+
+                inp.addEventListener('blur', function () {
+                    const mm = canonicalPaymentMethodLabel(this.getAttribute('data-method'));
+                    const amt = parseDigitsToAmount(paymentAmounts[mm]);
+                    if (amt == null) {
+                        try { this.value = ''; } catch (e) {}
+                        return;
+                    }
+                    try { this.value = formatearMoneda(amt); } catch (e) {}
+                });
+
+                inp.addEventListener('input', function () {
+                    const mm = canonicalPaymentMethodLabel(this.getAttribute('data-method'));
+                    paymentTouched[mm] = true;
+                    const cleaned = normalizeDigitsOnly(this.value);
+                    setInputValuePreserveCursor(this, cleaned);
+                    paymentAmounts[mm] = cleaned;
+                    refreshPaymentsValidation(true);
+                });
+
+                row.appendChild(label);
+                row.appendChild(inp);
+                paymentsDetailRows.appendChild(row);
+            });
+        }
+    }
+
+    function applySmartAutofillIfNeeded(totalNow) {
+        const methods = getSelectedPaymentMethods();
+        if (methods.length !== 1) return;
+        const isFull = (!ventaOnAccount && !ventaUseInstallments);
+        if (isFull) return;
+        const m = methods[0];
+        if (paymentTouched[m]) return;
+        if (paymentAmounts[m] == null) {
+            paymentAmounts[m] = (parseFloat(totalNow || 0) || 0);
+        }
+    }
+
+    function refreshPaymentsValidation(skipRerenderDetail) {
+        const totals = computeTicketTotals();
+        const totalTicket = parseFloat(totals?.total || 0) || 0;
+        const totalNow = computeMontoACobrarAhora(totalTicket);
+
+        const isFull = (!ventaOnAccount && !ventaUseInstallments);
+
+        try { if (paymentsTotalNowEl) paymentsTotalNowEl.textContent = formatearMoneda(totalNow); } catch (e) {}
+
+        const methods = getSelectedPaymentMethods();
+        const showDetail = (methods.length >= 2);
+        if (paymentsDetail) paymentsDetail.classList.toggle('hidden', !showDetail);
+
+        // 1 medio: modo simple (sin inputs). Autocompleta el monto a cobrar ahora.
+        if (methods.length === 1) {
+            const m = methods[0];
+            paymentAmounts[m] = totalNow;
+            paymentTouched[m] = false;
+            try {
+                if (paymentsTotalSumEl) paymentsTotalSumEl.textContent = formatearMoneda(totalNow);
+                if (paymentsTotalDiffEl) paymentsTotalDiffEl.textContent = formatearMoneda(0);
+                if (paymentsTotalDiffEl) paymentsTotalDiffEl.classList.remove('text-red-700');
+                if (paymentsDetailMsg) paymentsDetailMsg.classList.add('hidden');
+            } catch (e) {}
+            try {
+                if (btnConfirmarVenta) {
+                    btnConfirmarVenta.disabled = false;
+                    btnConfirmarVenta.classList.remove('opacity-50');
+                    btnConfirmarVenta.classList.remove('cursor-not-allowed');
+                }
+            } catch (e) {}
+            return;
+        }
+
+        if (!methods.length) {
+            try {
+                if (paymentsTotalSumEl) paymentsTotalSumEl.textContent = formatearMoneda(0);
+                if (paymentsTotalDiffEl) paymentsTotalDiffEl.textContent = formatearMoneda(totalNow);
+                if (paymentsTotalDiffEl) paymentsTotalDiffEl.classList.add('text-red-700');
+                if (paymentsDetailMsg) paymentsDetailMsg.classList.add('hidden');
+            } catch (e) {}
+            try {
+                if (btnConfirmarVenta) {
+                    btnConfirmarVenta.disabled = true;
+                    btnConfirmarVenta.classList.add('opacity-50');
+                    btnConfirmarVenta.classList.add('cursor-not-allowed');
+                }
+            } catch (e) {}
+            return;
+        }
+
+        // 2+ medios: sin autocompletar, requiere inputs
+        if (showDetail && !skipRerenderDetail) {
+            renderPaymentsDetailForSelected(totalNow);
+        }
+
+        let sum = 0;
+        let missing = false;
+        methods.forEach(function (m) {
+            const v = paymentAmounts[m];
+            if (v == null || String(v) === '') {
+                missing = true;
+                return;
+            }
+            const n = parseDigitsToAmount(v);
+            if (!isFinite(n) || n < 0) {
+                missing = true;
+                return;
+            }
+            sum += n;
+        });
+
+        const diff = totalNow - sum;
+        const tol = 0.01;
+        const ok = (!missing) && (Math.abs(diff) <= tol) && (methods.length >= 2);
+
+        try { if (paymentsTotalSumEl) paymentsTotalSumEl.textContent = formatearMoneda(sum); } catch (e) {}
+        try {
+            if (paymentsTotalDiffEl) paymentsTotalDiffEl.textContent = formatearMoneda(diff);
+            if (paymentsTotalDiffEl) paymentsTotalDiffEl.classList.toggle('text-red-700', Math.abs(diff) > tol);
+        } catch (e) {}
+
+        try {
+            if (paymentsDetailMsg) {
+                const showMsg = (!ok);
+                paymentsDetailMsg.classList.toggle('hidden', !showMsg);
+                if (showMsg) {
+                    const sm = missing
+                        ? 'Completá los montos de los medios seleccionados.'
+                        : ('La suma de los pagos (' + formatearMoneda(sum) + ') debe coincidir con el monto a cobrar (' + formatearMoneda(totalNow) + '). Diferencia: ' + formatearMoneda(diff) + '.');
+                    paymentsDetailMsg.textContent = sm;
+                } else {
+                    paymentsDetailMsg.textContent = '';
+                }
+            }
+        } catch (e) {}
+
+        try {
+            if (btnConfirmarVenta) {
+                btnConfirmarVenta.disabled = !ok;
+                btnConfirmarVenta.classList.toggle('opacity-50', !ok);
+                btnConfirmarVenta.classList.toggle('cursor-not-allowed', !ok);
+            }
+        } catch (e) {}
+    }
+
+    function onPaymentMethodsChanged() {
+        const selected = getSelectedPaymentMethods();
+        const prevCount = prevPaymentSelectionCount;
+        prevPaymentSelectionCount = selected.length;
+        const selectedSet = new Set(selected);
+
+        // Regla estricta: en multi-pago siempre iniciar vacío.
+        // Si pasa de 1 medio a 2+, limpiar lo autocompletado.
+        if (selected.length >= 2) {
+            Object.keys(paymentAmounts || {}).forEach(function (k) { delete paymentAmounts[k]; });
+            Object.keys(paymentTouched || {}).forEach(function (k) { delete paymentTouched[k]; });
+            selected.forEach(function (m) {
+                paymentAmounts[m] = '';
+                paymentTouched[m] = false;
+            });
+            lastRenderedPaymentMethodsKey = '';
+        }
+        Object.keys(paymentAmounts || {}).forEach(function (k) {
+            if (!selectedSet.has(k)) {
+                delete paymentAmounts[k];
+                delete paymentTouched[k];
+            }
+        });
+        refreshPaymentsValidation();
+    }
+
+    function getSelectedCambioPaymentMethods() {
+        const els = Array.from(document.querySelectorAll('input[name="cambio_forma_pago"].cambio-payment-method-checkbox'));
+        const selected = els.filter(el => !!el.checked).map(el => canonicalPaymentMethodLabel(el.value)).filter(Boolean);
+        const out = [];
+        const seen = new Set();
+        paymentMethodOrder.forEach(m => {
+            if (selected.includes(m) && !seen.has(m)) {
+                seen.add(m);
+                out.push(m);
+            }
+        });
+        selected.forEach(m => {
+            if (!seen.has(m)) {
+                seen.add(m);
+                out.push(m);
+            }
+        });
+        return out;
+    }
+
+    function computeCambioPaso3TotalsFromUi() {
+        const itemsOut = getCartItemsCambioVenta();
+        const subtotal = (itemsOut || []).reduce((acc, it) => acc + (parseFloat(it?.subtotal || 0) || 0), 0);
+
+        const descPct = Math.max(0, Math.min(100, parseNumeroFlexible(document.getElementById('cambio-ticket-descuento-general-paso3')?.value || '0') || 0));
+        const recPct = Math.max(0, Math.min(200, parseNumeroFlexible(document.getElementById('cambio-ticket-recargo-general-paso3')?.value || '0') || 0));
+
+        const descAmount = Math.max(0, subtotal) * (descPct / 100);
+        const recAmount = Math.max(0, (subtotal - descAmount)) * (recPct / 100);
+        const totalFinal = Math.max(0, subtotal - descAmount + recAmount);
+
+        const saldo = Math.max(0, parseFloat(saldoAFavor || 0) || 0);
+        const diffToPay = Math.max(0, totalFinal - saldo);
+
+        return {
+            subtotal,
+            discount_general_pct: descPct,
+            discount_general_amount: descAmount,
+            surcharge_general_pct: recPct,
+            surcharge_general_amount: recAmount,
+            total_nueva_venta: totalFinal,
+            diferencia_a_abonar: diffToPay,
+            saldo_a_favor: saldo,
+        };
+    }
+
+    function renderCambioPaymentsDetailForSelected() {
+        const methods = getSelectedCambioPaymentMethods();
+        const show = methods.length >= 2;
+        const rowsEl = document.getElementById('cambio-payments-detail-rows');
+        if (!show || !rowsEl) return;
+
+        const methodsKey = methods.join('|');
+        const shouldRerender = (methodsKey !== lastRenderedCambioPaymentMethodsKey);
+        if (!shouldRerender) return;
+
+        lastRenderedCambioPaymentMethodsKey = methodsKey;
+        rowsEl.innerHTML = '';
+        methods.forEach(function (m) {
+            const row = document.createElement('div');
+            row.className = 'flex items-center justify-between gap-2';
+            row.setAttribute('data-method-row', m);
+
+            const label = document.createElement('div');
+            label.className = 'text-[11px] text-gray-700 font-medium';
+            label.textContent = m;
+
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.setAttribute('inputmode', 'numeric');
+            inp.className = 'payment-amount-input w-28 px-2 py-1.5 text-xs border rounded-md text-right';
+            inp.setAttribute('data-method', m);
+            inp.placeholder = '';
+
+            const rawDigits = normalizeDigitsOnly(cambioPaymentAmounts[m] == null ? '' : cambioPaymentAmounts[m]);
+            inp.value = rawDigits;
+
+            inp.addEventListener('focus', function () {
+                const mm = canonicalPaymentMethodLabel(this.getAttribute('data-method'));
+                const raw = normalizeDigitsOnly(cambioPaymentAmounts[mm] == null ? '' : cambioPaymentAmounts[mm]);
+                try { this.value = raw; } catch (e) {}
+            });
+
+            inp.addEventListener('blur', function () {
+                const mm = canonicalPaymentMethodLabel(this.getAttribute('data-method'));
+                const amt = parseDigitsToAmount(cambioPaymentAmounts[mm]);
+                if (amt == null) {
+                    try { this.value = ''; } catch (e) {}
+                    return;
+                }
+                try { this.value = formatearMoneda(amt); } catch (e) {}
+            });
+
+            inp.addEventListener('input', function () {
+                const mm = canonicalPaymentMethodLabel(this.getAttribute('data-method'));
+                cambioPaymentTouched[mm] = true;
+                const cleaned = normalizeDigitsOnly(this.value);
+                setInputValuePreserveCursor(this, cleaned);
+                cambioPaymentAmounts[mm] = cleaned;
+                refreshCambioPaymentsValidation(true);
+            });
+
+            row.appendChild(label);
+            row.appendChild(inp);
+            rowsEl.appendChild(row);
+        });
+    }
+
+    function refreshCambioPaso3ResumenUi(totals) {
+        const t = totals && typeof totals === 'object' ? totals : computeCambioPaso3TotalsFromUi();
+        try {
+            const subtotalEl = document.getElementById('cambio-ticket-subtotal');
+            if (subtotalEl) subtotalEl.textContent = formatearMoneda(t.subtotal || 0);
+        } catch (e) {}
+        try {
+            const totalEl = document.getElementById('resumen-total-cambio-venta');
+            if (totalEl) totalEl.textContent = formatearMoneda(t.total_nueva_venta || 0);
+        } catch (e) {}
+        try {
+            const saldoEl = document.getElementById('resumen-saldo-a-favor');
+            if (saldoEl) saldoEl.textContent = formatearMoneda(t.saldo_a_favor || 0);
+        } catch (e) {}
+        try {
+            const diffEl = document.getElementById('resumen-diferencia-a-abonar');
+            if (diffEl) diffEl.textContent = formatearMoneda(t.diferencia_a_abonar || 0);
+        } catch (e) {}
+        try {
+            const labelDescEl = document.getElementById('cambio-venta-desc-general-label-paso3');
+            const amtDescEl = document.getElementById('cambio-venta-desc-general-amount-paso3');
+            const pct = parseFloat(t.discount_general_pct || 0) || 0;
+            if (labelDescEl) labelDescEl.textContent = pct > 0 ? ('(-) Descuento general (' + String(pct) + '%)') : '(-) Descuento general';
+            if (amtDescEl) amtDescEl.textContent = formatearMoneda(-Math.abs(parseFloat(t.discount_general_amount || 0) || 0));
+        } catch (e) {}
+        try {
+            const labelRecEl = document.getElementById('cambio-venta-recargo-general-label-paso3');
+            const amtRecEl = document.getElementById('cambio-venta-recargo-general-amount-paso3');
+            const pct = parseFloat(t.surcharge_general_pct || 0) || 0;
+            if (labelRecEl) labelRecEl.textContent = pct > 0 ? ('(+) Recargo general (' + String(pct) + '%)') : '(+) Recargo general';
+            if (amtRecEl) amtRecEl.textContent = formatearMoneda(Math.abs(parseFloat(t.surcharge_general_amount || 0) || 0));
+        } catch (e) {}
+    }
+
+    function refreshCambioPaymentsValidation(skipRerenderDetail) {
+        const totals = computeCambioPaso3TotalsFromUi();
+        refreshCambioPaso3ResumenUi(totals);
+
+        const totalNow = parseFloat(totals?.diferencia_a_abonar || 0) || 0;
+        const methods = getSelectedCambioPaymentMethods();
+
+        const detailEl = document.getElementById('cambio-payments-detail');
+        const totalNowEl = document.getElementById('cambio-payments-total-now');
+        const sumEl = document.getElementById('cambio-payments-total-sum');
+        const diffEl = document.getElementById('cambio-payments-total-diff');
+        const msgEl = document.getElementById('cambio-payments-detail-msg');
+
+        try { if (totalNowEl) totalNowEl.textContent = formatearMoneda(totalNow); } catch (e) {}
+
+        // Si no hay nada para cobrar, permitir confirmar sin exigir pago.
+        if (totalNow <= 0.00001) {
+            try {
+                if (detailEl) detailEl.classList.add('hidden');
+                if (sumEl) sumEl.textContent = formatearMoneda(0);
+                if (diffEl) diffEl.textContent = formatearMoneda(0);
+                if (diffEl) diffEl.classList.remove('text-red-700');
+                if (msgEl) msgEl.classList.add('hidden');
+            } catch (e) {}
+            try {
+                if (btnConfirmarCambioFinal) {
+                    btnConfirmarCambioFinal.disabled = false;
+                    btnConfirmarCambioFinal.classList.remove('opacity-50');
+                    btnConfirmarCambioFinal.classList.remove('cursor-not-allowed');
+                }
+            } catch (e) {}
+            return;
+        }
+
+        const showDetail = (methods.length >= 2);
+        try { if (detailEl) detailEl.classList.toggle('hidden', !showDetail); } catch (e) {}
+
+        // 1 medio: modo simple (sin inputs). Autocompleta el monto a cobrar ahora.
+        if (methods.length === 1) {
+            const m = methods[0];
+            cambioPaymentAmounts[m] = totalNow;
+            cambioPaymentTouched[m] = false;
+            try {
+                if (sumEl) sumEl.textContent = formatearMoneda(totalNow);
+                if (diffEl) diffEl.textContent = formatearMoneda(0);
+                if (diffEl) diffEl.classList.remove('text-red-700');
+                if (msgEl) msgEl.classList.add('hidden');
+            } catch (e) {}
+            try {
+                if (btnConfirmarCambioFinal) {
+                    btnConfirmarCambioFinal.disabled = false;
+                    btnConfirmarCambioFinal.classList.remove('opacity-50');
+                    btnConfirmarCambioFinal.classList.remove('cursor-not-allowed');
+                }
+            } catch (e) {}
+            return;
+        }
+
+        if (!methods.length) {
+            try {
+                if (sumEl) sumEl.textContent = formatearMoneda(0);
+                if (diffEl) diffEl.textContent = formatearMoneda(totalNow);
+                if (diffEl) diffEl.classList.add('text-red-700');
+                if (msgEl) msgEl.classList.add('hidden');
+            } catch (e) {}
+            try {
+                if (btnConfirmarCambioFinal) {
+                    btnConfirmarCambioFinal.disabled = true;
+                    btnConfirmarCambioFinal.classList.add('opacity-50');
+                    btnConfirmarCambioFinal.classList.add('cursor-not-allowed');
+                }
+            } catch (e) {}
+            return;
+        }
+
+        if (showDetail && !skipRerenderDetail) {
+            renderCambioPaymentsDetailForSelected();
+        }
+
+        let sum = 0;
+        let missing = false;
+        methods.forEach(function (m) {
+            const v = cambioPaymentAmounts[m];
+            if (v == null || String(v) === '') {
+                missing = true;
+                return;
+            }
+            const n = parseDigitsToAmount(v);
+            if (!isFinite(n) || n < 0) {
+                missing = true;
+                return;
+            }
+            sum += n;
+        });
+
+        const diff = totalNow - sum;
+        const tol = 0.01;
+        const ok = (!missing) && (Math.abs(diff) <= tol) && (methods.length >= 2);
+
+        try { if (sumEl) sumEl.textContent = formatearMoneda(sum); } catch (e) {}
+        try {
+            if (diffEl) diffEl.textContent = formatearMoneda(diff);
+            if (diffEl) diffEl.classList.toggle('text-red-700', Math.abs(diff) > tol);
+        } catch (e) {}
+
+        try {
+            if (msgEl) {
+                const showMsg = (!ok);
+                msgEl.classList.toggle('hidden', !showMsg);
+                if (showMsg) {
+                    const sm = missing
+                        ? 'Completá los montos de los medios seleccionados.'
+                        : ('La suma de los pagos (' + formatearMoneda(sum) + ') debe coincidir con el monto a cobrar (' + formatearMoneda(totalNow) + '). Diferencia: ' + formatearMoneda(diff) + '.');
+                    msgEl.textContent = sm;
+                } else {
+                    msgEl.textContent = '';
+                }
+            }
+        } catch (e) {}
+
+        try {
+            if (btnConfirmarCambioFinal) {
+                btnConfirmarCambioFinal.disabled = !ok;
+                btnConfirmarCambioFinal.classList.toggle('opacity-50', !ok);
+                btnConfirmarCambioFinal.classList.toggle('cursor-not-allowed', !ok);
+            }
+        } catch (e) {}
+    }
+
+    function onCambioPaymentMethodsChanged() {
+        const selected = getSelectedCambioPaymentMethods();
+        const selectedSet = new Set(selected);
+
+        if (selected.length >= 2) {
+            Object.keys(cambioPaymentAmounts || {}).forEach(function (k) { delete cambioPaymentAmounts[k]; });
+            Object.keys(cambioPaymentTouched || {}).forEach(function (k) { delete cambioPaymentTouched[k]; });
+            selected.forEach(function (m) {
+                cambioPaymentAmounts[m] = '';
+                cambioPaymentTouched[m] = false;
+            });
+            lastRenderedCambioPaymentMethodsKey = '';
+        }
+        Object.keys(cambioPaymentAmounts || {}).forEach(function (k) {
+            if (!selectedSet.has(k)) {
+                delete cambioPaymentAmounts[k];
+                delete cambioPaymentTouched[k];
+            }
+        });
+        refreshCambioPaymentsValidation();
+    }
+
+    function getSelectedCambioPaymentsPayload() {
+        const totals = computeCambioPaso3TotalsFromUi();
+        const totalNow = parseFloat(totals?.diferencia_a_abonar || 0) || 0;
+        if (totalNow <= 0.00001) return [];
+        const methods = getSelectedCambioPaymentMethods();
+        if (methods.length === 1) {
+            const m = methods[0];
+            const k = normPaymentMethodKey(m);
+            return [{ method: k || 'cash', amount: totalNow }];
+        }
+        const out = [];
+        methods.forEach(function (m) {
+            const k = normPaymentMethodKey(m);
+            const amt = parseDigitsToAmount(cambioPaymentAmounts[m]);
+            out.push({ method: k || '', amount: (amt == null ? null : amt) });
+        });
+        return out;
+    }
+
     function resetVentaPaymentState() {
         ventaOnAccount = false;
         ventaPaidAmount = 0;
         ventaUseInstallments = false;
+        try {
+            const els = Array.from(document.querySelectorAll('input[name="forma_pago"].payment-method-checkbox'));
+            els.forEach(function (el) {
+                const v = canonicalPaymentMethodLabel(el.value);
+                el.checked = (v === 'Efectivo');
+            });
+        } catch (e) {
+        }
+        try {
+            Object.keys(paymentAmounts || {}).forEach(function (k) { delete paymentAmounts[k]; });
+            Object.keys(paymentTouched || {}).forEach(function (k) { delete paymentTouched[k]; });
+        } catch (e) {
+        }
         try {
             if (panelCuentaCorriente) panelCuentaCorriente.classList.add('hidden');
             if (panelSistemaCuotas) panelSistemaCuotas.classList.add('hidden');
@@ -2997,6 +3687,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try { syncCuentaCorrienteInlinePreview(); } catch (e) {}
         try { syncCuotasPreview(); } catch (e) {}
         try { computeTicketTotals(); } catch (e) {}
+        try { refreshPaymentsValidation(); } catch (e) {}
     }
 
     function updatePaymentButtonsVisual() {
@@ -3063,6 +3754,8 @@ document.addEventListener('DOMContentLoaded', function() {
             renderCcResumen(ccResumenPaso1, paid, due, ventaOnAccount);
             renderCcResumen(ccResumenPaso2, paid, due, ventaOnAccount);
         } catch (e) {}
+
+        try { refreshPaymentsValidation(); } catch (e) {}
     }
 
     function openCuentaCorrientePanel() {
@@ -3136,6 +3829,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try { if (cuotasTotal) cuotasTotal.textContent = formatearMoneda(total); } catch (e) {}
         try { if (cuotasEach) cuotasEach.textContent = formatearMoneda(each); } catch (e) {}
+
+        try { refreshPaymentsValidation(); } catch (e) {}
 
         try {
             const resumen = (mode === 'fixed')
@@ -3813,14 +4508,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function getCambioPaymentMethod() {
-        const checked = document.querySelector('input[name="cambio_forma_pago"]:checked');
-        if (!checked) return 'Efectivo';
-        const label = checked.closest('label');
-        const txt = String(label?.textContent || '').replace(/\s+/g, ' ').trim();
-        if (txt.toLowerCase().includes('transferencia')) return 'Transferencia';
-        if (txt.toLowerCase().includes('débito') || txt.toLowerCase().includes('debito')) return 'Débito';
-        if (txt.toLowerCase().includes('crédito') || txt.toLowerCase().includes('credito')) return 'Crédito';
-        return 'Efectivo';
+        const methods = getSelectedCambioPaymentMethods();
+        return String(methods[0] || 'Efectivo');
     }
 
     function historialAccionesHtml(ticket) {
@@ -4133,27 +4822,90 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!total) return true;
         if (!sel || sel.size === 0) return false;
         if (sel.size >= total) return true;
-        return sel.has(String(value || '').trim());
+        const raw = String(value || '').trim();
+        if (filterKey === 'pago') {
+            const parts = raw.split('+').map(s => String(s || '').trim()).filter(Boolean);
+            if (!parts.length) return sel.has(raw);
+            return parts.some(p => sel.has(p));
+        }
+        return sel.has(raw);
     }
 
     function normPaymentMethodKey(v) {
+        // Acepta string legacy ("Efectivo"), key nueva ("cash"), o lista de pagos [{method,amount}].
+        if (Array.isArray(v)) {
+            const arr = v.map(x => normPaymentMethodKey(x && typeof x === 'object' ? x.method : '')).filter(Boolean);
+            return arr.join('+');
+        }
         const s = String(v || '').trim().toLowerCase();
         if (!s) return '';
         const noAcc = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        if (noAcc.includes('efectivo')) return 'efectivo';
-        if (noAcc.includes('transfer')) return 'transferencia';
-        if (noAcc.includes('credito')) return 'credito';
-        if (noAcc.includes('debito')) return 'debito';
+        if (noAcc === 'cash') return 'cash';
+        if (noAcc === 'transfer') return 'transfer';
+        if (noAcc === 'debit') return 'debit';
+        if (noAcc === 'credit') return 'credit';
+        if (noAcc.includes('efectivo')) return 'cash';
+        if (noAcc.includes('transfer')) return 'transfer';
+        if (noAcc.includes('credito')) return 'credit';
+        if (noAcc.includes('debito')) return 'debit';
         return noAcc;
     }
 
     function displayPaymentMethod(v) {
+        if (Array.isArray(v)) {
+            const order = ['cash', 'transfer', 'debit', 'credit'];
+            const labelFor = function (k) {
+                if (k === 'cash') return 'Efectivo';
+                if (k === 'transfer') return 'Transferencia';
+                if (k === 'debit') return 'Débito';
+                if (k === 'credit') return 'Crédito';
+                return '';
+            };
+            const seen = new Set();
+            const keys = [];
+            v.forEach(function (p) {
+                const k = normPaymentMethodKey(p && typeof p === 'object' ? p.method : '');
+                if (!k) return;
+                if (seen.has(k)) return;
+                seen.add(k);
+                keys.push(k);
+            });
+            keys.sort(function (a, b) {
+                const ia = order.indexOf(a);
+                const ib = order.indexOf(b);
+                if (ia === -1 && ib === -1) return String(a).localeCompare(String(b));
+                if (ia === -1) return 1;
+                if (ib === -1) return -1;
+                return ia - ib;
+            });
+            const labels = keys.map(labelFor).filter(Boolean);
+            return labels.join(' + ') || 'Efectivo';
+        }
         const k = normPaymentMethodKey(v);
-        if (k === 'efectivo') return 'Efectivo';
-        if (k === 'debito') return 'Débito';
-        if (k === 'credito') return 'Crédito';
-        if (k === 'transferencia') return 'Transferencia';
+        if (k === 'cash') return 'Efectivo';
+        if (k === 'transfer') return 'Transferencia';
+        if (k === 'debit') return 'Débito';
+        if (k === 'credit') return 'Crédito';
         return String(v || '').trim() || 'Efectivo';
+    }
+
+    function getSelectedPaymentsPayload() {
+        const totals = computeTicketTotals();
+        const totalTicket = parseFloat(totals?.total || 0) || 0;
+        const totalNow = computeMontoACobrarAhora(totalTicket);
+        const methods = getSelectedPaymentMethods();
+        if (methods.length === 1) {
+            const m = methods[0];
+            const k = normPaymentMethodKey(m);
+            return [{ method: k || 'cash', amount: totalNow }];
+        }
+        const out = [];
+        methods.forEach(function (m) {
+            const k = normPaymentMethodKey(m);
+            const amt = parseDigitsToAmount(paymentAmounts[m]);
+            out.push({ method: k || '', amount: (amt == null ? null : amt) });
+        });
+        return out;
     }
 
     function truncateText(s, n) {
@@ -4410,12 +5162,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function initVentasMultiPagoFromSales(sales) {
-        const preferred = ['efectivo', 'transferencia', 'debito', 'credito'];
+        const preferred = ['cash', 'transfer', 'debit', 'credit'];
         const opts = preferred.map(v => {
-            const label = (v === 'efectivo') ? 'Efectivo'
-                : (v === 'transferencia') ? 'Transferencia'
-                : (v === 'debito') ? 'Débito'
-                : (v === 'credito') ? 'Crédito'
+            const label = (v === 'cash') ? 'Efectivo'
+                : (v === 'transfer') ? 'Transferencia'
+                : (v === 'debit') ? 'Débito'
+                : (v === 'credit') ? 'Crédito'
                 : v;
             return { value: v, label: label };
         });
@@ -4522,7 +5274,10 @@ document.addEventListener('DOMContentLoaded', function() {
             tr.setAttribute('data-ticket', ticket);
             tr.setAttribute('data-fecha', String(s?.fecha || '').trim());
             tr.setAttribute('data-cliente', String(s?.customer_name || '').trim());
-            tr.setAttribute('data-pago-key', normPaymentMethodKey(String(s?.payment_method || '').trim()));
+            const payKey = (Array.isArray(s?.payments) && s.payments.length)
+                ? normPaymentMethodKey(s.payments)
+                : normPaymentMethodKey(String(s?.payment_method || '').trim());
+            tr.setAttribute('data-pago-key', String(payKey || '').trim());
             tr.setAttribute('data-is-gift', isGift ? '1' : '0');
             tr.setAttribute('data-gift-code', giftCode);
             tr.setAttribute('data-employee-id', String(s?.employee_id || '').trim());
@@ -4617,7 +5372,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 if (k === 'pago') {
-                    cells.push('<td data-col-key="pago" class="px-3 py-2 text-center text-gray-500">' + escapeHtml(displayPaymentMethod(s?.payment_method)) + '</td>');
+                    const disp = (Array.isArray(s?.payments) && s.payments.length)
+                        ? displayPaymentMethod(s.payments)
+                        : displayPaymentMethod(s?.payment_method);
+                    cells.push('<td data-col-key="pago" class="px-3 py-2 text-center text-gray-500">' + escapeHtml(disp) + '</td>');
                     return;
                 }
                 if (k === 'tipo') {
@@ -4942,9 +5700,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const cust = String(s?.customer_name || '').trim();
                 if (qCli && !cust.toLowerCase().includes(qCli)) return;
 
-                const pay = String(s?.payment_method || 'Efectivo').trim();
-                const payKey = normPaymentMethodKey(pay);
-                if (!ventasMultiMatches(payKey, 'pago')) return;
+                const payKey = (Array.isArray(s?.payments) && s.payments.length)
+                    ? normPaymentMethodKey(s.payments)
+                    : normPaymentMethodKey(String(s?.payment_method || 'Efectivo').trim());
+                const payKeys = String(payKey || '').split('+').filter(Boolean);
+                const okPago = payKeys.some(k => ventasMultiMatches(k, 'pago'));
+                if (!okPago) return;
 
                 if (!ventasMultiMatches(tipoLabel, 'tipo')) return;
 
@@ -6501,6 +7262,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         totalEstimadoEl.textContent = formatearMoneda(total);
         computeTicketTotals();
+        try { refreshPaymentsValidation(); } catch (e) {}
         if (pasoTicket && !pasoTicket.classList.contains('hidden')) {
             renderTicketCartSummary();
             try { renderTicketCartItemsFromMainCart(); } catch (e) {}
@@ -6689,11 +7451,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setPaymentMethodUi(method) {
         const m = String(method || '').trim();
-        const radios = Array.from(document.querySelectorAll('input[name="forma_pago"]'));
-        radios.forEach(r => {
-            const v = String(r?.value || '').trim();
-            r.checked = (v === m);
+        const els = Array.from(document.querySelectorAll('input[name="forma_pago"].payment-method-checkbox'));
+        if (!els.length) return;
+        els.forEach(r => {
+            const v = canonicalPaymentMethodLabel(String(r?.value || '').trim());
+            r.checked = (v === canonicalPaymentMethodLabel(m || 'Efectivo'));
         });
+        try { onPaymentMethodsChanged(); } catch (e) {}
     }
 
     function openEditTicket(ticket) {
@@ -6794,6 +7558,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (ventaRecargoGeneralAmountPaso2El) ventaRecargoGeneralAmountPaso2El.textContent = formatearMoneda(Math.abs(sam));
         } catch (e) {
         }
+
+        try { refreshPaymentsValidation(); } catch (e) {}
     }
 
     function computeTicketTotals() {
@@ -7178,9 +7944,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function getSelectedPaymentMethod() {
-        const checked = document.querySelector('input[name="forma_pago"]:checked');
-        const v = checked ? (checked.value || '') : '';
-        return String(v || 'Efectivo');
+        return getSingleSelectedPaymentMethodOrDefault();
     }
 
     function getCartItems() {
@@ -8371,6 +9135,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function getLocalISODate(d) {
+        const dt = (d instanceof Date) ? d : new Date();
+        const yyyy = String(dt.getFullYear());
+        const mm = String(dt.getMonth() + 1).padStart(2, '0');
+        const dd = String(dt.getDate()).padStart(2, '0');
+        return yyyy + '-' + mm + '-' + dd;
+    }
+
+    try {
+        if (typeof defaultFecha === 'undefined') {
+            var defaultFecha = getLocalISODate();
+        }
+    } catch (e) {
+    }
+
     function formatFechaDMY(value) {
         const s = String(value ?? '').trim();
         const m = s.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
@@ -9089,9 +9868,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const cust = String(s?.customer_name || '').trim();
             if (qCli && !cust.toLowerCase().includes(qCli)) return false;
 
-            const pay = String(s?.payment_method || 'Efectivo').trim();
-            const payKey = normPaymentMethodKey(pay);
-            if (!ventasMultiMatches(payKey, 'pago')) return false;
+            const payKey = (Array.isArray(s?.payments) && s.payments.length)
+                ? normPaymentMethodKey(s.payments)
+                : normPaymentMethodKey(String(s?.payment_method || 'Efectivo').trim());
+            const payKeys = String(payKey || '').split('+').filter(Boolean);
+            const okPago = payKeys.some(k => ventasMultiMatches(k, 'pago'));
+            if (!okPago) return false;
 
             const tipoLabel = historialTipoLabelFromSale(s);
             if (!ventasMultiMatches(tipoLabel, 'tipo')) return false;
@@ -9507,6 +10289,7 @@ td.num,th.num{text-align:right}
                 type: 'Venta',
                 status: 'Completada',
                 payment_method: pago,
+                payments: getSelectedPaymentsPayload(),
                 notes: notas,
                 total,
                 discount_general_pct: totals.pct,
@@ -9787,11 +10570,30 @@ td.num,th.num{text-align:right}
     if (btnPagoCompletoCambio) btnPagoCompletoCambio.addEventListener('click', function () { setPagoCompletoCambio(); });
     if (btnCuentaCorrienteCambio) btnCuentaCorrienteCambio.addEventListener('click', function () { openCuentaCorrienteCambioModal(); });
 
+    try {
+        const pmChecksCambio = Array.from(document.querySelectorAll('input[name="cambio_forma_pago"].cambio-payment-method-checkbox'));
+        pmChecksCambio.forEach(function (el) {
+            el.addEventListener('change', function () {
+                try { onCambioPaymentMethodsChanged(); } catch (e) {}
+            });
+        });
+    } catch (e) {
+    }
+
     syncInstallmentsButtonVisibility();
 
     if (btnPagoCompleto) btnPagoCompleto.addEventListener('click', function () { setPagoCompleto(); });
     if (btnCuentaCorriente) btnCuentaCorriente.addEventListener('click', function () { openCuentaCorrientePanel(); });
     if (btnSistemaCuotas) btnSistemaCuotas.addEventListener('click', function () { setSistemaCuotas(); });
+    try {
+        const pmChecks = Array.from(document.querySelectorAll('input[name="forma_pago"].payment-method-checkbox'));
+        pmChecks.forEach(function (el) {
+            el.addEventListener('change', function () {
+                try { onPaymentMethodsChanged(); } catch (e) {}
+            });
+        });
+    } catch (e) {
+    }
     if (btnCloseSistemaCuotas && panelSistemaCuotas) btnCloseSistemaCuotas.addEventListener('click', function () {
         panelSistemaCuotas.classList.add('hidden');
         ventaUseInstallments = false;
@@ -9838,6 +10640,16 @@ td.num,th.num{text-align:right}
     if (btnCloseCreateCustomer) btnCloseCreateCustomer.addEventListener('click', function () { closeModalCompat(modalCreateCustomer); });
     if (btnCancelCreateCustomer) btnCancelCreateCustomer.addEventListener('click', function () { closeModalCompat(modalCreateCustomer); });
     if (btnSaveCreateCustomer) btnSaveCreateCustomer.addEventListener('click', function () { saveNewCustomer(); });
+
+    try {
+        // Fecha local por defecto (evita desfase por UTC). No pisar si ya hay valor (edición o cambio manual).
+        if (ticketFecha && !String(ticketFecha.value || '').trim()) {
+            ticketFecha.value = getLocalISODate();
+        }
+    } catch (e) {
+    }
+
+    try { refreshPaymentsValidation(); } catch (e) {}
 
     if (inputDescuentoGeneral) {
         inputDescuentoGeneral.addEventListener('input', function () {
@@ -10013,6 +10825,14 @@ td.num,th.num{text-align:right}
         inputTicketTotalFinal.addEventListener('blur', function () {
             computeTicketTotals();
         });
+    }
+
+    try {
+        const cambioDescPaso3 = document.getElementById('cambio-ticket-descuento-general-paso3');
+        const cambioRecPaso3 = document.getElementById('cambio-ticket-recargo-general-paso3');
+        if (cambioDescPaso3) cambioDescPaso3.addEventListener('input', function () { try { refreshCambioPaymentsValidation(); } catch (e) {} });
+        if (cambioRecPaso3) cambioRecPaso3.addEventListener('input', function () { try { refreshCambioPaymentsValidation(); } catch (e) {} });
+    } catch (e) {
     }
 
     if (inputSearchVentasCliente) inputSearchVentasCliente.addEventListener('input', function () { applyVentasFilters(); });
@@ -10213,23 +11033,19 @@ td.num,th.num{text-align:right}
                 }
 
                 const fecha = String(document.getElementById('cambio-fecha')?.value || '').trim() || defaultFecha;
-                const pago = getCambioPaymentMethod();
+                const pago = normPaymentMethodKey(getCambioPaymentMethod()) || 'cash';
                 let notas = String(inputNotasCambio?.value || '').trim();
 
-                const cambioVentaTotals = computeCambioVentaGeneralTotalsFromUi();
-                const subtotalNuevaVenta = Math.max(0, parseFloat(cambioVentaTotals?.subtotal_nueva_venta || 0) || 0);
-                const newTotal = Math.max(0, parseFloat(cambioVentaTotals?.total_nueva_venta || 0) || 0);
-                const discountGeneralPct = Math.max(0, parseFloat(cambioVentaTotals?.discount_general_pct || 0) || 0);
-                const discountGeneralAmount = Math.max(0, parseFloat(cambioVentaTotals?.discount_general_amount || 0) || 0);
-                const surchargeGeneralPct = Math.max(0, parseFloat(cambioVentaTotals?.surcharge_general_pct || 0) || 0);
-                const surchargeGeneralAmount = Math.max(0, parseFloat(cambioVentaTotals?.surcharge_general_amount || 0) || 0);
+                const t3 = computeCambioPaso3TotalsFromUi();
+                const subtotalNuevaVenta = Math.max(0, parseFloat(t3?.subtotal || 0) || 0);
+                const newTotal = Math.max(0, parseFloat(t3?.total_nueva_venta || 0) || 0);
+                const discountGeneralPct = Math.max(0, parseFloat(t3?.discount_general_pct || 0) || 0);
+                const discountGeneralAmount = Math.max(0, parseFloat(t3?.discount_general_amount || 0) || 0);
+                const surchargeGeneralPct = Math.max(0, parseFloat(t3?.surcharge_general_pct || 0) || 0);
+                const surchargeGeneralAmount = Math.max(0, parseFloat(t3?.surcharge_general_amount || 0) || 0);
                 const returnTotal = Math.max(0, parseFloat(editCambioVentaReturnTotal || 0) || 0);
 
-                const diffToPay = Math.max(0, newTotal - returnTotal);
-                if (cambioOnAccount && (!selectedCustomer || !selectedCustomer.name)) {
-                    showAlertModal('Para usar cuenta corriente tenés que asociar un cliente.', 'Atención', 'Validación requerida');
-                    return;
-                }
+                const diffToPay = Math.max(0, parseFloat(t3?.diferencia_a_abonar || 0) || 0);
 
                 if (cambioIsGift) {
                     if (!selectedCustomer || !selectedCustomer.name) {
@@ -10238,10 +11054,9 @@ td.num,th.num{text-align:right}
                     }
                 }
 
-                const paidCash = (diffToPay <= 0) ? 0 : (cambioOnAccount ? Math.max(0, Math.min(diffToPay, (parseFloat(cambioPaidAmount || 0) || 0))) : diffToPay);
-                const credit = Math.min(returnTotal, newTotal);
-                const paidForSale = Math.max(0, Math.min(newTotal, credit + paidCash));
-                const dueForSale = Math.max(0, newTotal - paidForSale);
+                const payments = getSelectedCambioPaymentsPayload();
+                const paidAmount = diffToPay;
+                const dueAmount = 0;
 
                 const custName = String(selectedCustomer?.name || inputClienteCambio?.value || '').trim();
                 const custId = String(selectedCustomer?.id || '').trim();
@@ -10259,15 +11074,16 @@ td.num,th.num{text-align:right}
                     type: 'Venta',
                     status: 'Completada',
                     payment_method: pago,
+                    payments: payments,
                     notes: notas,
                     total: Math.abs(newTotal),
                     discount_general_pct: discountGeneralPct,
                     discount_general_amount: discountGeneralAmount,
                     general_surcharge_pct: surchargeGeneralPct,
                     surcharge_general_amount: surchargeGeneralAmount,
-                    on_account: (dueForSale > 0),
-                    paid_amount: paidForSale,
-                    due_amount: dueForSale,
+                    on_account: false,
+                    paid_amount: paidAmount,
+                    due_amount: dueAmount,
                     customer_id: custId,
                     customer_name: custName,
                     ...getSelectedEmployeePayload(selectCambioEmployee),
@@ -10322,24 +11138,19 @@ td.num,th.num{text-align:right}
             }
 
             const fecha = String(document.getElementById('cambio-fecha')?.value || '').trim() || defaultFecha;
-            const pago = getCambioPaymentMethod();
+            const pago = normPaymentMethodKey(getCambioPaymentMethod()) || 'cash';
             const notas = String(inputNotasCambio?.value || '').trim();
 
             const returnTotal = itemsIn.reduce((acc, it) => acc + (parseFloat(it.subtotal || 0) || 0), 0);
-            const cambioVentaTotals = computeCambioVentaGeneralTotalsFromUi();
-            const subtotalNuevaVenta = Math.max(0, parseFloat(cambioVentaTotals?.subtotal_nueva_venta || 0) || 0);
-            const newTotal = Math.max(0, parseFloat(cambioVentaTotals?.total_nueva_venta || 0) || 0);
-            const discountGeneralPct = Math.max(0, parseFloat(cambioVentaTotals?.discount_general_pct || 0) || 0);
-            const discountGeneralAmount = Math.max(0, parseFloat(cambioVentaTotals?.discount_general_amount || 0) || 0);
-            const surchargeGeneralPct = Math.max(0, parseFloat(cambioVentaTotals?.surcharge_general_pct || 0) || 0);
-            const surchargeGeneralAmount = Math.max(0, parseFloat(cambioVentaTotals?.surcharge_general_amount || 0) || 0);
-            const diff = newTotal - returnTotal;
-
-            const diffToPay = Math.max(0, diff);
-            if (cambioOnAccount && (!selectedCustomer || !selectedCustomer.name)) {
-                showAlertModal('Para usar cuenta corriente tenés que asociar un cliente.', 'Atención', 'Validación requerida');
-                return;
-            }
+            saldoAFavor = Math.max(0, parseFloat(returnTotal || 0) || 0);
+            const t3 = computeCambioPaso3TotalsFromUi();
+            const subtotalNuevaVenta = Math.max(0, parseFloat(t3?.subtotal || 0) || 0);
+            const newTotal = Math.max(0, parseFloat(t3?.total_nueva_venta || 0) || 0);
+            const discountGeneralPct = Math.max(0, parseFloat(t3?.discount_general_pct || 0) || 0);
+            const discountGeneralAmount = Math.max(0, parseFloat(t3?.discount_general_amount || 0) || 0);
+            const surchargeGeneralPct = Math.max(0, parseFloat(t3?.surcharge_general_pct || 0) || 0);
+            const surchargeGeneralAmount = Math.max(0, parseFloat(t3?.surcharge_general_amount || 0) || 0);
+            const diffToPay = Math.max(0, parseFloat(t3?.diferencia_a_abonar || 0) || 0);
 
             if (cambioIsGift) {
                 if (!selectedCustomer || !selectedCustomer.name) {
@@ -10347,9 +11158,10 @@ td.num,th.num{text-align:right}
                     return;
                 }
             }
-            const paidAmount = (diffToPay <= 0) ? 0 : (cambioOnAccount ? Math.max(0, Math.min(diffToPay, (parseFloat(cambioPaidAmount || 0) || 0))) : diffToPay);
-            const dueAmount = (diffToPay <= 0) ? 0 : (cambioOnAccount ? Math.max(0, diffToPay - paidAmount) : 0);
-            const onAccount = (diffToPay > 0) && (dueAmount > 0);
+            const payments = getSelectedCambioPaymentsPayload();
+            const paidAmount = diffToPay;
+            const dueAmount = 0;
+            const onAccount = false;
 
             const custName = String(selectedCustomer?.name || inputClienteCambio?.value || '').trim();
             const custId = String(selectedCustomer?.id || '').trim();
@@ -10357,6 +11169,7 @@ td.num,th.num{text-align:right}
             apiCreateExchange({
                 fecha,
                 payment_method: pago,
+                payments: payments,
                 notes: notas,
                 customer_id: custId,
                 customer_name: custName,
@@ -10371,6 +11184,7 @@ td.num,th.num{text-align:right}
                 discount_general_amount: discountGeneralAmount,
                 general_surcharge_pct: surchargeGeneralPct,
                 surcharge_general_amount: surchargeGeneralAmount,
+                on_account: onAccount,
                 paid_amount: paidAmount,
                 due_amount: dueAmount,
                 is_gift: !!cambioIsGift,
@@ -10450,6 +11264,7 @@ td.num,th.num{text-align:right}
             cambioPaso3.classList.remove('hidden');
 
             try { renderCambioTicketCartSummary(); } catch (e) {}
+            try { refreshCambioPaymentsValidation(); } catch (e) {}
 
             maybeRefreshCambioGiftCode();
             if (pillCambioPaso1 && pillCambioPaso2 && pillCambioPaso3) {

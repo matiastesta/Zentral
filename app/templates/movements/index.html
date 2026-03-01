@@ -310,6 +310,71 @@ document.addEventListener('DOMContentLoaded', function () {
         return TENANT_PREFIX + s;
     }
 
+    function isoFromDate(d) {
+        try {
+            if (!d) return '';
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return y + '-' + m + '-' + dd;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function getSalesFromApi(rango, cb) {
+        const fromIso = (rango && rango.from) ? isoFromDate(rango.from) : '';
+        const toIso = (rango && rango.to) ? isoFromDate(rango.to) : '';
+        const qs = [];
+        if (fromIso) qs.push('from=' + encodeURIComponent(fromIso));
+        if (toIso) qs.push('to=' + encodeURIComponent(toIso));
+        qs.push('scope=cobros');
+        qs.push('limit=20000');
+        const url = apiPath('/sales/api/sales' + (qs.length ? ('?' + qs.join('&')) : ''));
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                const items = (data && data.ok === true && Array.isArray(data.items)) ? data.items : (Array.isArray(data && data.items) ? data.items : []);
+                if (typeof cb === 'function') cb(items);
+            })
+            .catch(function () {
+                if (typeof cb === 'function') cb([]);
+            });
+    }
+
+    function getExpenses(opts, cb) {
+        const o = (opts && typeof opts === 'object') ? opts : {};
+        const qs = [];
+        if (o.from) qs.push('from=' + encodeURIComponent(String(o.from)));
+        if (o.to) qs.push('to=' + encodeURIComponent(String(o.to)));
+        if (o.limit) qs.push('limit=' + encodeURIComponent(String(o.limit)));
+        const url = apiPath('/expenses/api/expenses' + (qs.length ? ('?' + qs.join('&')) : ''));
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                const items = (data && data.ok === true && Array.isArray(data.items)) ? data.items : (Array.isArray(data && data.items) ? data.items : []);
+                if (typeof cb === 'function') cb(items);
+            })
+            .catch(function () {
+                if (typeof cb === 'function') cb([]);
+            });
+    }
+
+    async function apiDeleteSale(ticket) {
+        const t = String(ticket || '').trim();
+        if (!t) return { ok: false, error: 'invalid' };
+        const url = apiPath('/sales/api/sales/' + encodeURIComponent(t));
+        try {
+            const r = await fetch(url, { method: 'DELETE', credentials: 'same-origin' });
+            if (r.status === 204) return { ok: true };
+            const data = await r.json().catch(function () { return {}; });
+            if (data && typeof data === 'object') return data;
+            return { ok: false, error: 'delete_failed' };
+        } catch (e) {
+            return { ok: false, error: 'network_error' };
+        }
+    }
+
     const tabVentas = document.getElementById('tab-mov-ventas');
     const tabEgresos = document.getElementById('tab-mov-egresos');
     const tabArqueo = document.getElementById('tab-mov-arqueo');
@@ -347,11 +412,168 @@ document.addEventListener('DOMContentLoaded', function () {
     let activeTab = 'ventas';
     let lastRendered = [];
 
+    function openModalCompat(el) {
+        if (!el) return;
+        try { el.classList.remove('hidden'); } catch (e) {}
+    }
+
+    function closeModalCompat(el) {
+        if (!el) return;
+        try { el.classList.add('hidden'); } catch (e) {}
+    }
+
+    function openExport() {
+        openModalCompat(modalExport);
+    }
+
+    function closeExport() {
+        closeModalCompat(modalExport);
+    }
+
+    function exportCsv() {
+        const rows = Array.isArray(lastRendered) ? lastRendered : [];
+        if (!rows.length) return;
+        const headers = Object.keys(rows[0] || {});
+        const esc = function (v) {
+            const s = String(v == null ? '' : v);
+            return '"' + s.replace(/"/g, '""') + '"';
+        };
+        const lines = [];
+        lines.push(headers.map(esc).join(','));
+        rows.forEach(function (r) {
+            lines.push(headers.map(h => esc(r && r[h] != null ? r[h] : '')).join(','));
+        });
+        const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'movimientos.csv';
+        document.body.appendChild(a);
+        a.click();
+        try { document.body.removeChild(a); } catch (e) {}
+        try { URL.revokeObjectURL(url); } catch (e) {}
+    }
+
+    function exportPdfPrint() {
+        const rows = Array.isArray(lastRendered) ? lastRendered : [];
+        if (!rows.length) return;
+        const headers = Object.keys(rows[0] || {});
+        const w = window.open('', '_blank');
+        if (!w) return;
+        const html = [];
+        html.push('<html><head><title>Movimientos</title>');
+        html.push('<style>body{font-family:Arial,sans-serif;font-size:12px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:6px;text-align:left} th{background:#f5f5f5}</style>');
+        html.push('</head><body>');
+        html.push('<h2>Movimientos</h2>');
+        html.push('<table><thead><tr>' + headers.map(h => '<th>' + escapeHtml(h) + '</th>').join('') + '</tr></thead><tbody>');
+        rows.forEach(function (r) {
+            html.push('<tr>' + headers.map(h => '<td>' + escapeHtml(r && r[h] != null ? r[h] : '') + '</td>').join('') + '</tr>');
+        });
+        html.push('</tbody></table>');
+        html.push('</body></html>');
+        w.document.open();
+        w.document.write(html.join(''));
+        w.document.close();
+        try { w.focus(); } catch (e) {}
+        try { w.print(); } catch (e) {}
+    }
+
     function isPromise(x) { return !!x && typeof x.then === 'function'; }
 
     function formatearMoneda(valor) {
         const numero = isNaN(valor) ? 0 : valor;
         return '$' + numero.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function paymentMethodLabel(method) {
+        const raw = String(method || '').trim();
+        if (!raw) return '';
+        const low = raw.toLowerCase();
+        if (low.indexOf('+') >= 0) {
+            const parts = raw.split('+').map(s => String(s || '').trim()).filter(Boolean);
+            return parts.map(paymentMethodLabel).join(' + ');
+        }
+        if (low.indexOf(',') >= 0) {
+            const parts = raw.split(',').map(s => String(s || '').trim()).filter(Boolean);
+            return parts.map(paymentMethodLabel).join(' + ');
+        }
+        if (low === 'cash') return 'Efectivo';
+        if (low === 'transfer') return 'Transferencia';
+        if (low === 'debit') return 'Débito';
+        if (low === 'credit') return 'Crédito';
+        return raw;
+    }
+
+    function getPaymentsArray(s) {
+        const rawArr = (Array.isArray(s?.payments) && s.payments.length)
+            ? s.payments
+            : ((Array.isArray(s?.sale_payments) && s.sale_payments.length) ? s.sale_payments : null);
+        if (rawArr) {
+            return rawArr.map(function (p) {
+                return {
+                    method: String(p?.method || p?.payment_method || '').trim(),
+                    amount: parseFloat(p?.amount ?? p?.monto ?? p?.valor ?? 0) || 0,
+                };
+            }).filter(function (p) { return !!p.method && Math.abs(p.amount) > 1e-9; });
+        }
+        const pb = s?.payment_breakdown ?? s?.paymentBreakdown;
+        if (!pb) return [];
+        try {
+            const obj = (typeof pb === 'string') ? JSON.parse(pb) : pb;
+            if (Array.isArray(obj)) {
+                return obj.map(function (p) {
+                    return {
+                        method: String(p?.method || p?.payment_method || '').trim(),
+                        amount: parseFloat(p?.amount ?? p?.monto ?? p?.valor ?? 0) || 0,
+                    };
+                }).filter(function (p) { return !!p.method && Math.abs(p.amount) > 1e-9; });
+            }
+            if (obj && typeof obj === 'object') {
+                const out = [];
+                Object.keys(obj).forEach(function (k) {
+                    const amt = parseFloat(obj[k] ?? 0) || 0;
+                    if (Math.abs(amt) <= 1e-9) return;
+                    out.push({ method: String(k || '').trim(), amount: amt });
+                });
+                return out;
+            }
+        } catch (e) {}
+        return [];
+    }
+
+    function paymentLabelFromBreakdown(s) {
+        const arr = getPaymentsArray(s);
+        if (!arr.length) return paymentMethodLabel(s?.payment_method || '');
+        const seen = new Set();
+        const labels = [];
+        arr.forEach(function (p) {
+            const m = String(p?.method || '').trim();
+            if (!m) return;
+            const key = m.toLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            labels.push(paymentMethodLabel(m));
+        });
+        return labels.filter(Boolean).join(' + ');
+    }
+
+    function buildPaymentsDetailHtml(s, rowKey) {
+        const arr = getPaymentsArray(s);
+        if (!arr.length) return '';
+        const parts = [];
+        arr.forEach(function (p) {
+            const m = paymentMethodLabel(p?.method || '');
+            const a = parseFloat(p?.amount || 0) || 0;
+            if (!m) return;
+            parts.push('<div class="text-xs text-gray-600">' + escapeHtml(m) + ' ' + escapeHtml(formatearMoneda(a)) + '</div>');
+        });
+        if (!parts.length) return '';
+        const sid = 'paydet-' + String(rowKey || '').replace(/[^a-zA-Z0-9_-]/g, '');
+        return ''
+            + '<div class="mt-1">'
+            +   '<button type="button" class="btn-pay-toggle text-xs text-blue-700 hover:text-blue-900 inline-flex items-center gap-1" data-target="' + sid + '" data-open="0">Ver detalle <i class="fas fa-chevron-down text-[10px]"></i></button>'
+            +   '<div id="' + sid + '" class="hidden mt-1">' + parts.join('') + '</div>'
+            + '</div>';
     }
 
     let CAN_WITHDRAW = false;
@@ -482,6 +704,15 @@ document.addEventListener('DOMContentLoaded', function () {
         return v ? [v] : [];
     }
 
+    function selectAllMultiSelect(selectEl) {
+        if (!selectEl) return;
+        try {
+            const opts = Array.from(selectEl.options || []);
+            opts.forEach(o => { o.selected = true; });
+        } catch (e) {
+        }
+    }
+
     function getSelectFilterState(selectEl) {
         const emptyValue = '';
         if (!selectEl) return { mode: 'all', values: [] };
@@ -544,13 +775,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 const name = String(it?.nombre || it?.product_name || 'Producto').trim();
                 const qty = parseNumeroSeguro(it?.cantidad ?? it?.qty);
                 if (!name) continue;
-                const qtxt = (qty && isFinite(qty)) ? (String(qty.toLocaleString('es-AR', { maximumFractionDigits: 2 })) + 'x ') : '';
-                parts.push(qtxt + name);
-                if (parts.length >= 3) break;
+                const q = (isNaN(qty) ? 0 : qty) || 0;
+                parts.push(name + ' (x' + String(q) + ')');
             }
-            if (!parts.length) return '';
-            const suffix = (items.length > parts.length) ? '…' : '';
-            return 'Detalle: ' + parts.join(', ') + suffix;
+            return parts.join(' · ');
         } catch (e) {
             return '';
         }
@@ -562,65 +790,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let egresosSupsSelected = new Set();
     let egresosCatsAllSelected = true;
     let egresosSupsAllSelected = true;
-
-    function buildUniqueSorted(arr) {
-        const seen = new Map();
-        (Array.isArray(arr) ? arr : []).forEach(function (raw) {
-            const label = String(raw || '').replace(/\s+/g, ' ').trim();
-            if (!label) return;
-            const k = normKey(label);
-            if (!k) return;
-            if (!seen.has(k)) seen.set(k, label);
-        });
-        return Array.from(seen.entries())
-            .map(([k, label]) => ({ k, label }))
-            .sort((a, b) => String(a.label).localeCompare(String(b.label), 'es'));
-    }
-
-    function setDropdownOpen(menu, open, anchorBtn) {
-        if (!menu) return;
-        menu.classList.toggle('hidden', !open);
-        if (!open) {
-            try {
-                menu.style.position = '';
-                menu.style.left = '';
-                menu.style.top = '';
-                menu.style.maxHeight = '';
-                menu.style.zIndex = '';
-            } catch (e) {}
-            return;
-        }
-
-        try {
-            const btn = anchorBtn || null;
-            if (!btn || !btn.getBoundingClientRect) return;
-            const r = btn.getBoundingClientRect();
-            const pad = 10;
-            const spaceBelow = Math.max(0, window.innerHeight - r.bottom - pad);
-            const spaceAbove = Math.max(0, r.top - pad);
-
-            const wantUp = (spaceBelow < 220) && (spaceAbove > spaceBelow);
-            const maxH = Math.max(140, Math.min(340, (wantUp ? (spaceAbove - 12) : (spaceBelow - 12))));
-
-            menu.style.position = 'fixed';
-            menu.style.left = Math.max(pad, Math.min(r.left, window.innerWidth - pad - 300)) + 'px';
-            menu.style.top = (wantUp ? Math.max(pad, r.top - maxH - 6) : (r.bottom + 6)) + 'px';
-            menu.style.maxHeight = maxH + 'px';
-            menu.style.overflow = 'auto';
-            menu.style.zIndex = '1050';
-        } catch (e) {
-        }
-    }
-
-    function selectAllMultiSelect(selectEl) {
-        if (!selectEl) return;
-        try {
-            const allOpt = Array.from(selectEl.options || []).find(o => String(o.value || '') === '');
-            Array.from(selectEl.options || []).forEach(function (o) { o.selected = false; });
-            if (allOpt) allOpt.selected = true;
-        } catch (e) {
-        }
-    }
 
     function updateCatsButtonLabel() {
         if (!fEgresosCatBtn) return;
@@ -758,128 +927,6 @@ document.addEventListener('DOMContentLoaded', function () {
         renderSupsItems();
     }
 
-    function openExport() { if (modalExport) modalExport.classList.remove('hidden'); }
-    function closeExport() { if (modalExport) modalExport.classList.add('hidden'); }
-
-    function escapeCsvCell(v) {
-        const s = String(v ?? '');
-        if (/[\n\r",;]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
-        return s;
-    }
-
-    function exportCsv() {
-        const rows = lastRendered || [];
-        if (!rows.length) return;
-        const header = Object.keys(rows[0]);
-        const lines = [header.map(escapeCsvCell).join(';')];
-        rows.forEach(r => {
-            lines.push(header.map(k => escapeCsvCell(r?.[k])).join(';'));
-        });
-        const blob = new Blob(["\ufeff" + lines.join("\n")], { type: 'text/csv;charset=utf-8;' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'movimientos_' + activeTab + '.csv';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.setTimeout(function () { URL.revokeObjectURL(a.href); }, 500);
-    }
-
-    function exportPdfPrint() {
-        const rows = lastRendered || [];
-        const w = window.open('', '_blank');
-        if (!w) return;
-        const header = rows.length ? Object.keys(rows[0]) : [];
-        const headHtml = header.map(h => '<th>' + String(h) + '</th>').join('');
-        const bodyHtml = rows.map(r => '<tr>' + header.map(h => '<td>' + String(r?.[h] ?? '') + '</td>').join('') + '</tr>').join('');
-        const html = ''
-            + '<!doctype html><html lang="es"><head><meta charset="utf-8" />'
-            + '<title>Exportar movimientos</title>'
-            + '<style>body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:#111}h1{font-size:18px;margin:0 0 6px 0}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;vertical-align:top}th{background:#f9fafb}</style>'
-            + '</head><body>'
-            + '<h1>Movimientos (' + activeTab + ')</h1>'
-            + '<table><thead><tr>' + headHtml + '</tr></thead><tbody>' + bodyHtml + '</tbody></table>'
-            + '<script>window.onload=function(){window.print();}<\/script>'
-            + '</body></html>';
-        w.document.open();
-        w.document.write(html);
-        w.document.close();
-    }
-
-    function isoFromDate(d) {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return y + '-' + m + '-' + day;
-    }
-
-    function getSalesFromApi(range, cb) {
-        const qs = [];
-        if (range && range.from) qs.push('from=' + encodeURIComponent(isoFromDate(range.from)));
-        if (range && range.to) qs.push('to=' + encodeURIComponent(isoFromDate(range.to)));
-        qs.push('limit=20000');
-        const url = '/sales/api/sales' + (qs.length ? ('?' + qs.join('&')) : '');
-        fetch(url, { credentials: 'same-origin' })
-            .then(r => r.json())
-            .then(data => {
-                const items = data && Array.isArray(data.items) ? data.items : [];
-                cb(items);
-            })
-            .catch(() => cb([]));
-    }
-
-    function apiDeleteSale(ticket) {
-        const t = String(ticket || '').trim();
-        if (!t) return Promise.resolve({ ok: false, error: 'invalid_ticket' });
-        return fetch('/sales/api/sales/' + encodeURIComponent(t), {
-            method: 'DELETE',
-            credentials: 'same-origin'
-        }).then(function (r) {
-            if (!r) return { ok: false, error: 'network' };
-            if (r.status === 204) return { ok: true };
-            return r.json().catch(function () {
-                return { ok: (r && r.ok) ? true : false };
-            });
-        }).catch(function () {
-            return { ok: false, error: 'network' };
-        });
-    }
-
-    function apiDeleteExpense(expenseId) {
-        const id = String(expenseId || '').trim();
-        if (!id) return Promise.resolve({ ok: false, error: 'invalid_expense' });
-        return fetch('/expenses/api/expenses/' + encodeURIComponent(id), {
-            method: 'DELETE',
-            credentials: 'same-origin'
-        }).then(r => r.json()).catch(() => ({ ok: false, error: 'network' }));
-    }
-
-    function getExpenses(opts, cb) {
-        try {
-            if (window.StorageService && typeof window.StorageService.getExpenses === 'function') {
-                const res = window.StorageService.getExpenses(opts);
-                if (isPromise(res)) return res.then(x => cb(Array.isArray(x) ? x : []));
-                return cb(Array.isArray(res) ? res : []);
-            }
-        } catch (e) {
-        }
-        cb([]);
-    }
-
-    function getArqueosFromApi(fromIso, toIso, cb) {
-        const qs = [];
-        if (fromIso) qs.push('from=' + encodeURIComponent(fromIso));
-        if (toIso) qs.push('to=' + encodeURIComponent(toIso));
-        const url = '/movements/api/cash-counts' + (qs.length ? ('?' + qs.join('&')) : '');
-        fetch(url, { credentials: 'same-origin' })
-            .then(r => r.json())
-            .then(data => {
-                const items = data && Array.isArray(data.items) ? data.items : [];
-                cb(items);
-            })
-            .catch(() => cb([]));
-    }
-
     function renderVentas() {
         if (!tbodyVentas) return;
         const q = String(fVentasQ?.value || '').trim().toLowerCase();
@@ -961,7 +1008,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const cust = String(s?.customer_name || '').trim().toLowerCase();
                     if (qCliente && !cust.includes(qCliente)) return false;
 
-                    const pm = String(s?.payment_method || '').trim();
+                    const pm = paymentLabelFromBreakdown(s);
                     if (pagosState.mode === 'none') return false;
                     if (pagosState.mode === 'some' && pagosState.values.indexOf(pm) < 0) return false;
 
@@ -1002,7 +1049,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     Tipo: (String(s?.type || '') === 'IngresoAjusteInv') ? 'Ingreso por ajuste' : labelTipo(s),
                     Cliente: String(s?.customer_name || ''),
                     Total: formatearMoneda(parseFloat(s?.total || 0) || 0),
-                    Pago: s?.payment_method || '',
+                    Pago: paymentLabelFromBreakdown(s),
                     Notas: buildNotes(s)
                 }));
 
@@ -1018,16 +1065,24 @@ document.addEventListener('DOMContentLoaded', function () {
                     const ticketDisplay = displayTicketForRow(s) || String(s?.ticket || '').trim();
                     const locked = isLockedSale(s);
                     const noteHtml = buildNoteCellHtml(buildNotes(s), ticket || (s?.created_at || ''));
+                    const payLabel = paymentLabelFromBreakdown(s);
+                    const paymentsArr = getPaymentsArray(s);
+                    const payDetailHtml = (paymentsArr && paymentsArr.length >= 2)
+                        ? buildPaymentsDetailHtml(s, ticket || (s?.created_at || ''))
+                        : '';
                     tr.innerHTML = ''
                         + '<td class="px-4 py-3 text-sm text-gray-900">' + String(ticketDisplay || '') + '</td>'
                         + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(s?.fecha || s?.date || '') + '</td>'
                         + '<td class="px-4 py-3 text-sm text-gray-500">' + (String(s?.type || '') === 'IngresoAjusteInv' ? 'Ingreso por ajuste' : labelTipo(s)) + '</td>'
                         + '<td class="px-4 py-3 text-sm text-gray-700">' + String(s?.customer_name || '—') + '</td>'
                         + '<td class="px-4 py-3 text-sm text-right text-gray-900">' + formatearMoneda(parseFloat(s?.total || 0) || 0) + '</td>'
-                        + '<td class="px-4 py-3 text-sm text-center text-gray-500">' + String(s?.payment_method || '') + '</td>'
+                        + '<td class="px-4 py-3 text-sm text-center text-gray-500">'
+                        +   '<div>' + escapeHtml(payLabel) + '</div>'
+                        +   payDetailHtml
+                        + '</td>'
                         + '<td class="px-4 py-3 text-sm text-gray-500">' + noteHtml + '</td>'
                         + '<td class="px-4 py-3 text-center">'
-                        +   (locked ? '' : ('<button type="button" class="btn-del-sale h-8 w-8 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-ticket="' + String(ticket).replace(/"/g, '&quot;') + '" title="Eliminar">'
+                        +   (locked ? '' : ('<button type="button" class="btn-del-sale h-8 w-8 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" data-ticket="' + String(ticket).replace(/"/g, '&quot;') + '" data-ticket-display="' + String(ticketDisplay).replace(/"/g, '&quot;') + '" title="Eliminar">'
                         +       '<i class="fas fa-trash text-[12px]"></i>'
                         +   '</button>'))
                         + '</td>';
@@ -1038,12 +1093,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     tbodyVentas.querySelectorAll('.btn-del-sale').forEach(function (btn) {
                         btn.addEventListener('click', async function () {
                             const t = String(btn.getAttribute('data-ticket') || '').trim();
+                            const tDisplay = String(btn.getAttribute('data-ticket-display') || t).trim();
                             if (!t) return;
                             const ok = await (window.confirmModal ? window.confirmModal(
-                                '¿Querés eliminar el ticket ' + t + '? Esta acción revierte inventario y elimina el movimiento asociado.',
+                                '¿Querés eliminar el ticket ' + tDisplay + '? Esta acción revierte inventario y elimina el movimiento asociado.',
                                 'Eliminar ingreso',
                                 'No se puede deshacer.'
-                            ) : Promise.resolve(window.confirm('¿Eliminar el ticket ' + t + '?')));
+                            ) : Promise.resolve(window.confirm('¿Eliminar el ticket ' + tDisplay + '?')));
                             if (!ok) return;
                             const res = await apiDeleteSale(t);
                             if (!res || res.ok !== true) {
@@ -1052,6 +1108,23 @@ document.addEventListener('DOMContentLoaded', function () {
                                 return;
                             }
                             renderVentas();
+                        });
+                    });
+                } catch (e) {}
+
+                try {
+                    tbodyVentas.querySelectorAll('.btn-pay-toggle').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            const targetId = String(btn.getAttribute('data-target') || '').trim();
+                            if (!targetId) return;
+                            const el = document.getElementById(targetId);
+                            if (!el) return;
+                            const open = String(btn.getAttribute('data-open') || '0') === '1';
+                            el.classList.toggle('hidden', open);
+                            btn.setAttribute('data-open', open ? '0' : '1');
+                            btn.innerHTML = (open
+                                ? 'Ver detalle <i class="fas fa-chevron-down text-[10px]"></i>'
+                                : 'Ocultar detalle <i class="fas fa-chevron-up text-[10px]"></i>');
                         });
                     });
                 } catch (e) {}
