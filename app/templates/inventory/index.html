@@ -2907,6 +2907,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let preciosDraft = new Map();
     let preciosGlobalPctValue = null;
+    let preciosProductsCache = null;
+    let preciosFetchTimer = null;
 
     function formatMoneyARS0(n) {
         const x = parseNumeroSeguro(n);
@@ -2990,11 +2992,12 @@ document.addEventListener('DOMContentLoaded', function () {
         abrirModal(modalPrecios, true);
         preciosDraft = new Map();
         preciosGlobalPctValue = null;
+        preciosProductsCache = null;
         if (preciosGlobalPct) preciosGlobalPct.value = '';
         syncSaveButton();
         if (preciosMsg) preciosMsg.textContent = 'Guardá para aplicar los cambios.';
         updatePreciosSuppliers();
-        if (!Array.isArray(cacheProducts) || !cacheProducts.length) {
+        if (!Array.isArray(cacheLots) || !cacheLots.length) {
             if (preciosTbody) preciosTbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>';
             loadProductsLots(function (products, lots, movements) {
                 updateFilterOptions(products, lots);
@@ -3003,11 +3006,61 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (activeTab === 'current') renderCurrent(vis.filteredProducts);
                 if (activeTab === 'lots') renderLots(vis.filteredLots);
                 updatePreciosSuppliers();
-                renderPreciosTable();
+                fetchAndRenderPrecios();
             });
             return;
         }
-        renderPreciosTable();
+        fetchAndRenderPrecios();
+    }
+
+    function apiListProductsForPrices(filters) {
+        const f = (filters && typeof filters === 'object') ? filters : {};
+        const qs = [];
+        const q = String(f.q || '').trim();
+        const catId = String(f.category_id || '').trim();
+        const supId = String(f.supplier_id || '').trim();
+        if (q) qs.push('q=' + encodeURIComponent(q));
+        if (catId) qs.push('category_id=' + encodeURIComponent(catId));
+        if (supId) qs.push('supplier_id=' + encodeURIComponent(supId));
+        qs.push('limit=50000');
+        const url = '/inventory/api/products/prices_list' + (qs.length ? ('?' + qs.join('&')) : '');
+        return fetch(url, { credentials: 'same-origin' })
+            .then(function (r) {
+                if (!r || !r.ok) return { ok: false, items: [] };
+                return r.json().then(
+                    (d) => (d && d.ok && Array.isArray(d.items)) ? { ok: true, items: d.items } : { ok: false, items: [] },
+                    () => ({ ok: false, items: [] })
+                );
+            })
+            .catch(function () { return { ok: false, items: [] }; });
+    }
+
+    function getPreciosFilters() {
+        return {
+            q: String(preciosQ?.value || '').trim(),
+            category_id: String(preciosCat?.value || '').trim(),
+            supplier_id: String(preciosSup?.value || '').trim(),
+        };
+    }
+
+    function fetchAndRenderPrecios() {
+        if (!preciosTbody) return;
+        const f = getPreciosFilters();
+        preciosTbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>';
+        return apiListProductsForPrices(f).then(function (res) {
+            preciosProductsCache = Array.isArray(res?.items) ? res.items : [];
+            renderPreciosTable();
+        });
+    }
+
+    function scheduleFetchAndRenderPrecios() {
+        try {
+            if (preciosFetchTimer) clearTimeout(preciosFetchTimer);
+        } catch (e) {
+        }
+        preciosFetchTimer = setTimeout(function () {
+            fetchAndRenderPrecios();
+        }, 180);
     }
 
     function closePrecios() {
@@ -5744,19 +5797,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderPreciosTable() {
         if (!preciosTbody) return;
-        const products = Array.isArray(cacheProducts) ? cacheProducts.slice() : [];
+        const products = Array.isArray(preciosProductsCache) ? preciosProductsCache.slice() : [];
         products.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
         updatePreciosCats(products);
 
-        const q = String(preciosQ?.value || '').trim().toLowerCase();
-        const cat = String(preciosCat?.value || '').trim();
-        const supId = String(preciosSup?.value || '').trim();
-        const visible = products.filter(p => {
-            if (q && !String(p?.name || '').toLowerCase().includes(q)) return false;
-            if (cat && String(p?.category?.name || p?.category || '') !== cat) return false;
-            if (supId && String(p?.primary_supplier_id || '').trim() !== supId) return false;
-            return true;
-        });
+        const visible = products;
 
         if (!visible.length) {
             preciosTbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">No hay productos para los filtros actuales.</td></tr>';
@@ -5962,9 +6007,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btnPrecios) btnPrecios.addEventListener('click', openPrecios);
     if (btnClosePrecios) btnClosePrecios.addEventListener('click', closePrecios);
     if (btnCancelPrecios) btnCancelPrecios.addEventListener('click', closePrecios);
-    if (preciosQ) preciosQ.addEventListener('input', renderPreciosTable);
-    if (preciosCat) preciosCat.addEventListener('change', renderPreciosTable);
-    if (preciosSup) preciosSup.addEventListener('change', renderPreciosTable);
+    if (preciosQ) preciosQ.addEventListener('input', scheduleFetchAndRenderPrecios);
+    if (preciosCat) preciosCat.addEventListener('change', scheduleFetchAndRenderPrecios);
+    if (preciosSup) preciosSup.addEventListener('change', scheduleFetchAndRenderPrecios);
     if (preciosGlobalPct) {
         preciosGlobalPct.addEventListener('input', function () {
             const raw = String(preciosGlobalPct.value ?? '').trim();

@@ -22,6 +22,7 @@ from flask_login import login_required
 from sqlalchemy import and_, or_, func, case, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
+from sqlalchemy.sql import exists
 from typing import Optional
 from werkzeug.utils import secure_filename
 
@@ -1972,6 +1973,117 @@ def list_products():
         except Exception:
             pass
     return jsonify({'ok': True, 'items': [_serialize_product(r) for r in rows]})
+
+
+@bp.get('/api/products/prices_list')
+@login_required
+@module_required('inventory')
+def list_products_for_prices_modal():
+    _ensure_product_stock_ilimitado_column()
+    _ensure_product_ref_cost_column()
+    _ensure_product_deleted_at_column()
+
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+
+    qraw = str(request.args.get('q') or '').strip()
+    supplier_id = str(request.args.get('supplier_id') or '').strip()
+    cat_raw = str(request.args.get('category_id') or '').strip()
+
+    limit = int(request.args.get('limit') or 20000)
+    if limit <= 0 or limit > 50000:
+        limit = 20000
+
+    q = (
+        db.session.query(Product)
+        .filter(Product.company_id == cid)
+        .filter(Product.deleted_at.is_(None))
+        .filter(Product.active == True)  # noqa: E712
+    )
+
+    if cat_raw:
+        try:
+            cat_id = int(cat_raw)
+        except Exception:
+            cat_id = None
+        if cat_id is not None:
+            q = q.filter(Product.category_id == cat_id)
+
+    if qraw:
+        term = f"%{qraw}%"
+        q = q.filter(
+            or_(
+                Product.name.ilike(term),
+                Product.internal_code.ilike(term),
+                Product.barcode.ilike(term),
+            )
+        )
+
+    if supplier_id:
+        lot_exists = exists().where(
+            and_(
+                InventoryLot.company_id == cid,
+                InventoryLot.product_id == Product.id,
+                func.trim(func.coalesce(InventoryLot.supplier_id, '')) == supplier_id,
+            )
+        )
+        q = q.filter(
+            or_(
+                func.trim(func.coalesce(Product.primary_supplier_id, '')) == supplier_id,
+                lot_exists,
+            )
+        )
+
+    q = q.order_by(Product.name.asc()).limit(limit)
+    rows = q.all()
+    return jsonify({'ok': True, 'items': [_serialize_product(r) for r in rows]})
+
+
+@bp.get('/api/products/prices_list/count')
+@login_required
+@module_required('inventory')
+def count_products_for_prices_modal():
+    """QA helper: count products for supplier_id using same logic as prices_list."""
+    _ensure_product_deleted_at_column()
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    cid = str(getattr(g, 'company_id', '') or '').strip()
+    if not cid:
+        return jsonify({'ok': True, 'count': 0})
+
+    supplier_id = str(request.args.get('supplier_id') or '').strip()
+    if not supplier_id:
+        return jsonify({'ok': False, 'error': 'supplier_id_required'}), 400
+
+    q = (
+        db.session.query(func.count(Product.id))
+        .filter(Product.company_id == cid)
+        .filter(Product.deleted_at.is_(None))
+        .filter(Product.active == True)  # noqa: E712
+    )
+    lot_exists = exists().where(
+        and_(
+            InventoryLot.company_id == cid,
+            InventoryLot.product_id == Product.id,
+            func.trim(func.coalesce(InventoryLot.supplier_id, '')) == supplier_id,
+        )
+    )
+    q = q.filter(
+        or_(
+            func.trim(func.coalesce(Product.primary_supplier_id, '')) == supplier_id,
+            lot_exists,
+        )
+    )
+    n = q.scalar() or 0
+    return jsonify({'ok': True, 'count': int(n)})
 
 
 @bp.get('/api/products/search')
