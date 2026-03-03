@@ -2000,8 +2000,19 @@ def list_products_for_prices_modal():
     if limit <= 0 or limit > 50000:
         limit = 20000
 
+    stock_sq = (
+        db.session.query(
+            InventoryLot.product_id.label('product_id'),
+            func.sum(InventoryLot.qty_available).label('stock'),
+        )
+        .filter(InventoryLot.company_id == cid)
+        .group_by(InventoryLot.product_id)
+        .subquery()
+    )
+
     q = (
-        db.session.query(Product)
+        db.session.query(Product, stock_sq.c.stock)
+        .outerjoin(stock_sq, stock_sq.c.product_id == Product.id)
         .filter(Product.company_id == cid)
         .filter(Product.deleted_at.is_(None))
         .filter(Product.active == True)  # noqa: E712
@@ -2042,7 +2053,18 @@ def list_products_for_prices_modal():
 
     q = q.order_by(Product.name.asc()).limit(limit)
     rows = q.all()
-    return jsonify({'ok': True, 'items': [_serialize_product(r) for r in rows]})
+    items = []
+    for row in rows:
+        try:
+            p = row[0]
+            stock = row[1]
+        except Exception:
+            p = row
+            stock = None
+        item = _serialize_product(p)
+        item['stock'] = float(stock) if stock is not None else None
+        items.append(item)
+    return jsonify({'ok': True, 'items': items})
 
 
 @bp.get('/api/products/prices_list/count')

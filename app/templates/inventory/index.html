@@ -781,6 +781,7 @@
                             <tr>
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Producto</th>
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Categoría</th>
+                                <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Stock</th>
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Costo unitario</th>
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Precio actual</th>
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Nuevo precio</th>
@@ -793,7 +794,7 @@
                             </tr>
                         </thead>
                         <tbody id="precios-tbody" class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>
+                            <tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -5804,9 +5805,24 @@ document.addEventListener('DOMContentLoaded', function () {
         const visible = products;
 
         if (!visible.length) {
-            preciosTbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">No hay productos para los filtros actuales.</td></tr>';
+            preciosTbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">No hay productos para los filtros actuales.</td></tr>';
             return;
         }
+
+        const stockLabel = function (p) {
+            const ilimitado = !!(p && (p.stock_ilimitado || p.stock_ilimitado === 1 || p.stock_ilimitado === '1'));
+            if (ilimitado) return '∞';
+            const raw = p ? p.stock : null;
+            if (raw === null || raw === undefined || raw === '') return '—';
+            const n = parseNumeroSeguro(raw);
+            if (!isFinite(n)) return '—';
+            if (Math.abs(n) < 1e-9) return '0';
+            try {
+                return n.toLocaleString('es-AR', { maximumFractionDigits: 2 });
+            } catch (e) {
+                return String(n);
+            }
+        };
 
         preciosTbody.innerHTML = '';
         visible.forEach(p => {
@@ -5823,6 +5839,7 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.innerHTML = ''
                 + '<td class="px-4 py-3 text-sm text-gray-900">' + String(p?.name || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + String(p?.category?.name || p?.category || '') + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(stockLabel(p)) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + (hasCost ? formatMoneyARS0(unitCost) : '<span class="text-amber-700" title="Este producto no tiene costo cargado">—</span>') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoneyARS0(base) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right">'
