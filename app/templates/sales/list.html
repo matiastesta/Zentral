@@ -160,6 +160,55 @@
         </div>
     </div>
 
+    <div id="modal-ticket-print-setup" class="hidden fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/40"></div>
+        <div class="relative h-full w-full flex items-center justify-center p-4">
+            <div class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                        <div class="text-base font-semibold text-gray-900">Guía de impresión</div>
+                        <div class="text-xs text-gray-500">Elegí el ancho de tu rollo para que el ticket salga perfecto.</div>
+                    </div>
+                    <button id="btn-close-ticket-print-setup" type="button" class="text-gray-400 hover:text-gray-600">×</button>
+                </div>
+                <div class="p-5">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button id="btn-select-paper-58" type="button" class="text-left w-full rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 p-4">
+                            <div class="flex items-center justify-between">
+                                <div class="font-semibold text-gray-900">58mm</div>
+                                <div id="badge-paper-58" class="hidden text-[11px] px-2 py-0.5 rounded-full border font-medium" style="background-color:#d1fae5;color:#065f46;border-color:#10b981;">Seleccionado</div>
+                            </div>
+                            <div class="mt-2 rounded-lg bg-gray-50 border border-gray-200 p-3 overflow-hidden">
+                                <div class="flex justify-center">
+                                    <iframe id="ticket-preview-58" title="Preview 58mm" style="width:260px;height:360px;border:0;background:#fff;transform:scale(0.92);transform-origin:top center;pointer-events:none;"></iframe>
+                                </div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-2">Recomendado para impresoras de 58mm.</div>
+                        </button>
+
+                        <button id="btn-select-paper-80" type="button" class="text-left w-full rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 p-4">
+                            <div class="flex items-center justify-between">
+                                <div class="font-semibold text-gray-900">80mm</div>
+                                <div id="badge-paper-80" class="hidden text-[11px] px-2 py-0.5 rounded-full border font-medium" style="background-color:#d1fae5;color:#065f46;border-color:#10b981;">Seleccionado</div>
+                            </div>
+                            <div class="mt-2 rounded-lg bg-gray-50 border border-gray-200 p-3 overflow-hidden">
+                                <div class="flex justify-center">
+                                    <iframe id="ticket-preview-80" title="Preview 80mm" style="width:320px;height:360px;border:0;background:#fff;transform:scale(0.90);transform-origin:top center;pointer-events:none;"></iframe>
+                                </div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-2">Recomendado para impresoras de 80mm.</div>
+                        </button>
+                    </div>
+
+                    <div class="mt-5 flex items-center justify-end gap-2">
+                        <button id="btn-cancel-ticket-print-setup" type="button" class="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Cancelar</button>
+                        <button id="btn-confirm-ticket-print-setup" type="button" class="px-4 py-2 rounded-lg text-white" style="background-color:#0d1067;">Imprimir</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-exit-cambio" class="hidden fixed inset-0 z-50">
         <div class="absolute inset-0 bg-black/40"></div>
         <div class="relative h-full w-full flex items-center justify-center p-4">
@@ -1447,9 +1496,14 @@
                         </div>
                     </div>
                 </div>
-                <button id="btn-imprimir-ticket" type="button" class="w-full mt-3 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100" data-business-name="{{ business.name if business else '' }}">
-                    Imprimir ticket
-                </button>
+                <div class="w-full mt-3 flex items-stretch gap-2">
+                    <button id="btn-imprimir-ticket" type="button" class="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100" data-business-name="{{ business.name if business else '' }}">
+                        Imprimir ticket
+                    </button>
+                    <button id="btn-ticket-print-config" type="button" class="inline-flex items-center justify-center px-3 py-2 rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50" title="Configurar impresión">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
                 <button id="btn-confirmar-venta" type="button" class="w-full mt-3 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">
                     Confirmar ticket y registrar
                 </button>
@@ -6744,9 +6798,194 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const btnImprimirTicket = document.getElementById('btn-imprimir-ticket');
+    const btnTicketPrintConfig = document.getElementById('btn-ticket-print-config');
+
+    const modalTicketPrintSetup = document.getElementById('modal-ticket-print-setup');
+    const btnCloseTicketPrintSetup = document.getElementById('btn-close-ticket-print-setup');
+    const btnCancelTicketPrintSetup = document.getElementById('btn-cancel-ticket-print-setup');
+    const btnConfirmTicketPrintSetup = document.getElementById('btn-confirm-ticket-print-setup');
+    const btnSelectPaper58 = document.getElementById('btn-select-paper-58');
+    const btnSelectPaper80 = document.getElementById('btn-select-paper-80');
+    const badgePaper58 = document.getElementById('badge-paper-58');
+    const badgePaper80 = document.getElementById('badge-paper-80');
+    const preview58 = document.getElementById('ticket-preview-58');
+    const preview80 = document.getElementById('ticket-preview-80');
+
+    const TICKET_PAPER_MM_KEY = 'ticket_paper_mm';
+
+    function getTicketPaperMm() {
+        try {
+            const v = parseInt(String(localStorage.getItem(TICKET_PAPER_MM_KEY) || '').trim(), 10);
+            if (v === 80) return 80;
+            if (v === 58) return 58;
+            return 0;
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    function setTicketPaperMm(mm) {
+        try {
+            const v = parseInt(String(mm || '').trim(), 10);
+            const n = (v === 80) ? 80 : 58;
+            localStorage.setItem(TICKET_PAPER_MM_KEY, String(n));
+            return n;
+        } catch (e) {
+            return 58;
+        }
+    }
+
+    let selectedTicketPaperMm = 58;
+
+    function openTicketPrintSetup() {
+        if (!modalTicketPrintSetup) return;
+        try { modalTicketPrintSetup.classList.remove('hidden'); } catch (e) {}
+        try { document.body.classList.add('overflow-hidden'); } catch (e) {}
+    }
+
+    function closeTicketPrintSetup() {
+        if (!modalTicketPrintSetup) return;
+        try { modalTicketPrintSetup.classList.add('hidden'); } catch (e) {}
+        try { document.body.classList.remove('overflow-hidden'); } catch (e) {}
+    }
+
+    function updateTicketPaperBadges() {
+        try {
+            const is58 = selectedTicketPaperMm === 58;
+            const is80 = selectedTicketPaperMm === 80;
+            if (badgePaper58) badgePaper58.classList.toggle('hidden', !is58);
+            if (badgePaper80) badgePaper80.classList.toggle('hidden', !is80);
+            if (btnSelectPaper58) {
+                btnSelectPaper58.classList.toggle('border-indigo-600', is58);
+                btnSelectPaper58.classList.toggle('bg-indigo-50', is58);
+                btnSelectPaper58.classList.toggle('border-gray-200', !is58);
+                btnSelectPaper58.classList.toggle('bg-white', !is58);
+            }
+            if (btnSelectPaper80) {
+                btnSelectPaper80.classList.toggle('border-indigo-600', is80);
+                btnSelectPaper80.classList.toggle('bg-indigo-50', is80);
+                btnSelectPaper80.classList.toggle('border-gray-200', !is80);
+                btnSelectPaper80.classList.toggle('bg-white', !is80);
+            }
+        } catch (e) {}
+    }
+
+    function buildTicketDataForPreview() {
+        const items = (typeof getCartItems === 'function') ? getCartItems() : [];
+        const fecha = String(ticketFecha?.value || '').trim() || defaultFecha;
+        const notas = String(ticketNotas?.value || '').trim();
+        const diasCambio = (parseInt(String(ticketDiasCambio?.value || ''), 10) || 0);
+        const pago = (typeof getSelectedPaymentMethod === 'function') ? getSelectedPaymentMethod() : 'Efectivo';
+        const totals = (typeof computeTicketTotals === 'function') ? computeTicketTotals() : { total: 0 };
+        const total = (totals && typeof totals.total === 'number' && isFinite(totals.total)) ? totals.total : (parseFloat(totals?.total || 0) || 0);
+
+        let businessName = '';
+        try {
+            const el = document.getElementById('business-name');
+            businessName = String(el?.textContent || '').trim();
+        } catch (e) {
+            businessName = '';
+        }
+        if (!businessName) {
+            try {
+                businessName = String(btnImprimirTicket?.getAttribute('data-business-name') || '').trim();
+            } catch (e) {
+                businessName = '';
+            }
+        }
+
+        return {
+            businessName,
+            ticket: editTicketId ? String(editTicketId) : '',
+            fecha,
+            payment_method: pago,
+            customer_name: selectedCustomer ? (selectedCustomer.name || '') : '',
+            notes: notas,
+            total,
+            dias_cambio: diasCambio,
+            items,
+            is_gift: !!ventaIsGift,
+            gift_code: String(ventaGiftCode || '').trim(),
+        };
+    }
+
+    function renderTicketPreviews() {
+        try {
+            const baseData = buildTicketDataForPreview();
+            if (preview58) preview58.srcdoc = buildTicketPrintHtml({ ...baseData, paper_mm: 58 });
+            if (preview80) preview80.srcdoc = buildTicketPrintHtml({ ...baseData, paper_mm: 80 });
+        } catch (e) {
+        }
+    }
+
+    function openTicketPrintSetupWithSaved() {
+        const saved = getTicketPaperMm();
+        selectedTicketPaperMm = (saved === 58 || saved === 80) ? saved : 58;
+        updateTicketPaperBadges();
+        renderTicketPreviews();
+        openTicketPrintSetup();
+    }
+
     if (btnImprimirTicket) {
         btnImprimirTicket.addEventListener('click', function () {
-            printCurrentTicket();
+            const items = (typeof getCartItems === 'function') ? getCartItems() : [];
+            if (!items.length) {
+                showAlertModal('Agregá al menos un producto al carrito.', 'Atención', 'Validación requerida');
+                return;
+            }
+
+            const saved = getTicketPaperMm();
+            if (saved === 58 || saved === 80) {
+                try {
+                    printCurrentTicket({ paper_mm: saved });
+                } catch (e) {
+                    const msg = (e && e.message) ? e.message : String(e || 'Error al imprimir');
+                    showAlertModal(msg, 'Error', 'Impresión');
+                }
+                return;
+            }
+
+            if (modalTicketPrintSetup) {
+                selectedTicketPaperMm = 58;
+                updateTicketPaperBadges();
+                renderTicketPreviews();
+                openTicketPrintSetup();
+                return;
+            }
+
+            try {
+                printCurrentTicket({ paper_mm: 58 });
+            } catch (e) {
+                const msg = (e && e.message) ? e.message : String(e || 'Error al imprimir');
+                showAlertModal(msg, 'Error', 'Impresión');
+            }
+        });
+    }
+
+    if (btnTicketPrintConfig) {
+        btnTicketPrintConfig.addEventListener('click', function () {
+            if (!modalTicketPrintSetup) {
+                showAlertModal('No se pudo abrir la configuración de impresión.', 'Error', 'Impresión');
+                return;
+            }
+            openTicketPrintSetupWithSaved();
+        });
+    }
+
+    if (btnCloseTicketPrintSetup) btnCloseTicketPrintSetup.addEventListener('click', closeTicketPrintSetup);
+    if (btnCancelTicketPrintSetup) btnCancelTicketPrintSetup.addEventListener('click', closeTicketPrintSetup);
+    if (btnSelectPaper58) btnSelectPaper58.addEventListener('click', function () { selectedTicketPaperMm = 58; updateTicketPaperBadges(); });
+    if (btnSelectPaper80) btnSelectPaper80.addEventListener('click', function () { selectedTicketPaperMm = 80; updateTicketPaperBadges(); });
+    if (btnConfirmTicketPrintSetup) {
+        btnConfirmTicketPrintSetup.addEventListener('click', function () {
+            const mm = setTicketPaperMm(selectedTicketPaperMm);
+            closeTicketPrintSetup();
+            try {
+                printCurrentTicket({ paper_mm: mm });
+            } catch (e) {
+                const msg = (e && e.message) ? e.message : String(e || 'Error al imprimir');
+                showAlertModal(msg, 'Error', 'Impresión');
+            }
         });
     }
 
@@ -9198,26 +9437,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const total = (parseFloat(data?.total ?? 0) || 0);
 
+        const paperMm = (parseInt(String(data?.paper_mm ?? ''), 10) === 80) ? 80 : 58;
+        const pageMarginMm = (paperMm === 80) ? 4 : 3;
+        const fontBase = (paperMm === 80) ? 12 : 11;
+        const headerFont = (paperMm === 80) ? 18 : 16;
+        const tableFont = (paperMm === 80) ? 12 : 11;
+
         return (
             '<!doctype html><html><head><meta charset="utf-8">'
             + '<title>Ticket</title>'
             + '<style>'
             + 'html,body{margin:0;padding:0;font-family:Arial, sans-serif;}'
-            + '@page{size:58mm auto;margin:3mm;}'
-            + 'body{width:58mm;}'
-            + '.h{text-align:center;font-weight:700;font-size:16px;margin:0 0 6px 0;}'
-            + '.meta{font-size:11px;line-height:1.2;margin-bottom:6px;}'
+            + '@page{size:' + String(paperMm) + 'mm auto;margin:' + String(pageMarginMm) + 'mm;}'
+            + 'body{width:' + String(paperMm) + 'mm;font-size:' + String(fontBase) + 'px;}'
+            + '.h{text-align:center;font-weight:700;font-size:' + String(headerFont) + 'px;margin:0 0 6px 0;}'
+            + '.meta{font-size:' + String(fontBase) + 'px;line-height:1.2;margin-bottom:6px;}'
             + '.sep{border-top:1px dashed #000;margin:6px 0;}'
-            + 'table{width:100%;border-collapse:collapse;font-size:11px;}'
+            + 'table{width:100%;border-collapse:collapse;font-size:' + String(tableFont) + 'px;}'
             + 'td{padding:2px 0;vertical-align:top;}'
-            + 'td.name{width:48%;padding-right:4px;}'
+            + 'td.name{width:' + String(paperMm === 80 ? 52 : 48) + '%;padding-right:4px;}'
             + 'td.qty{width:10%;text-align:right;white-space:nowrap;padding-right:4px;}'
-            + 'td.price{width:21%;text-align:right;white-space:nowrap;padding-right:6px;}'
-            + 'td.sub{width:21%;text-align:right;white-space:nowrap;}'
-            + 'tr.th td{padding:0 0 3px 0;font-size:10px;font-weight:700;}'
+            + 'td.price{width:19%;text-align:right;white-space:nowrap;padding-right:6px;}'
+            + 'td.sub{width:19%;text-align:right;white-space:nowrap;}'
+            + 'tr.th td{padding:0 0 3px 0;font-size:' + String(paperMm === 80 ? 11 : 10) + 'px;font-weight:700;}'
             + 'tr.th td{border-bottom:1px dotted #000;}'
-            + '.tot{font-size:12px;font-weight:700;text-align:right;margin-top:6px;}'
-            + '.f{text-align:center;font-size:11px;margin-top:10px;}'
+            + '.tot{font-size:' + String(paperMm === 80 ? 13 : 12) + 'px;font-weight:700;text-align:right;margin-top:6px;}'
+            + '.f{text-align:center;font-size:' + String(fontBase) + 'px;margin-top:10px;}'
             + '</style></head><body>'
             + (businessName ? ('<div class="h">' + businessName + '</div>') : '')
             + '<div class="meta">'
@@ -9241,7 +9486,8 @@ document.addEventListener('DOMContentLoaded', function() {
         );
     }
 
-    function printCurrentTicket() {
+    function printCurrentTicket(opts) {
+        const paperMm = (parseInt(String(opts?.paper_mm ?? ''), 10) === 80) ? 80 : 58;
         const items = getCartItems();
         if (!items.length) {
             showAlertModal('Agregá al menos un producto al carrito.', 'Atención', 'Validación requerida');
@@ -9285,7 +9531,7 @@ document.addEventListener('DOMContentLoaded', function() {
             gift_code: String(ventaGiftCode || '').trim(),
         };
 
-        const html = buildTicketPrintHtml(data);
+        const html = buildTicketPrintHtml({ ...data, paper_mm: paperMm });
         const w = window.open('', '_blank', 'width=420,height=720');
         if (!w) {
             showAlertModal('El navegador bloqueó la ventana de impresión. Habilitá popups para poder imprimir.', 'Atención', 'Impresión');
