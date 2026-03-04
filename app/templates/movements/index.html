@@ -360,6 +360,25 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
+    function getArqueosFromApi(fromIso, toIso, cb) {
+        const qs = [];
+        const f = String(fromIso || '').trim();
+        const t = String(toIso || '').trim();
+        if (f) qs.push('from=' + encodeURIComponent(f));
+        if (t) qs.push('to=' + encodeURIComponent(t));
+        const url = apiPath('/movements/api/cash-counts' + (qs.length ? ('?' + qs.join('&')) : ''));
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                const items = (data && data.ok === true && Array.isArray(data.items)) ? data.items : (Array.isArray(data && data.items) ? data.items : []);
+                if (typeof cb === 'function') cb(items);
+            })
+            .catch(function (e) {
+                try { console.error('Error cargando arqueos', e); } catch (err) {}
+                if (typeof cb === 'function') cb([]);
+            });
+    }
+
     async function apiDeleteSale(ticket) {
         const t = String(ticket || '').trim();
         if (!t) return { ok: false, error: 'invalid' };
@@ -1236,7 +1255,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const toIso = rango ? (rango.to.getFullYear() + '-' + String(rango.to.getMonth() + 1).padStart(2, '0') + '-' + String(rango.to.getDate()).padStart(2, '0')) : '';
 
         tbodyArqueo.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
-        getArqueosFromApi(fromIso, toIso, function (items) {
+        try {
+            getArqueosFromApi(fromIso, toIso, function (items) {
             let historico = Array.isArray(items) ? items.slice() : [];
             historico.sort((a, b) => String(b?.date || '').localeCompare(String(a?.date || '')));
 
@@ -1278,7 +1298,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                 });
             } catch (e) {}
-        });
+            });
+        } catch (e) {
+            try { console.error('renderArqueo failed', e); } catch (err) {}
+            tbodyArqueo.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">No se pudo cargar.</td></tr>';
+        }
     }
 
     const modalDetalle = document.getElementById('modal-arqueo-detalle');
