@@ -1431,7 +1431,13 @@ def _sanitize_notes_for_display(notes: str) -> str:
 @login_required
 @module_required('sales')
 def index():
-    return render_template('sales/list.html', title='Ventas')
+    try:
+        from datetime import date as dt_date
+        today = dt_date.today()
+        today_dmy = today.strftime('%d/%m/%Y')
+    except Exception:
+        today_dmy = ''
+    return render_template('sales/list.html', title='Ventas', today_dmy=today_dmy)
 
 
 def _compute_related_for_row(row: Sale, cid: str) -> dict:

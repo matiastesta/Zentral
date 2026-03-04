@@ -11155,7 +11155,59 @@ td.num,th.num{text-align:right}
 
     initVentasMultiFiltersStatic();
 
-    // No forzar rango por defecto: mostrar historial completo salvo que el usuario seleccione un rango.
+    function setVentasDefaultTodayRange() {
+        try {
+            if (!inputFechaRango) return false;
+            const cur = String(inputFechaRango.value || '').trim();
+            if (cur) return false;
+
+            let dmy = '';
+            try {
+                dmy = String({{ (today_dmy or '')|tojson }} || '').trim();
+            } catch (e) {
+                dmy = '';
+            }
+            if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dmy)) {
+                const now = new Date();
+                if (!isFinite(now.getTime())) return false;
+                const dd = String(now.getDate()).padStart(2, '0');
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                const yyyy = String(now.getFullYear());
+                dmy = dd + '/' + mm + '/' + yyyy;
+            }
+
+            let now = null;
+            try {
+                const parts = dmy.split('/');
+                const d = parseInt(parts[0], 10) || 0;
+                const m = parseInt(parts[1], 10) || 0;
+                const y = parseInt(parts[2], 10) || 0;
+                if (y > 0 && m > 0 && d > 0) now = new Date(y, m - 1, d);
+            } catch (e) {
+                now = null;
+            }
+
+            inputFechaRango.value = dmy;
+            try {
+                if (ventasRangePicker && typeof ventasRangePicker.setDate === 'function') {
+                    const dt = (now && isFinite(now.getTime())) ? now : null;
+                    if (dt) ventasRangePicker.setDate([dt, dt], true);
+                }
+            } catch (e) {
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    const forcedToday = setVentasDefaultTodayRange();
+    if (forcedToday) {
+        try {
+            refreshVentasFromServerForRange();
+        } catch (e) {
+        }
+    }
 
     initSalesEmployeesSelectors();
     initHistorialVentas();
