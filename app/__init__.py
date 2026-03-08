@@ -542,6 +542,79 @@ def create_app(config_class=Config):
             return None
 
     @app.before_request
+    def _enforce_subscription_expiration():
+        try:
+            # Never block zentral admin or superadmin routes.
+            if str(session.get('auth_is_zentral_admin') or '') == '1':
+                return None
+
+            try:
+                from flask_login import current_user
+
+                if getattr(current_user, 'is_authenticated', False) and (
+                    getattr(current_user, 'is_master', False)
+                    or str(getattr(current_user, 'role', '') or '') == 'zentral_admin'
+                ):
+                    return None
+            except Exception:
+                pass
+
+            path = str(getattr(request, 'path', '') or '')
+            if path.startswith('/superadmin'):
+                return None
+            # Allow auth routes so the user can reach login/logout.
+            if path.startswith('/auth'):
+                return None
+            # Allow static.
+            if path.startswith('/static'):
+                return None
+            # Allow the lock screen itself.
+            if path.startswith('/suscripcion-vencida'):
+                return None
+
+            # Only enforce on write operations. GET/HEAD should render normally,
+            # while the UI layer can display a blocking overlay.
+            try:
+                method = str(getattr(request, 'method', '') or '').upper()
+            except Exception:
+                method = ''
+            if method in {'GET', 'HEAD', 'OPTIONS'}:
+                return None
+
+            from app.tenancy import ensure_request_context
+
+            ensure_request_context()
+            c = getattr(g, 'company', None)
+            if not c:
+                return None
+
+            end_at = None
+            try:
+                end_at = getattr(c, 'subscription_ends_at', None)
+            except Exception:
+                end_at = None
+            if not end_at:
+                return None
+
+            today = date.today()
+            if end_at >= today:
+                return None
+
+            accept = request.headers.get('Accept') or ''
+            wants_json = ('application/json' in accept) or path.startswith('/api/') or ('/api/' in path)
+            if wants_json:
+                return jsonify({'ok': False, 'error': 'subscription_expired', 'message': 'Suscripción vencida. Operación no permitida.'}), 403
+
+            return render_template('subscription_expired.html', title='Suscripción vencida'), 403
+        except Exception:
+            # Never take down the app due to subscription enforcement issues.
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return None
+
+    @app.before_request
     def _guard_broken_login_state():
         # If Flask-Login thinks there's a user but RLS/tenant settings hide that row,
         # accessing current_user attributes can raise ObjectDeletedError.
@@ -620,7 +693,7 @@ def create_app(config_class=Config):
             from app.models import Company
 
             if not getattr(current_user, 'is_authenticated', False):
-                return {"subscription_days_left": None, "subscription_badge": None}
+                return {"subscription_days_left": None, "subscription_badge": None, "subscription_locked": False}
 
             support_mode = False
             try:
@@ -629,7 +702,7 @@ def create_app(config_class=Config):
                 support_mode = False
 
             if str(getattr(current_user, 'role', '') or '') == 'zentral_admin' and not support_mode:
-                return {"subscription_days_left": None, "subscription_badge": None}
+                return {"subscription_days_left": None, "subscription_badge": None, "subscription_locked": False}
 
             # Resolve the effective tenant company id (supports impersonation).
             cid = ''
@@ -656,7 +729,7 @@ def create_app(config_class=Config):
                     c = None
 
             if not c:
-                return {"subscription_days_left": None, "subscription_badge": None}
+                return {"subscription_days_left": None, "subscription_badge": None, "subscription_locked": False}
 
             end_d = None
             try:
@@ -664,12 +737,12 @@ def create_app(config_class=Config):
             except Exception:
                 end_d = None
             if not end_d:
-                return {"subscription_days_left": None, "subscription_badge": None}
+                return {"subscription_days_left": None, "subscription_badge": None, "subscription_locked": False}
 
             try:
                 days_left = int((end_d - date.today()).days)
             except Exception:
-                return {"subscription_days_left": None, "subscription_badge": None}
+                return {"subscription_days_left": None, "subscription_badge": None, "subscription_locked": False}
 
             # Color thresholds: green (>7), yellow (1..7), red (<=0)
             badge = 'green'
@@ -681,9 +754,10 @@ def create_app(config_class=Config):
             return {
                 "subscription_days_left": days_left,
                 "subscription_badge": badge,
+                "subscription_locked": bool(days_left < 0),
             }
         except Exception:
-            return {"subscription_days_left": None, "subscription_badge": None}
+            return {"subscription_days_left": None, "subscription_badge": None, "subscription_locked": False}
 
     @app.cli.group('zentral')
     def zentral_cli():

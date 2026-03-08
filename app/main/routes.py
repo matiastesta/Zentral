@@ -531,3 +531,8 @@ def index():
         low_stock_products=low_stock_products,
         upcoming_calendar_events=upcoming_calendar_events,
     )
+
+
+@bp.get('/suscripcion-vencida')
+def subscription_expired():
+    return render_template('subscription_expired.html', title='Suscripción vencida')
