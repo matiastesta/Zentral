@@ -79,6 +79,47 @@
   line-height: 1.25 !important;
   vertical-align: middle !important;
  }
+
+ .arqueo-shift-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  white-space: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+ }
+
+ .arqueo-shift-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+  border: 1px solid #e5e7eb;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 9999px;
+  padding: 0.5rem 0.8rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+ }
+
+ .arqueo-shift-pill .arqueo-shift-time,
+ .arqueo-shift-pill .arqueo-shift-paren {
+  color: #9ca3af;
+  transition: color .18s ease;
+ }
+
+ #arqueo-shift-wrap input[name="arqueo-shift"]:checked + .arqueo-shift-pill {
+  background: var(--brand-color);
+  border-color: var(--brand-color);
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  transform: translateY(-1px);
+ }
+
+ #arqueo-shift-wrap input[name="arqueo-shift"]:checked + .arqueo-shift-pill .arqueo-shift-time,
+ #arqueo-shift-wrap input[name="arqueo-shift"]:checked + .arqueo-shift-pill .arqueo-shift-paren {
+  color: rgba(255, 255, 255, 0.88);
+ }
 </style>
 <!-- HOME de Ventas: acciones principales + indicadores + historial -->
 <div id="ventas-home" class="space-y-6">
@@ -352,6 +393,29 @@
                 </div>
                 <div class="p-5 overflow-y-auto" style="max-height:calc(85vh - 132px)">
                     <div id="panel-arqueo" class="space-y-3">
+                        <div id="arqueo-shift-wrap" class="hidden">
+                            <div class="arqueo-shift-bar rounded-2xl border border-gray-200 bg-gray-50/90 p-1.5 shadow-sm">
+                                <label class="inline-flex items-center cursor-pointer shrink-0">
+                                    <input type="radio" name="arqueo-shift" value="turno_1" checked class="peer sr-only">
+                                    <span class="arqueo-shift-pill">
+                                        <span class="font-semibold">Primer turno</span>
+                                        <span class="arqueo-shift-paren text-[12px]">(</span>
+                                        <span class="arqueo-shift-time text-[12px]" data-arqueo-shift-schedule="turno_1">08:00–16:00</span>
+                                        <span class="arqueo-shift-paren text-[12px]">)</span>
+                                    </span>
+                                </label>
+                                <span class="shrink-0 text-gray-300 text-xs">·</span>
+                                <label class="inline-flex items-center cursor-pointer shrink-0">
+                                    <input type="radio" name="arqueo-shift" value="turno_2" class="peer sr-only">
+                                    <span class="arqueo-shift-pill">
+                                        <span class="font-semibold">Segundo turno</span>
+                                        <span class="arqueo-shift-paren text-[12px]">(</span>
+                                        <span class="arqueo-shift-time text-[12px]" data-arqueo-shift-schedule="turno_2">16:00–08:00</span>
+                                        <span class="arqueo-shift-paren text-[12px]">)</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                                 <label class="block font-medium text-gray-600 mb-1 text-xs">Fecha de arqueo</label>
@@ -1504,6 +1568,10 @@
                         <i class="fas fa-cog"></i>
                     </button>
                 </div>
+                <button id="btn-descargar-comprobante" type="button" class="w-full mt-2 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white rounded-md border border-gray-200 hover:bg-gray-50">
+                    <i class="far fa-file-pdf"></i>
+                    Descargar comprobante
+                </button>
                 <button id="btn-confirmar-venta" type="button" class="w-full mt-3 inline-flex items-center justify-center px-3 py-2 text-sm font-medium text-white rounded-md" style="background-color:#0d1067;" data-brand-bg="{{ brand_color }}">
                     Confirmar ticket y registrar
                 </button>
@@ -1600,15 +1668,38 @@
 {% block scripts %}
 {{ super() }}
 <script id="installments-config" type="application/json">{"enabled": {{ 'true' if business and business.habilitar_sistema_cuotas else 'false' }} }</script>
+<script id="cash-count-config" type="application/json">{"double_shift": {{ 'true' if business and business.habilitar_doble_turno_arqueo else 'false' }}, "turno_1": {"desde": "{{ business.arqueo_turno_1_desde if business and business.arqueo_turno_1_desde else '08:00' }}", "hasta": "{{ business.arqueo_turno_1_hasta if business and business.arqueo_turno_1_hasta else '16:00' }}"}, "turno_2": {"desde": "{{ business.arqueo_turno_2_desde if business and business.arqueo_turno_2_desde else '16:00' }}", "hasta": "{{ business.arqueo_turno_2_hasta if business and business.arqueo_turno_2_hasta else '08:00' }}"} }</script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let INSTALLMENTS_ENABLED = false;
+    let CASH_COUNT_DOUBLE_SHIFT = false;
+    let CASH_COUNT_SHIFT_SCHEDULES = {
+        turno_1: { desde: '08:00', hasta: '16:00' },
+        turno_2: { desde: '16:00', hasta: '08:00' },
+    };
     try {
         const rawCfg = document.getElementById('installments-config');
         const parsed = rawCfg ? JSON.parse(String(rawCfg.textContent || '{}')) : {};
         INSTALLMENTS_ENABLED = !!(parsed && parsed.enabled);
     } catch (e) {
         INSTALLMENTS_ENABLED = false;
+    }
+
+    try {
+        const cfgCash = JSON.parse(document.getElementById('cash-count-config')?.textContent || '{}');
+        CASH_COUNT_DOUBLE_SHIFT = !!cfgCash.double_shift;
+        CASH_COUNT_SHIFT_SCHEDULES = {
+            turno_1: {
+                desde: String(cfgCash?.turno_1?.desde || '08:00'),
+                hasta: String(cfgCash?.turno_1?.hasta || '16:00'),
+            },
+            turno_2: {
+                desde: String(cfgCash?.turno_2?.desde || '16:00'),
+                hasta: String(cfgCash?.turno_2?.hasta || '08:00'),
+            },
+        };
+    } catch (e) {
+        CASH_COUNT_DOUBLE_SHIFT = false;
     }
 
     function scrollAElemento(target) {
@@ -2105,12 +2196,81 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectArqueoEmployee = document.getElementById('arqueo-employee');
     const msgArqueoNoEmployees = document.getElementById('msg-arqueo-no-employees');
     const msgArqueoEmployeeRequired = document.getElementById('msg-arqueo-employee-required');
+    const arqueoShiftWrap = document.getElementById('arqueo-shift-wrap');
+    const arqueoShiftInputs = Array.from(document.querySelectorAll('input[name="arqueo-shift"]'));
+    const arqueoShiftScheduleEls = Array.from(document.querySelectorAll('[data-arqueo-shift-schedule]'));
     const gridProductos = document.getElementById('grid-productos');
     const tablaProductosWrap = document.getElementById('tabla-productos-wrap');
     const tablaProductosBody = document.getElementById('tabla-productos-body');
     const ventaStep1ProductsHead = document.getElementById('venta-step1-products-head');
     const btnViewGrid = document.getElementById('btn-view-grid');
     const btnViewList = document.getElementById('btn-view-list');
+
+    if (arqueoShiftWrap) arqueoShiftWrap.classList.toggle('hidden', !CASH_COUNT_DOUBLE_SHIFT);
+
+    function getSelectedArqueoShift() {
+        if (!CASH_COUNT_DOUBLE_SHIFT) return 'turno_1';
+        const hit = arqueoShiftInputs.find(function (i) { return !!i.checked; });
+        return String((hit && hit.value) || 'turno_1').trim() || 'turno_1';
+    }
+
+    function setSelectedArqueoShift(shiftCode) {
+        const wanted = String(shiftCode || 'turno_1').trim() || 'turno_1';
+        arqueoShiftInputs.forEach(function (input) {
+            input.checked = (String(input.value || '').trim() === wanted);
+        });
+    }
+
+    function formatShiftDisplay(shiftCode) {
+        const key = String(shiftCode || 'turno_1').trim() || 'turno_1';
+        const cfg = CASH_COUNT_SHIFT_SCHEDULES[key] || {};
+        return String(cfg.desde || '00:00') + '–' + String(cfg.hasta || '00:00');
+    }
+
+    function parseShiftMinutesLabel(value, fallbackMinutes) {
+        const raw = String(value || '').trim();
+        const m = raw.match(/^(\d{1,2}):(\d{2})$/);
+        if (!m) return fallbackMinutes;
+        const hh = Math.max(0, Math.min(23, parseInt(m[1], 10) || 0));
+        const mm = Math.max(0, Math.min(59, parseInt(m[2], 10) || 0));
+        return (hh * 60) + mm;
+    }
+
+    function isMinutesInsideShift(minutesNow, fromMinutes, toMinutes) {
+        const now = parseInt(minutesNow, 10);
+        const from = parseInt(fromMinutes, 10);
+        const to = parseInt(toMinutes, 10);
+        if (!Number.isFinite(now) || !Number.isFinite(from) || !Number.isFinite(to)) return false;
+        if (from === to) return true;
+        if (from < to) return now >= from && now < to;
+        return now >= from || now < to;
+    }
+
+    function getCurrentArqueoShiftByClock() {
+        const now = new Date();
+        const minutesNow = (now.getHours() * 60) + now.getMinutes();
+        const t1 = CASH_COUNT_SHIFT_SCHEDULES.turno_1 || {};
+        const t2 = CASH_COUNT_SHIFT_SCHEDULES.turno_2 || {};
+        const t1From = parseShiftMinutesLabel(t1.desde, 8 * 60);
+        const t1To = parseShiftMinutesLabel(t1.hasta, 16 * 60);
+        const t2From = parseShiftMinutesLabel(t2.desde, 16 * 60);
+        const t2To = parseShiftMinutesLabel(t2.hasta, 8 * 60);
+        if (isMinutesInsideShift(minutesNow, t1From, t1To)) return 'turno_1';
+        if (isMinutesInsideShift(minutesNow, t2From, t2To)) return 'turno_2';
+        return 'turno_1';
+    }
+
+    function applyCurrentClockShiftSelection() {
+        if (!CASH_COUNT_DOUBLE_SHIFT) return;
+        setSelectedArqueoShift(getCurrentArqueoShiftByClock());
+    }
+
+    function syncArqueoShiftScheduleLabels() {
+        arqueoShiftScheduleEls.forEach(function (el) {
+            const key = String(el.getAttribute('data-arqueo-shift-schedule') || 'turno_1').trim() || 'turno_1';
+            el.textContent = formatShiftDisplay(key);
+        });
+    }
 
     const btnVentaStep1Columns = document.getElementById('btn-venta-step1-columns');
     const modalVentaStep1Columns = document.getElementById('modal-venta-step1-columns');
@@ -4576,6 +4736,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const voidBtn = (isCambio && changeId > 0)
             ? ('<button type="button" class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 opcion-void-cambio" data-change-id="' + String(changeId) + '" data-ticket="' + t + '">Anular cambio</button>')
             : '';
+        const downloadReceiptBtn = (!isCambio)
+            ? ('<button type="button" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 opcion-descargar-comprobante" data-ticket="' + t + '">Descargar comprobante</button>')
+            : '';
         const voidSaleBtn = (!isCambio)
             ? ('<button type="button" class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50 opcion-void-venta" data-ticket="' + t + '">Anular venta</button>')
             : '';
@@ -4588,6 +4751,7 @@ document.addEventListener('DOMContentLoaded', function() {
             +   '<div class="menu-mov-acciones hidden origin-top-right absolute right-0 mt-1 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">'
             +     '<div class="py-1 text-[11px]">'
             +       '<button type="button" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 opcion-ver-ticket" data-ticket="' + t + '" data-open-mode="' + (isCambio ? 'readonly' : 'edit') + '" data-change-id="' + String(changeId) + '">' + label + '</button>'
+            +       downloadReceiptBtn
             +       voidBtn
             +       voidSaleBtn
             +       delBtn
@@ -4645,6 +4809,32 @@ document.addEventListener('DOMContentLoaded', function() {
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
+        });
+    }
+
+    function apiPreviewSaleReceiptPdf(payload) {
+        return fetch(apiPath('/sales/api/sales/receipt-pdf/preview'), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {}),
+        }).then(async function (r) {
+            if (!r || !r.ok) {
+                let msg = 'No se pudo generar el comprobante.';
+                try {
+                    const ct = String(r.headers.get('content-type') || '').toLowerCase();
+                    if (ct.includes('application/json')) {
+                        const d = await r.json();
+                        msg = String(d?.message || d?.error || msg);
+                    } else {
+                        const txt = await r.text();
+                        if (txt) msg = String(txt);
+                    }
+                } catch (e) {
+                }
+                throw new Error(msg);
+            }
+            return r.blob();
         });
     }
 
@@ -5410,7 +5600,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 if (k === 'fecha') {
-                    cells.push('<td data-col-key="fecha" class="px-3 py-2 text-gray-500">' + formatFechaDisplay(s?.fecha || '—') + '</td>');
+                    cells.push('<td data-col-key="fecha" class="px-3 py-2 text-gray-500">' + escapeHtml(formatFechaHoraVenta(s)) + '</td>');
                     return;
                 }
                 if (k === 'cliente') {
@@ -6798,6 +6988,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const btnImprimirTicket = document.getElementById('btn-imprimir-ticket');
+    const btnDescargarComprobante = document.getElementById('btn-descargar-comprobante');
     const btnTicketPrintConfig = document.getElementById('btn-ticket-print-config');
 
     const modalTicketPrintSetup = document.getElementById('modal-ticket-print-setup');
@@ -6841,6 +7032,146 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!modalTicketPrintSetup) return;
         try { modalTicketPrintSetup.classList.remove('hidden'); } catch (e) {}
         try { document.body.classList.add('overflow-hidden'); } catch (e) {}
+    }
+
+    function buildCurrentSalePayload() {
+        const items = getCartItems();
+        if (!items.length) {
+            throw new Error('Agregá al menos un producto al carrito.');
+        }
+
+        if (ventaIsGift) {
+            if (!selectedCustomer || !selectedCustomer.name) {
+                throw new Error('En el caso de ser un regalo, debés registrar un cliente.');
+            }
+        }
+
+        if (ventaOnAccount) {
+            if (!selectedCustomer || !selectedCustomer.name) {
+                throw new Error('Para usar cuenta corriente tenés que asociar un cliente.');
+            }
+        }
+
+        if (ventaUseInstallments) {
+            if (!INSTALLMENTS_ENABLED) {
+                throw new Error('El sistema de cuotas está deshabilitado en la configuración del negocio.');
+            }
+            if (!selectedCustomer || !selectedCustomer.name) {
+                throw new Error('Para usar cuotas tenés que asociar un cliente.');
+            }
+        }
+
+        const fecha = String(ticketFecha?.value || '').trim() || defaultFecha;
+        const notas = String(ticketNotas?.value || '').trim();
+        const pago = getSelectedPaymentMethod();
+        const totals = computeTicketTotals();
+        const total = totals.total;
+        const paidAmount = ventaOnAccount ? Math.max(0, Math.min(total, (parseFloat(ventaPaidAmount || 0) || 0))) : total;
+        const dueAmount = ventaOnAccount ? Math.max(0, total - paidAmount) : 0;
+
+        const payload = {
+            fecha,
+            type: 'Venta',
+            status: 'Completada',
+            payment_method: pago,
+            payments: getSelectedPaymentsPayload(),
+            notes: notas,
+            total,
+            discount_general_pct: totals.pct,
+            discount_general_amount: totals.descGeneral,
+            surcharge_general_pct: totals.surchargePct,
+            surcharge_general_amount: totals.surchargeAmount,
+            items,
+            customer_id: selectedCustomer ? (selectedCustomer.id || '') : '',
+            customer_name: selectedCustomer ? (selectedCustomer.name || '') : '',
+            ...getSelectedEmployeePayload(selectTicketEmployee),
+            on_account: ventaOnAccount,
+            paid_amount: paidAmount,
+            due_amount: dueAmount,
+            is_gift: !!ventaIsGift,
+            gift_code: (ventaIsGift ? (ventaGiftCode || '') : ''),
+        };
+
+        if (ventaUseInstallments) {
+            const mode = getCuotasMode();
+            const intervalRaw = parseInt(cuotasInterval?.value || '', 10);
+            if (!isFinite(intervalRaw) || intervalRaw <= 0) {
+                throw new Error('Ingresá un intervalo (días) válido para las cuotas.');
+            }
+            const interval = Math.max(1, Math.min(365, intervalRaw));
+            if (mode === 'indefinite') {
+                payload.installments = {
+                    enabled: true,
+                    mode: 'indefinite',
+                    interval_days: interval,
+                };
+            } else {
+                const count = Math.max(1, Math.min(24, parseInt(cuotasCount?.value || 1, 10) || 1));
+                payload.installments = {
+                    enabled: true,
+                    mode: 'fixed',
+                    installments_count: count,
+                    interval_days: interval,
+                };
+            }
+        }
+
+        return payload;
+    }
+
+    function downloadSaleReceipt(ticket) {
+        const t = String(ticket || '').trim();
+        if (!t) throw new Error('missing_ticket');
+        try {
+            const url = apiPath('/sales/api/sales/' + encodeURIComponent(t) + '/receipt-pdf');
+            window.open(url, '_blank', 'noopener');
+        } catch (e) {
+            throw new Error('No se pudo descargar el comprobante.');
+        }
+    }
+
+    function triggerSaleReceiptDownloadFromCurrentState() {
+        if (window.__salesPreviewingReceipt === true) return;
+        const savedTicket = String(editTicketId || '').trim();
+        if (savedTicket) {
+            try {
+                downloadSaleReceipt(savedTicket);
+            } catch (e) {
+                const msg = (e && e.message) ? e.message : 'No se pudo descargar el comprobante.';
+                showAlertModal(msg, 'Error', 'Comprobante');
+            }
+            return;
+        }
+
+        let payload = null;
+        try {
+            payload = buildCurrentSalePayload();
+        } catch (e) {
+            const msg = (e && e.message) ? e.message : 'No se pudo preparar el comprobante.';
+            showAlertModal(msg, 'Atención', 'Comprobante');
+            return;
+        }
+
+        window.__salesPreviewingReceipt = true;
+        try { if (btnDescargarComprobante) btnDescargarComprobante.disabled = true; } catch (e) {}
+        Promise.resolve(apiPreviewSaleReceiptPdf(payload)).then(function (blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'comprobante_venta_previsualizacion.pdf';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function () {
+                try { URL.revokeObjectURL(url); } catch (e) {}
+            }, 2000);
+        }).catch(function (e) {
+            const msg = (e && e.message) ? e.message : 'No se pudo generar el comprobante.';
+            showAlertModal(msg, 'Error', 'Comprobante');
+        }).finally(function () {
+            try { window.__salesPreviewingReceipt = false; } catch (e) {}
+            try { if (btnDescargarComprobante) btnDescargarComprobante.disabled = false; } catch (e) {}
+        });
     }
 
     function closeTicketPrintSetup() {
@@ -6969,6 +7300,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             openTicketPrintSetupWithSaved();
+        });
+    }
+
+    if (btnDescargarComprobante) {
+        btnDescargarComprobante.addEventListener('click', function () {
+            triggerSaleReceiptDownloadFromCurrentState();
         });
     }
 
@@ -7309,7 +7646,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const fecha = String(document.getElementById('fecha-arqueo')?.value || '').trim();
             if (fecha) {
-                fetch(apiPath('/sales/api/cash-count/calc?date=' + encodeURIComponent(fecha)), { credentials: 'same-origin' })
+                fetch(apiPath('/sales/api/cash-count/calc?date=' + encodeURIComponent(fecha) + '&shift=' + encodeURIComponent(getSelectedArqueoShift())), { credentials: 'same-origin' })
                     .then(r => r.json())
                     .then(data => {
                         if (!data || data.ok !== true) throw new Error('calc_failed');
@@ -7384,7 +7721,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function checkArqueoStaleForDate(fecha) {
         const f = String(fecha || '').trim();
         if (!f) return;
-        fetch(apiPath('/sales/api/cash-count/status?date=' + encodeURIComponent(f)), { credentials: 'same-origin' })
+        fetch(apiPath('/sales/api/cash-count/status?date=' + encodeURIComponent(f) + '&shift=' + encodeURIComponent(getSelectedArqueoShift())), { credentials: 'same-origin' })
             .then(r => r.json())
             .then(data => {
                 if (!data || !data.ok) return;
@@ -7405,6 +7742,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function openArqueoModal() {
         if (!modalArqueo) return;
+        try { applyCurrentClockShiftSelection(); } catch (e) {}
         modalArqueo.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
         try { recalcularArqueoAutomatico(); } catch (e) {}
@@ -7419,13 +7757,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadArqueoFromServer() {
         const fecha = String(document.getElementById('fecha-arqueo')?.value || '').trim();
         if (!fecha) return;
-        fetch(apiPath('/sales/api/cash-count?date=' + encodeURIComponent(fecha)), { credentials: 'same-origin' })
+        fetch(apiPath('/sales/api/cash-count?date=' + encodeURIComponent(fecha) + '&shift=' + encodeURIComponent(getSelectedArqueoShift())), { credentials: 'same-origin' })
             .then(r => r.json())
             .then(data => {
                 const item = data && data.item ? data.item : null;
                 if (!item) {
                     setArqueoBadge('pendiente');
                     arqueoLastSavedAtMs = 0;
+                    setSelectedArqueoShift(getSelectedArqueoShift());
                     if (montoApertura) montoApertura.value = '';
                     if (montoCierre) montoCierre.value = '';
                     if (selectArqueoEmployee) selectArqueoEmployee.value = '';
@@ -7433,6 +7772,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
+                setSelectedArqueoShift(item.shift_code || getSelectedArqueoShift());
                 setMonedaARSInput(montoApertura, item.opening_amount ?? '');
                 setMonedaARSInput(montoCierre, item.closing_amount ?? '');
                 setMonedaARSInput(montoEfectivoDia, item.cash_day_amount ?? '');
@@ -8767,6 +9107,15 @@ document.addEventListener('DOMContentLoaded', function() {
             loadArqueoFromServer();
         });
     }
+    arqueoShiftInputs.forEach(function (input) {
+        input.addEventListener('change', function () {
+            if (!CASH_COUNT_DOUBLE_SHIFT) return;
+            loadArqueoFromServer();
+            try { recalcularArqueoAutomatico(); } catch (e) {}
+        });
+    });
+
+    syncArqueoShiftScheduleLabels();
 
     if (selectArqueoEmployee) {
         selectArqueoEmployee.addEventListener('change', function () {
@@ -8785,6 +9134,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const employeeName = String(selectArqueoEmployee?.selectedOptions?.[0]?.textContent || '').trim();
             const fecha = String(document.getElementById('fecha-arqueo')?.value || '').trim();
             if (!fecha) return;
+            if (!employeeId) {
+                if (msgArqueoEmployeeRequired) msgArqueoEmployeeRequired.classList.remove('hidden');
+                mostrarMensajesArqueo({ ok: false, detalle: 'Debés seleccionar un responsable de caja para guardar el arqueo.' });
+                try { selectArqueoEmployee?.focus(); } catch (e) {}
+                return;
+            }
 
             const opening = parseMonedaARSInput(montoApertura.value || '0') || 0;
             const cashDay = parseMonedaARSInput(montoEfectivoDia.value || '0') || 0;
@@ -8796,6 +9151,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 credentials: 'same-origin',
                 body: JSON.stringify({
                     date: fecha,
+                    shift_code: getSelectedArqueoShift(),
                     employee_id: employeeId,
                     employee_name: employeeName,
                     opening_amount: opening,
@@ -9398,6 +9754,31 @@ document.addEventListener('DOMContentLoaded', function() {
         return s;
     }
 
+    function formatFechaHoraVenta(sale) {
+        try {
+            const created = parseInt(String(sale?.created_at || 0), 10) || 0;
+            if (created > 0) {
+                const d = new Date(created);
+                if (!isNaN(d.getTime())) {
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const yy = String(d.getFullYear());
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const mi = String(d.getMinutes()).padStart(2, '0');
+                    return dd + '/' + mm + '/' + yy + ' - ' + hh + ':' + mi;
+                }
+            }
+        } catch (e) {
+        }
+        try {
+            const iso = String(sale?.fecha || '').trim();
+            if (!iso) return '—';
+            return formatFechaDisplay(iso);
+        } catch (e) {
+            return '—';
+        }
+    }
+
     function buildTicketPrintHtml(data) {
         const businessName = escapeHtml(String(data?.businessName || '').trim() || '');
         const ticket = escapeHtml(String(data?.ticket || '').trim() || '');
@@ -9970,12 +10351,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Manejar opciones del menú (editar + eliminar)
     document.addEventListener('click', function (e) {
         const btnVer = e.target.closest('.opcion-ver-ticket');
+        const btnReceipt = e.target.closest('.opcion-descargar-comprobante');
         const btnEliminar = e.target.closest('.opcion-eliminar-ticket');
         const btnVoid = e.target.closest('.opcion-void-cambio');
         const btnVoidSale = e.target.closest('.opcion-void-venta');
-        if (!btnVer && !btnEliminar && !btnVoid && !btnVoidSale) return;
+        if (!btnVer && !btnReceipt && !btnEliminar && !btnVoid && !btnVoidSale) return;
         e.stopPropagation();
-        const ticket = (btnVer || btnEliminar || btnVoid || btnVoidSale).getAttribute('data-ticket') || '';
+        const ticket = (btnVer || btnReceipt || btnEliminar || btnVoid || btnVoidSale).getAttribute('data-ticket') || '';
 
         if (btnVer) {
             cerrarTodosLosMenusMov();
@@ -9990,6 +10372,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             else openEditTicket(ticket);
+            return;
+        }
+
+        if (btnReceipt) {
+            cerrarTodosLosMenusMov();
+            downloadSaleReceipt(ticket);
             return;
         }
 
@@ -10044,9 +10432,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function fmtFechaForExport(sale) {
         try {
-            const iso = String(sale?.fecha || '').trim();
-            if (!iso) return '';
-            return formatFechaDisplay(iso);
+            return formatFechaHoraVenta(sale);
         } catch (e) {
             return '';
         }
@@ -10520,63 +10906,16 @@ td.num,th.num{text-align:right}
                 }
             }
 
-            const fecha = String(ticketFecha?.value || '').trim() || defaultFecha;
-            const notas = String(ticketNotas?.value || '').trim();
-            const pago = getSelectedPaymentMethod();
-            const totals = computeTicketTotals();
-            const total = totals.total;
-            const ventaLibre = !!(toggleVentaLibreTicket?.checked || toggleVentaLibre?.checked);
-
-            const paidAmount = ventaOnAccount ? Math.max(0, Math.min(total, (parseFloat(ventaPaidAmount || 0) || 0))) : total;
-            const dueAmount = ventaOnAccount ? Math.max(0, total - paidAmount) : 0;
-
-            const payload = {
-                fecha,
-                type: 'Venta',
-                status: 'Completada',
-                payment_method: pago,
-                payments: getSelectedPaymentsPayload(),
-                notes: notas,
-                total,
-                discount_general_pct: totals.pct,
-                discount_general_amount: totals.descGeneral,
-                surcharge_general_pct: totals.surchargePct,
-                surcharge_general_amount: totals.surchargeAmount,
-                items,
-                customer_id: selectedCustomer ? (selectedCustomer.id || '') : '',
-                customer_name: selectedCustomer ? (selectedCustomer.name || '') : '',
-                ...getSelectedEmployeePayload(selectTicketEmployee),
-                on_account: ventaOnAccount,
-                paid_amount: paidAmount,
-                due_amount: dueAmount,
-                is_gift: !!ventaIsGift,
-                gift_code: (ventaIsGift ? (ventaGiftCode || '') : ''),
-            };
-
-            if (ventaUseInstallments) {
-                const mode = getCuotasMode();
-                const intervalRaw = parseInt(cuotasInterval?.value || '', 10);
-                if (!isFinite(intervalRaw) || intervalRaw <= 0) {
-                    showAlertModal('Ingresá un intervalo (días) válido para las cuotas.', 'Atención', 'Validación requerida');
-                    return;
-                }
-                const interval = Math.max(1, Math.min(365, intervalRaw));
-                if (mode === 'indefinite') {
-                    payload.installments = {
-                        enabled: true,
-                        mode: 'indefinite',
-                        interval_days: interval,
-                    };
-                } else {
-                    const count = Math.max(1, Math.min(24, parseInt(cuotasCount?.value || 1, 10) || 1));
-                    payload.installments = {
-                        enabled: true,
-                        mode: 'fixed',
-                        installments_count: count,
-                        interval_days: interval,
-                    };
-                }
+            let payload = null;
+            try {
+                payload = buildCurrentSalePayload();
+            } catch (e) {
+                const msg = (e && e.message) ? e.message : 'No se pudo preparar la venta.';
+                showAlertModal(msg, 'Atención', 'Validación requerida');
+                return;
             }
+            const fecha = String(payload?.fecha || '').trim() || defaultFecha;
+            const pago = String(payload?.payment_method || '').trim() || getSelectedPaymentMethod();
 
             if (window.__salesSavingSale === true) return;
             window.__salesSavingSale = true;

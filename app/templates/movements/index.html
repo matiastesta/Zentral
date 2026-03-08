@@ -248,6 +248,7 @@
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Fecha</th>
+                            <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Turno</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Responsable</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Apertura</th>
                             <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Efectivo del día</th>
@@ -256,7 +257,7 @@
                         </tr>
                     </thead>
                     <tbody id="mov-arqueo-tbody" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
+                        <tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin datos.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1254,14 +1255,19 @@ document.addEventListener('DOMContentLoaded', function () {
         const fromIso = rango ? (rango.from.getFullYear() + '-' + String(rango.from.getMonth() + 1).padStart(2, '0') + '-' + String(rango.from.getDate()).padStart(2, '0')) : '';
         const toIso = rango ? (rango.to.getFullYear() + '-' + String(rango.to.getMonth() + 1).padStart(2, '0') + '-' + String(rango.to.getDate()).padStart(2, '0')) : '';
 
-        tbodyArqueo.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
+        tbodyArqueo.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando…</td></tr>';
         try {
             getArqueosFromApi(fromIso, toIso, function (items) {
             let historico = Array.isArray(items) ? items.slice() : [];
-            historico.sort((a, b) => String(b?.date || '').localeCompare(String(a?.date || '')));
+            historico.sort((a, b) => {
+                const dcmp = String(b?.date || '').localeCompare(String(a?.date || ''));
+                if (dcmp !== 0) return dcmp;
+                return String(a?.shift_code || 'turno_1').localeCompare(String(b?.shift_code || 'turno_1'));
+            });
 
             lastRendered = historico.map(r => ({
                 Fecha: fmtFecha(r?.date || ''),
+                Turno: String((r?.shift_label || 'Primer turno') + ' · ' + (r?.shift_display || '24 hs')),
                 Responsable: (r?.employee_name || ''),
                 Apertura: formatearMoneda(parseNumeroSeguro(r?.opening_amount)),
                 Efectivo_dia: formatearMoneda(parseNumeroSeguro(r?.cash_day_amount)),
@@ -1270,21 +1276,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
             tbodyArqueo.innerHTML = '';
             if (!historico.length) {
-                tbodyArqueo.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
+                tbodyArqueo.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Sin resultados.</td></tr>';
                 return;
             }
             historico.forEach(r => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-gray-50';
                 const dateIso = String(r?.date || '').trim();
+                const shiftCode = String(r?.shift_code || 'turno_unico').trim() || 'turno_unico';
+                const shiftLabel = String(r?.shift_label || (shiftCode === 'turno_2' ? 'Segundo turno' : (shiftCode === 'turno_unico' ? 'Turno único' : 'Primer turno')));
+                const shiftDisplay = String(r?.shift_display || '24 hs');
+                const shiftTone = (shiftCode === 'turno_unico')
+                    ? 'bg-slate-50 text-slate-700 border border-slate-200'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+                const shiftBadge = '<span class="inline-flex flex-col items-start px-2 py-1 rounded-xl text-[11px] font-medium ' + shiftTone + '"><span>' + escapeHtml(shiftLabel) + '</span><span class="text-[10px] opacity-80">' + escapeHtml(shiftDisplay) + '</span></span>';
+                try {
+                    const prevDate = String(historico[historico.indexOf(r) - 1]?.date || '').trim();
+                    if (prevDate && prevDate === dateIso) tr.className += ' border-t-0';
+                } catch (e) {}
                 tr.innerHTML = ''
                     + '<td class="px-4 py-3 text-sm text-gray-700">' + fmtFecha(r?.date || '-') + '</td>'
+                    + '<td class="px-4 py-3 text-sm text-gray-700">' + shiftBadge + '</td>'
                     + '<td class="px-4 py-3 text-sm text-gray-700">' + String(r?.employee_name || '-') + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.opening_amount)) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.cash_day_amount)) + '</td>'
                     + '<td class="px-4 py-3 text-sm text-right text-gray-700">' + formatearMoneda(parseNumeroSeguro(r?.closing_amount)) + '</td>'
                     + '<td class="px-4 py-3 text-right">'
-                    +   '<button type="button" class="btn-arqueo-detalle inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-md hover:bg-blue-100" data-date="' + escapeHtml(dateIso) + '">Ver detalle</button>'
+                    +   '<button type="button" class="btn-arqueo-detalle inline-flex items-center px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-md hover:bg-blue-100" data-date="' + escapeHtml(dateIso) + '" data-shift="' + escapeHtml(shiftCode) + '" data-shift-display="' + escapeHtml(shiftDisplay) + '">Ver detalle</button>'
                     + '</td>';
                 tbodyArqueo.appendChild(tr);
             });
@@ -1293,15 +1311,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 tbodyArqueo.querySelectorAll('.btn-arqueo-detalle').forEach(function (btn) {
                     btn.addEventListener('click', function () {
                         const d = String(btn.getAttribute('data-date') || '').trim();
+                        const s = String(btn.getAttribute('data-shift') || 'turno_1').trim() || 'turno_1';
+                        const sd = String(btn.getAttribute('data-shift-display') || '24 hs').trim() || '24 hs';
                         if (!d) return;
-                        openArqueoDetalle(d);
+                        openArqueoDetalle(d + '|' + s + '|' + encodeURIComponent(sd));
                     });
                 });
             } catch (e) {}
             });
         } catch (e) {
             try { console.error('renderArqueo failed', e); } catch (err) {}
-            tbodyArqueo.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">No se pudo cargar.</td></tr>';
+            tbodyArqueo.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">No se pudo cargar.</td></tr>';
         }
     }
 
@@ -1443,8 +1463,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function openArqueoDetalle(dateIso) {
-        activeDetalleDate = String(dateIso || '').trim();
-        if (detalleSubtitle) detalleSubtitle.textContent = activeDetalleDate ? ('Fecha: ' + activeDetalleDate) : '—';
+        const raw = String(dateIso || '').trim();
+        const parts = raw.split('|');
+        activeDetalleDate = String(parts[0] || '').trim();
+        const rawShift = String(parts[1] || 'turno_unico').trim();
+        const shiftLabel = rawShift === 'turno_2' ? 'Segundo turno' : (rawShift === 'turno_unico' ? 'Turno único' : 'Primer turno');
+        const shiftDisplay = decodeURIComponent(String(parts[2] || '24 hs'));
+        if (detalleSubtitle) detalleSubtitle.textContent = activeDetalleDate ? ('Fecha: ' + activeDetalleDate + ' · ' + shiftLabel + ' · ' + shiftDisplay) : '—';
         if (btnOpenNewWithdrawal) btnOpenNewWithdrawal.classList.toggle('hidden', !(CAN_WITHDRAW));
         openModal(modalDetalle);
         await refreshDetalle();

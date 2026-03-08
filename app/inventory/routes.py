@@ -38,9 +38,9 @@ from app.inventory import bp
 
 
 _CODIGO_INTERNO_MIN_LEN = 4
-_CODIGO_INTERNO_MAX_LEN = 12
+_CODIGO_INTERNO_MAX_LEN = 50
 _CODIGO_INTERNO_AUTO_LEN = 8
-_CODIGO_INTERNO_PATTERN = re.compile(r'^\S{4,12}$')
+_CODIGO_INTERNO_PATTERN = re.compile(r'^[A-Z0-9\-\_\#\.]{4,50}$')
 
 
 def _company_id() -> str:
@@ -1975,6 +1975,164 @@ def list_products():
     return jsonify({'ok': True, 'items': [_serialize_product(r) for r in rows]})
 
 
+@bp.get('/api/inventory/current')
+@login_required
+@module_required('inventory')
+def list_inventory_current_paged():
+    _ensure_product_stock_ilimitado_column()
+    _ensure_product_ref_cost_column()
+    _ensure_product_deleted_at_column()
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': [], 'page': 1, 'per_page': 50, 'total_items': 0, 'total_pages': 1})
+
+    raw_q = str(request.args.get('search') or request.args.get('q') or '').strip()
+    raw_cat = str(request.args.get('category_id') or '').strip()
+    raw_status = str(request.args.get('status') or '').strip()
+    raw_page = str(request.args.get('page') or '1').strip()
+    raw_per_page = str(request.args.get('per_page') or '50').strip().lower()
+
+    try:
+        page = int(raw_page or '1')
+    except Exception:
+        page = 1
+    if page < 1:
+        page = 1
+
+    fetch_all = raw_per_page in ('all', 'todos', '0', '-1')
+    try:
+        per_page = 50000 if fetch_all else int(raw_per_page or '50')
+    except Exception:
+        per_page = 50
+    if per_page <= 0:
+        per_page = 50
+    if per_page > 50000:
+        per_page = 50000
+
+    stock_sq = (
+        db.session.query(
+            InventoryLot.product_id.label('product_id'),
+            func.coalesce(func.sum(InventoryLot.qty_available), 0.0).label('stock'),
+            func.coalesce(func.sum(InventoryLot.qty_available * InventoryLot.unit_cost), 0.0).label('total_value'),
+        )
+        .filter(InventoryLot.company_id == cid)
+        .group_by(InventoryLot.product_id)
+        .subquery()
+    )
+
+    q = (
+        db.session.query(Product, stock_sq.c.stock, stock_sq.c.total_value)
+        .outerjoin(stock_sq, stock_sq.c.product_id == Product.id)
+        .filter(Product.company_id == cid)
+        .filter(Product.deleted_at.is_(None))
+    )
+
+    if raw_q:
+        term = f"%{raw_q}%"
+        q = q.filter(
+            or_(
+                Product.name.ilike(term),
+                Product.internal_code.ilike(term),
+                Product.barcode.ilike(term),
+                Product.description.ilike(term),
+            )
+        )
+
+    if raw_cat:
+        try:
+            cat_id = int(raw_cat)
+        except Exception:
+            cat_id = None
+        if cat_id is not None:
+            q = q.filter(Product.category_id == cat_id)
+        else:
+            q = q.outerjoin(Category, Category.id == Product.category_id).filter(func.lower(func.trim(func.coalesce(Category.name, ''))) == raw_cat.strip().lower())
+
+    status_filters = [s.strip() for s in raw_status.split(',') if s.strip()]
+    stock_value = func.coalesce(stock_sq.c.stock, 0.0)
+    status_expr = case(
+        (Product.active == False, 'Inactivo'),  # noqa: E712
+        (Product.stock_ilimitado == True, 'OK'),  # noqa: E712
+        (and_(func.coalesce(Product.min_stock, 0.0) > 0, stock_value <= func.coalesce(Product.min_stock, 0.0)), 'Crítico'),
+        (and_(func.coalesce(Product.reorder_point, 0.0) > 0, stock_value <= func.coalesce(Product.reorder_point, 0.0)), 'Reponer'),
+        else_='OK',
+    )
+    if status_filters:
+        q = q.filter(status_expr.in_(status_filters))
+
+    total_items = int(q.count() or 0)
+
+    rows = (
+        q.order_by(Product.name.asc(), Product.id.asc())
+        .offset(0 if fetch_all else ((page - 1) * per_page))
+        .limit(per_page)
+        .all()
+    )
+
+    try:
+        changed = _ensure_codigo_interno_on_products([r[0] for r in (rows or []) if r and r[0]])
+        if changed:
+            db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+    items = []
+    for row in (rows or []):
+        try:
+            prod = row[0]
+            stock = float(row[1] or 0.0)
+            total_value = float(row[2] or 0.0)
+        except Exception:
+            continue
+        is_unlimited = bool(getattr(prod, 'stock_ilimitado', False))
+        if is_unlimited:
+            avg = None
+            total = None
+            status = 'OK' if bool(getattr(prod, 'active', True)) else 'Inactivo'
+        else:
+            avg = (total_value / stock) if stock > 0 else float(getattr(prod, 'costo_unitario_referencia', 0.0) or 0.0)
+            if bool(getattr(prod, 'active', True)) is False:
+                status = 'Inactivo'
+            elif float(getattr(prod, 'min_stock', 0.0) or 0.0) > 0 and stock <= float(getattr(prod, 'min_stock', 0.0) or 0.0):
+                status = 'Crítico'
+            elif float(getattr(prod, 'reorder_point', 0.0) or 0.0) > 0 and stock <= float(getattr(prod, 'reorder_point', 0.0) or 0.0):
+                status = 'Reponer'
+            else:
+                status = 'OK'
+            total = stock * avg
+        items.append({
+            'product': _serialize_product(prod),
+            'metrics': {
+                'stock': None if is_unlimited else stock,
+                'avg': avg,
+                'total': total,
+                'status': status,
+                'unlimited': is_unlimited,
+            },
+        })
+
+    total_pages = 1 if fetch_all else max(1, (total_items + per_page - 1) // per_page)
+    if page > total_pages:
+        page = total_pages
+
+    return jsonify({
+        'ok': True,
+        'items': items,
+        'page': page,
+        'per_page': ('all' if fetch_all else per_page),
+        'total_items': total_items,
+        'total_pages': total_pages,
+    })
+
+
 @bp.get('/api/products/prices_list')
 @login_required
 @module_required('inventory')
@@ -2198,7 +2356,17 @@ def create_product():
         codigo_interno_raw = str(payload.get('internal_code') or '')
     internal_code = None
     if codigo_interno_raw:
-        internal_code = _validate_codigo_interno_or_raise(_normalize_codigo_interno(codigo_interno_raw))
+        try:
+            internal_code = _validate_codigo_interno_or_raise(_normalize_codigo_interno(codigo_interno_raw))
+        except ValueError as ve:
+            err_key = str(getattr(ve, 'args', ['codigo_interno_invalid'])[0] or 'codigo_interno_invalid')
+            return jsonify({'ok': False, 'error': err_key}), 400
+        except Exception:
+            try:
+                current_app.logger.exception('create_product: failed to validate codigo_interno')
+            except Exception:
+                pass
+            return jsonify({'ok': False, 'error': 'codigo_interno_invalid'}), 400
 
     barcode_raw = str(payload.get('barcode') or '').strip() or None
 
@@ -2339,6 +2507,10 @@ def create_product():
         return jsonify({'ok': False, 'error': 'unique_violation'}), 400
     except Exception:
         db.session.rollback()
+        try:
+            current_app.logger.exception('create_product: db_error')
+        except Exception:
+            pass
         return jsonify({'ok': False, 'error': 'db_error'}), 400
     return jsonify({'ok': True, 'item': _serialize_product(row)})
 

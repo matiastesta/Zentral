@@ -551,9 +551,36 @@ def create_app(config_class=Config):
             try:
                 from flask_login import current_user
 
+                def _norm_role(raw: str) -> str:
+                    s = str(raw or '').strip().lower()
+                    s = '_'.join([p for p in s.split() if p])
+                    cleaned = []
+                    for ch in s:
+                        if (ch.isalnum()) or ch in {'_', '-'}:
+                            cleaned.append(ch)
+                    out = ''.join(cleaned)
+                    while '__' in out:
+                        out = out.replace('__', '_')
+                    while '--' in out:
+                        out = out.replace('--', '-')
+                    return out.strip('_-')
+
+                role_norm = _norm_role(str(getattr(current_user, 'role', '') or ''))
+                global_roles = {
+                    'zentral_admin',
+                    'central_admin',
+                    'superadmin',
+                    'super_admin',
+                    'super-admin',
+                    'owner_global',
+                    'usuario_madre',
+                    'madre',
+                    'global_admin',
+                }
+
                 if getattr(current_user, 'is_authenticated', False) and (
                     getattr(current_user, 'is_master', False)
-                    or str(getattr(current_user, 'role', '') or '') == 'zentral_admin'
+                    or (role_norm in global_roles)
                 ):
                     return None
             except Exception:
@@ -692,6 +719,33 @@ def create_app(config_class=Config):
             from flask_login import current_user
             from app.models import Company
 
+            def _norm_role(raw: str) -> str:
+                s = str(raw or '').strip().lower()
+                s = '_'.join([p for p in s.split() if p])
+                cleaned = []
+                for ch in s:
+                    if (ch.isalnum()) or ch in {'_', '-'}:
+                        cleaned.append(ch)
+                out = ''.join(cleaned)
+                while '__' in out:
+                    out = out.replace('__', '_')
+                while '--' in out:
+                    out = out.replace('--', '-')
+                return out.strip('_-')
+
+            role_norm = _norm_role(str(getattr(current_user, 'role', '') or ''))
+            global_roles = {
+                'zentral_admin',
+                'central_admin',
+                'superadmin',
+                'super_admin',
+                'super-admin',
+                'owner_global',
+                'usuario_madre',
+                'madre',
+                'global_admin',
+            }
+
             if not getattr(current_user, 'is_authenticated', False):
                 return {"subscription_days_left": None, "subscription_badge": None, "subscription_locked": False}
 
@@ -700,6 +754,15 @@ def create_app(config_class=Config):
                 support_mode = bool(is_impersonating())
             except Exception:
                 support_mode = False
+
+            if (role_norm in global_roles):
+                return {"subscription_days_left": None, "subscription_badge": None, "subscription_locked": False}
+
+            try:
+                if bool(getattr(current_user, 'is_master', False)):
+                    return {"subscription_days_left": None, "subscription_badge": None, "subscription_locked": False}
+            except Exception:
+                pass
 
             if str(getattr(current_user, 'role', '') or '') == 'zentral_admin' and not support_mode:
                 return {"subscription_days_left": None, "subscription_badge": None, "subscription_locked": False}

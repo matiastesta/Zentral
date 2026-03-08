@@ -5,7 +5,7 @@ from flask_login import login_required
 from flask_login import current_user
 
 from app import db
-from app.models import CalendarEvent, CashCount, CashWithdrawal, User
+from app.models import BusinessSettings, CalendarEvent, CashCount, CashWithdrawal, User
 from app.permissions import module_required, module_required_any
 from app.movements import bp
 
@@ -55,11 +55,21 @@ def list_cash_counts():
     q = q.order_by(CashCount.count_date.desc())
 
     rows = q.all()
+    bs = BusinessSettings.get_for_company(cid)
+    turno_1_display = str(getattr(bs, 'arqueo_turno_1_desde', '08:00') or '08:00').strip() + '–' + str(getattr(bs, 'arqueo_turno_1_hasta', '16:00') or '16:00').strip()
+    turno_2_display = str(getattr(bs, 'arqueo_turno_2_desde', '16:00') or '16:00').strip() + '–' + str(getattr(bs, 'arqueo_turno_2_hasta', '08:00') or '08:00').strip()
     items = []
     for r in rows:
+        raw_shift_code = getattr(r, 'shift_code', None)
+        shift_code = str(raw_shift_code or '').strip()
+        is_legacy_single = not bool(shift_code)
+        normalized_shift_code = shift_code or 'turno_unico'
         items.append({
             'date': r.count_date.isoformat(),
             'employee_name': r.employee_name,
+            'shift_code': normalized_shift_code,
+            'shift_label': ('Turno único' if is_legacy_single else ('Segundo turno' if shift_code == 'turno_2' else 'Primer turno')),
+            'shift_display': ('24 hs' if is_legacy_single else (turno_2_display if shift_code == 'turno_2' else turno_1_display)),
             'opening_amount': r.opening_amount,
             'cash_day_amount': r.cash_day_amount,
             'closing_amount': r.closing_amount,

@@ -1,4 +1,5 @@
 from datetime import date as dt_date, datetime, timedelta
+from io import BytesIO
 from typing import Any, Dict, List, Optional
 import re
 import uuid
@@ -7,7 +8,7 @@ import math
 import os
 import unicodedata
 
-from flask import abort, current_app, g, jsonify, render_template, request, url_for
+from flask import abort, current_app, g, jsonify, render_template, request, send_file, url_for
 from flask_login import login_required, current_user
 
 from sqlalchemy import func, inspect, text, and_, or_, false
@@ -16,7 +17,7 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import selectinload, joinedload
 
 from app import db
-from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Expense, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem, SalePayment, SalesHistoryUserConfig, User, UserTableColumnPrefs
+from app.models import BusinessSettings, CashCount, Category, Customer, Employee, Expense, FileAsset, Installment, InstallmentPlan, InventoryLot, InventoryMovement, Product, Sale, SaleItem, SalePayment, SalesHistoryUserConfig, User, UserTableColumnPrefs
 from app.permissions import module_required, module_required_any
 from app.sales import bp
 
@@ -526,37 +527,67 @@ def _ensure_cash_count_snapshot_column() -> None:
         if 'cash_count' not in set(insp.get_table_names() or []):
             return
         cols = {str(c.get('name') or '') for c in (insp.get_columns('cash_count') or [])}
+        driver = str(engine.url.drivername)
         stmts = []
         if 'efectivo_calculado_snapshot' not in cols:
-            if str(engine.url.drivername).startswith('sqlite'):
+            if driver.startswith('sqlite'):
                 stmts.append('ALTER TABLE cash_count ADD COLUMN efectivo_calculado_snapshot FLOAT')
             else:
                 stmts.append('ALTER TABLE cash_count ADD COLUMN IF NOT EXISTS efectivo_calculado_snapshot DOUBLE PRECISION')
         if 'cash_expected_at_save' not in cols:
-            if str(engine.url.drivername).startswith('sqlite'):
+            if driver.startswith('sqlite'):
                 stmts.append('ALTER TABLE cash_count ADD COLUMN cash_expected_at_save FLOAT')
             else:
                 stmts.append('ALTER TABLE cash_count ADD COLUMN IF NOT EXISTS cash_expected_at_save DOUBLE PRECISION')
         if 'last_cash_event_at_save' not in cols:
-            if str(engine.url.drivername).startswith('sqlite'):
+            if driver.startswith('sqlite'):
                 stmts.append('ALTER TABLE cash_count ADD COLUMN last_cash_event_at_save DATETIME')
             else:
                 stmts.append('ALTER TABLE cash_count ADD COLUMN IF NOT EXISTS last_cash_event_at_save TIMESTAMP')
         if 'status' not in cols:
-            if str(engine.url.drivername).startswith('sqlite'):
+            if driver.startswith('sqlite'):
                 stmts.append("ALTER TABLE cash_count ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'draft'")
             else:
                 stmts.append("ALTER TABLE cash_count ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'draft'")
         if 'done_at' not in cols:
-            if str(engine.url.drivername).startswith('sqlite'):
+            if driver.startswith('sqlite'):
                 stmts.append('ALTER TABLE cash_count ADD COLUMN done_at DATETIME')
             else:
                 stmts.append('ALTER TABLE cash_count ADD COLUMN IF NOT EXISTS done_at TIMESTAMP')
-        if not stmts:
-            return
+        if 'shift_code' not in cols:
+            if driver.startswith('sqlite'):
+                stmts.append('ALTER TABLE cash_count ADD COLUMN shift_code VARCHAR(16)')
+            else:
+                stmts.append('ALTER TABLE cash_count ADD COLUMN IF NOT EXISTS shift_code VARCHAR(16)')
         with engine.begin() as conn:
             for sql in stmts:
                 conn.execute(text(sql))
+            try:
+                unique_names = {str((c or {}).get('name') or '') for c in (insp.get_unique_constraints('cash_count') or [])}
+            except Exception:
+                unique_names = set()
+            try:
+                index_rows = insp.get_indexes('cash_count') or []
+                index_names = {str((c or {}).get('name') or '') for c in index_rows}
+            except Exception:
+                index_names = set()
+
+            if driver.startswith('sqlite'):
+                try:
+                    if 'uq_cash_count_company_date_shift' not in index_names:
+                        conn.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS uq_cash_count_company_date_shift ON cash_count (company_id, count_date, shift_code)'))
+                except Exception:
+                    pass
+            else:
+                if 'uq_cash_count_company_date' in unique_names:
+                    try:
+                        conn.execute(text('ALTER TABLE cash_count DROP CONSTRAINT IF EXISTS uq_cash_count_company_date'))
+                    except Exception:
+                        pass
+                try:
+                    conn.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS uq_cash_count_company_date_shift ON cash_count (company_id, count_date, shift_code)'))
+                except Exception:
+                    pass
     except Exception:
         try:
             current_app.logger.exception('Failed to ensure cash_count snapshot column')
@@ -1437,7 +1468,107 @@ def index():
         today_dmy = today.strftime('%d/%m/%Y')
     except Exception:
         today_dmy = ''
-    return render_template('sales/list.html', title='Ventas', today_dmy=today_dmy)
+    business = BusinessSettings.get_for_company(_company_id())
+    return render_template('sales/list.html', title='Ventas', today_dmy=today_dmy, business=business)
+
+
+def _cash_count_shift_enabled(cid: str) -> bool:
+    try:
+        bs = BusinessSettings.get_for_company(cid)
+        return bool(getattr(bs, 'habilitar_doble_turno_arqueo', False))
+    except Exception:
+        return False
+
+
+def _normalize_cash_shift(raw_shift, enabled: bool) -> str:
+    raw = str(raw_shift or '').strip().lower()
+    if enabled:
+        if raw in {'turno_2', 'segundo_turno', 'segundo', '2'}:
+            return 'turno_2'
+        return 'turno_1'
+    return 'turno_1'
+
+
+def _parse_shift_minutes(raw_value: str, default_minutes: int) -> int:
+    s = str(raw_value or '').strip()
+    try:
+        if len(s) == 5 and s[2] == ':':
+            hh = int(s[:2])
+            mm = int(s[3:5])
+            if 0 <= hh <= 23 and 0 <= mm <= 59:
+                return (hh * 60) + mm
+    except Exception:
+        pass
+    return int(default_minutes)
+
+
+def _format_shift_hhmm(minutes: int) -> str:
+    m = int(minutes or 0) % 1440
+    hh = m // 60
+    mm = m % 60
+    return f'{hh:02d}:{mm:02d}'
+
+
+def _get_shift_schedule_for_company(cid: str, shift_code: str) -> dict:
+    enabled = _cash_count_shift_enabled(cid)
+    if not enabled:
+        return {
+            'enabled': False,
+            'shift_code': 'turno_unico',
+            'label': 'Turno único',
+            'desde': '00:00',
+            'hasta': '00:00',
+            'display': '24 hs',
+            'start_minutes': 0,
+            'end_minutes': 0,
+        }
+
+    bs = BusinessSettings.get_for_company(cid)
+    t1_from = _parse_shift_minutes(getattr(bs, 'arqueo_turno_1_desde', '08:00'), 8 * 60)
+    t1_to = _parse_shift_minutes(getattr(bs, 'arqueo_turno_1_hasta', '16:00'), 16 * 60)
+    t2_from = _parse_shift_minutes(getattr(bs, 'arqueo_turno_2_desde', '16:00'), 16 * 60)
+    t2_to = _parse_shift_minutes(getattr(bs, 'arqueo_turno_2_hasta', '08:00'), 8 * 60)
+
+    normalized = _normalize_cash_shift(shift_code, True)
+    if normalized == 'turno_2':
+        start_minutes = t2_from
+        end_minutes = t2_to
+        label = 'Segundo turno'
+    else:
+        start_minutes = t1_from
+        end_minutes = t1_to
+        label = 'Primer turno'
+
+    return {
+        'enabled': True,
+        'shift_code': normalized,
+        'label': label,
+        'desde': _format_shift_hhmm(start_minutes),
+        'hasta': _format_shift_hhmm(end_minutes),
+        'display': _format_shift_hhmm(start_minutes) + '–' + _format_shift_hhmm(end_minutes),
+        'start_minutes': start_minutes,
+        'end_minutes': end_minutes,
+    }
+
+
+def _get_shift_window(cid: str, d: dt_date, shift_code: str) -> tuple[datetime, datetime, dict]:
+    info = _get_shift_schedule_for_company(cid, shift_code)
+    if not info.get('enabled'):
+        start_dt = datetime.combine(d, datetime.min.time())
+        end_dt = start_dt + timedelta(days=1)
+        return start_dt, end_dt, info
+
+    start_minutes = int(info.get('start_minutes') or 0)
+    end_minutes = int(info.get('end_minutes') or 0)
+    start_dt = datetime.combine(d, datetime.min.time()) + timedelta(minutes=start_minutes)
+    end_dt = datetime.combine(d, datetime.min.time()) + timedelta(minutes=end_minutes)
+    if end_minutes <= start_minutes:
+        end_dt = end_dt + timedelta(days=1)
+    return start_dt, end_dt, info
+
+
+def _apply_dt_window(q, model_col, start_dt: datetime, end_dt: datetime):
+    return q.filter(model_col >= start_dt, model_col < end_dt)
 
 
 def _compute_related_for_row(row: Sale, cid: str) -> dict:
@@ -2147,17 +2278,675 @@ def _serialize_sale(row: Sale, related: dict | None = None, users_map: dict | No
         'venta_libre_count': int(venta_libre_count),
         'items': [
             {
-                'product_id': it.product_id or '',
-                'nombre': it.product_name or 'Producto',
-                'precio': it.unit_price,
+                'id': it.id,
+                'product_id': it.product_id,
+                'nombre': it.product_name,
                 'cantidad': it.qty,
+                'precio': it.unit_price,
                 'descuento': it.discount_pct,
                 'subtotal': it.subtotal,
-                'direction': it.direction,
+                'direction': getattr(it, 'direction', 'out') or 'out',
             }
             for it in (row.items or [])
         ],
     }
+
+
+def _format_currency_ars(v) -> str:
+    n = _num(v)
+    sign = '-' if n < 0 else ''
+    n = abs(n)
+    s = f"{n:,.2f}"
+    s = s.replace(',', 'X').replace('.', ',').replace('X', '.')
+    return f"{sign}$ {s}"
+
+
+def _get_receipt_business_info(cid: str) -> tuple[BusinessSettings | None, str, object | None]:
+    bs = None
+    try:
+        bs = BusinessSettings.get_for_company(cid)
+    except Exception:
+        bs = None
+
+    business_name = str(getattr(bs, 'name', '') or '').strip() or 'Zentral'
+    logo_source = None
+    try:
+        logo_file_id = str(getattr(bs, 'logo_file_id', '') or '').strip() if bs else ''
+        if logo_file_id:
+            asset = db.session.query(FileAsset).filter(FileAsset.company_id == cid, FileAsset.id == logo_file_id).first()
+            if asset and (str(getattr(asset, 'status', 'active') or 'active') == 'active'):
+                endpoint = str(current_app.config.get('R2_ENDPOINT_URL') or '').strip()
+                access_key = str(current_app.config.get('R2_ACCESS_KEY_ID') or '').strip()
+                secret_key = str(current_app.config.get('R2_SECRET_ACCESS_KEY') or '').strip()
+                region = str(current_app.config.get('R2_REGION') or 'auto').strip() or 'auto'
+                bucket = str(getattr(asset, 'bucket', '') or '').strip()
+                object_key = str(getattr(asset, 'object_key', '') or '').strip()
+                if endpoint and access_key and secret_key and bucket and object_key:
+                    import boto3
+                    from botocore.config import Config as BotoConfig
+
+                    client = boto3.client(
+                        's3',
+                        endpoint_url=endpoint,
+                        aws_access_key_id=access_key,
+                        aws_secret_access_key=secret_key,
+                        region_name=region,
+                        config=BotoConfig(signature_version='s3v4', s3={'addressing_style': 'path'}),
+                    )
+                    body = client.get_object(Bucket=bucket, Key=object_key)['Body'].read()
+                    if body:
+                        logo_source = BytesIO(body)
+    except Exception:
+        logo_source = None
+
+    try:
+        if not logo_source and bs and getattr(bs, 'logo_filename', None):
+            p = os.path.join(current_app.static_folder, 'uploads', str(bs.logo_filename))
+            if os.path.exists(p):
+                logo_source = p
+    except Exception:
+        logo_source = None
+
+    if not logo_source:
+        try:
+            fallback = os.path.join(current_app.static_folder, 'uploads', 'business_logo.png')
+            if os.path.exists(fallback):
+                logo_source = fallback
+        except Exception:
+            logo_source = None
+
+    return bs, business_name, logo_source
+
+
+def _draw_receipt_logo(c, logo_source, x: float, y: float, size: float, brand_color: str):
+    if not logo_source:
+        return
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.utils import ImageReader
+
+        image = ImageReader(logo_source)
+        p = c.beginPath()
+        p.circle(x + (size / 2), y + (size / 2), size / 2)
+        c.saveState()
+        c.clipPath(p, stroke=0, fill=0)
+        c.drawImage(image, x, y, width=size, height=size, preserveAspectRatio=True, mask='auto')
+        c.restoreState()
+        c.setStrokeColor(colors.HexColor(brand_color))
+        c.circle(x + (size / 2), y + (size / 2), size / 2, stroke=1, fill=0)
+    except Exception:
+        return
+
+
+def _clean_ticket_for_filename(ticket: str) -> str:
+    raw = str(ticket or '').strip()
+    if raw.startswith('#'):
+        raw = raw[1:]
+    return raw or 'venta'
+
+
+def _payment_method_label_es(value: str) -> str:
+    raw = str(value or '').strip()
+    key = raw.lower()
+    mapping = {
+        'cash': 'Efectivo',
+        'efectivo': 'Efectivo',
+        'transfer': 'Transferencia',
+        'transferencia': 'Transferencia',
+        'debit': 'Débito',
+        'debito': 'Débito',
+        'débito': 'Débito',
+        'card_debit': 'Débito',
+        'credit': 'Crédito',
+        'credito': 'Crédito',
+        'crédito': 'Crédito',
+        'card_credit': 'Crédito',
+        'cc': 'Cuenta corriente',
+        'cuenta corriente': 'Cuenta corriente',
+        'current_account': 'Cuenta corriente',
+        'installments': 'Sistema de cuotas',
+        'cuotas': 'Sistema de cuotas',
+        'sistema de cuotas': 'Sistema de cuotas',
+    }
+    return mapping.get(key, raw or '—')
+
+
+def _payment_methods_label_es(values: list[str]) -> str:
+    labels = []
+    seen = set()
+    for value in (values or []):
+        label = _payment_method_label_es(value)
+        if not label or label in seen:
+            continue
+        seen.add(label)
+        labels.append(label)
+    return ' + '.join(labels) if labels else '—'
+
+
+def _receipt_brand_color(bs: BusinessSettings | None) -> str:
+    color = str(getattr(bs, 'primary_color', '') or '').strip()
+    if re.match(r'^#(?:[0-9a-fA-F]{3}){1,2}$', color):
+        return color
+    return '#0d1067'
+
+
+def _payment_breakdown_rows(raw_rows: list[dict]) -> list[dict]:
+    grouped: dict[str, float] = {}
+    order: list[str] = []
+    for raw in (raw_rows or []):
+        d = raw if isinstance(raw, dict) else {}
+        method = str(d.get('method') or '').strip()
+        if not method:
+            continue
+        amount = _num(d.get('amount'))
+        key = _canonical_payment_method_key(method) or method.lower()
+        if key not in grouped:
+            grouped[key] = 0.0
+            order.append(key)
+        grouped[key] += float(amount or 0.0)
+    out = []
+    for key in order:
+        out.append({
+            'method': key,
+            'label': _payment_method_label_es(key),
+            'amount': float(grouped.get(key, 0.0) or 0.0),
+        })
+    return out
+
+
+def _receipt_adjustment_label(base: str, pct: float, amount: float, *, negative: bool = False) -> str:
+    label = str(base or '').strip() or 'Ajuste'
+    try:
+        pct_value = float(pct or 0.0)
+    except Exception:
+        pct_value = 0.0
+    try:
+        amount_value = abs(float(amount or 0.0))
+    except Exception:
+        amount_value = 0.0
+    if pct_value > 0.0001:
+        pct_txt = f"{pct_value:.2f}".rstrip('0').rstrip('.').replace('.', ',')
+        return f"{label} ({pct_txt}%)"
+    if amount_value > 0.0001 and negative:
+        return f"{label}"
+    return label
+
+
+def _format_currency_signed(value: float, *, positive_sign: str = '', negative_sign: str = '-') -> str:
+    n = _num(value)
+    if n < 0:
+        return f"{negative_sign}{_format_currency_ars(abs(n))}"
+    if n > 0 and positive_sign:
+        return f"{positive_sign}{_format_currency_ars(n)}"
+    return _format_currency_ars(n)
+
+
+def _resolve_receipt_adjustment_amount(base_amount: float, pct: float, subtotal: float) -> float:
+    amount = abs(_num(base_amount))
+    pct_value = abs(_num(pct))
+    subtotal_value = abs(_num(subtotal))
+    if amount > 0.0001:
+        return amount
+    if pct_value > 0.0001 and subtotal_value > 0.0001:
+        return subtotal_value * (pct_value / 100.0)
+    return 0.0
+
+
+def _build_receipt_context_from_sale(row: Sale, bs: BusinessSettings | None) -> dict:
+    created_dt = getattr(row, 'created_at', None)
+    sale_date = getattr(row, 'sale_date', None)
+    date_label = ''
+    hour_label = ''
+    try:
+        if created_dt:
+            date_label = created_dt.strftime('%d/%m/%Y')
+            hour_label = created_dt.strftime('%H:%M')
+        elif sale_date:
+            date_label = sale_date.strftime('%d/%m/%Y')
+    except Exception:
+        date_label = ''
+        hour_label = ''
+
+    items = []
+    subtotal_before_general = 0.0
+    try:
+        for it in (getattr(row, 'items', None) or []):
+            qty = float(getattr(it, 'qty', 0.0) or 0.0)
+            unit_price = float(getattr(it, 'unit_price', 0.0) or 0.0)
+            line_base = qty * unit_price
+            line_subtotal = float(getattr(it, 'subtotal', 0.0) or 0.0)
+            if abs(line_subtotal) < 0.0001 and abs(line_base) > 0.0001:
+                line_subtotal = line_base
+            subtotal_before_general += max(0.0, line_base)
+            items.append({
+                'product': str(getattr(it, 'product_name', '') or 'Producto').strip() or 'Producto',
+                'qty': qty,
+                'unit_price': unit_price,
+                'subtotal': line_subtotal,
+            })
+    except Exception:
+        items = []
+
+    payment_values = []
+    payment_rows = []
+    try:
+        for p in (getattr(row, 'payments', None) or []):
+            value = str(getattr(p, 'method', '') or '').strip()
+            if value:
+                payment_values.append(value)
+                payment_rows.append({
+                    'method': value,
+                    'amount': float(getattr(p, 'amount', 0.0) or 0.0),
+                })
+    except Exception:
+        payment_values = []
+        payment_rows = []
+    if not payment_values:
+        payment_values = [str(getattr(row, 'payment_method', '') or '').strip()]
+    if not payment_rows and payment_values:
+        fallback_amount = float(getattr(row, 'paid_amount', 0.0) or 0.0)
+        if fallback_amount <= 0.0001:
+            fallback_amount = float(getattr(row, 'total', 0.0) or 0.0)
+        payment_rows = [{'method': payment_values[0], 'amount': fallback_amount}]
+
+    discount_pct = float(getattr(row, 'discount_general_pct', 0.0) or 0.0)
+    surcharge_pct = float(getattr(row, 'general_surcharge_pct', 0.0) or 0.0)
+    discount_amount = _resolve_receipt_adjustment_amount(getattr(row, 'discount_general_amount', 0.0), discount_pct, subtotal_before_general)
+    surcharge_amount = _resolve_receipt_adjustment_amount(getattr(row, 'surcharge_general_amount', 0.0), surcharge_pct, max(0.0, subtotal_before_general - discount_amount))
+
+    return {
+        'ticket': str(getattr(row, 'ticket', '') or '').strip(),
+        'business_name': str(getattr(bs, 'name', '') or '').strip() or 'Zentral',
+        'business_address': str(getattr(bs, 'address', '') or '').strip(),
+        'business_phone': str(getattr(bs, 'phone', '') or '').strip(),
+        'business_email': str(getattr(bs, 'email', '') or '').strip(),
+        'customer_name': str(getattr(row, 'customer_name', '') or '').strip() or 'Consumidor final',
+        'date_label': date_label,
+        'hour_label': hour_label,
+        'items': items,
+        'subtotal_amount': subtotal_before_general,
+        'discount_amount': discount_amount,
+        'discount_pct': discount_pct,
+        'surcharge_amount': surcharge_amount,
+        'surcharge_pct': surcharge_pct,
+        'total_amount': float(getattr(row, 'total', 0.0) or 0.0),
+        'payment_method_label': _payment_methods_label_es(payment_values),
+        'payment_rows': _payment_breakdown_rows(payment_rows),
+        'notes': str(getattr(row, 'notes', '') or '').strip(),
+    }
+
+
+def _build_receipt_context_from_payload(payload: dict, bs: BusinessSettings | None) -> dict:
+    sale_date = _parse_date_iso(payload.get('fecha') or payload.get('date'), dt_date.today())
+    items = []
+    subtotal_before_general = 0.0
+    for raw in (payload.get('items') if isinstance(payload.get('items'), list) else []):
+        d = raw if isinstance(raw, dict) else {}
+        qty = _num(d.get('cantidad') if d.get('cantidad') is not None else d.get('qty'))
+        unit_price = _num(d.get('precio') if d.get('precio') is not None else d.get('unit_price'))
+        line_base = qty * unit_price
+        line_subtotal = _num(d.get('subtotal'))
+        if abs(line_subtotal) < 0.0001 and abs(line_base) > 0.0001:
+            discount_pct = _num(d.get('descuento') if d.get('descuento') is not None else d.get('discount_pct'))
+            line_subtotal = line_base * (1 - (max(0.0, min(100.0, discount_pct)) / 100.0))
+        subtotal_before_general += max(0.0, line_base)
+        items.append({
+            'product': str(d.get('nombre') or d.get('product_name') or 'Producto').strip() or 'Producto',
+            'qty': qty,
+            'unit_price': unit_price,
+            'subtotal': line_subtotal,
+        })
+
+    payment_values = []
+    payment_rows = []
+    for p in (payload.get('payments') if isinstance(payload.get('payments'), list) else []):
+        if not isinstance(p, dict):
+            continue
+        value = str(p.get('method') or '').strip()
+        if value:
+            payment_values.append(value)
+            payment_rows.append({'method': value, 'amount': _num(p.get('amount'))})
+    if not payment_values:
+        payment_values = [str(payload.get('payment_method') or '').strip()]
+    if not payment_rows and payment_values:
+        fallback_amount = _num(payload.get('paid_amount'))
+        if fallback_amount <= 0.0001:
+            fallback_amount = _num(payload.get('total'))
+        payment_rows = [{'method': payment_values[0], 'amount': fallback_amount}]
+
+    discount_pct = _num(payload.get('discount_general_pct'))
+    surcharge_pct = _num(payload.get('surcharge_general_pct') if payload.get('surcharge_general_pct') is not None else payload.get('general_surcharge_pct'))
+    discount_amount = _resolve_receipt_adjustment_amount(payload.get('discount_general_amount'), discount_pct, subtotal_before_general)
+    surcharge_amount = _resolve_receipt_adjustment_amount(payload.get('surcharge_general_amount'), surcharge_pct, max(0.0, subtotal_before_general - discount_amount))
+
+    return {
+        'ticket': str(payload.get('ticket') or '').strip(),
+        'business_name': str(getattr(bs, 'name', '') or '').strip() or 'Zentral',
+        'business_address': str(getattr(bs, 'address', '') or '').strip(),
+        'business_phone': str(getattr(bs, 'phone', '') or '').strip(),
+        'business_email': str(getattr(bs, 'email', '') or '').strip(),
+        'customer_name': str(payload.get('customer_name') or '').strip() or 'Consumidor final',
+        'date_label': sale_date.strftime('%d/%m/%Y') if sale_date else '',
+        'hour_label': datetime.now().strftime('%H:%M'),
+        'items': items,
+        'subtotal_amount': subtotal_before_general,
+        'discount_amount': discount_amount,
+        'discount_pct': discount_pct,
+        'surcharge_amount': surcharge_amount,
+        'surcharge_pct': surcharge_pct,
+        'total_amount': _num(payload.get('total')),
+        'payment_method_label': _payment_methods_label_es(payment_values),
+        'payment_rows': _payment_breakdown_rows(payment_rows),
+        'notes': str(payload.get('notes') or '').strip(),
+    }
+
+
+def _render_sale_receipt_pdf(receipt: dict, bs: BusinessSettings | None, logo_path: object | None):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfgen import canvas
+
+    brand_color = _receipt_brand_color(bs)
+
+    def _wrap_text(text: str, font_name: str, font_size: int, max_width: float) -> list[str]:
+        words = str(text or '').replace('\n', ' ').split()
+        if not words:
+            return ['']
+        lines = []
+        cur = ''
+        for w in words:
+            cand = (cur + ' ' + w).strip() if cur else w
+            try:
+                cand_w = pdfmetrics.stringWidth(cand, font_name, font_size)
+            except Exception:
+                cand_w = len(cand) * (font_size * 0.5)
+            if cand_w <= max_width:
+                cur = cand
+            else:
+                if cur:
+                    lines.append(cur)
+                cur = w
+        if cur:
+            lines.append(cur)
+        return lines or ['']
+
+    def _qty_label(value: float) -> str:
+        try:
+            if abs(float(value) - int(float(value))) < 0.001:
+                return str(int(float(value)))
+        except Exception:
+            pass
+        return f"{float(value):.2f}".replace('.', ',')
+
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    width, height = A4
+    margin = 16 * mm
+    usable_width = width - (margin * 2)
+    y = height - margin
+    footer_y = 17 * mm
+
+    def _new_page():
+        nonlocal y
+        c.showPage()
+        y = height - margin
+
+    def _ensure_space(required: float):
+        nonlocal y
+        if y < footer_y + required:
+            _new_page()
+
+    header_bottom = y - 28 * mm
+    logo_size = 24 * mm
+    logo_center_y = y - 11 * mm
+    text_x = margin + logo_size + 6 * mm
+
+    _draw_receipt_logo(c, logo_path, margin, logo_center_y - (logo_size / 2), logo_size, brand_color)
+
+    c.setFillColor(colors.HexColor('#111827'))
+    c.setFont('Helvetica-Bold', 15)
+    c.drawString(text_x, y - 6 * mm, str(receipt.get('business_name') or 'Zentral'))
+    c.setFont('Helvetica', 10)
+    c.setFillColor(colors.HexColor(brand_color))
+    c.drawString(text_x, y - 12 * mm, 'Comprobante de venta')
+
+    right_x = width - margin
+    c.setFillColor(colors.HexColor('#6b7280'))
+    c.setFont('Helvetica-Bold', 9)
+    c.drawRightString(right_x - 18 * mm, y - 7 * mm, 'Fecha:')
+    c.drawRightString(right_x - 18 * mm, y - 13 * mm, 'Hora:')
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#111827'))
+    c.drawRightString(right_x, y - 7 * mm, str(receipt.get('date_label') or '—'))
+    c.drawRightString(right_x, y - 13 * mm, str(receipt.get('hour_label') or '—'))
+
+    c.setStrokeColor(colors.HexColor(brand_color))
+    c.setLineWidth(0.8)
+    c.line(margin, header_bottom, width - margin, header_bottom)
+    y = header_bottom - 8 * mm
+
+    c.setFont('Helvetica-Bold', 10)
+    c.setFillColor(colors.HexColor('#111827'))
+    c.drawString(margin, y, 'Datos del negocio')
+    y -= 5 * mm
+    c.setFont('Helvetica', 8.8)
+    business_lines = [
+        str(receipt.get('business_name') or '').strip(),
+        ('Dirección: ' + str(receipt.get('business_address') or '').strip()) if receipt.get('business_address') else '',
+        ('Teléfono: ' + str(receipt.get('business_phone') or '').strip()) if receipt.get('business_phone') else '',
+        ('Email: ' + str(receipt.get('business_email') or '').strip()) if receipt.get('business_email') else '',
+    ]
+    for line in business_lines:
+        if not line:
+            continue
+        c.setFillColor(colors.HexColor('#374151'))
+        for wrapped_line in _wrap_text(str(line), 'Helvetica', 8.8, usable_width):
+            c.drawString(margin, y, wrapped_line)
+            y -= 4.6 * mm
+    c.setStrokeColor(colors.HexColor('#e5e7eb'))
+    c.setLineWidth(0.5)
+    c.line(margin, y + 1.5 * mm, width - margin, y + 1.5 * mm)
+    y -= 3 * mm
+
+    c.setFont('Helvetica-Bold', 10)
+    c.setFillColor(colors.HexColor('#111827'))
+    c.drawString(margin, y, 'Datos del cliente')
+    y -= 5 * mm
+    c.setFont('Helvetica', 8.8)
+    c.setFillColor(colors.HexColor('#374151'))
+    c.drawString(margin, y, 'Cliente: ' + str(receipt.get('customer_name') or 'Consumidor final'))
+    y -= 8 * mm
+
+    table_x = margin
+    table_w = usable_width
+    product_col_w = table_w * 0.50
+    qty_col_w = table_w * 0.13
+    unit_col_w = table_w * 0.19
+    subtotal_col_w = table_w - product_col_w - qty_col_w - unit_col_w
+    product_text_w = product_col_w - 3 * mm
+    qty_right_x = table_x + product_col_w + qty_col_w - 1 * mm
+    unit_right_x = table_x + product_col_w + qty_col_w + unit_col_w - 1 * mm
+    subtotal_right_x = table_x + table_w
+
+    _ensure_space(70 * mm)
+    c.setFont('Helvetica-Bold', 8.7)
+    c.setFillColor(colors.HexColor('#111827'))
+    c.drawString(table_x, y, 'Producto')
+    c.drawRightString(qty_right_x, y, 'Cantidad')
+    c.drawRightString(unit_right_x, y, 'Precio unitario')
+    c.drawRightString(subtotal_right_x, y, 'Subtotal')
+    y -= 2.5 * mm
+    c.setStrokeColor(colors.HexColor(brand_color))
+    c.line(table_x, y, table_x + table_w, y)
+    y -= 5 * mm
+
+    c.setFont('Helvetica', 8.7)
+    c.setFillColor(colors.HexColor('#111827'))
+    for item in (receipt.get('items') or []):
+        wrapped = _wrap_text(str(item.get('product') or ''), 'Helvetica', 8.7, product_text_w)
+        row_h = max(5.5 * mm, len(wrapped) * 4.2 * mm)
+        _ensure_space(row_h + 8 * mm)
+        line_y = y
+        for line in wrapped:
+            c.drawString(table_x, line_y, line)
+            line_y -= 4.2 * mm
+        c.drawRightString(qty_right_x, y, _qty_label(float(item.get('qty') or 0.0)))
+        c.drawRightString(unit_right_x, y, _format_currency_ars(item.get('unit_price')))
+        c.drawRightString(subtotal_right_x, y, _format_currency_ars(item.get('subtotal')))
+        y -= row_h
+        c.setStrokeColor(colors.HexColor('#e5e7eb'))
+        c.setLineWidth(0.4)
+        c.line(table_x, y + 2 * mm, table_x + table_w, y + 2 * mm)
+        y -= 2.5 * mm
+
+    summary_w = min(64 * mm, usable_width * 0.42)
+    summary_x = width - margin - summary_w
+    summary_h = 31 * mm
+    _ensure_space(summary_h + 14 * mm)
+    summary_top = y - 3 * mm
+    c.setStrokeColor(colors.HexColor('#e5e7eb'))
+    c.roundRect(summary_x, summary_top - summary_h, summary_w, summary_h, 3 * mm, stroke=1, fill=0)
+    c.setFont('Helvetica-Bold', 9)
+    c.setFillColor(colors.HexColor('#111827'))
+    c.drawString(summary_x + 3 * mm, summary_top - 4 * mm, 'Resumen de la venta')
+    c.setStrokeColor(colors.HexColor(brand_color))
+    c.line(summary_x + 3 * mm, summary_top - 6 * mm, summary_x + summary_w - 3 * mm, summary_top - 6 * mm)
+    sy = summary_top - 11 * mm
+    rows = [
+        ('Subtotal', receipt.get('subtotal_amount')),
+        (_receipt_adjustment_label('Descuento aplicado', receipt.get('discount_pct'), receipt.get('discount_amount'), negative=True), -abs(_num(receipt.get('discount_amount')))),
+        (_receipt_adjustment_label('Recargo aplicado', receipt.get('surcharge_pct'), receipt.get('surcharge_amount')), abs(_num(receipt.get('surcharge_amount')))),
+    ]
+    c.setFont('Helvetica', 8.5)
+    c.setFillColor(colors.HexColor('#374151'))
+    for label, value in rows:
+        c.drawString(summary_x + 3 * mm, sy, label)
+        c.drawRightString(summary_x + summary_w - 3 * mm, sy, _format_currency_signed(value, positive_sign='+', negative_sign='-'))
+        sy -= 5 * mm
+    c.setFont('Helvetica-Bold', 10)
+    c.setFillColor(colors.HexColor(brand_color))
+    c.drawString(summary_x + 3 * mm, sy - 1 * mm, 'TOTAL')
+    c.drawRightString(summary_x + summary_w - 3 * mm, sy - 1 * mm, _format_currency_ars(receipt.get('total_amount')))
+
+    y = summary_top - summary_h - 7 * mm
+
+    c.setStrokeColor(colors.HexColor('#e5e7eb'))
+    c.line(margin, y, width - margin, y)
+    y -= 6 * mm
+    c.setFont('Helvetica-Bold', 9)
+    c.setFillColor(colors.HexColor('#111827'))
+    c.drawString(margin, y, 'Forma de pago')
+    y -= 5 * mm
+    payment_rows = receipt.get('payment_rows') if isinstance(receipt.get('payment_rows'), list) else []
+    c.setFont('Helvetica', 9)
+    c.setFillColor(colors.HexColor('#374151'))
+    if payment_rows:
+        payments_total = 0.0
+        for pay in payment_rows:
+            _ensure_space(6 * mm)
+            label = str(pay.get('label') or '—')
+            amount = _num(pay.get('amount'))
+            payments_total += amount
+            c.drawString(margin, y, f'{label}:')
+            c.drawRightString(width - margin, y, _format_currency_ars(amount))
+            y -= 4.8 * mm
+        _ensure_space(7 * mm)
+        c.setStrokeColor(colors.HexColor('#e5e7eb'))
+        c.setLineWidth(0.4)
+        c.line(margin, y + 1.4 * mm, width - margin, y + 1.4 * mm)
+        c.setFont('Helvetica-Bold', 9)
+        c.setFillColor(colors.HexColor('#111827'))
+        c.drawString(margin, y - 2.2 * mm, 'Total medios de pago:')
+        c.drawRightString(width - margin, y - 2.2 * mm, _format_currency_ars(payments_total))
+        y -= 7 * mm
+    else:
+        c.drawString(margin, y, str(receipt.get('payment_method_label') or '—'))
+        y -= 4.8 * mm
+    y -= 2 * mm
+
+    notes = str(receipt.get('notes') or '').strip()
+    if notes:
+        c.setFont('Helvetica-Bold', 9)
+        c.setFillColor(colors.HexColor('#111827'))
+        c.drawString(margin, y, 'Observaciones')
+        y -= 5 * mm
+        c.setFont('Helvetica', 8.6)
+        c.setFillColor(colors.HexColor('#374151'))
+        for line in _wrap_text(notes, 'Helvetica', 8.6, usable_width):
+            _ensure_space(6 * mm)
+            c.drawString(margin, y, line)
+            y -= 4.2 * mm
+
+    c.setStrokeColor(colors.HexColor(brand_color))
+    c.line(margin, footer_y + 10 * mm, width - margin, footer_y + 10 * mm)
+    c.setFont('Helvetica-Bold', 9)
+    c.setFillColor(colors.HexColor('#111827'))
+    c.drawCentredString(width / 2, footer_y + 5 * mm, 'Gracias por su compra')
+    c.setFont('Helvetica', 7.8)
+    c.setFillColor(colors.HexColor('#6b7280'))
+    c.drawCentredString(width / 2, footer_y, 'Documento generado automáticamente por Zentral – Sistema de Gestión')
+
+    c.save()
+    buf.seek(0)
+    return buf
+
+
+@bp.get('/api/sales/<ticket>/receipt-pdf')
+@login_required
+@module_required('sales')
+def download_sale_receipt_pdf(ticket):
+    try:
+        import reportlab
+    except Exception:
+        return jsonify({'ok': False, 'error': 'reportlab_missing'}), 400
+
+    t = str(ticket or '').strip()
+    cid = _company_id()
+    if not t or not cid:
+        return jsonify({'ok': False, 'error': 'invalid_ticket'}), 400
+
+    row = (
+        db.session.query(Sale)
+        .options(selectinload(Sale.items), selectinload(Sale.payments))
+        .filter(Sale.company_id == cid, Sale.ticket == t)
+        .first()
+    )
+    if not row:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+
+    bs, business_name, logo_path = _get_receipt_business_info(cid)
+    _ = business_name
+    receipt = _build_receipt_context_from_sale(row, bs)
+    buf = _render_sale_receipt_pdf(receipt, bs, logo_path)
+    filename = f"comprobante_venta_{_clean_ticket_for_filename(t)}.pdf"
+    return send_file(buf, mimetype='application/pdf', as_attachment=True, download_name=filename)
+
+
+@bp.post('/api/sales/receipt-pdf/preview')
+@login_required
+@module_required('sales')
+def preview_sale_receipt_pdf():
+    try:
+        import reportlab
+    except Exception:
+        return jsonify({'ok': False, 'error': 'reportlab_missing'}), 400
+
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    payload = request.get_json(silent=True) or {}
+    items = payload.get('items') if isinstance(payload.get('items'), list) else []
+    if not items:
+        return jsonify({'ok': False, 'error': 'items_required'}), 400
+
+    bs, _, logo_path = _get_receipt_business_info(cid)
+    receipt = _build_receipt_context_from_payload(payload, bs)
+    buf = _render_sale_receipt_pdf(receipt, bs, logo_path)
+    filename = 'comprobante_venta_previsualizacion.pdf'
+    return send_file(buf, mimetype='application/pdf', as_attachment=True, download_name=filename)
 
 
 _CODIGO_INTERNO_MIN_LEN = 4
@@ -3682,13 +4471,13 @@ def _num(v):
         return 0.0
 
 
-def _last_cash_event_sale(cid: str, d: dt_date):
+def _last_cash_event_sale(cid: str, d: dt_date, shift_code: str = 'turno_1'):
     try:
+        start_dt, end_dt, _ = _get_shift_window(cid, d, shift_code)
         q = (
-            db.session.query(func.max(Sale.updated_at))
+            db.session.query(func.max(Sale.created_at))
             .outerjoin(SalePayment, and_(SalePayment.company_id == cid, SalePayment.sale_id == Sale.id))
             .filter(Sale.company_id == cid)
-            .filter(Sale.sale_date == d)
             .filter(Sale.status.notin_(['Reemplazada', 'voided', 'Anulado']))
             .filter(Sale.sale_type.in_(['Venta', 'CobroVenta', 'CobroCC', 'CobroCuota', 'Cambio', 'Devolucion', 'Devolución', 'Pago']))
             .filter(
@@ -3698,41 +4487,46 @@ def _last_cash_event_sale(cid: str, d: dt_date):
                 )
             )
         )
+        q = _apply_dt_window(q, Sale.created_at, start_dt, end_dt)
         return q.scalar()
     except Exception:
         return None
 
 
-def _last_cash_event_expense(cid: str, d: dt_date):
+def _last_cash_event_expense(cid: str, d: dt_date, shift_code: str = 'turno_1'):
     try:
+        start_dt, end_dt, _ = _get_shift_window(cid, d, shift_code)
         return (
-            db.session.query(func.max(Expense.updated_at))
+            db.session.query(func.max(Expense.created_at))
             .filter(Expense.company_id == cid)
-            .filter(Expense.expense_date == d)
             .filter(Expense.payment_method == 'Efectivo')
+            .filter(Expense.created_at >= start_dt)
+            .filter(Expense.created_at < end_dt)
             .scalar()
         )
     except Exception:
         return None
 
 
-def _last_cash_event_withdrawal(cid: str, d: dt_date):
+def _last_cash_event_withdrawal(cid: str, d: dt_date, shift_code: str = 'turno_1'):
     try:
         from app.models import CashWithdrawal
+        start_dt, end_dt, _ = _get_shift_window(cid, d, shift_code)
         return (
-            db.session.query(func.max(CashWithdrawal.updated_at))
+            db.session.query(func.max(CashWithdrawal.fecha_registro))
             .filter(CashWithdrawal.company_id == cid)
-            .filter(CashWithdrawal.fecha_imputacion == d)
+            .filter(CashWithdrawal.fecha_registro >= start_dt)
+            .filter(CashWithdrawal.fecha_registro < end_dt)
             .scalar()
         )
     except Exception:
         return None
 
 
-def _cash_expected_now(cid: str, d: dt_date) -> float:
-    ventas = _cash_sales_total(cid, d)
-    egresos = _cash_expenses_total(cid, d)
-    retiros = _cash_withdrawals_total(cid, d)
+def _cash_expected_now(cid: str, d: dt_date, shift_code: str = 'turno_1') -> float:
+    ventas = _cash_sales_total(cid, d, shift_code)
+    egresos = _cash_expenses_total(cid, d, shift_code)
+    retiros = _cash_withdrawals_total(cid, d, shift_code)
     total = float((ventas or 0.0) - (egresos or 0.0) - (retiros or 0.0))
     try:
         current_app.logger.info(
@@ -3749,10 +4543,10 @@ def _cash_expected_now(cid: str, d: dt_date) -> float:
     return total
 
 
-def _last_cash_event_now(cid: str, d: dt_date):
-    a = _last_cash_event_sale(cid, d)
-    b = _last_cash_event_expense(cid, d)
-    c = _last_cash_event_withdrawal(cid, d)
+def _last_cash_event_now(cid: str, d: dt_date, shift_code: str = 'turno_1'):
+    a = _last_cash_event_sale(cid, d, shift_code)
+    b = _last_cash_event_expense(cid, d, shift_code)
+    c = _last_cash_event_withdrawal(cid, d, shift_code)
     candidates = [x for x in [a, b, c] if x is not None]
     if not candidates:
         return None
@@ -5545,7 +6339,15 @@ def get_cash_count():
     if not cid:
         return jsonify({'ok': True, 'item': None})
 
-    row = db.session.query(CashCount).filter(CashCount.company_id == cid, CashCount.count_date == d).first()
+    shift_enabled = _cash_count_shift_enabled(cid)
+    shift_code = _normalize_cash_shift(request.args.get('shift') or request.args.get('shift_code'), shift_enabled)
+    _, _, shift_info = _get_shift_window(cid, d, shift_code)
+
+    row = (
+        db.session.query(CashCount)
+        .filter(CashCount.company_id == cid, CashCount.count_date == d, db.func.coalesce(CashCount.shift_code, 'turno_1') == shift_code)
+        .first()
+    )
     if not row:
         return jsonify({'ok': True, 'item': None})
 
@@ -5555,6 +6357,9 @@ def get_cash_count():
             'date': row.count_date.isoformat(),
             'employee_id': row.employee_id,
             'employee_name': row.employee_name,
+            'shift_code': getattr(row, 'shift_code', None) or ('turno_1' if shift_enabled else 'turno_unico'),
+            'shift_label': ('Turno único' if not getattr(row, 'shift_code', None) else shift_info.get('label')),
+            'shift_display': shift_info.get('display'),
             'opening_amount': row.opening_amount,
             'cash_day_amount': row.cash_day_amount,
             'closing_amount': row.closing_amount,
@@ -5581,6 +6386,10 @@ def save_cash_count():
     if not cid:
         return jsonify({'ok': False, 'error': 'no_company'}), 400
 
+    shift_enabled = _cash_count_shift_enabled(cid)
+    shift_code = _normalize_cash_shift(payload.get('shift') or payload.get('shift_code'), shift_enabled)
+    _, _, shift_info = _get_shift_window(cid, d, shift_code)
+
     def num(v):
         try:
             return float(v)
@@ -5600,19 +6409,22 @@ def save_cash_count():
     employee_id = str(employee_id_raw or '').strip() or None if employee_id_raw not in (None, '') else None
     employee_name = str(employee_name_raw or '').strip() or None if employee_name_raw not in (None, '') else None
 
-    row = db.session.query(CashCount).filter(CashCount.company_id == cid, CashCount.count_date == d).first()
+    if not employee_id:
+        return jsonify({'ok': False, 'error': 'employee_required', 'message': 'Debés seleccionar un responsable de caja para guardar el arqueo.'}), 400
+
+    row = (
+        db.session.query(CashCount)
+        .filter(CashCount.company_id == cid, CashCount.count_date == d, db.func.coalesce(CashCount.shift_code, 'turno_1') == shift_code)
+        .first()
+    )
     if not row:
-        # Compat: algunas DB viejas (SQLite) pueden tener UNIQUE(count_date) y no (company_id, count_date)
-        # En ese caso, si existe un arqueo para la fecha, hay que actualizarlo en vez de insertar.
-        row = db.session.query(CashCount).filter(CashCount.count_date == d).first()
-        if not row:
-            row = CashCount(count_date=d, company_id=cid)
-            db.session.add(row)
-        else:
-            try:
-                row.company_id = cid
-            except Exception:
-                pass
+        row = CashCount(count_date=d, company_id=cid, shift_code=shift_code)
+        db.session.add(row)
+
+    try:
+        row.shift_code = shift_code
+    except Exception:
+        pass
 
     if 'employee_id' in payload and employee_id_raw not in (None, ''):
         row.employee_id = employee_id
@@ -5643,8 +6455,8 @@ def save_cash_count():
         closing_final = 0.0
     row.difference_amount = (opening_final + cash_day_final) - closing_final
 
-    cash_expected = _cash_expected_now(cid, d)
-    last_event = _last_cash_event_now(cid, d)
+    cash_expected = _cash_expected_now(cid, d, shift_code)
+    last_event = _last_cash_event_now(cid, d, shift_code)
     try:
         row.cash_expected_at_save = float(cash_expected)
     except Exception:
@@ -5672,11 +6484,15 @@ def save_cash_count():
     try:
         db.session.commit()
     except IntegrityError:
-        # Compat fuerte: si la DB tiene UNIQUE(count_date) y estamos intentando insertar,
-        # reintentar como UPDATE del registro existente para esa fecha.
         db.session.rollback()
         try:
-            existing = db.session.query(CashCount).filter(CashCount.count_date == d).first()
+            existing = (
+                db.session.query(CashCount)
+                .filter(CashCount.company_id == cid, CashCount.count_date == d, db.func.coalesce(CashCount.shift_code, 'turno_1') == shift_code)
+                .first()
+            )
+            if existing is None and (not shift_enabled) and shift_code == 'turno_1':
+                existing = db.session.query(CashCount).filter(CashCount.company_id == cid, CashCount.count_date == d).first()
         except Exception:
             existing = None
 
@@ -5685,26 +6501,40 @@ def save_cash_count():
                 existing.company_id = cid
             except Exception:
                 pass
+            try:
+                existing.shift_code = shift_code
+            except Exception:
+                pass
             existing.employee_id = employee_id
             existing.employee_name = employee_name
             existing.opening_amount = opening
             existing.cash_day_amount = cash_day
             existing.closing_amount = closing
-            existing.difference_amount = diff
+            existing.difference_amount = row.difference_amount
             existing.created_by_user_id = row.created_by_user_id
+            try:
+                existing.cash_expected_at_save = row.cash_expected_at_save
+                existing.last_cash_event_at_save = row.last_cash_event_at_save
+                existing.status = row.status
+                existing.done_at = row.done_at
+                existing.efectivo_calculado_snapshot = row.efectivo_calculado_snapshot
+            except Exception:
+                pass
             try:
                 db.session.commit()
                 row = existing
             except Exception:
                 db.session.rollback()
+                current_app.logger.exception('Failed to commit existing cash_count row after IntegrityError fallback')
                 return jsonify({'ok': False, 'error': 'db_error'}), 400
         else:
             return jsonify({'ok': False, 'error': 'already_exists', 'message': 'Ya existe un arqueo para esa fecha.'}), 400
     except Exception:
+        current_app.logger.exception('Failed to save cash_count')
         db.session.rollback()
         return jsonify({'ok': False, 'error': 'db_error'}), 400
 
-    return jsonify({'ok': True, 'item': {'date': row.count_date.isoformat(), 'difference_amount': row.difference_amount}})
+    return jsonify({'ok': True, 'item': {'date': row.count_date.isoformat(), 'shift_code': getattr(row, 'shift_code', None) or 'turno_1', 'shift_label': shift_info.get('label'), 'shift_display': shift_info.get('display'), 'difference_amount': row.difference_amount}})
 
 
 def _round2(v: float) -> float:
@@ -5714,8 +6544,9 @@ def _round2(v: float) -> float:
         return 0.0
 
 
-def _cash_sales_total(cid: str, d: dt_date) -> float:
+def _cash_sales_total(cid: str, d: dt_date, shift_code: str = 'turno_1') -> float:
     try:
+        start_dt, end_dt, _ = _get_shift_window(cid, d, shift_code)
         # Fuente de verdad: SalePayment.method (pagos mixtos). Para ventas legacy sin SalePayment,
         # usar Sale.payment_method == 'Efectivo'.
         q_pay = (
@@ -5723,37 +6554,38 @@ def _cash_sales_total(cid: str, d: dt_date) -> float:
             .select_from(Sale)
             .join(SalePayment, and_(SalePayment.company_id == cid, SalePayment.sale_id == Sale.id))
             .filter(Sale.company_id == cid)
-            .filter(Sale.sale_date == d)
             .filter(Sale.status == 'Completada')
             .filter(Sale.sale_type.in_(['Venta', 'CobroVenta', 'CobroCC', 'CobroCuota']))
             .filter(SalePayment.method == 'cash')
         )
+        q_pay = _apply_dt_window(q_pay, Sale.created_at, start_dt, end_dt)
         total_pay = float(q_pay.scalar() or 0.0)
 
         q_legacy = (
             db.session.query(func.coalesce(func.sum(Sale.total), 0.0))
             .outerjoin(SalePayment, and_(SalePayment.company_id == cid, SalePayment.sale_id == Sale.id))
             .filter(Sale.company_id == cid)
-            .filter(Sale.sale_date == d)
             .filter(Sale.status == 'Completada')
             .filter(Sale.sale_type.in_(['Venta', 'CobroVenta', 'CobroCC', 'CobroCuota']))
             .filter(SalePayment.id.is_(None))
             .filter(Sale.payment_method == 'Efectivo')
         )
+        q_legacy = _apply_dt_window(q_legacy, Sale.created_at, start_dt, end_dt)
         total_legacy = float(q_legacy.scalar() or 0.0)
         return float(total_pay + total_legacy)
     except Exception:
         return 0.0
 
 
-def _cash_expenses_total(cid: str, d: dt_date) -> float:
+def _cash_expenses_total(cid: str, d: dt_date, shift_code: str = 'turno_1') -> float:
     try:
+        start_dt, end_dt, _ = _get_shift_window(cid, d, shift_code)
         q = (
             db.session.query(func.coalesce(func.sum(Expense.amount), 0.0))
             .filter(Expense.company_id == cid)
-            .filter(Expense.expense_date == d)
             .filter(Expense.payment_method == 'Efectivo')
         )
+        q = q.filter(Expense.created_at >= start_dt).filter(Expense.created_at < end_dt)
         # Algunos schemas tienen status / tipo. Si existen, filtramos.
         try:
             if hasattr(Expense, 'status'):
@@ -5770,13 +6602,15 @@ def _cash_expenses_total(cid: str, d: dt_date) -> float:
         return 0.0
 
 
-def _cash_withdrawals_total(cid: str, d: dt_date) -> float:
+def _cash_withdrawals_total(cid: str, d: dt_date, shift_code: str = 'turno_1') -> float:
     try:
         from app.models import CashWithdrawal
+        start_dt, end_dt, _ = _get_shift_window(cid, d, shift_code)
         q = (
             db.session.query(func.coalesce(func.sum(CashWithdrawal.monto), 0.0))
             .filter(CashWithdrawal.company_id == cid)
-            .filter(CashWithdrawal.fecha_imputacion == d)
+            .filter(CashWithdrawal.fecha_registro >= start_dt)
+            .filter(CashWithdrawal.fecha_registro < end_dt)
         )
         return float(q.scalar() or 0.0)
     except Exception:
@@ -5797,9 +6631,13 @@ def cash_count_calc_api():
     if not cid:
         return jsonify({'ok': False, 'error': 'no_company'}), 400
 
-    ventas = _cash_sales_total(cid, d)
-    egresos = _cash_expenses_total(cid, d)
-    retiros = _cash_withdrawals_total(cid, d)
+    shift_enabled = _cash_count_shift_enabled(cid)
+    shift_code = _normalize_cash_shift(request.args.get('shift') or request.args.get('shift_code'), shift_enabled)
+    _, _, shift_info = _get_shift_window(cid, d, shift_code)
+
+    ventas = _cash_sales_total(cid, d, shift_code)
+    egresos = _cash_expenses_total(cid, d, shift_code)
+    retiros = _cash_withdrawals_total(cid, d, shift_code)
     total = float((ventas or 0.0) - (retiros or 0.0) - (egresos or 0.0))
 
     try:
@@ -5819,6 +6657,9 @@ def cash_count_calc_api():
         'ok': True,
         'date': d.isoformat(),
         'company_id': str(cid),
+        'shift_code': shift_code,
+        'shift_label': shift_info.get('label'),
+        'shift_display': shift_info.get('display'),
         'ventas_efectivo': _round2(ventas),
         'retiros_efectivo': _round2(retiros),
         'egresos_efectivo': _round2(egresos),
@@ -5884,12 +6725,20 @@ def cash_count_status():
     if not cid:
         return jsonify({'ok': True, 'date': d.isoformat(), 'has_record': False, 'status': 'none', 'is_valid': False, 'should_show': 'pendiente'})
 
-    row = db.session.query(CashCount).filter(CashCount.company_id == cid, CashCount.count_date == d).first()
-    if not row:
-        return jsonify({'ok': True, 'date': d.isoformat(), 'has_record': False, 'status': 'none', 'is_valid': False, 'should_show': 'pendiente'})
+    shift_enabled = _cash_count_shift_enabled(cid)
+    shift_code = _normalize_cash_shift(request.args.get('shift') or request.args.get('shift_code'), shift_enabled)
+    _, _, shift_info = _get_shift_window(cid, d, shift_code)
 
-    expected_now = _cash_expected_now(cid, d)
-    last_now = _last_cash_event_now(cid, d)
+    row = (
+        db.session.query(CashCount)
+        .filter(CashCount.company_id == cid, CashCount.count_date == d, db.func.coalesce(CashCount.shift_code, 'turno_1') == shift_code)
+        .first()
+    )
+    if not row:
+        return jsonify({'ok': True, 'date': d.isoformat(), 'has_record': False, 'status': 'none', 'is_valid': False, 'should_show': 'pendiente', 'shift_code': shift_code, 'shift_label': shift_info.get('label'), 'shift_display': shift_info.get('display')})
+
+    expected_now = _cash_expected_now(cid, d, shift_code)
+    last_now = _last_cash_event_now(cid, d, shift_code)
 
     expected_save = getattr(row, 'cash_expected_at_save', None)
     if expected_save is None:
@@ -5936,4 +6785,7 @@ def cash_count_status():
         'last_cash_event_now': (last_now.isoformat() if last_now else None),
         'last_cash_event_at_save': (last_save.isoformat() if last_save else None),
         'done_at': (getattr(row, 'done_at', None).isoformat() if getattr(row, 'done_at', None) else None),
+        'shift_code': getattr(row, 'shift_code', None) or 'turno_1',
+        'shift_label': shift_info.get('label'),
+        'shift_display': shift_info.get('display'),
     })

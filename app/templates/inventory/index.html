@@ -339,8 +339,8 @@
                             <div class="md:col-span-3">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Código interno</label>
                                 <div id="file-sku" class="px-3 py-2 text-sm border rounded-md bg-gray-50"></div>
-                                <input id="file-codigo-interno" type="text" maxlength="12" class="hidden w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
-                                <div id="file-codigo-interno-hint" class="hidden mt-1 text-[11px] text-gray-500">0/12 · Sin espacios</div>
+                                <input id="file-codigo-interno" type="text" maxlength="50" class="hidden w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
+                                <div id="file-codigo-interno-hint" class="hidden mt-1 text-[11px] text-gray-500">0/50 · Sin espacios</div>
                             </div>
                             <div class="md:col-span-3">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Código de barras</label>
@@ -669,6 +669,22 @@
                 </tr>
             </tbody>
         </table>
+        <div class="px-4 py-3 border-t border-gray-100 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div class="flex items-center gap-2 text-xs text-gray-600">
+                <span>Productos por página</span>
+                <select id="inv-current-per-page" class="px-2 py-1 border rounded-md text-xs bg-white">
+                    <option value="20">20</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                    <option value="all">Todos</option>
+                </select>
+            </div>
+            <div class="flex items-center justify-between gap-2 md:justify-end">
+                <button id="inv-current-prev" type="button" class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Anterior</button>
+                <span id="inv-current-page-meta" class="text-xs text-gray-600 min-w-[120px] text-center">Página 1 de 1</span>
+                <button id="inv-current-next" type="button" class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Siguiente</button>
+            </div>
+        </div>
     </div>
 
     <!-- Personalizar columnas (drawer lateral) -->
@@ -864,8 +880,8 @@
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Código interno</label>
-                                <input id="prod-codigo-interno" type="text" maxlength="12" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
-                                <div id="prod-codigo-interno-hint" class="mt-1 text-[11px] text-gray-500">0/12 · Sin espacios</div>
+                                <input id="prod-codigo-interno" type="text" maxlength="50" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="Opcional">
+                                <div id="prod-codigo-interno-hint" class="mt-1 text-[11px] text-gray-500">0/50 · Sin espacios</div>
                             </div>
                             <div class="md:col-span-3">
                                 <label class="block text-xs font-medium text-gray-600 mb-1">Código de barras</label>
@@ -1320,6 +1336,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const tbodyCurrent = document.getElementById('inv-tbody-current');
     const tbodyLots = document.getElementById('inv-tbody-lots');
+    const invCurrentPerPage = document.getElementById('inv-current-per-page');
+    const invCurrentPrev = document.getElementById('inv-current-prev');
+    const invCurrentNext = document.getElementById('inv-current-next');
+    const invCurrentPageMeta = document.getElementById('inv-current-page-meta');
 
     let filterQ = document.getElementById('inv-q');
     const filterQLots = document.getElementById('inv-q-lots');
@@ -2256,6 +2276,11 @@ document.addEventListener('DOMContentLoaded', function () {
     let cacheProducts = [];
     let cacheLots = [];
     let cacheMovements = [];
+    let invCurrentPage = 1;
+    let invCurrentPerPageValue = 50;
+    let invCurrentTotalPages = 1;
+    let invCurrentTotalItems = 0;
+    let invCurrentRows = [];
     let cacheCategories = [];
     let didLoadCategories = false;
     let suppliersCache = null;
@@ -3104,6 +3129,77 @@ document.addEventListener('DOMContentLoaded', function () {
             .catch(function () { return []; });
     }
 
+    function apiListInventoryCurrentPaged(params) {
+        const p = (params && typeof params === 'object') ? params : {};
+        const qs = [];
+        const page = parseInt(String(p.page || 1), 10) || 1;
+        const perPageRaw = String(p.per_page || invCurrentPerPageValue || 50).trim();
+        const search = String(p.search || '').trim();
+        const categoryId = String(p.category_id || '').trim();
+        const statusValues = Array.isArray(p.statuses) ? p.statuses : [];
+        qs.push('page=' + encodeURIComponent(String(page)));
+        qs.push('per_page=' + encodeURIComponent(perPageRaw));
+        if (search) qs.push('search=' + encodeURIComponent(search));
+        if (categoryId) qs.push('category_id=' + encodeURIComponent(categoryId));
+        if (statusValues.length) qs.push('status=' + encodeURIComponent(statusValues.join(',')));
+        const url = '/inventory/api/inventory/current?' + qs.join('&');
+        return fetch(url, { credentials: 'same-origin' })
+            .then(function (r) {
+                if (!r || !r.ok) return { ok: false, items: [], page: 1, total_pages: 1, total_items: 0 };
+                return r.json().catch(function () { return { ok: false, items: [], page: 1, total_pages: 1, total_items: 0 }; });
+            })
+            .catch(function () { return { ok: false, items: [], page: 1, total_pages: 1, total_items: 0 }; });
+    }
+
+    function getCurrentStatusFilters() {
+        return (filterStatus && filterStatus.selectedOptions)
+            ? Array.from(filterStatus.selectedOptions).map(function (o) { return String(o.value || '').trim(); }).filter(Boolean)
+            : [];
+    }
+
+    function renderInvCurrentPagerMeta() {
+        const totalPages = Math.max(1, parseInt(String(invCurrentTotalPages || 1), 10) || 1);
+        const page = Math.min(totalPages, Math.max(1, parseInt(String(invCurrentPage || 1), 10) || 1));
+        if (invCurrentPageMeta) invCurrentPageMeta.textContent = 'Página ' + String(page) + ' de ' + String(totalPages);
+        if (invCurrentPrev) invCurrentPrev.disabled = page <= 1;
+        if (invCurrentNext) invCurrentNext.disabled = page >= totalPages;
+        if (invCurrentPrev) invCurrentPrev.classList.toggle('opacity-50', page <= 1);
+        if (invCurrentPrev) invCurrentPrev.classList.toggle('cursor-not-allowed', page <= 1);
+        if (invCurrentNext) invCurrentNext.classList.toggle('opacity-50', page >= totalPages);
+        if (invCurrentNext) invCurrentNext.classList.toggle('cursor-not-allowed', page >= totalPages);
+        if (invCurrentPerPage) invCurrentPerPage.value = String(invCurrentPerPageValue === 'all' ? 'all' : invCurrentPerPageValue);
+    }
+
+    function loadInvCurrentPage() {
+        if (!tbodyCurrent) return Promise.resolve();
+        const colspan = (getInvCurrentVisibleColumns().length || invCurrentDefaultColumns.length) + 1;
+        tbodyCurrent.innerHTML = '<tr><td colspan="' + String(colspan) + '" class="px-4 py-6 text-sm text-center text-gray-500">Cargando inventario…</td></tr>';
+        const statuses = getCurrentStatusFilters();
+        return apiListInventoryCurrentPaged({
+            page: invCurrentPage,
+            per_page: invCurrentPerPageValue,
+            search: String(filterQ?.value || '').trim(),
+            category_id: String(filterCat?.value || '').trim(),
+            statuses: statuses,
+        }).then(function (data) {
+            invCurrentRows = Array.isArray(data?.items) ? data.items : [];
+            invCurrentPage = parseInt(String(data?.page || invCurrentPage), 10) || 1;
+            invCurrentTotalPages = parseInt(String(data?.total_pages || 1), 10) || 1;
+            invCurrentTotalItems = parseInt(String(data?.total_items || 0), 10) || 0;
+            renderInvCurrentPagerMeta();
+            const mapped = invCurrentRows.map(function (row) {
+                return { p: row?.product || null, m: row?.metrics || {} };
+            }).filter(function (x) { return !!x && !!x.p; });
+            renderCurrent(mapped);
+        }).catch(function () {
+            invCurrentRows = [];
+            invCurrentTotalPages = 1;
+            invCurrentTotalItems = 0;
+            renderInvCurrentPagerMeta();
+            tbodyCurrent.innerHTML = '<tr><td colspan="' + String(colspan) + '" class="px-4 py-6 text-sm text-center text-gray-500">No se pudo cargar.</td></tr>';
+        });
+    }
+
     function apiListSuppliers(q) {
         const qs = [];
         const query = String(q || '').trim();
@@ -3876,7 +3972,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (!name) { if (window.showAlertModal) window.showAlertModal('Completá el nombre del producto.', 'Atención', 'Validación requerida'); else alert('Completá el nombre del producto.'); return; }
         if (!categoryId) { if (window.showAlertModal) window.showAlertModal('Seleccioná la categoría del producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná la categoría del producto.'); return; }
-        if (codigoInterno && (codigoInterno.length < 4 || codigoInterno.length > 12)) { if (window.showAlertModal) window.showAlertModal('El código interno debe tener entre 4 y 12 caracteres.', 'Atención', 'Validación requerida'); else alert('El código interno debe tener entre 4 y 12 caracteres.'); return; }
+        if (codigoInterno && (codigoInterno.length < 4 || codigoInterno.length > 50)) { if (window.showAlertModal) window.showAlertModal('El código interno debe tener entre 4 y 50 caracteres.', 'Atención', 'Validación requerida'); else alert('El código interno debe tener entre 4 y 50 caracteres.'); return; }
         if (codigoInterno && /\s/.test(codigoInterno)) { if (window.showAlertModal) window.showAlertModal('El código interno no admite espacios.', 'Atención', 'Validación requerida'); else alert('El código interno no admite espacios.'); return; }
         if (barcode && barcode.length > 64) { if (window.showAlertModal) window.showAlertModal('El código de barras admite hasta 64 caracteres.', 'Atención', 'Validación requerida'); else alert('El código de barras admite hasta 64 caracteres.'); return; }
         if (barcode && !/^[A-Za-z0-9]+$/.test(barcode)) { if (window.showAlertModal) window.showAlertModal('El código de barras solo admite letras y números.', 'Atención', 'Validación requerida'); else alert('El código de barras solo admite letras y números.'); return; }
@@ -4503,7 +4599,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!cu.ok) errs.costo_unitario = 'Costo unitario debe ser numérico.';
         else if ((cu.value ?? 0) < 0) errs.costo_unitario = 'Costo unitario debe ser ≥ 0.';
 
-        if (codigoInterno && (codigoInterno.length < 4 || codigoInterno.length > 12)) errs.codigo_interno = 'Código interno: 4 a 12 caracteres.';
+        if (codigoInterno && (codigoInterno.length < 4 || codigoInterno.length > 50)) errs.codigo_interno = 'Código interno: 4 a 50 caracteres.';
         else if (codigoInterno && /\s/.test(codigoInterno)) errs.codigo_interno = 'Código interno: sin espacios.';
 
         if (d.requires_codigo_interno === true) {
@@ -5041,6 +5137,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? '<button type="button" class="w-full text-left px-3 py-2 text-xs text-gray-400 cursor-not-allowed" disabled title="Producto con stock indeterminado: no se pueden crear lotes.">Agregar lote</button>'
                 : '<button type="button" class="btn-add-lot-product w-full text-left px-3 py-2 text-xs text-blue-700 hover:bg-gray-50" data-product-id="' + String(p.id) + '">Agregar lote</button>';
 
+            const codigoInternoHtml = (function () {
+                const code = String(codigoInterno || '').trim();
+                if (!code) {
+                    return '<td class="px-4 py-3 text-sm text-gray-600">—</td>';
+                }
+                const needsTrunc = code.length > 10;
+                const shown = needsTrunc ? (code.slice(0, 10) + '...') : code;
+                return ''
+                    + '<td class="px-4 py-3 text-sm text-gray-600 align-top">'
+                    + '  <div class="max-w-[180px] min-w-0">'
+                    + '    <span class="block overflow-hidden text-ellipsis whitespace-nowrap" title="' + esc(code) + '">' + esc(shown) + '</span>'
+                    + '  </div>'
+                    + '</td>';
+            })();
+
             const cellByKey = {
                 imagen: '<td class="px-4 py-3 text-sm text-gray-700">' + imgCell + '</td>',
                 producto: '<td class="px-4 py-3 text-sm font-medium text-gray-900">' + esc(p.name) + '</td>',
@@ -5048,7 +5159,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 stock: '<td class="px-4 py-3 text-sm text-gray-600">' + (isUnlimited ? unlimitedStockCell : fmtNumero(m.stock)) + '</td>',
                 costo_prom: '<td class="px-4 py-3 text-sm text-right text-gray-600">' + (isUnlimited ? '—' : fmtMoneda(m.avg)) + '</td>',
                 valor_total: '<td class="px-4 py-3 text-sm text-right text-gray-600">' + (isUnlimited ? '—' : fmtMoneda(m.total)) + '</td>',
-                codigo_interno: '<td class="px-4 py-3 text-sm text-gray-600">' + esc(codigoInterno || '—') + '</td>',
+                codigo_interno: codigoInternoHtml,
                 estado: '<td class="px-4 py-3 text-sm text-gray-600">' + statusBadgeHtml(m.status) + '</td>',
                 precio: '<td class="px-4 py-3 text-sm text-right text-gray-600">' + priceCell + '</td>',
                 codigo_barras: '<td class="px-4 py-3 text-sm text-gray-600">' + barcodeCell + '</td>',
@@ -5651,7 +5762,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const vis = getVisibleRowsData();
-            if (activeTab === 'current') renderCurrent(vis.filteredProducts);
+            if (activeTab === 'current') loadInvCurrentPage();
             if (activeTab === 'lots') renderLots(vis.filteredLots);
         }, { movements: false });
     }
@@ -6545,7 +6656,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (!name) { if (window.showAlertModal) window.showAlertModal('Completá el nombre del producto.', 'Atención', 'Validación requerida'); else alert('Completá el nombre del producto.'); return; }
             if (!categoryId) { if (window.showAlertModal) window.showAlertModal('Seleccioná la categoría del producto.', 'Atención', 'Validación requerida'); else alert('Seleccioná la categoría del producto.'); return; }
-            if (codigoInterno && (codigoInterno.length < 4 || codigoInterno.length > 12)) { if (window.showAlertModal) window.showAlertModal('El código interno debe tener entre 4 y 12 caracteres.', 'Atención', 'Validación requerida'); else alert('El código interno debe tener entre 4 y 12 caracteres.'); return; }
+            if (codigoInterno && (codigoInterno.length < 4 || codigoInterno.length > 50)) { if (window.showAlertModal) window.showAlertModal('El código interno debe tener entre 4 y 50 caracteres.', 'Atención', 'Validación requerida'); else alert('El código interno debe tener entre 4 y 50 caracteres.'); return; }
             if (codigoInterno && /\s/.test(codigoInterno)) { if (window.showAlertModal) window.showAlertModal('El código interno no admite espacios.', 'Atención', 'Validación requerida'); else alert('El código interno no admite espacios.'); return; }
             if (barcode && barcode.length > 64) { if (window.showAlertModal) window.showAlertModal('El código de barras admite hasta 64 caracteres.', 'Atención', 'Validación requerida'); else alert('El código de barras admite hasta 64 caracteres.'); return; }
             if (barcode && !/^[A-Za-z0-9]+$/.test(barcode)) { if (window.showAlertModal) window.showAlertModal('El código de barras solo admite letras y números.', 'Atención', 'Validación requerida'); else alert('El código de barras solo admite letras y números.'); return; }
@@ -7227,12 +7338,46 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         filterQ.addEventListener('input', function () {
             try { filterQLots.value = String(filterQ.value || ''); } catch (e) { }
+            invCurrentPage = 1;
+            if (activeTab === 'current') {
+                try { loadInvCurrentPage(); } catch (e) { }
+            }
         });
     }
 
     if (filterLotsSup) {
         filterLotsSup.addEventListener('input', renderAll);
         filterLotsSup.addEventListener('change', renderAll);
+    }
+
+    if (filterCat) {
+        filterCat.addEventListener('change', function () {
+            invCurrentPage = 1;
+            if (activeTab === 'current') loadInvCurrentPage();
+        });
+    }
+
+    if (invCurrentPerPage) {
+        invCurrentPerPage.addEventListener('change', function () {
+            const raw = String(invCurrentPerPage.value || '50').trim().toLowerCase();
+            invCurrentPerPageValue = (raw === 'all') ? 'all' : (parseInt(raw, 10) || 50);
+            invCurrentPage = 1;
+            if (activeTab === 'current') loadInvCurrentPage();
+        });
+    }
+    if (invCurrentPrev) {
+        invCurrentPrev.addEventListener('click', function () {
+            if (invCurrentPage <= 1) return;
+            invCurrentPage -= 1;
+            if (activeTab === 'current') loadInvCurrentPage();
+        });
+    }
+    if (invCurrentNext) {
+        invCurrentNext.addEventListener('click', function () {
+            if (invCurrentPage >= invCurrentTotalPages) return;
+            invCurrentPage += 1;
+            if (activeTab === 'current') loadInvCurrentPage();
+        });
     }
 
     function setStatusFilter(values) {
@@ -7324,7 +7469,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 } catch (e) {
                 }
                 suppressStatusSync = false;
-                try { renderAll(); } catch (e) { }
+                try {
+                    invCurrentPage = 1;
+                    if (activeTab === 'current') loadInvCurrentPage();
+                    else renderAll();
+                } catch (e) { }
             }, 0);
         };
 

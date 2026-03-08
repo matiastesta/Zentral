@@ -1,4 +1,5 @@
 import os
+import re
 
 from flask import g, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required
@@ -9,6 +10,20 @@ from app.files.storage import upload_to_r2_and_create_asset
 from app.models import BusinessSettings, Company, Installment, InstallmentPlan
 from app.permissions import module_required
 from app.settings import bp
+
+
+def _parse_shift_hhmm(raw: str):
+    s = str(raw or '').strip()
+    if not re.match(r'^\d{2}:\d{2}$', s):
+        return None
+    try:
+        hh = int(s[:2])
+        mm = int(s[3:5])
+    except Exception:
+        return None
+    if hh < 0 or hh > 23 or mm < 0 or mm > 59:
+        return None
+    return (hh * 60) + mm
 
 
 @bp.route("/", methods=["GET", "POST"])
@@ -88,6 +103,36 @@ def business_settings():
                     installments_enabled = prev_installments_enabled
 
             bs.habilitar_sistema_cuotas = bool(installments_enabled)
+
+            try:
+                bs.habilitar_doble_turno_arqueo = str(request.form.get('habilitar_doble_turno_arqueo') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+            except Exception:
+                bs.habilitar_doble_turno_arqueo = bool(getattr(bs, 'habilitar_doble_turno_arqueo', False))
+
+            t1_desde = str(request.form.get('arqueo_turno_1_desde') or getattr(bs, 'arqueo_turno_1_desde', '08:00') or '08:00').strip()
+            t1_hasta = str(request.form.get('arqueo_turno_1_hasta') or getattr(bs, 'arqueo_turno_1_hasta', '16:00') or '16:00').strip()
+            t2_desde = str(request.form.get('arqueo_turno_2_desde') or getattr(bs, 'arqueo_turno_2_desde', '16:00') or '16:00').strip()
+            t2_hasta = str(request.form.get('arqueo_turno_2_hasta') or getattr(bs, 'arqueo_turno_2_hasta', '08:00') or '08:00').strip()
+
+            if bool(bs.habilitar_doble_turno_arqueo):
+                m1d = _parse_shift_hhmm(t1_desde)
+                m1h = _parse_shift_hhmm(t1_hasta)
+                m2d = _parse_shift_hhmm(t2_desde)
+                m2h = _parse_shift_hhmm(t2_hasta)
+                if None in {m1d, m1h, m2d, m2h}:
+                    flash('Los horarios de doble turno deben tener formato HH:MM válido.', 'error')
+                    return redirect(url_for('settings.business_settings'))
+                if m1d == m1h or m2d == m2h:
+                    flash('Cada turno debe tener una duración mayor a 0 minutos.', 'error')
+                    return redirect(url_for('settings.business_settings'))
+                if not (m1h == m2d and m2h == m1d):
+                    flash('Los dos turnos deben cubrir las 24 horas sin huecos ni superposiciones. Configurá el fin de un turno exactamente igual al inicio del otro.', 'error')
+                    return redirect(url_for('settings.business_settings'))
+
+            bs.arqueo_turno_1_desde = t1_desde
+            bs.arqueo_turno_1_hasta = t1_hasta
+            bs.arqueo_turno_2_desde = t2_desde
+            bs.arqueo_turno_2_hasta = t2_hasta
 
             f = request.files.get('business_logo')
             if f and getattr(f, 'filename', ''):
