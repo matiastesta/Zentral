@@ -3251,11 +3251,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const paymentMethodOrder = ['Efectivo', 'Transferencia', 'Débito', 'Crédito'];
     const paymentMethodLabels = {
         Efectivo: 'Efectivo',
+        cash: 'Efectivo',
         Transferencia: 'Transferencia',
+        transfer: 'Transferencia',
         'Débito': 'Débito',
         Débito: 'Débito',
+        debit: 'Débito',
         Crédito: 'Crédito',
-        'Crédito': 'Crédito'
+        'Crédito': 'Crédito',
+        credit: 'Crédito'
     };
     const paymentAmounts = {};
     const paymentTouched = {};
@@ -3379,9 +3383,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 inp.setAttribute('data-method', m);
                 inp.placeholder = '';
 
-                // valor crudo (solo dígitos) en foco; formateado al salir
                 const rawDigits = normalizeDigitsOnly(paymentAmounts[m] == null ? '' : paymentAmounts[m]);
-                inp.value = rawDigits;
+                const amtToFormat = parseDigitsToAmount(rawDigits);
+                if (amtToFormat != null) {
+                    inp.value = formatearMoneda(amtToFormat);
+                } else {
+                    inp.value = '';
+                }
 
                 inp.addEventListener('focus', function () {
                     const mm = canonicalPaymentMethodLabel(this.getAttribute('data-method'));
@@ -3538,6 +3546,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const prevCount = prevPaymentSelectionCount;
         prevPaymentSelectionCount = selected.length;
         const selectedSet = new Set(selected);
+
+        if (forceLoad) {
+            lastRenderedPaymentMethodsKey = '';
+        }
 
         // Regla estricta: en multi-pago siempre iniciar vacío.
         // Si pasa de 1 medio a 2+, limpiar lo autocompletado.
