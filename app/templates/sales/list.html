@@ -7086,8 +7086,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const pago = getSelectedPaymentMethod();
         const totals = computeTicketTotals();
         const total = totals.total;
-        const paidAmount = ventaOnAccount ? Math.max(0, Math.min(total, (parseFloat(ventaPaidAmount || 0) || 0))) : total;
-        const dueAmount = ventaOnAccount ? Math.max(0, total - paidAmount) : 0;
+        let paidAmount = total;
+        let dueAmount = 0;
+        let isOnAccount = ventaOnAccount;
+
+        if (ventaUseInstallments) {
+            paidAmount = computeMontoACobrarAhora(total);
+            dueAmount = Math.max(0, total - paidAmount);
+            isOnAccount = true; // Installments imply pending balance
+        } else if (ventaOnAccount) {
+            paidAmount = Math.max(0, Math.min(total, (parseFloat(ventaPaidAmount || 0) || 0)));
+            dueAmount = Math.max(0, total - paidAmount);
+        }
 
         const payload = {
             fecha,
@@ -7105,7 +7115,7 @@ document.addEventListener('DOMContentLoaded', function() {
             customer_id: selectedCustomer ? (selectedCustomer.id || '') : '',
             customer_name: selectedCustomer ? (selectedCustomer.name || '') : '',
             ...getSelectedEmployeePayload(selectTicketEmployee),
-            on_account: ventaOnAccount,
+            on_account: isOnAccount,
             paid_amount: paidAmount,
             due_amount: dueAmount,
             is_gift: !!ventaIsGift,
@@ -8140,6 +8150,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 else setSelectedCustomer(null);
             } catch (e) {
             }
+
+            try {
+                if (sale.is_installments) {
+                    setSistemaCuotas();
+                } else if (sale.on_account || parseFloat(sale.due_amount || 0) > 0.001) {
+                    openCuentaCorrientePanel();
+                    if (typeof ccInlinePaid !== 'undefined' && ccInlinePaid) {
+                        ccInlinePaid.value = formatearMoneda(parseFloat(sale.paid_amount || 0));
+                        syncCuentaCorrienteInlinePreview();
+                    }
+                } else {
+                    setPagoCompleto();
+                }
+            } catch (e) {}
 
             try {
                 applyEmployeesToSelectors();
