@@ -597,25 +597,19 @@
 
     <button id="kpi-alerts-card" type="button" class="md:col-span-2 p-3 rounded-xl bg-white shadow border border-gray-100 text-left hover:bg-gray-50">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-            <div class="flex flex-col items-center text-center">
-                <div class="flex items-center gap-3">
-                    <div class="h-10 w-10 flex items-center justify-center rounded-full bg-amber-50 text-amber-700">
-                        <i class="fas fa-exclamation-triangle"></i>
-                    </div>
-                    <div class="flex flex-col">
-                        <div class="text-xs uppercase tracking-wide text-gray-500">Alertas activas</div>
-                        <div class="mt-0.5 flex items-baseline justify-center gap-2">
-                            <div class="text-3xl font-semibold text-gray-900 leading-none"><span id="kpi-alerts">0</span></div>
-                            <div class="text-xs font-medium text-gray-700 leading-none">stock bajo + vencimientos</div>
-                        </div>
-                    </div>
+            <div class="flex flex-col items-center justify-center text-center px-2 py-1">
+                <div class="h-10 w-10 flex items-center justify-center rounded-full bg-amber-50 text-amber-700 mb-1.5">
+                    <i class="fas fa-exclamation-triangle"></i>
                 </div>
+                <div class="text-xs uppercase tracking-wide text-gray-500">Alertas activas</div>
+                <div class="mt-1 text-3xl font-semibold text-gray-900 leading-none"><span id="kpi-alerts">0</span></div>
+                <div class="mt-1 text-xs font-normal text-gray-700 leading-tight">stock bajo + vencimientos</div>
             </div>
 
-            <div class="flex flex-col items-center text-center md:border-l md:border-gray-100 md:pl-4">
-                <div class="text-xs uppercase tracking-wide text-gray-500">Alertas por producto</div>
-                <div id="kpi-alerts-list" class="mt-2 w-full space-y-1"></div>
-                <div id="kpi-alerts-hint" class="mt-2 text-xs text-gray-500">Click para ver productos en “Reponer” y “Crítico”.</div>
+            <div class="flex flex-col justify-center md:border-l md:border-gray-100 md:pl-4">
+                <div class="text-xs uppercase tracking-wide text-gray-500 text-center md:text-left">Alertas por producto</div>
+                <div id="kpi-alerts-list" class="mt-2 w-full space-y-0.5"></div>
+                <div id="kpi-alerts-hint" class="mt-2 text-[11px] text-gray-500 text-center md:text-left">Click para ver productos en “Reponer” y “Crítico”.</div>
             </div>
         </div>
     </button>
@@ -5042,34 +5036,30 @@ document.addEventListener('DOMContentLoaded', function () {
         if (kpiAlerts) kpiAlerts.textContent = String(alerts);
 
         if (kpiAlertsList) {
-            const maxItems = 6;
+            const maxItems = 5;
             const shown = alertProducts.slice(0, maxItems);
+            const hiddenCount = Math.max(0, alertProducts.length - shown.length);
             if (!shown.length) {
                 kpiAlertsList.innerHTML = '<div class="text-xs text-gray-500 text-center">Sin alertas de stock.</div>';
             } else {
-                const first = shown[0];
-                const rest = shown.slice(1);
-                const firstTag = (first.status === 'Crítico') ? 'Crítico' : (first.status === 'Reponer') ? 'Reponer' : 'OK';
-                const firstCls = (first.status === 'Crítico') ? 'text-red-700' : (first.status === 'Reponer') ? 'text-indigo-700' : 'text-gray-700';
-                const firstRow = '<div class="flex items-center justify-between gap-2">'
-                    + '<div class="truncate text-sm font-semibold text-gray-900">' + String(first.name) + '</div>'
-                    + '<span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ' + (first.status === 'Crítico' ? 'bg-red-50 text-red-700' : first.status === 'Reponer' ? 'bg-indigo-50 text-indigo-700' : 'bg-green-50 text-green-700') + '">' + firstTag + '</span>'
-                    + '</div>';
-
-                const restRows = rest.map(it => {
+                const rows = shown.map(it => {
                     const tag = (it.status === 'Crítico') ? 'Crítico' : (it.status === 'Reponer') ? 'Reponer' : 'OK';
                     const pill = (it.status === 'Crítico')
                         ? 'bg-red-50 text-red-700'
                         : (it.status === 'Reponer')
                             ? 'bg-indigo-50 text-indigo-700'
                             : 'bg-green-50 text-green-700';
-                    return '<div class="flex items-center justify-between gap-2">'
-                        + '<div class="truncate text-[11px] text-gray-700">' + String(it.name) + '</div>'
-                        + '<span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ' + pill + '">' + tag + '</span>'
+                    return '<div class="flex w-full items-center justify-between gap-2 rounded text-left hover:bg-gray-50">'
+                        + '<div class="min-w-0 flex-1 truncate text-[11px] font-normal text-gray-700">' + String(it.name) + '</div>'
+                        + '<span class="shrink-0 inline-flex min-w-[50px] items-center justify-center px-1.5 py-[1px] rounded-full text-[9px] font-semibold ' + pill + '">' + tag + '</span>'
                         + '</div>';
                 }).join('');
 
-                kpiAlertsList.innerHTML = firstRow + (restRows ? ('<div class="mt-2 space-y-1">' + restRows + '</div>') : '');
+                const moreLink = hiddenCount > 0
+                    ? ('<div class="text-[10px] font-medium text-indigo-600 underline text-left hover:text-indigo-700 pt-0.5">+' + String(hiddenCount) + ' productos más</div>')
+                    : '';
+
+                kpiAlertsList.innerHTML = rows + moreLink;
             }
             if (kpiAlertsHint) kpiAlertsHint.classList.toggle('hidden', shown.length > 0);
         }
