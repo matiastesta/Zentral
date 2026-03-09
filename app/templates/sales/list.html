@@ -3533,7 +3533,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (e) {}
     }
 
-    function onPaymentMethodsChanged() {
+    function onPaymentMethodsChanged(forceLoad) {
         const selected = getSelectedPaymentMethods();
         const prevCount = prevPaymentSelectionCount;
         prevPaymentSelectionCount = selected.length;
@@ -3541,7 +3541,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Regla estricta: en multi-pago siempre iniciar vacío.
         // Si pasa de 1 medio a 2+, limpiar lo autocompletado.
-        if (selected.length >= 2) {
+        if (selected.length >= 2 && !forceLoad) {
             Object.keys(paymentAmounts || {}).forEach(function (k) { delete paymentAmounts[k]; });
             Object.keys(paymentTouched || {}).forEach(function (k) { delete paymentTouched[k]; });
             selected.forEach(function (m) {
@@ -8070,7 +8070,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        try { onPaymentMethodsChanged(); } catch (e) {}
+        try { onPaymentMethodsChanged(true); } catch (e) {}
     }
 
     function openEditTicket(ticket) {
