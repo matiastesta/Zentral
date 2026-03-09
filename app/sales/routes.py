@@ -6230,10 +6230,11 @@ def update_sale(ticket):
             return jsonify({'ok': False, 'error': 'payments_sum_mismatch'}), 400
 
         try:
-            row.payments = []
+            db.session.query(SalePayment).filter(SalePayment.company_id == cid, SalePayment.sale_id == row.id).delete()
             for p in (payments or []):
-                row.payments.append(SalePayment(
+                db.session.add(SalePayment(
                     company_id=cid,
+                    sale_id=row.id,
                     method=str(p.get('method') or '').strip(),
                     amount=float(p.get('amount') or 0.0),
                 ))
