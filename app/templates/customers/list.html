@@ -1030,13 +1030,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const modalSettle = document.getElementById('modal-settle-debt');
     const btnCloseSettle = document.getElementById('btn-close-settle');
     const btnCancelSettle = document.getElementById('btn-cancel-settle');
-    const btnConfirmSettle = document.getElementById('btn-confirm-settle');
     const settleSubtitle = document.getElementById('settle-subtitle');
-    const settleSale = document.getElementById('settle-sale');
-    const settleAmount = document.getElementById('settle-amount');
-    const settleMethod = document.getElementById('settle-method');
-    const settlePayAmount = document.getElementById('settle-pay-amount');
-    const settleError = document.getElementById('settle-error');
 
     const modalCobro = document.getElementById('modal-cobro');
     const cobroTitle = document.getElementById('cobro-title');
@@ -2877,7 +2871,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         settleCustomerId = safeStr(c.id);
         if (settleSubtitle) settleSubtitle.textContent = safeStr(c.full_name || 'Cliente');
-        if (settleError) settleError.classList.add('hidden');
 
         const outs = ensureArray(cacheSales)
             .filter(s => {
@@ -2892,41 +2885,64 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
 
-        if (settleSale) {
-            settleSale.innerHTML = '';
+        const listContainer = document.getElementById('settle-sales-list');
+        if (listContainer) {
             if (!outs.length) {
-                const opt = document.createElement('option');
-                opt.value = '';
-                opt.textContent = 'Sin deudas pendientes.';
-                settleSale.appendChild(opt);
+                listContainer.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">El cliente no registra deudas pendientes en cuenta corriente.</div>';
             } else {
-                outs.forEach(s => {
+                if (outs.length === 1) {
+                    openCcCheckoutForSaleId(safeStr(outs[0]?.id));
+                    return;
+                }
+                
+                const html = outs.map(s => {
+                    const sid = safeStr(s?.id);
                     const due = parseFloat(s?.due_amount || 0) || 0;
+                    const total = parseFloat(s?.total || 0) || 0;
+                    const paid = Math.max(0, total - due);
                     const fechaRaw = safeStr(s?.fecha || '');
                     const fecha = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function')
                         ? window.formatFechaDisplay(fechaRaw)
                         : fechaRaw;
-                    const opt = document.createElement('option');
-                    opt.value = safeStr(s?.id);
-                    opt.textContent = safeStr(s?.ticket || '') + ' · ' + fecha + ' · Deuda: ' + fmtMoney(due);
-                    settleSale.appendChild(opt);
+                    
+                    const productsLabel = (() => {
+                        const items = ensureArray(s?.items);
+                        const names = items.map(it => safeStr(it?.nombre || it?.product_name || '')).filter(Boolean);
+                        if (!names.length) return '—';
+                        if (names.length === 1) return names[0];
+                        return names[0] + ' (+' + (names.length - 1) + ')';
+                    })();
+
+                    return `
+                        <div class="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-semibold text-gray-900">Ticket #${safeStr(s?.ticket || '—')}</span>
+                                    <span class="text-xs text-gray-500">•</span>
+                                    <span class="text-xs text-gray-500">${fecha}</span>
+                                </div>
+                                <div class="text-xs text-gray-600 truncate max-w-md" title="${String(productsLabel).replace(/"/g, '&quot;')}">${productsLabel}</div>
+                                <div class="flex items-center gap-4 mt-2">
+                                    <div class="text-xs"><span class="text-gray-500">Total:</span> <span class="font-medium text-gray-900">$${fmtMoney(total)}</span></div>
+                                    <div class="text-xs"><span class="text-gray-500">Abonado:</span> <span class="font-medium text-green-700">$${fmtMoney(paid)}</span></div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-end gap-2 shrink-0">
+                                <div class="text-sm"><span class="text-gray-500 mr-1">Saldo pendiente:</span> <span class="font-bold text-red-700 text-base">$${fmtMoney(due)}</span></div>
+                                <button type="button" onclick="window.openCcCheckoutForSaleId('${sid}')" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 shadow-sm">Cobrar deuda</button>
+                            </div>
+                        </div>
+                    `;
                 });
+                listContainer.innerHTML = html.join('');
             }
-        }
-
-        const firstId = outs.length ? safeStr(outs[0]?.id) : '';
-        if (settleSale && firstId) settleSale.value = firstId;
-        const firstDue = outs.length ? (parseFloat(outs[0]?.due_amount || 0) || 0) : 0;
-        if (settleAmount) settleAmount.textContent = fmtMoney(firstDue);
-        if (settlePayAmount) settlePayAmount.value = String(firstDue || 0);
-
-        if (outs.length === 1 && firstId) {
-            openCcCheckoutForSaleId(firstId);
-            return;
         }
 
         openModal(modalSettle);
     }
+
+    // Expose to window so onclick works
+    window.openCcCheckoutForSaleId = openCcCheckoutForSaleId;
 
     function openCcCheckoutForSaleId(saleId) {
         const sid = safeStr(saleId);
@@ -3350,38 +3366,7 @@ document.addEventListener('DOMContentLoaded', function () {
         openModal(modalSettleType);
     }
 
-    function syncSettleAmount() {
-        const id = safeStr(settleSale?.value);
-        const s = ensureArray(cacheSales).find(x => safeStr(x?.id) === id);
-        const due = s ? (parseFloat(s?.due_amount || 0) || 0) : 0;
-        if (settleAmount) settleAmount.textContent = fmtMoney(due);
-        if (settlePayAmount) settlePayAmount.value = String(due || 0);
-    }
 
-    function confirmSettleDebt() {
-        const saleId = safeStr(settleSale?.value);
-        const method = safeStr(settleMethod?.value || 'Efectivo') || 'Efectivo';
-        const payAmount = parseFloat(settlePayAmount?.value || 0) || 0;
-        if (!saleId) {
-            if (settleError) settleError.classList.remove('hidden');
-            return;
-        }
-        const s = ensureArray(cacheSales).find(x => safeStr(x?.id) === saleId);
-        const due = s ? (parseFloat(s?.due_amount || 0) || 0) : 0;
-        if (!(payAmount > 0) || payAmount - due > 0.00001) {
-            if (settleError) {
-                settleError.querySelector('span').textContent = 'Ingresá un monto válido (mayor a 0 y menor o igual a la deuda).';
-                settleError.classList.remove('hidden');
-            }
-            return;
-        }
-        if (settleError) {
-            settleError.querySelector('span').textContent = 'Seleccioná una venta válida.';
-            settleError.classList.add('hidden');
-        }
-        closeModal(modalSettle);
-        openCcCheckoutForSaleId(saleId);
-    }
 
     function applyCrmLabelsToUi(cfg) {
         const c = cfg && typeof cfg === 'object' ? cfg : readCrmConfig();
@@ -4343,8 +4328,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (btnCloseSettle) btnCloseSettle.addEventListener('click', function () { closeModal(modalSettle); });
         if (btnCancelSettle) btnCancelSettle.addEventListener('click', function () { closeModal(modalSettle); });
-        if (btnConfirmSettle) btnConfirmSettle.addEventListener('click', function () { confirmSettleDebt(); });
-        if (settleSale) settleSale.addEventListener('change', function () { syncSettleAmount(); });
         if (modalSettle) {
             modalSettle.addEventListener('click', function (e) {
                 const target = e.target;
