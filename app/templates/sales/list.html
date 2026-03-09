@@ -8106,14 +8106,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                if (inputDescuentoGeneral) inputDescuentoGeneral.value = formatearPctParaInputNumber(parseFloat(sale.discount_general_pct || 0) || 0);
+                const dp = parseFloat(sale.discount_general_pct || 0) || 0;
+                if (inputDescuentoGeneral) inputDescuentoGeneral.value = dp > 0 ? formatearPctParaInputNumber(dp) : '';
                 if (inputDescuentoGeneralPaso2) inputDescuentoGeneralPaso2.value = inputDescuentoGeneral?.value || '';
+                try { setCartGeneralDiscountPct(dp); } catch (e) {}
             } catch (e) {
             }
 
             try {
                 const sp = parseFloat(sale.general_surcharge_pct || sale.surcharge_general_pct || sale.surcharge_pct || 0) || 0;
-                if (inputRecargoGeneral) inputRecargoGeneral.value = formatearPctParaInputNumber200(sp);
+                if (inputRecargoGeneral) inputRecargoGeneral.value = sp > 0 ? formatearPctParaInputNumber200(sp) : '';
                 if (inputRecargoGeneralPaso2) inputRecargoGeneralPaso2.value = inputRecargoGeneral?.value || '';
                 try { setCartGeneralSurchargePct(sp); } catch (e) {}
             } catch (e) {
