@@ -8157,7 +8157,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             // En el HTML actual, el id "ticket-descuentos-sidebar" se usa para mostrar "Subtotal".
             if (ticketDescuentosSidebar) {
-                const est = parseFloat((t.subtotalConDescItem != null ? t.subtotalConDescItem : t.subtotal) || 0) || 0;
+                const est = parseFloat((t.subtotal_sin_desc != null ? t.subtotal_sin_desc : (t.subtotalSinDesc != null ? t.subtotalSinDesc : t.subtotal)) || 0) || 0;
                 ticketDescuentosSidebar.textContent = formatearMoneda(est);
             }
         } catch (e) {
