@@ -648,6 +648,38 @@ class Product(db.Model):
 
 
 
+class TandaCarga(db.Model):
+
+    __tablename__ = 'tanda_carga'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    company_id = db.Column(db.String(36), nullable=False, index=True, default=_default_company_id)
+
+    identificador = db.Column(db.String(64), nullable=False, index=True)
+
+    tipo_origen = db.Column(db.String(32), nullable=False, default='excel', index=True)
+
+    fecha_hora_creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
+
+    user = db.relationship('User', backref='tandas_carga')
+
+    cantidad_items = db.Column(db.Integer, nullable=False, default=0)
+
+    cantidad_total_unidades = db.Column(db.Float, nullable=False, default=0.0)
+
+    observacion = db.Column(db.Text, nullable=True)
+
+    estado = db.Column(db.String(16), nullable=False, default='activa', index=True)
+
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+
 class InventoryLot(db.Model):
 
     __tablename__ = 'inventory_lot'
@@ -686,6 +718,10 @@ class InventoryLot(db.Model):
 
     origin_sale_ticket = db.Column(db.String(32), nullable=True, index=True)
 
+    tanda_carga_id = db.Column(db.Integer, db.ForeignKey('tanda_carga.id'), nullable=True, index=True)
+
+    tanda_carga = db.relationship('TandaCarga', backref='lotes')
+
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -723,6 +759,10 @@ class InventoryMovement(db.Model):
     lot_id = db.Column(db.Integer, db.ForeignKey('inventory_lot.id'), nullable=True, index=True)
 
     lot = db.relationship('InventoryLot', backref='movements')
+
+    tanda_carga_id = db.Column(db.Integer, db.ForeignKey('tanda_carga.id'), nullable=True, index=True)
+
+    tanda_carga = db.relationship('TandaCarga', backref='movimientos')
 
 
 

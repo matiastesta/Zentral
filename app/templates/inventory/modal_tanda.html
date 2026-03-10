@@ -1,0 +1,110 @@
+<!-- Modal profesional para gestionar tandas de carga -->
+<div id="modal-tanda-actions" class="hidden fixed inset-0 z-50" style="z-index: 70;">
+    <div class="absolute inset-0 bg-black/50"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: calc(100vh - 2rem);">
+            
+            <!-- Header -->
+            <div class="px-5 py-4 border-b border-gray-100">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 id="modal-tanda-title" class="text-lg font-semibold text-gray-900">Gestionar tanda de inventario</h3>
+                        <p id="modal-tanda-subtitle" class="text-xs text-gray-500 mt-1">Revisar detalles y acciones disponibles</p>
+                    </div>
+                    <button id="btn-close-modal-tanda" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 min-h-0 overflow-y-auto p-5">
+                
+                <!-- Detalle de la tanda -->
+                <div class="rounded-xl bg-blue-50 border border-blue-100 p-4 mb-4">
+                    <div class="flex items-start gap-3">
+                        <div id="modal-tanda-icon" class="shrink-0 text-2xl">📦</div>
+                        <div class="flex-1 min-w-0">
+                            <div id="modal-tanda-name" class="font-semibold text-gray-900 text-sm mb-2">Tanda de carga</div>
+                            
+                            <div class="grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <div class="text-gray-500">Fecha y hora</div>
+                                    <div id="modal-tanda-fecha" class="font-medium text-gray-900 mt-0.5">—</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-500">Origen</div>
+                                    <div id="modal-tanda-origen" class="font-medium text-gray-900 mt-0.5">—</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-500">Productos afectados</div>
+                                    <div id="modal-tanda-productos" class="font-medium text-gray-900 mt-0.5">—</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-500">Unidades totales</div>
+                                    <div id="modal-tanda-unidades" class="font-medium text-gray-900 mt-0.5">—</div>
+                                </div>
+                            </div>
+
+                            <div id="modal-tanda-proveedores-wrap" class="mt-3 pt-3 border-t border-blue-200">
+                                <div class="text-gray-500 text-xs mb-1">Proveedores</div>
+                                <div id="modal-tanda-proveedores" class="text-xs font-medium text-gray-900">—</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Advertencia si no se puede modificar/eliminar -->
+                <div id="modal-tanda-warning" class="hidden rounded-xl bg-amber-50 border border-amber-200 p-4 mb-4">
+                    <div class="flex items-start gap-2">
+                        <i class="fas fa-exclamation-triangle text-amber-600 mt-0.5"></i>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-semibold text-amber-900 text-sm mb-1">Advertencia</div>
+                            <div id="modal-tanda-warning-text" class="text-xs text-amber-800">
+                                Esta tanda contiene lotes con movimientos posteriores.
+                            </div>
+                            <ul id="modal-tanda-warning-list" class="mt-2 text-xs text-amber-800 space-y-1 pl-4 list-disc">
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información sobre eliminación -->
+                <div id="modal-tanda-delete-info" class="rounded-xl bg-red-50 border border-red-100 p-4">
+                    <div class="flex items-start gap-2">
+                        <i class="fas fa-info-circle text-red-600 mt-0.5"></i>
+                        <div class="flex-1 min-w-0 text-xs text-red-800">
+                            <div class="font-semibold mb-1">Al eliminar esta tanda:</div>
+                            <ul class="space-y-1 pl-4 list-disc">
+                                <li>Se eliminarán todos los lotes de esta carga</li>
+                                <li>Se eliminarán los movimientos de inventario asociados</li>
+                                <li>Solo se puede realizar si ningún lote fue vendido, consumido o ajustado</li>
+                                <li>Esta acción no se puede deshacer</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer con acciones -->
+            <div class="px-5 py-4 border-t border-gray-100 bg-gray-50">
+                <div class="flex items-center justify-between gap-3">
+                    <button id="btn-cancel-modal-tanda" type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    
+                    <div class="flex items-center gap-2">
+                        <button id="btn-modify-tanda" type="button" class="hidden px-4 py-2 text-sm font-medium text-white rounded-md hover:bg-blue-700" style="background-color:#0d1067;">
+                            <i class="fas fa-edit mr-1.5"></i> Modificar tanda
+                        </button>
+                        <button id="btn-delete-tanda-confirm" type="button" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">
+                            <i class="fas fa-trash-alt mr-1.5"></i> Eliminar tanda
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>

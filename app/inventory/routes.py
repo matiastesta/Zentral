@@ -30,7 +30,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 
 from app import db
-from app.models import Category, Expense, FileAsset, InventoryLot, InventoryMovement, Product, Sale, SaleItem, Supplier
+from app.models import Category, Expense, FileAsset, InventoryLot, InventoryMovement, Product, Sale, SaleItem, Supplier, TandaCarga
 from app.files.storage import upload_to_r2_and_create_asset
 from app.permissions import module_required, module_required_any
 from app.tenancy import ensure_request_context
@@ -48,6 +48,57 @@ def _company_id() -> str:
         return str(getattr(g, 'company_id', '') or '').strip()
     except Exception:
         return ''
+
+
+def _ensure_tanda_carga_columns() -> None:
+    """Asegura que las columnas tanda_carga_id existan en inventory_lot e inventory_movement."""
+    try:
+        engine = db.engine
+        insp = inspect(engine)
+        tables = set(insp.get_table_names() or [])
+        
+        # Verificar y agregar columna en inventory_lot
+        if 'inventory_lot' in tables:
+            cols = {str(c.get('name') or '') for c in (insp.get_columns('inventory_lot') or [])}
+            if 'tanda_carga_id' not in cols:
+                with engine.begin() as conn:
+                    conn.execute(text('ALTER TABLE inventory_lot ADD COLUMN IF NOT EXISTS tanda_carga_id INTEGER'))
+                    conn.execute(text('CREATE INDEX IF NOT EXISTS idx_inventory_lot_tanda_carga_id ON inventory_lot (tanda_carga_id)'))
+        
+        # Verificar y agregar columna en inventory_movement
+        if 'inventory_movement' in tables:
+            cols = {str(c.get('name') or '') for c in (insp.get_columns('inventory_movement') or [])}
+            if 'tanda_carga_id' not in cols:
+                with engine.begin() as conn:
+                    conn.execute(text('ALTER TABLE inventory_movement ADD COLUMN IF NOT EXISTS tanda_carga_id INTEGER'))
+                    conn.execute(text('CREATE INDEX IF NOT EXISTS idx_inventory_movement_tanda_carga_id ON inventory_movement (tanda_carga_id)'))
+        
+        # Verificar y crear tabla tanda_carga si no existe
+        if 'tanda_carga' not in tables:
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS tanda_carga (
+                        id SERIAL PRIMARY KEY,
+                        company_id VARCHAR(36) NOT NULL,
+                        identificador VARCHAR(64) NOT NULL,
+                        tipo_origen VARCHAR(32) NOT NULL DEFAULT 'excel',
+                        fecha_hora_creacion TIMESTAMP NOT NULL,
+                        user_id INTEGER,
+                        cantidad_items INTEGER NOT NULL DEFAULT 0,
+                        cantidad_total_unidades FLOAT NOT NULL DEFAULT 0,
+                        observacion TEXT,
+                        estado VARCHAR(16) NOT NULL DEFAULT 'activa',
+                        created_at TIMESTAMP NOT NULL,
+                        updated_at TIMESTAMP NOT NULL
+                    )
+                """))
+                conn.execute(text('CREATE INDEX IF NOT EXISTS idx_tanda_carga_company_id ON tanda_carga (company_id)'))
+                conn.execute(text('CREATE INDEX IF NOT EXISTS idx_tanda_carga_identificador ON tanda_carga (identificador)'))
+                conn.execute(text('CREATE INDEX IF NOT EXISTS idx_tanda_carga_tipo_origen ON tanda_carga (tipo_origen)'))
+                conn.execute(text('CREATE INDEX IF NOT EXISTS idx_tanda_carga_fecha_hora ON tanda_carga (fecha_hora_creacion)'))
+                conn.execute(text('CREATE INDEX IF NOT EXISTS idx_tanda_carga_estado ON tanda_carga (estado)'))
+    except Exception as e:
+        current_app.logger.warning(f'Could not ensure tanda_carga columns: {e}')
 
 
 def _ensure_product_stock_ilimitado_column() -> None:
@@ -982,11 +1033,8 @@ def inventory_import_excel():
     created_suppliers = 0
     processed_rows = 0
 
-    today = dt_date.today()
-    try:
-        received_at = datetime.combine(today, datetime.min.time())
-    except Exception:
-        received_at = datetime.utcnow()
+    # Usar hora real completa, no medianoche
+    received_at = datetime.utcnow()
 
     for i, row_vals in enumerate(rows_iter, start=2):
         vals = row_vals or ()
@@ -1101,7 +1149,10 @@ def inventory_import_excel():
                 if len(candidates) == 1:
                     prod = candidates[0]
                 elif len(candidates) >= 2:
-                    raise ValueError('ambiguous_requires_codigo_interno')
+                    # Incluir códigos internos de candidatos en el mensaje
+                    codigos = [f"'{c.internal_code or '(sin código)'}'" for c in candidates]
+                    codigos_str = ', '.join(codigos)
+                    raise ValueError(f'ambiguous_requires_codigo_interno|{codigos_str}')
 
             product_was_existing = bool(prod)
 
@@ -1449,20 +1500,25 @@ def inventory_import_excel_preview():
         will_create_supplier = bool(sup_norm) and (sup_norm not in existing_sup)
         matched_product_id = None
         match_kind = 'new'
-        requires_codigo_interno = False
+        requires_manual_decision = False
+        conflict_reason = None
 
+        # Regla A: Si hay código interno, buscar coincidencia exacta
         if codigo_interno:
             if codigo_interno in existing_by_ci:
+                # Coincide código interno → agregar lote al existente
                 product_exists = True
-                match_kind = 'codigo_interno'
+                match_kind = 'exact_match_codigo'
                 try:
                     matched_product_id = int(getattr(existing_by_ci[codigo_interno], 'id', None))
                 except Exception:
                     matched_product_id = None
             else:
+                # Código interno no existe → crear producto nuevo
                 product_exists = False
-                match_kind = 'new_codigo_interno'
+                match_kind = 'new_with_codigo'
         else:
+            # Sin código interno: buscar por nombre + categoría
             product_exists = False
             if cat_norm and cat_norm in existing_cat_by_norm and prod_norm:
                 try:
@@ -1471,7 +1527,7 @@ def inventory_import_excel_preview():
                     cat_id = 0
                 if cat_id:
                     candidates = (
-                        db.session.query(Product.id)
+                        db.session.query(Product.id, Product.internal_code)
                         .filter(Product.company_id == cid, Product.category_id == cat_id)
                         .filter(func.lower(func.trim(Product.name)) == nombre.lower())
                         .filter(Product.deleted_at.is_(None))
@@ -1479,19 +1535,25 @@ def inventory_import_excel_preview():
                         .all()
                     )
                     if len(candidates) == 1:
+                        # Un solo candidato sin código interno proporcionado
+                        # Regla B: Requiere confirmación manual
                         product_exists = True
-                        match_kind = 'nombre_categoria'
+                        match_kind = 'requires_confirmation'
+                        requires_manual_decision = True
+                        conflict_reason = 'sin_codigo_interno'
                         try:
-                            matched_product_id = int(getattr(candidates[0], 'id', None))
+                            matched_product_id = int(candidates[0][0])
                         except Exception:
-                            try:
-                                matched_product_id = int(candidates[0][0])
-                            except Exception:
-                                matched_product_id = None
+                            matched_product_id = None
                     elif len(candidates) >= 2:
+                        # Múltiples candidatos sin código interno
+                        # Regla B: Requiere confirmación manual (ambiguo)
                         product_exists = True
-                        match_kind = 'ambiguous'
-                        requires_codigo_interno = True
+                        match_kind = 'ambiguous_multiple'
+                        requires_manual_decision = True
+                        # Incluir códigos internos disponibles
+                        codigos_disponibles = [c[1] or '(sin código)' for c in candidates]
+                        conflict_reason = f'multiples_candidatos|{", ".join([f"{cd!r}" for cd in codigos_disponibles])}'
 
         if will_create_category:
             new_cats.add(cat_norm)
@@ -1519,8 +1581,14 @@ def inventory_import_excel_preview():
             'product_exists': product_exists,
             'matched_product_id': matched_product_id,
             'match_kind': match_kind,
-            'requires_codigo_interno': requires_codigo_interno,
+            'requires_manual_decision': requires_manual_decision,
+            'conflict_reason': conflict_reason,
         })
+
+    # Calcular resumen mejorado
+    new_products_count = sum(1 for r in out_rows if not r.get('product_exists'))
+    add_lots_count = sum(1 for r in out_rows if r.get('product_exists') and r.get('match_kind') == 'exact_match_codigo')
+    requires_decision_count = sum(1 for r in out_rows if r.get('requires_manual_decision'))
 
     return jsonify({
         'ok': True,
@@ -1529,6 +1597,9 @@ def inventory_import_excel_preview():
             'rows_detected': len(out_rows),
             'new_categories': len(new_cats),
             'new_suppliers': len(new_sups),
+            'new_products': new_products_count,
+            'add_lots_to_existing': add_lots_count,
+            'requires_manual_decision': requires_decision_count,
         }
     })
 
@@ -1539,6 +1610,8 @@ def inventory_import_excel_preview():
 def inventory_import_excel_commit():
     _ensure_product_stock_ilimitado_column()
     _ensure_product_deleted_at_column()
+    _ensure_tanda_carga_columns()
+    
     try:
         ensure_request_context()
     except Exception:
@@ -1559,11 +1632,39 @@ def inventory_import_excel_commit():
     created_suppliers = 0
     errors = []
 
+    # Usar timestamp real de importación (con hora exacta)
+    # Esto permite agrupar correctamente en tandas por fecha_ingreso
     today = dt_date.today()
+    received_at = datetime.utcnow()
+
+    # Crear TandaCarga para esta importación Excel
+    from flask_login import current_user
+    tanda_fecha = received_at  # Usar mismo timestamp para tanda y lotes
+    tanda_identificador = f'TANDA-{tanda_fecha.strftime("%Y%m%d-%H%M%S")}'
+    
     try:
-        received_at = datetime.combine(today, datetime.min.time())
+        user_id = current_user.id if current_user and current_user.is_authenticated else None
     except Exception:
-        received_at = datetime.utcnow()
+        user_id = None
+    
+    tanda = TandaCarga(
+        company_id=cid,
+        identificador=tanda_identificador,
+        tipo_origen='excel',
+        fecha_hora_creacion=tanda_fecha,
+        user_id=user_id,
+        cantidad_items=0,
+        cantidad_total_unidades=0.0,
+        observacion=f'Importación Excel - {len(rows)} filas procesadas',
+        estado='activa',
+        created_at=tanda_fecha,
+        updated_at=tanda_fecha
+    )
+    db.session.add(tanda)
+    db.session.flush()
+    
+    lotes_creados_tanda = []
+    movimientos_creados_tanda = []
 
     for idx, r in enumerate(rows, start=1):
         d = r if isinstance(r, dict) else {}
@@ -1684,7 +1785,10 @@ def inventory_import_excel_commit():
                 if len(candidates) == 1:
                     prod = candidates[0]
                 elif len(candidates) >= 2:
-                    raise ValueError('ambiguous_requires_codigo_interno')
+                    # Incluir códigos internos de candidatos en el mensaje
+                    codigos = [f"'{c.internal_code or '(sin código)'}'" for c in candidates]
+                    codigos_str = ', '.join(codigos)
+                    raise ValueError(f'ambiguous_requires_codigo_interno|{codigos_str}')
 
             if prod:
                 if not bool(getattr(prod, 'active', True)):
@@ -1784,6 +1888,7 @@ def inventory_import_excel_commit():
                     expiration_date=exp_dt,
                     lot_code=_generate_lot_code(),
                     note=nota_lote or 'Ingreso por inventario (importación Excel)',
+                    tanda_carga_id=tanda.id,
                 )
                 if not supplier_id and not supplier_name:
                     lot.supplier_id = None
@@ -1802,9 +1907,12 @@ def inventory_import_excel_commit():
                     qty_delta=cantidad,
                     unit_cost=costo_unitario,
                     total_cost=cantidad * costo_unitario,
+                    tanda_carga_id=tanda.id,
                 )
                 db.session.add(mv)
                 created_lots += 1
+                lotes_creados_tanda.append(lot)
+                movimientos_creados_tanda.append(mv)
 
             elif cost_provided:
                 lot = InventoryLot(
@@ -1818,6 +1926,7 @@ def inventory_import_excel_commit():
                     expiration_date=exp_dt,
                     lot_code=_generate_lot_code(),
                     note=nota_lote or 'Importación Excel (sin stock)',
+                    tanda_carga_id=tanda.id,
                 )
                 if not supplier_id and not supplier_name:
                     lot.supplier_id = None
@@ -1825,6 +1934,7 @@ def inventory_import_excel_commit():
                 lot.received_at = received_at
                 db.session.add(lot)
                 created_lots += 1
+                lotes_creados_tanda.append(lot)
 
             nested.commit()
         except Exception as e:
@@ -1836,11 +1946,16 @@ def inventory_import_excel_commit():
             errors.append({'row': row_num, 'error': code})
             continue
 
+    # Actualizar estadísticas de la tanda
+    tanda.cantidad_items = len(lotes_creados_tanda)
+    tanda.cantidad_total_unidades = sum(lote.qty_initial for lote in lotes_creados_tanda)
+    tanda.updated_at = datetime.utcnow()
+
     try:
         db.session.commit()
-    except Exception:
+    except Exception as e:
         db.session.rollback()
-        return jsonify({'ok': False, 'error': 'db_error'}), 400
+        return jsonify({'ok': False, 'error': 'db_error', 'detail': str(e)}), 400
 
     return jsonify({
         'ok': True,
@@ -1850,6 +1965,12 @@ def inventory_import_excel_commit():
             'categories_created': created_categories,
             'suppliers_created': created_suppliers,
             'errors': len(errors),
+        },
+        'tanda': {
+            'id': tanda.id,
+            'identificador': tanda.identificador,
+            'cantidad_items': tanda.cantidad_items,
+            'cantidad_total_unidades': tanda.cantidad_total_unidades,
         },
         'errors': errors,
     })
@@ -1904,6 +2025,17 @@ def get_product_method_lock(product_id: int):
     return jsonify({'ok': True, 'locked': bool(locked)})
 
 
+def _datetime_to_utc_iso(dt):
+    """Convierte datetime a ISO string con Z para indicar UTC explícitamente"""
+    if not dt:
+        return None
+    # Si es naive (sin timezone), asumimos que es UTC
+    iso_str = dt.isoformat()
+    # Si no tiene timezone info, agregar Z
+    if not iso_str.endswith('Z') and '+' not in iso_str[-6:] and dt.tzinfo is None:
+        iso_str += 'Z'
+    return iso_str
+
 def _serialize_lot(l: InventoryLot):
     return {
         'id': l.id,
@@ -1913,10 +2045,10 @@ def _serialize_lot(l: InventoryLot):
         'qty_initial': l.qty_initial,
         'qty_available': l.qty_available,
         'unit_cost': l.unit_cost,
-        'received_at': l.received_at.isoformat() if l.received_at else None,
+        'received_at': _datetime_to_utc_iso(l.received_at),
         'supplier_id': str(getattr(l, 'supplier_id', '') or ''),
         'supplier_name': l.supplier_name or '',
-        'expiration_date': l.expiration_date.isoformat() if l.expiration_date else None,
+        'expiration_date': _datetime_to_utc_iso(l.expiration_date),
         'lot_code': l.lot_code or '',
         'note': l.note or '',
         'origin_sale_ticket': l.origin_sale_ticket or '',
@@ -2962,6 +3094,7 @@ def clear_inventory():
 def list_lots():
     _ensure_product_stock_ilimitado_column()
     _ensure_product_deleted_at_column()
+    _ensure_tanda_carga_columns()
     limit = int(request.args.get('limit') or 5000)
     if limit <= 0 or limit > 20000:
         limit = 5000
@@ -3084,10 +3217,17 @@ def create_lot():
                 pass
 
             movement_date = _parse_date_iso(str(payload.get('date') or '').strip(), dt_date.today())
-            try:
-                received_at = datetime.combine(movement_date, datetime.min.time())
-            except Exception:
+            # Si el usuario especificó una fecha pasada, combinar con hora actual
+            # Si es hoy, usar timestamp real completo
+            if movement_date == dt_date.today():
                 received_at = datetime.utcnow()
+            else:
+                # Fecha pasada: usar hora actual del día actual aplicada a esa fecha
+                hora_actual = datetime.utcnow().time()
+                try:
+                    received_at = datetime.combine(movement_date, hora_actual)
+                except Exception:
+                    received_at = datetime.utcnow()
 
             mv = InventoryMovement(
                 company_id=cid,
@@ -3120,10 +3260,15 @@ def create_lot():
     db.session.flush()
 
     movement_date = _parse_date_iso(str(payload.get('date') or '').strip(), dt_date.today())
-    try:
-        received_at = datetime.combine(movement_date, datetime.min.time())
-    except Exception:
+    # Usar hora real, no medianoche
+    if movement_date == dt_date.today():
         received_at = datetime.utcnow()
+    else:
+        hora_actual = datetime.utcnow().time()
+        try:
+            received_at = datetime.combine(movement_date, hora_actual)
+        except Exception:
+            received_at = datetime.utcnow()
 
     mv = InventoryMovement(
         company_id=cid,
@@ -3212,10 +3357,15 @@ def set_product_stock_mode(product_id: int):
     db.session.add(lot)
     db.session.flush()
 
-    try:
-        received_at = datetime.combine(movement_date, datetime.min.time())
-    except Exception:
+    # Usar hora real, no medianoche
+    if movement_date == dt_date.today():
         received_at = datetime.utcnow()
+    else:
+        hora_actual = datetime.utcnow().time()
+        try:
+            received_at = datetime.combine(movement_date, hora_actual)
+        except Exception:
+            received_at = datetime.utcnow()
     lot.received_at = received_at
 
     mv = InventoryMovement(
@@ -3302,10 +3452,15 @@ def update_lot(lot_id: int):
     if not movement_date:
         return jsonify({'ok': False, 'error': 'date_required'}), 400
 
-    try:
-        received_at = datetime.combine(movement_date, datetime.min.time())
-    except Exception:
+    # Usar hora real, no medianoche
+    if movement_date == dt_date.today():
         received_at = datetime.utcnow()
+    else:
+        hora_actual = datetime.utcnow().time()
+        try:
+            received_at = datetime.combine(movement_date, hora_actual)
+        except Exception:
+            received_at = datetime.utcnow()
 
     lot.supplier_id = supplier_id
     lot.supplier_name = supplier_name
@@ -3619,6 +3774,8 @@ def delete_lot(lot_id: int):
 @login_required
 @module_required('inventory')
 def list_inventory_movements():
+    _ensure_tanda_carga_columns()
+    
     raw_from = (request.args.get('from') or '').strip()
     raw_to = (request.args.get('to') or '').strip()
     product_id = (request.args.get('product_id') or '').strip()
@@ -3649,3 +3806,559 @@ def list_inventory_movements():
     q = q.order_by(InventoryMovement.movement_date.desc(), InventoryMovement.id.desc()).limit(limit)
     rows = q.all()
     return jsonify({'ok': True, 'items': [_serialize_movement(r) for r in rows]})
+
+
+@bp.get('/api/tandas-dinamicas')
+@login_required
+@module_required('inventory')
+def list_tandas_dinamicas():
+    """
+    Lista tandas agrupando dinámicamente por received_at.
+    Usado cuando el usuario activa "Agrupar por tandas de carga".
+    """
+    _ensure_tanda_carga_columns()
+    
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': []})
+    
+    # Agrupar lotes por received_at y contar items/unidades
+    from collections import defaultdict
+    from sqlalchemy import func
+    tandas = (
+        db.session.query(
+            InventoryLot.received_at,
+            func.count(InventoryLot.id).label('cantidad_items'),
+            func.sum(InventoryLot.qty_initial).label('cantidad_total_unidades')
+        )
+        .join(Product)
+        .filter(InventoryLot.company_id == cid)
+        .filter(Product.company_id == cid)
+        .filter(Product.deleted_at.is_(None))
+        .group_by(InventoryLot.received_at)
+        .order_by(InventoryLot.received_at.desc())
+        .all()
+    )
+
+    detalles_origen = {
+        row[0]: {
+            'tipo_origen': str(row[1] or '').strip().lower(),
+            'nota': str(row[2] or '').strip().lower(),
+        }
+        for row in (
+            db.session.query(
+                InventoryLot.received_at,
+                TandaCarga.tipo_origen,
+                InventoryLot.note,
+            )
+            .outerjoin(TandaCarga, TandaCarga.id == InventoryLot.tanda_carga_id)
+            .join(Product)
+            .filter(InventoryLot.company_id == cid)
+            .filter(Product.company_id == cid)
+            .filter(Product.deleted_at.is_(None))
+            .order_by(InventoryLot.received_at.desc(), InventoryLot.id.asc())
+            .all()
+        )
+    }
+
+    def _resolver_origen(cantidad_items, tipo_origen_raw, nota_raw):
+        tipo = str(tipo_origen_raw or '').strip().lower()
+        nota = str(nota_raw or '').strip().lower()
+        if tipo == 'excel' or 'excel' in nota or 'importa' in nota:
+            return 'excel'
+        if cantidad_items <= 1:
+            return 'manual_item'
+        if cantidad_items > 1:
+            return 'manual_lote'
+        return 'fallback'
+
+    def _display_meta(origin_type, seq):
+        if origin_type == 'excel':
+            return {
+                'display_name': f'Tanda subida por Excel N°{seq}',
+                'origin_icon': '📥',
+            }
+        if origin_type == 'manual_lote':
+            return {
+                'display_name': f'Artículos cargados por lote N°{seq}',
+                'origin_icon': '📦',
+            }
+        if origin_type == 'manual_item':
+            return {
+                'display_name': f'Artículo creado manualmente N°{seq}',
+                'origin_icon': '✏️',
+            }
+        return {
+            'display_name': f'Carga de inventario N°{seq}',
+            'origin_icon': '📁',
+        }
+    
+    # PASO 1: Contar totales por tipo para asignar números en orden inverso
+    total_por_tipo = defaultdict(int)
+    tipos_tandas = []
+    for tanda in tandas:
+        received_at = tanda[0]
+        cantidad_items = tanda[1] or 0
+        detalle = detalles_origen.get(received_at) or {}
+        origin_type = _resolver_origen(cantidad_items, detalle.get('tipo_origen'), detalle.get('nota'))
+        tipos_tandas.append(origin_type)
+        total_por_tipo[origin_type] += 1
+    
+    # PASO 2: Asignar números en orden descendente (N°1 = más vieja, N°mayor = más reciente)
+    counters = {k: v + 1 for k, v in total_por_tipo.items()}  # Empezar desde el total+1
+    
+    items = []
+    for i, tanda in enumerate(tandas):
+        received_at = tanda[0]
+        cantidad_items = tanda[1] or 0
+        cantidad_total_unidades = float(tanda[2] or 0)
+        origin_type = tipos_tandas[i]
+        
+        # Decrementar contador para asignar números invertidos
+        counters[origin_type] -= 1
+        seq = counters[origin_type]
+        meta = _display_meta(origin_type, seq)
+        
+        # Generar identificador legible
+        if received_at:
+            fecha_str = received_at.strftime('%d/%m/%Y %H:%M:%S')
+            identificador = f"TANDA-{received_at.strftime('%Y%m%d-%H%M%S')}"
+        else:
+            fecha_str = "Sin fecha"
+            identificador = "TANDA-SIN-FECHA"
+        
+        items.append({
+            'received_at': _datetime_to_utc_iso(received_at),
+            'fecha_str': fecha_str,
+            'identificador': identificador,
+            'display_name': meta['display_name'],
+            'display_subtitle': f'{fecha_str} · {cantidad_items} ítems / {cantidad_total_unidades:,.2f} unidades'.replace(',', 'X').replace('.', ',').replace('X', '.'),
+            'origin_type': origin_type,
+            'origin_icon': meta['origin_icon'],
+            'sequence_number': seq,
+            'cantidad_items': cantidad_items,
+            'cantidad_total_unidades': cantidad_total_unidades,
+            'tipo_origen': origin_type
+        })
+    
+    return jsonify({'ok': True, 'items': items})
+
+
+@bp.get('/api/tandas-dinamicas/detalle')
+@login_required
+@module_required('inventory')
+def get_tanda_dinamica_detalle():
+    """
+    Obtiene el detalle de una tanda dinámica (todos los lotes con ese received_at).
+    """
+    _ensure_tanda_carga_columns()
+    
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    
+    received_at_str = request.args.get('received_at')
+    if not received_at_str:
+        return jsonify({'ok': False, 'error': 'received_at_required'}), 400
+    
+    # Parsear fecha
+    try:
+        from dateutil import parser
+        received_at = parser.isoparse(received_at_str)
+    except Exception:
+        return jsonify({'ok': False, 'error': 'invalid_date'}), 400
+    
+    # Obtener todos los lotes con ese received_at
+    lotes = (
+        db.session.query(InventoryLot)
+        .join(Product)
+        .filter(InventoryLot.company_id == cid)
+        .filter(Product.company_id == cid)
+        .filter(Product.deleted_at.is_(None))
+        .filter(InventoryLot.received_at == received_at)
+        .order_by(InventoryLot.id)
+        .all()
+    )
+    
+    return jsonify({
+        'ok': True,
+        'received_at': _datetime_to_utc_iso(received_at),
+        'items': [_serialize_lot(lote) for lote in lotes]
+    })
+
+
+@bp.delete('/api/tandas-dinamicas')
+@login_required
+@module_required('inventory')
+def delete_tanda_dinamica():
+    """
+    Elimina una tanda dinámica completa (todos los lotes con ese received_at).
+    Solo permite eliminación si ningún lote tuvo movimientos de venta.
+    """
+    _ensure_tanda_carga_columns()
+    
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    
+    payload = request.get_json(silent=True) or {}
+    received_at_str = payload.get('received_at')
+    if not received_at_str:
+        return jsonify({'ok': False, 'error': 'received_at_required'}), 400
+    
+    # Parsear fecha
+    try:
+        from dateutil import parser
+        received_at = parser.isoparse(received_at_str)
+    except Exception:
+        return jsonify({'ok': False, 'error': 'invalid_date'}), 400
+    
+    # Obtener todos los lotes de esta tanda
+    lotes = (
+        db.session.query(InventoryLot)
+        .filter(InventoryLot.company_id == cid)
+        .filter(InventoryLot.received_at == received_at)
+        .all()
+    )
+    
+    if not lotes:
+        return jsonify({'ok': False, 'error': 'tanda_not_found'}), 404
+    
+    # Validar que ningún lote tenga movimientos de venta
+    lote_ids = [lote.id for lote in lotes]
+    
+    movimientos_venta = (
+        db.session.query(InventoryMovement)
+        .filter(InventoryMovement.company_id == cid)
+        .filter(InventoryMovement.lot_id.in_(lote_ids))
+        .filter(InventoryMovement.type == 'sale')
+        .count()
+    )
+    
+    if movimientos_venta > 0:
+        return jsonify({
+            'ok': False,
+            'error': 'tanda_has_sales',
+            'message': 'No se puede eliminar esta tanda porque algunos lotes ya tuvieron ventas.'
+        }), 400
+    
+    # Validar que qty_available sea igual a qty_initial (no hubo consumo)
+    for lote in lotes:
+        if lote.qty_available < lote.qty_initial - 0.001:
+            return jsonify({
+                'ok': False,
+                'error': 'tanda_has_consumption',
+                'message': 'No se puede eliminar esta tanda porque algunos lotes ya fueron consumidos.'
+            }), 400
+    
+    try:
+        # Eliminar movimientos de compra
+        db.session.query(InventoryMovement).filter(
+            InventoryMovement.company_id == cid,
+            InventoryMovement.lot_id.in_(lote_ids),
+            InventoryMovement.type == 'purchase'
+        ).delete(synchronize_session=False)
+        
+        # Eliminar lotes
+        db.session.query(InventoryLot).filter(
+            InventoryLot.company_id == cid,
+            InventoryLot.received_at == received_at
+        ).delete(synchronize_session=False)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'ok': True,
+            'message': f'Tanda eliminada: {len(lotes)} lotes'
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'ok': False,
+            'error': 'db_error',
+            'message': str(e)
+        }), 500
+
+
+@bp.get('/api/tandas-carga')
+@login_required
+@module_required('inventory')
+def list_tandas_carga():
+    """Lista todas las tandas de carga con paginación."""
+    _ensure_tanda_carga_columns()
+    
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': True, 'items': [], 'total': 0})
+    
+    page = int(request.args.get('page') or 1)
+    per_page = int(request.args.get('per_page') or 50)
+    if page < 1:
+        page = 1
+    if per_page < 1 or per_page > 200:
+        per_page = 50
+    
+    # Filtros opcionales
+    tipo_origen = (request.args.get('tipo_origen') or '').strip()
+    estado = (request.args.get('estado') or '').strip()
+    fecha_desde = _parse_date_iso(request.args.get('fecha_desde') or '', None)
+    fecha_hasta = _parse_date_iso(request.args.get('fecha_hasta') or '', None)
+    
+    q = db.session.query(TandaCarga).filter(TandaCarga.company_id == cid)
+    
+    if tipo_origen:
+        q = q.filter(TandaCarga.tipo_origen == tipo_origen)
+    if estado:
+        q = q.filter(TandaCarga.estado == estado)
+    if fecha_desde:
+        q = q.filter(TandaCarga.fecha_hora_creacion >= datetime.combine(fecha_desde, datetime.min.time()))
+    if fecha_hasta:
+        q = q.filter(TandaCarga.fecha_hora_creacion <= datetime.combine(fecha_hasta, datetime.max.time()))
+    
+    total = q.count()
+    
+    tandas = (
+        q.order_by(TandaCarga.fecha_hora_creacion.desc())
+        .limit(per_page)
+        .offset((page - 1) * per_page)
+        .all()
+    )
+    
+    items = []
+    for tanda in tandas:
+        # Obtener proveedor dominante
+        proveedores = db.session.query(InventoryLot.supplier_name).filter(
+            InventoryLot.tanda_carga_id == tanda.id,
+            InventoryLot.supplier_name.isnot(None)
+        ).distinct().all()
+        
+        proveedor_display = 'Varios' if len(proveedores) > 1 else (proveedores[0][0] if proveedores else '—')
+        
+        items.append({
+            'id': tanda.id,
+            'identificador': tanda.identificador,
+            'tipo_origen': tanda.tipo_origen,
+            'fecha_hora_creacion': tanda.fecha_hora_creacion.isoformat() if tanda.fecha_hora_creacion else None,
+            'user_id': tanda.user_id,
+            'cantidad_items': tanda.cantidad_items,
+            'cantidad_total_unidades': tanda.cantidad_total_unidades,
+            'observacion': tanda.observacion,
+            'estado': tanda.estado,
+            'proveedor_display': proveedor_display,
+        })
+    
+    return jsonify({
+        'ok': True,
+        'items': items,
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': (total + per_page - 1) // per_page if per_page > 0 else 0
+    })
+
+
+@bp.get('/api/tandas-carga/<int:tanda_id>')
+@login_required
+@module_required('inventory')
+def get_tanda_carga_detail(tanda_id: int):
+    """Obtiene el detalle completo de una tanda de carga."""
+    _ensure_tanda_carga_columns()
+    
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    
+    tanda = db.session.query(TandaCarga).filter(
+        TandaCarga.id == tanda_id,
+        TandaCarga.company_id == cid
+    ).first()
+    
+    if not tanda:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    
+    # Obtener lotes asociados
+    lotes = db.session.query(InventoryLot).filter(
+        InventoryLot.tanda_carga_id == tanda.id
+    ).order_by(InventoryLot.created_at).all()
+    
+    lotes_data = []
+    for lote in lotes:
+        product = db.session.get(Product, lote.product_id)
+        lotes_data.append({
+            'id': lote.id,
+            'product_id': lote.product_id,
+            'product_name': product.name if product else '—',
+            'product_internal_code': product.internal_code if product else '',
+            'qty_initial': lote.qty_initial,
+            'qty_available': lote.qty_available,
+            'unit_cost': lote.unit_cost,
+            'supplier_name': lote.supplier_name,
+            'expiration_date': _datetime_to_utc_iso(lote.expiration_date),
+            'lot_code': lote.lot_code,
+            'note': lote.note,
+            'received_at': _datetime_to_utc_iso(lote.received_at),
+        })
+    
+    return jsonify({
+        'ok': True,
+        'tanda': {
+            'id': tanda.id,
+            'identificador': tanda.identificador,
+            'tipo_origen': tanda.tipo_origen,
+            'fecha_hora_creacion': tanda.fecha_hora_creacion.isoformat() if tanda.fecha_hora_creacion else None,
+            'user_id': tanda.user_id,
+            'cantidad_items': tanda.cantidad_items,
+            'cantidad_total_unidades': tanda.cantidad_total_unidades,
+            'observacion': tanda.observacion,
+            'estado': tanda.estado,
+        },
+        'lotes': lotes_data
+    })
+
+
+@bp.delete('/api/tandas-carga/<int:tanda_id>')
+@login_required
+@module_required('inventory')
+def delete_tanda_carga(tanda_id: int):
+    """
+    Elimina una tanda de carga completa con validaciones de seguridad.
+    
+    No permite eliminación si algún lote de la tanda:
+    - Ya tuvo ventas
+    - Ya fue consumido parcialmente
+    - Ya fue ajustado
+    - Ya tuvo movimientos posteriores
+    """
+    _ensure_tanda_carga_columns()
+    
+    try:
+        ensure_request_context()
+    except Exception:
+        pass
+    
+    cid = _company_id()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    
+    tanda = db.session.query(TandaCarga).filter(
+        TandaCarga.id == tanda_id,
+        TandaCarga.company_id == cid
+    ).first()
+    
+    if not tanda:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    
+    # Obtener todos los lotes de la tanda
+    lotes = db.session.query(InventoryLot).filter(
+        InventoryLot.tanda_carga_id == tanda.id
+    ).all()
+    
+    if not lotes:
+        # Si no hay lotes, eliminar la tanda directamente
+        try:
+            db.session.delete(tanda)
+            db.session.commit()
+            return jsonify({'ok': True, 'message': 'Tanda eliminada (sin lotes)'})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'ok': False, 'error': 'db_error', 'detail': str(e)}), 400
+    
+    # Validar que ningún lote tenga movimientos de venta
+    lotes_comprometidos = []
+    for lote in lotes:
+        # Verificar si tiene ventas
+        tiene_ventas = db.session.query(InventoryMovement.id).filter(
+            InventoryMovement.lot_id == lote.id,
+            InventoryMovement.type == 'sale'
+        ).first() is not None
+        
+        # Verificar si fue consumido parcialmente
+        fue_consumido = lote.qty_available < lote.qty_initial
+        
+        if tiene_ventas or fue_consumido:
+            product = db.session.get(Product, lote.product_id)
+            lotes_comprometidos.append({
+                'lot_id': lote.id,
+                'product_name': product.name if product else '—',
+                'qty_initial': lote.qty_initial,
+                'qty_available': lote.qty_available,
+                'tiene_ventas': tiene_ventas,
+                'fue_consumido': fue_consumido,
+            })
+    
+    if lotes_comprometidos:
+        return jsonify({
+            'ok': False,
+            'error': 'tanda_comprometida',
+            'message': 'No se puede eliminar esta tanda porque algunos lotes ya tuvieron movimientos posteriores (ventas, consumos o ajustes).',
+            'lotes_comprometidos': lotes_comprometidos,
+        }), 400
+    
+    # Si pasó todas las validaciones, proceder con la eliminación
+    try:
+        # Eliminar movimientos de inventario asociados a la tanda
+        db.session.query(InventoryMovement).filter(
+            InventoryMovement.tanda_carga_id == tanda.id
+        ).delete(synchronize_session=False)
+        
+        # Eliminar egresos vinculados a los lotes de la tanda
+        for lote in lotes:
+            patterns = [
+                f'%"lot_id":{lote.id}%',
+                f'%"lot_id": {lote.id}%',
+                f'%"lot_id":"{lote.id}"%',
+                f'%"lot_id": "{lote.id}"%',
+            ]
+            conds = [Expense.meta_json.ilike(p) for p in patterns]
+            if conds:
+                db.session.query(Expense).filter(
+                    Expense.company_id == cid,
+                    Expense.origin == 'inventory',
+                    or_(*conds)
+                ).delete(synchronize_session=False)
+        
+        # Eliminar lotes
+        db.session.query(InventoryLot).filter(
+            InventoryLot.tanda_carga_id == tanda.id
+        ).delete(synchronize_session=False)
+        
+        # Eliminar tanda
+        db.session.delete(tanda)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'ok': True,
+            'message': f'Se eliminó correctamente la tanda {tanda.identificador} con {len(lotes)} ítems y {tanda.cantidad_total_unidades} unidades.'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.exception('Failed to delete tanda_carga')
+        return jsonify({'ok': False, 'error': 'db_error', 'detail': str(e)}), 400

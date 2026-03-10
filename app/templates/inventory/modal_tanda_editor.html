@@ -1,0 +1,104 @@
+<!-- Modal de edición de tanda con tabla editable -->
+<div id="modal-tanda-editor" class="hidden fixed inset-0 z-50" style="z-index: 80;">
+    <div class="absolute inset-0 bg-black/60"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-7xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col" style="max-height: calc(100vh - 2rem);">
+            
+            <!-- Header -->
+            <div class="px-5 py-4 border-b border-gray-100">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">Modificar tanda de inventario</h3>
+                        <p id="tanda-editor-subtitle" class="text-xs text-gray-500 mt-1">Editá los datos de cada producto/lote de esta carga</p>
+                    </div>
+                    <button id="btn-close-tanda-editor" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 min-h-0 overflow-y-auto p-5">
+                
+                <!-- Info de tanda -->
+                <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <div class="flex items-center gap-3">
+                        <span id="tanda-editor-icon" class="text-2xl">📦</span>
+                        <div>
+                            <div id="tanda-editor-name" class="font-semibold text-sm text-gray-900">Tanda de carga</div>
+                            <div id="tanda-editor-fecha" class="text-xs text-gray-600">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Avisos de reclasificación -->
+                <div id="tanda-editor-warnings" class="hidden mb-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <div class="flex items-start gap-2">
+                        <i class="fas fa-info-circle text-amber-600 mt-0.5"></i>
+                        <div class="flex-1">
+                            <div class="font-semibold text-sm text-amber-900 mb-1">Cambios detectados</div>
+                            <ul id="tanda-editor-warnings-list" class="text-xs text-amber-800 space-y-1 pl-4 list-disc">
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla editable -->
+                <div class="overflow-x-auto border rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Código Interno</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Proveedor</th>
+                                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cantidad</th>
+                                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Vencimiento</th>
+                                <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tanda-editor-tbody" class="bg-white divide-y divide-gray-200">
+                            <!-- Filas generadas dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+
+            <!-- Footer con resumen y acciones -->
+            <div class="px-5 py-4 border-t border-gray-100 bg-gray-50">
+                
+                <!-- Resumen de cambios -->
+                <div id="tanda-editor-summary" class="hidden mb-4 p-3 bg-white rounded-lg border border-gray-200">
+                    <div class="font-semibold text-sm text-gray-900 mb-2">Resumen de cambios</div>
+                    <div class="grid grid-cols-3 gap-3 text-xs">
+                        <div>
+                            <span class="text-gray-500">Productos nuevos:</span>
+                            <span id="summary-nuevos" class="font-medium text-gray-900 ml-1">0</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">Lotes existentes:</span>
+                            <span id="summary-lotes" class="font-medium text-gray-900 ml-1">0</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">Conflictos:</span>
+                            <span id="summary-conflictos" class="font-medium text-red-600 ml-1">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-3">
+                    <button id="btn-cancel-tanda-editor" type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    
+                    <button id="btn-save-tanda-editor" type="button" class="px-4 py-2 text-sm font-medium text-white rounded-md hover:bg-blue-700" style="background-color:#0d1067;">
+                        <i class="fas fa-save mr-1.5"></i> Aplicar cambios
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>

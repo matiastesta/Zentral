@@ -317,11 +317,13 @@ def eerr_api():
     gross_margin = net_sales - cmv
 
     # 4) Gastos (incluye pendientes por CC proveedor; excluye pagos de CC para no duplicar)
+    # IMPORTANTE: Excluir origin='inventory' - el inventario es un ACTIVO, no un gasto operativo
     exp_q = (
         db.session.query(Expense)
         .filter(Expense.company_id == cid)
         .filter(Expense.expense_date >= d_from)
         .filter(Expense.expense_date <= d_to)
+        .filter(Expense.origin != 'inventory')  # Solo gastos del módulo Gastos
     )
     exp_rows = exp_q.all()
 
@@ -777,12 +779,13 @@ def eerr_api():
                     )
                     cmv_prev = _num(cmv_prev)
 
-                # Gastos previos
+                # Gastos previos (excluir inventario - es activo)
                 exp_rows_prev = (
                     db.session.query(Expense)
                     .filter(Expense.company_id == cid)
                     .filter(Expense.expense_date >= prev_from)
                     .filter(Expense.expense_date <= prev_to)
+                    .filter(Expense.origin != 'inventory')
                     .all()
                 )
                 payroll_prev = 0.0
@@ -1674,6 +1677,7 @@ def finance_api():
                 .filter(Expense.company_id == cid)
                 .filter(Expense.expense_date >= p_from)
                 .filter(Expense.expense_date <= p_to)
+                .filter(Expense.origin != 'inventory')  # Excluir inventario - es activo
                 .all()
             )
         except Exception:
@@ -2063,6 +2067,7 @@ def finance_api():
             .filter(Expense.company_id == cid)
             .filter(Expense.expense_date >= d_from)
             .filter(Expense.expense_date <= d_to)
+            .filter(Expense.origin != 'inventory')  # Excluir inventario - es activo
             .all()
         )
         for e in (exp_rows or []):
@@ -2164,6 +2169,7 @@ def finance_api():
             db.session.query(Expense)
             .filter(Expense.expense_date >= d_from)
             .filter(Expense.expense_date <= d_to)
+            .filter(Expense.origin != 'inventory')  # Excluir inventario - es activo
             .all()
         )
         for e in (exp_rows or []):

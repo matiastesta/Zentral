@@ -715,6 +715,23 @@
     </div>
 
     <div id="panel-lots" class="hidden">
+        <div class="mb-4 flex items-center justify-between gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <div class="flex items-center gap-3">
+                <label class="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="toggle-view-tandas" class="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300">
+                    <span class="ml-2 text-sm text-gray-700">Agrupar por tandas de carga</span>
+                </label>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-gray-600">
+                <label>Filtrar por origen:</label>
+                <select id="filter-tipo-origen" class="px-2 py-1 border rounded-md text-xs bg-white">
+                    <option value="">Todos</option>
+                    <option value="excel">Excel</option>
+                    <option value="manual">Manual</option>
+                </select>
+            </div>
+        </div>
+        
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
@@ -849,6 +866,39 @@
                         <div class="text-sm font-semibold text-gray-900">Importar masivamente</div>
                         <div class="mt-1 text-xs text-gray-500">Por Excel</div>
                     </button>
+                </div>
+
+                <div class="mt-5 p-4 rounded-xl bg-blue-50 border border-blue-100">
+                    <div class="flex items-start gap-2">
+                        <div class="shrink-0 mt-0.5 text-blue-600">
+                            <i class="fas fa-info-circle"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-sm font-semibold text-gray-900 mb-2">Reglas de importación por Excel</div>
+                            <div class="space-y-2 text-xs text-gray-700">
+                                <div class="flex gap-2">
+                                    <span class="shrink-0 font-semibold text-gray-900">1.</span>
+                                    <span><strong>Si nombre, categoría y código interno coinciden:</strong> Se agregará un lote al producto existente.</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <span class="shrink-0 font-semibold text-gray-900">2.</span>
+                                    <span><strong>Si nombre y categoría coinciden, pero no hay código interno:</strong> El sistema te pedirá confirmar si querés agregar un lote al producto existente o crear un producto nuevo.</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <span class="shrink-0 font-semibold text-gray-900">3.</span>
+                                    <span><strong>Si nombre y categoría coinciden, pero el código interno es diferente:</strong> Se creará un producto nuevo.</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <span class="shrink-0 font-semibold text-gray-900">4.</span>
+                                    <span><strong>Si el nombre o la categoría son diferentes:</strong> Se creará un producto nuevo.</span>
+                                </div>
+                                <div class="mt-3 pt-3 border-t border-blue-200 flex gap-2">
+                                    <span class="shrink-0 text-blue-600"><i class="fas fa-check-circle"></i></span>
+                                    <span class="text-blue-900"><strong>Importante:</strong> Las cargas de inventario aumentan el valor del stock como activo y no generan gastos operativos automáticos.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1340,6 +1390,12 @@ document.addEventListener('DOMContentLoaded', function () {
     let filterCat = document.getElementById('inv-cat');
     let filterStatus = document.getElementById('inv-status');
     const filterLotsSup = document.getElementById('inv-lots-sup');
+    
+    const toggleViewTandas = document.getElementById('toggle-view-tandas');
+    const filterTipoOrigen = document.getElementById('filter-tipo-origen');
+    
+    let tandasCargaData = [];
+    let tandasExpandidas = new Set();
 
     const btnInvColumnsMenu = document.getElementById('btn-inv-columns-menu');
     const modalInvColumns = document.getElementById('modal-inv-columns');
@@ -2999,13 +3055,44 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function fmtFecha(v) {
+        if (!v) return '';
         try {
-            if (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') {
-                return window.formatFechaDisplay(v);
+            const str = String(v);
+            // Si ya viene formateado, retornarlo
+            if (str.includes('/')) return str;
+            
+            // Parsear ISO string - IMPORTANTE: asegurar que se trate como UTC
+            // El backend guarda en UTC, necesitamos convertir a hora local
+            let isoStr = str.trim();
+            // Si no termina en Z, agregarlo para indicar que es UTC
+            if (!isoStr.endsWith('Z') && !isoStr.includes('+') && !isoStr.includes('T')) {
+                // Es solo fecha sin hora
+                isoStr += 'T00:00:00Z';
+            } else if (!isoStr.endsWith('Z') && !isoStr.includes('+')) {
+                // Tiene hora pero no timezone, agregar Z para UTC
+                isoStr += 'Z';
             }
+            
+            const d = new Date(isoStr);
+            if (isNaN(d.getTime())) return str;
+            
+            // Formatear DD/MM/YYYY HH:MM:SS en hora LOCAL del navegador
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            const seconds = String(d.getSeconds()).padStart(2, '0');
+            
+            // Si tiene hora (no es medianoche), mostrarla
+            if (hours !== '00' || minutes !== '00' || seconds !== '00') {
+                return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+            }
+            // Solo fecha
+            return `${day}/${month}/${year}`;
         } catch (e) {
+            return String(v ?? '');
         }
-        return String(v ?? '');
     }
 
     function openPrecios() {
@@ -4592,12 +4679,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (!cu.ok) errs.costo_unitario = 'Costo unitario debe ser numérico.';
         else if ((cu.value ?? 0) < 0) errs.costo_unitario = 'Costo unitario debe ser ≥ 0.';
-
+        
         if (codigoInterno && (codigoInterno.length < 4 || codigoInterno.length > 50)) errs.codigo_interno = 'Código interno: 4 a 50 caracteres.';
         else if (codigoInterno && /\s/.test(codigoInterno)) errs.codigo_interno = 'Código interno: sin espacios.';
 
-        if (d.requires_codigo_interno === true) {
-            errs.codigo_interno = 'Hay más de un producto con este nombre y categoría. Debés completar “codigo_interno”.';
+        // Validar ambigüedad de producto
+        const mk = String(d.match_kind || '').trim();
+        if (mk === 'ambiguous_multiple' || d.requires_codigo_interno === true) {
+            let msg = 'Hay más de un producto con este nombre y categoría. Debés completar "codigo_interno".';
+            // Si conflict_reason incluye códigos disponibles, mostrarlos
+            if (d.conflict_reason && String(d.conflict_reason).includes('multiples_candidatos|')) {
+                const parts = String(d.conflict_reason).split('|');
+                if (parts.length > 1) {
+                    msg += ' Códigos disponibles: ' + parts[1];
+                }
+            }
+            if (!codigoInterno) {
+                errs.codigo_interno = msg;
+            }
         }
 
         if (!isValidDateFlexible(venc)) errs.vencimiento = 'Vencimiento inválido (usa dd/mm/aaaa o yyyy-mm-dd).';
@@ -4713,15 +4812,41 @@ document.addEventListener('DOMContentLoaded', function () {
                 return el;
             };
 
+            const getCodigoInternoOptions = function () {
+                const mk = String(r.match_kind || '').trim();
+                const conflictReason = String(r.conflict_reason || '').trim();
+                if (mk !== 'ambiguous_multiple' && !conflictReason.includes('multiples_candidatos|')) return [];
+                const raw = conflictReason.split('|')[1] || '';
+                return raw
+                    .split(',')
+                    .map(v => String(v || '').trim())
+                    .map(v => v.replace(/^['"]+|['"]+$/g, ''))
+                    .filter(Boolean);
+            };
+
             const input = function (field, extraCls, placeholder) {
                 const v = String(r[field] ?? '');
                 const err = (r._errors && r._errors[field]) ? String(r._errors[field]) : '';
+                const codigoOptions = field === 'codigo_interno' ? getCodigoInternoOptions() : [];
                 return ''
+                    + '<div class="space-y-1">'
                     + '<div class="relative">'
                     + '<input data-row-idx="' + idx + '" data-field="' + esc(field) + '" value="' + esc(v) + '" placeholder="' + esc(placeholder || '') + '"'
                     + ' class="w-full px-2 py-1.5 pr-8 text-sm border rounded-md text-center ' + (extraCls || '') + (err ? ' border-red-300 ring-1 ring-red-200' : ' border-gray-200') + '"'
                     + ' title="' + esc(err || '') + '">'
                     + '<span class="cell-err-icon pointer-events-none absolute inset-y-0 right-2 flex items-center text-red-500 ' + (err ? '' : 'hidden') + '"><i class="fas fa-exclamation-circle"></i></span>'
+                    + '</div>'
+                    + ((field === 'codigo_interno' && codigoOptions.length)
+                        ? ('<select data-action="pick-codigo-interno-select" data-row-idx="' + idx + '" class="w-full px-2 py-1.5 text-[11px] border border-indigo-200 rounded-md bg-indigo-50 text-indigo-700">'
+                            + '<option value="">Seleccionar código existente</option>'
+                            + codigoOptions.map(function (opt) {
+                                return '<option value="' + esc(opt) + '"' + (String(v) === String(opt) ? ' selected' : '') + '>' + esc(opt) + '</option>';
+                            }).join('')
+                            + '</select>')
+                        : '')
+                    + ((field === 'codigo_interno' && codigoOptions.length)
+                        ? '<div class="text-[10px] text-indigo-700">Elegí uno de los códigos existentes</div>'
+                        : '')
                     + '</div>';
             };
 
@@ -4808,6 +4933,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 const row = previewRows[ridx];
                 if (!row) return;
                 row._deleted = true;
+                renderPreviewTable();
+                renderPreviewSummary();
+            });
+        });
+
+        Array.from(previewTbody.querySelectorAll('select[data-action="pick-codigo-interno-select"][data-row-idx]')).forEach(function (sel) {
+            sel.addEventListener('change', function () {
+                const ridx = parseInt(String(sel.getAttribute('data-row-idx') || '0'), 10);
+                const value = String(sel.value || '').trim();
+                const row = previewRows[ridx];
+                if (!row || row._deleted || !value) return;
+                row.codigo_interno = value;
+                validatePreviewRow(row);
                 renderPreviewTable();
                 renderPreviewSummary();
             });
@@ -5358,8 +5496,17 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function renderLots(filteredLots) {
+    async function renderLots(filteredLots) {
         if (!tbodyLots) return;
+        
+        // Si el toggle de tandas está activado, mostrar vista agrupada
+        if (toggleViewTandas && toggleViewTandas.checked) {
+            await loadTandasCarga();
+            renderTandasAgrupadas();
+            return;
+        }
+        
+        // Vista normal de lotes individuales
         if (!filteredLots.length) {
             tbodyLots.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">No hay resultados para los filtros actuales.</td></tr>';
             return;
@@ -5379,7 +5526,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + esc(codigoInterno || '—') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + fmtFecha(l.received_at || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + String(parseNumeroSeguro(l.qty_initial).toLocaleString('es-AR', { maximumFractionDigits: 2 })) + '</td>'
-                + '<td class="px-4 py-3 text-sm text-gray-500">' + formatMoney(parseNumeroSeguro(l.unit_cost)) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-right text-gray-500">' + formatMoney(parseNumeroSeguro(l.unit_cost)) + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + String(l.supplier_name || '') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-gray-500">' + (l.expiration_date ? fmtFecha(l.expiration_date) : '—') + '</td>'
                 + '<td class="px-4 py-3 text-sm text-right">'
@@ -5421,9 +5568,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
         Array.from(tbodyLots.querySelectorAll('.btn-lot-edit')).forEach(btn => {
             btn.addEventListener('click', function () {
-                const id = this.getAttribute('data-lot-id') || '';
+                const lotId = this.getAttribute('data-lot-id') || '';
                 closeAllLotMenus();
-                openEditLot(id);
+                
+                // Buscar el lote en cacheLots para obtener su received_at
+                const lots = Array.isArray(cacheLots) ? cacheLots : [];
+                const lot = lots.find(l => String(l.id) === String(lotId));
+                
+                if (lot && lot.received_at) {
+                    // Abrir modal de tanda (igual que modificar tanda)
+                    if (typeof window.openTandaEditor === 'function') {
+                        window.openTandaEditor(lot.received_at);
+                    } else {
+                        alert('No se pudo abrir el editor de tanda');
+                    }
+                } else {
+                    // Fallback al editor simple si no se encuentra received_at
+                    openEditLot(lotId);
+                }
             });
         });
 
@@ -5468,6 +5630,239 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
             });
         });
+    }
+
+    async function loadTandasCarga() {
+        try {
+            const res = await fetch('/inventory/api/tandas-dinamicas');
+            const data = await res.json();
+            if (data.ok && Array.isArray(data.items)) {
+                tandasCargaData = data.items;
+                return data.items;
+            }
+            return [];
+        } catch (e) {
+            console.error('Error cargando tandas:', e);
+            return [];
+        }
+    }
+
+    async function loadTandaDetail(receivedAt) {
+        try {
+            const params = new URLSearchParams({ received_at: receivedAt });
+            const res = await fetch('/inventory/api/tandas-dinamicas/detalle?' + params.toString());
+            const data = await res.json();
+            if (data.ok && data.items) {
+                return data.items;
+            }
+            return [];
+        } catch (e) {
+            console.error('Error cargando detalle de tanda:', e);
+            return [];
+        }
+    }
+
+    function renderTandasAgrupadas() {
+        if (!tbodyLots) return;
+        
+        const tandas = tandasCargaData || [];
+        if (!tandas.length) {
+            tbodyLots.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-sm text-center text-gray-500">No hay tandas de carga disponibles.</td></tr>';
+            return;
+        }
+
+        tbodyLots.innerHTML = '';
+        
+        tandas.forEach(tanda => {
+            const tr = document.createElement('tr');
+            tr.className = 'bg-blue-50 hover:bg-blue-100 cursor-pointer border-t-2 border-blue-200';
+            tr.dataset.receivedAt = tanda.received_at;
+            
+            const isExpanded = tandasExpandidas.has(tanda.received_at);
+            const iconClass = isExpanded ? 'fa-chevron-down' : 'fa-chevron-right';
+            
+            tr.innerHTML = ''
+                + '<td class="px-4 py-3" colspan="2">'
+                + '  <div class="flex items-center gap-2">'
+                + '    <i class="fas ' + iconClass + ' text-blue-600 text-xs"></i>'
+                + '    <span class="text-base leading-none">' + esc(tanda.origin_icon || '📁') + '</span>'
+                + '    <div class="min-w-0">'
+                + '      <div class="font-semibold text-sm text-gray-900">' + esc(tanda.display_name || tanda.identificador || 'Carga de inventario') + '</div>'
+                + '    </div>'
+                + '  </div>'
+                + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600">' + esc(tanda.fecha_str) + '</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600" colspan="2">' + tanda.cantidad_items + ' ítems / ' + parseNumeroSeguro(tanda.cantidad_total_unidades).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' unidades</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600" colspan="2">—</td>'
+                + '<td class="px-4 py-3 text-sm text-gray-600">—</td>'
+                + '<td class="px-4 py-3 text-sm text-right">'
+                + '  <div class="flex items-center justify-end gap-2">'
+                + '    <button type="button" class="btn-modify-tanda h-8 px-3 text-xs font-medium text-white rounded-md hover:bg-blue-700" style="background-color:#0d1067;" data-received-at="' + esc(tanda.received_at) + '">'
+                + '      <i class="fas fa-edit mr-1"></i> Modificar'
+                + '    </button>'
+                + '    <button type="button" class="btn-delete-tanda h-8 px-3 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700" data-received-at="' + esc(tanda.received_at) + '">'
+                + '      <i class="fas fa-trash-alt mr-1"></i> Eliminar'
+                + '    </button>'
+                + '  </div>'
+                + '</td>';
+            
+            tbodyLots.appendChild(tr);
+            
+            if (isExpanded) {
+                const detailRow = document.createElement('tr');
+                detailRow.className = 'tanda-detail-row';
+                detailRow.dataset.receivedAt = tanda.received_at;
+                detailRow.innerHTML = '<td colspan="9" class="px-4 py-2 bg-gray-50"><div class="text-sm text-gray-500 text-center">Cargando detalles...</div></td>';
+                tbodyLots.appendChild(detailRow);
+                
+                loadTandaDetail(tanda.received_at).then(lotes => {
+                    renderTandaDetalle(tanda.received_at, lotes);
+                });
+            }
+        });
+        
+        attachTandaEventListeners();
+    }
+
+    function renderTandaDetalle(receivedAt, lotes) {
+        const detailRow = tbodyLots.querySelector(`tr.tanda-detail-row[data-received-at="${receivedAt}"]`);
+        if (!detailRow) return;
+        
+        if (!lotes || !lotes.length) {
+            detailRow.innerHTML = '<td colspan="9" class="px-4 py-2 bg-gray-50"><div class="text-sm text-gray-500 text-center">No hay lotes en esta tanda.</div></td>';
+            return;
+        }
+        
+        let html = '<td colspan="9" class="p-0"><table class="min-w-full table-fixed"><colgroup>'
+            + '<col class="w-[56px]">'
+            + '<col>'
+            + '<col class="w-[140px]">'
+            + '<col class="w-[150px]">'
+            + '<col class="w-[120px]">'
+            + '<col class="w-[120px]">'
+            + '<col class="w-[170px]">'
+            + '<col class="w-[120px]">'
+            + '<col class="w-[120px]">'
+            + '</colgroup><tbody>';
+        
+        lotes.forEach(lote => {
+            const p = lote.product || {};
+            const imgUrl = String(p.image_url || '').trim();
+            const imgCell = imgUrl
+                ? ('<img src="' + imgUrl + '" alt="" class="h-9 w-9 rounded-md object-cover border border-gray-200 bg-gray-50">')
+                : ('<div class="h-9 w-9 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400"><i class="fas fa-image"></i></div>');
+            
+            const codigoInterno = String(lote.codigo_interno || p.codigo_interno || p.internal_code || '').trim();
+            const productName = String(p.name || lote.product_name || '—');
+            
+            html += '<tr class="bg-white hover:bg-gray-50 border-t border-gray-100">'
+                + '<td class="px-4 py-2 pl-4">' + imgCell + '</td>'
+                + '<td class="px-4 py-2 text-sm text-gray-900 align-middle">' + esc(productName) + '</td>'
+                + '<td class="px-4 py-2 text-sm text-gray-500 align-middle">' + esc(codigoInterno || '—') + '</td>'
+                + '<td class="px-4 py-2 text-sm text-gray-500 align-middle">' + fmtFecha(lote.received_at || '') + '</td>'
+                + '<td class="px-4 py-2 text-sm text-right text-gray-500">' + parseNumeroSeguro(lote.qty_initial).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + '</td>'
+                + '<td class="px-4 py-2 text-sm text-right text-gray-500">' + formatMoney(parseNumeroSeguro(lote.unit_cost)) + '</td>'
+                + '<td class="px-4 py-2 text-sm text-gray-500 align-middle">' + esc(lote.supplier_name || '—') + '</td>'
+                + '<td class="px-4 py-2 text-sm text-gray-500 align-middle">' + (lote.expiration_date ? fmtFecha(lote.expiration_date) : '—') + '</td>'
+                + '<td class="px-4 py-2"></td>'
+                + '</tr>';
+        });
+        
+        html += '</tbody></table></td>';
+        detailRow.innerHTML = html;
+    }
+
+    function attachTandaEventListeners() {
+        Array.from(tbodyLots.querySelectorAll('tr[data-received-at]:not(.tanda-detail-row)')).forEach(tr => {
+            tr.addEventListener('click', function(e) {
+                if (e.target.closest('.btn-delete-tanda')) return;
+                if (e.target.closest('.btn-modify-tanda')) return;
+                
+                const receivedAt = this.dataset.receivedAt;
+                if (tandasExpandidas.has(receivedAt)) {
+                    tandasExpandidas.delete(receivedAt);
+                } else {
+                    tandasExpandidas.add(receivedAt);
+                }
+                renderTandasAgrupadas();
+            });
+        });
+        
+        // Botones Modificar
+        Array.from(tbodyLots.querySelectorAll('.btn-modify-tanda')).forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const receivedAt = this.dataset.receivedAt;
+                openTandaEditor(receivedAt);
+            });
+        });
+        
+        // Botones Eliminar
+        Array.from(tbodyLots.querySelectorAll('.btn-delete-tanda')).forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const receivedAt = this.dataset.receivedAt;
+                // Usar nuevo modal profesional de gestión de tandas
+                if (typeof window.openTandaModal === 'function') {
+                    window.openTandaModal(receivedAt);
+                }
+            });
+        });
+    }
+
+    async function deleteTandaDinamica(receivedAt, tandaName, items, unidades) {
+        // OBSOLETA: Reemplazada por modal profesional window.openTandaModal()
+        // Mantener por compatibilidad temporal
+        const confirmMsg = '¿Eliminar esta tanda?\n\n'
+            + 'Tanda: ' + tandaName + '\n'
+            + 'Productos afectados: ' + items + '\n'
+            + 'Unidades totales: ' + unidades + '\n\n'
+            + 'Esta acción eliminará todos los lotes de esta carga.\n'
+            + 'Solo se puede eliminar si ningún lote fue vendido o consumido.';
+        
+        if (!confirm(confirmMsg)) return;
+        
+        try {
+            const res = await fetch('/inventory/api/tandas-dinamicas', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ received_at: receivedAt })
+            });
+            
+            const data = await res.json();
+            
+            if (!data.ok) {
+                const errorMsg = data.error === 'tanda_has_sales'
+                    ? 'No se puede eliminar esta tanda porque algunos lotes ya tuvieron ventas.'
+                    : data.error === 'tanda_has_consumption'
+                    ? 'No se puede eliminar esta tanda porque algunos lotes ya fueron consumidos.'
+                    : (data.message || 'Error al eliminar la tanda.');
+                
+                if (window.showAlertModal) {
+                    window.showAlertModal(errorMsg, 'Error', 'No se pudo eliminar');
+                } else {
+                    alert(errorMsg);
+                }
+                return;
+            }
+            
+            if (window.showAlertModal) {
+                window.showAlertModal(data.message || 'Tanda eliminada correctamente', 'Éxito', 'Operación exitosa');
+            } else {
+                alert('Tanda eliminada correctamente');
+            }
+            
+            tandasExpandidas.clear();
+            await loadTandasCarga();
+            renderAll();
+        } catch (e) {
+            console.error('Error eliminando tanda:', e);
+            if (window.showAlertModal) {
+                window.showAlertModal('Error de conexión al eliminar la tanda', 'Error', 'Operación fallida');
+            } else {
+                alert('Error de conexión al eliminar la tanda');
+            }
+        }
     }
 
     function openEditLot(lotId) {
@@ -5778,33 +6173,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (lotCt) lotCt.value = formatMonedaARS(ct);
     }
 
+    // OBSOLETA: Esta función generaba gastos operativos incorrectos.
+    // El inventario debe impactar solo como activo, NO como gasto operativo.
+    // Solo al vender se reconoce CMV (Costo de Mercadería Vendida).
     function crearEgresoDesdeInventario({ fecha, proveedor, valor, nota }) {
-        try {
-            if (window.StorageService && typeof window.StorageService.addExpenseFromInventory === 'function') {
-                const res = window.StorageService.addExpenseFromInventory({
-                    id: String(Date.now()),
-                    fecha: String(fecha || ''),
-                    categoria: 'Inventario',
-                    valor: parseNumeroSeguro(valor),
-                    nota: String(nota || ''),
-                    forma_pago: 'Transferencia',
-                    tipo_gasto: 'Variable',
-                    frecuencia: 'Único',
-                    comprobante: [],
-                    custom_fields: [],
-                    proveedor: String(proveedor || ''),
-                    supplier_id: '',
-                    supplier_name: String(proveedor || '')
-                });
-                try {
-                    if (res && typeof res.then === 'function') res.catch(function () { });
-                } catch (e) {
-                }
-                return res;
-            }
-        } catch (e) {
-            // noop
-        }
+        // NO HACER NADA - función deshabilitada por corrección contable
+        console.warn('[OBSOLETO] crearEgresoDesdeInventario ya no se usa. Inventario no genera gastos operativos.');
         return null;
     }
 
@@ -6294,6 +6668,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (tabCurrent) tabCurrent.addEventListener('click', function () { switchTab('current'); });
     if (tabLots) tabLots.addEventListener('click', function () { switchTab('lots'); });
+    
+    if (toggleViewTandas) {
+        toggleViewTandas.addEventListener('change', function() {
+            renderAll();
+        });
+    }
+    
+    if (filterTipoOrigen) {
+        filterTipoOrigen.addEventListener('change', function() {
+            if (toggleViewTandas && toggleViewTandas.checked) {
+                renderAll();
+            }
+        });
+    }
 
     if (btnBack1) btnBack1.addEventListener('click', closeCreate);
     if (btnBack2) btnBack2.addEventListener('click', closeCreate);
@@ -6464,7 +6852,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 html += '<div class="mt-2 rounded-lg border border-gray-200 overflow-hidden">';
                 html += '<div class="max-h-56 overflow-auto divide-y divide-gray-100">';
                 errs.slice(0, 200).forEach(function (e) {
-                    html += '<div class="px-3 py-2 text-xs text-gray-700">Fila <span class="font-semibold">' + esc(e.row) + '</span>: ' + esc(e.error) + '</div>';
+                    let errorMsg = String(e.error || '');
+                    let extraInfo = '';
+                    
+                    // Si el error es de ambigüedad, parsear códigos internos
+                    if (errorMsg.includes('ambiguous_requires_codigo_interno')) {
+                        const parts = errorMsg.split('|');
+                        if (parts.length > 1) {
+                            errorMsg = 'Fila ambigua, requiere código interno';
+                            extraInfo = '<div class="mt-1 text-[11px] text-indigo-700"><strong>Códigos disponibles:</strong> ' + esc(parts[1]) + '</div>';
+                        } else {
+                            errorMsg = 'Fila ambigua, requiere código interno';
+                        }
+                    }
+                    
+                    html += '<div class="px-3 py-2 text-xs text-gray-700">Fila <span class="font-semibold">' + esc(e.row) + '</span>: ' + esc(errorMsg) + extraInfo + '</div>';
                 });
                 html += '</div></div>';
             }
@@ -7304,7 +7706,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     else alert('No se pudo cargar el lote.');
                     return;
                 }
-                crearEgresoDesdeInventario({ fecha: entryDate, proveedor: supplier, valor: total, nota: expensePayload.nota });
+                // CORREGIDO: Ya no se crea gasto operativo.
+                // El inventario impacta solo como activo hasta la venta.
                 closeCreate();
                 renderAll();
             }).catch(function () {
@@ -7567,5 +7970,689 @@ document.addEventListener('DOMContentLoaded', function () {
     switchTab('current');
 });
 </script>
+
+{% include 'inventory/modal_tanda.html' %}
+{% include 'inventory/modal_tanda_editor.html' %}
+{% include 'inventory/modal_tanda_confirm.html' %}
+
+<script>
+// ============================================================================
+// GESTIÓN PROFESIONAL DE TANDAS - Modal y acciones
+// ============================================================================
+
+(function() {
+    const modalTanda = document.getElementById('modal-tanda-actions');
+    const btnCloseTanda = document.getElementById('btn-close-modal-tanda');
+    const btnCancelTanda = document.getElementById('btn-cancel-modal-tanda');
+    const btnDeleteTanda = document.getElementById('btn-delete-tanda-confirm');
+    const btnModifyTanda = document.getElementById('btn-modify-tanda');
+    
+    let currentTandaData = null;
+    
+    function closeTandaModal() {
+        if (modalTanda) modalTanda.classList.add('hidden');
+        currentTandaData = null;
+    }
+    
+    async function loadTandaSummary(receivedAt) {
+        try {
+            const params = new URLSearchParams({ received_at: receivedAt });
+            const res = await fetch('/inventory/api/tandas/summary?' + params.toString());
+            const data = await res.json();
+            if (data.ok && data.summary) {
+                return data.summary;
+            }
+            return null;
+        } catch (e) {
+            console.error('Error cargando resumen de tanda:', e);
+            return null;
+        }
+    }
+    
+    function showTandaModal(summary) {
+        if (!modalTanda || !summary) return;
+        
+        currentTandaData = summary;
+        
+        // Llenar datos del modal
+        const icon = document.getElementById('modal-tanda-icon');
+        const name = document.getElementById('modal-tanda-name');
+        const fecha = document.getElementById('modal-tanda-fecha');
+        const origen = document.getElementById('modal-tanda-origen');
+        const productos = document.getElementById('modal-tanda-productos');
+        const unidades = document.getElementById('modal-tanda-unidades');
+        const proveedores = document.getElementById('modal-tanda-proveedores');
+        const warning = document.getElementById('modal-tanda-warning');
+        const warningText = document.getElementById('modal-tanda-warning-text');
+        const warningList = document.getElementById('modal-tanda-warning-list');
+        
+        if (icon) icon.textContent = summary.origen_icon || '📦';
+        if (name) name.textContent = summary.origen_texto || 'Tanda de carga';
+        if (fecha) fecha.textContent = summary.fecha_str || '—';
+        if (origen) origen.textContent = summary.origen_texto || '—';
+        if (productos) productos.textContent = summary.cantidad_productos + ' productos';
+        if (unidades) {
+            const formatted = summary.cantidad_unidades.toLocaleString('es-AR', { maximumFractionDigits: 2 });
+            unidades.textContent = formatted + ' unidades';
+        }
+        if (proveedores) {
+            const provList = summary.proveedores || [];
+            proveedores.textContent = provList.length > 0 ? provList.join(', ') : 'Sin proveedor';
+        }
+        
+        // Mostrar/ocultar advertencia y botón modificar
+        if (warning && warningList && warningText) {
+            if (!summary.puede_modificar) {
+                warning.classList.remove('hidden');
+                const razones = summary.razones_no_modificable || [];
+                warningText.textContent = 'Esta tanda no se puede modificar ni eliminar porque tiene lotes con movimientos posteriores:';
+                warningList.innerHTML = razones.map(r => '<li>' + escapeHtml(r) + '</li>').join('');
+                if (btnModifyTanda) btnModifyTanda.classList.add('hidden');
+                if (btnDeleteTanda) btnDeleteTanda.disabled = true;
+            } else {
+                warning.classList.add('hidden');
+                if (btnModifyTanda) btnModifyTanda.classList.remove('hidden');
+                if (btnDeleteTanda) btnDeleteTanda.disabled = false;
+            }
+        }
+        
+        modalTanda.classList.remove('hidden');
+    }
+    
+    async function handleDeleteTanda() {
+        if (!currentTandaData) return;
+        
+        const confirmFn = (window.confirmModal && typeof window.confirmModal === 'function')
+            ? window.confirmModal
+            : function (m) { return Promise.resolve(window.confirm(m)); };
+        
+        const confirmed = await confirmFn(
+            '¿Estás seguro de que querés eliminar esta tanda completa?',
+            'Confirmar eliminación',
+            'Se eliminarán todos los lotes y movimientos asociados. Esta acción no se puede deshacer.',
+            { okText: 'Eliminar', cancelText: 'Cancelar' }
+        );
+        
+        if (!confirmed) return;
+        
+        try {
+            const res = await fetch('/inventory/api/tandas-dinamicas', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ received_at: currentTandaData.received_at })
+            });
+            
+            const data = await res.json();
+            
+            if (data.ok) {
+                if (window.showAlertModal) {
+                    window.showAlertModal('Tanda eliminada exitosamente', 'Éxito', 'Operación completada');
+                } else {
+                    alert('Tanda eliminada exitosamente');
+                }
+                closeTandaModal();
+                // Recargar vista de tandas
+                if (typeof loadTandasCarga === 'function') {
+                    loadTandasCarga().then(function() {
+                        if (typeof renderTandasAgrupadas === 'function') {
+                            renderTandasAgrupadas();
+                        }
+                    });
+                }
+            } else {
+                const errorMsg = data.error === 'has_sales' 
+                    ? 'No se puede eliminar: algunos lotes tienen ventas registradas'
+                    : 'No se pudo eliminar la tanda: ' + (data.error || 'error desconocido');
+                if (window.showAlertModal) {
+                    window.showAlertModal(errorMsg, 'Error', 'Operación fallida');
+                } else {
+                    alert(errorMsg);
+                }
+            }
+        } catch (e) {
+            console.error('Error eliminando tanda:', e);
+            if (window.showAlertModal) {
+                window.showAlertModal('Error al eliminar la tanda', 'Error', 'Operación fallida');
+            } else {
+                alert('Error al eliminar la tanda');
+            }
+        }
+    }
+    
+    async function handleModifyTanda() {
+        if (!currentTandaData) return;
+        
+        // TODO: Implementar flujo de modificación
+        // - Cargar datos editables de la tanda
+        // - Reabrir flujo de importación Excel con datos precargados
+        // - Permitir editar/agregar/eliminar filas
+        // - Validar y confirmar cambios
+        
+        if (window.showAlertModal) {
+            window.showAlertModal('Funcionalidad de modificación en desarrollo', 'Información', 'Próximamente');
+        } else {
+            alert('Funcionalidad de modificación en desarrollo');
+        }
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Event listeners
+    if (btnCloseTanda) btnCloseTanda.addEventListener('click', closeTandaModal);
+    if (btnCancelTanda) btnCancelTanda.addEventListener('click', closeTandaModal);
+    if (btnDeleteTanda) btnDeleteTanda.addEventListener('click', handleDeleteTanda);
+    if (btnModifyTanda) btnModifyTanda.addEventListener('click', handleModifyTanda);
+    
+    // Exponer función global para abrir modal desde los botones de tanda
+    window.openTandaModal = async function(receivedAt) {
+        const summary = await loadTandaSummary(receivedAt);
+        if (summary) {
+            showTandaModal(summary);
+        } else {
+            if (window.showAlertModal) {
+                window.showAlertModal('No se pudo cargar el detalle de la tanda', 'Error', 'Operación fallida');
+            } else {
+                alert('No se pudo cargar el detalle de la tanda');
+            }
+        }
+    };
+})();
+</script>
+
+<script>
+// ============================================================================
+// EDITOR DE TANDAS - Tabla editable con reclasificación producto→lote
+// ============================================================================
+
+(function() {
+    const modalEditor = document.getElementById('modal-tanda-editor');
+    const btnClose = document.getElementById('btn-close-tanda-editor');
+    const btnCancel = document.getElementById('btn-cancel-tanda-editor');
+    const btnSave = document.getElementById('btn-save-tanda-editor');
+    const tbody = document.getElementById('tanda-editor-tbody');
+    const warnings = document.getElementById('tanda-editor-warnings');
+    const warningsList = document.getElementById('tanda-editor-warnings-list');
+    const summary = document.getElementById('tanda-editor-summary');
+    
+    let currentReceivedAt = null;
+    let editableRows = [];
+    let originalData = [];
+    let allProducts = [];
+    
+    function closeEditor() {
+        if (modalEditor) modalEditor.classList.add('hidden');
+        currentReceivedAt = null;
+        editableRows = [];
+        originalData = [];
+    }
+    
+    async function loadEditableData(receivedAt) {
+        try {
+            const params = new URLSearchParams({ received_at: receivedAt });
+            const res = await fetch('/inventory/api/tandas/editable-data?' + params.toString());
+            const data = await res.json();
+            if (data.ok && data.rows) {
+                return data.rows;
+            }
+            return [];
+        } catch (e) {
+            console.error('Error cargando datos editables:', e);
+            return [];
+        }
+    }
+    
+    async function loadAllProducts() {
+        try {
+            const res = await fetch('/inventory/api/products');
+            const data = await res.json();
+            if (data.ok && data.items) {
+                return data.items;
+            }
+            return [];
+        } catch (e) {
+            return [];
+        }
+    }
+    
+    function detectReclassification(row) {
+        const original = originalData.find(o => o.lot_id === row.lot_id);
+        if (!original) return null;
+        
+        const codigoOriginal = String(original.codigo_interno || '').trim().toLowerCase();
+        const codigoNuevo = String(row.codigo_interno || '').trim().toLowerCase();
+        
+        // Si no cambió el código, no hay reclasificación
+        if (codigoOriginal === codigoNuevo) return null;
+        
+        // Buscar si el código NUEVO ya existe en otro producto
+        const existing = allProducts.find(p => 
+            String(p.internal_code || '').trim().toLowerCase() === codigoNuevo &&
+            p.id !== row.product_id
+        );
+        
+        if (existing) {
+            // CASO A: Código nuevo existe → Reasociar a producto existente
+            return {
+                type: 'reassign_to_existing',
+                existingProductId: existing.id,
+                existingProductName: existing.name,
+                willBecomeLot: true
+            };
+        } else if (codigoNuevo) {
+            // CASO B: Código nuevo NO existe → Crear producto nuevo
+            return {
+                type: 'create_new_product',
+                newCode: codigoNuevo,
+                willCreateNew: true
+            };
+        }
+        
+        return null;
+    }
+    
+    function renderEditableRows(rows) {
+        if (!tbody) return;
+        
+        tbody.innerHTML = '';
+        editableRows = [];
+        
+        rows.forEach((row, idx) => {
+            const tr = document.createElement('tr');
+            const rowData = { ...row, index: idx };
+            editableRows.push(rowData);
+            
+            const reclass = detectReclassification(row);
+            const hasMovements = !row.modificable;
+            
+            let statusCell = '';
+            if (hasMovements) {
+                statusCell = '<span class="text-xs text-red-600"><i class="fas fa-lock mr-1"></i>Bloqueado</span>';
+            } else if (reclass) {
+                if (reclass.type === 'create_new_product') {
+                    statusCell = '<span class="text-xs text-green-600"><i class="fas fa-plus-circle mr-1"></i>Nuevo producto</span>';
+                } else if (reclass.type === 'reassign_to_existing') {
+                    statusCell = '<span class="text-xs text-amber-600"><i class="fas fa-arrow-right mr-1"></i>→ Lote existente</span>';
+                }
+            } else {
+                statusCell = '<span class="text-xs text-gray-500">Editable</span>';
+            }
+            
+            tr.innerHTML = `
+                <td class="px-3 py-2">
+                    <input type="text" class="w-full px-2 py-1 text-xs border rounded" 
+                        data-field="nombre" data-index="${idx}" 
+                        value="${escapeAttr(row.nombre)}" 
+                        ${hasMovements ? 'disabled' : ''}>
+                </td>
+                <td class="px-3 py-2">
+                    <input type="text" class="w-full px-2 py-1 text-xs border rounded" 
+                        data-field="categoria" data-index="${idx}" 
+                        value="${escapeAttr(row.categoria)}" 
+                        ${hasMovements ? 'disabled' : ''}>
+                </td>
+                <td class="px-3 py-2">
+                    <input type="text" class="w-full px-2 py-1 text-xs border rounded" 
+                        data-field="codigo_interno" data-index="${idx}" 
+                        value="${escapeAttr(row.codigo_interno)}" 
+                        ${hasMovements ? 'disabled' : ''}>
+                </td>
+                <td class="px-3 py-2">
+                    <input type="text" class="w-full px-2 py-1 text-xs border rounded" 
+                        data-field="proveedor" data-index="${idx}" 
+                        value="${escapeAttr(row.proveedor)}">
+                </td>
+                <td class="px-3 py-2">
+                    <input type="number" step="0.01" class="w-full px-2 py-1 text-xs border rounded text-right" 
+                        data-field="cantidad" data-index="${idx}" 
+                        value="${row.cantidad}" 
+                        ${hasMovements ? 'disabled' : ''}>
+                </td>
+                <td class="px-3 py-2">
+                    <input type="number" step="0.01" class="w-full px-2 py-1 text-xs border rounded text-right" 
+                        data-field="costo_unitario" data-index="${idx}" 
+                        value="${row.costo_unitario}">
+                </td>
+                <td class="px-3 py-2">
+                    <input type="date" class="w-full px-2 py-1 text-xs border rounded" 
+                        data-field="vencimiento" data-index="${idx}" 
+                        value="${row.vencimiento ? row.vencimiento.split('T')[0] : ''}">
+                </td>
+                <td class="px-3 py-2 text-center">
+                    ${statusCell}
+                </td>
+            `;
+            
+            tbody.appendChild(tr);
+        });
+        
+        attachInputListeners();
+        updateWarnings();
+    }
+    
+    function attachInputListeners() {
+        if (!tbody) return;
+        
+        tbody.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', function() {
+                const idx = parseInt(this.dataset.index);
+                const field = this.dataset.field;
+                const value = this.value;
+                
+                if (editableRows[idx]) {
+                    editableRows[idx][field] = value;
+                }
+                
+                updateWarnings();
+                updateSummary();
+            });
+        });
+    }
+    
+    function updateWarnings() {
+        if (!warnings || !warningsList) return;
+        
+        const reclassifications = [];
+        const conflicts = [];
+        
+        editableRows.forEach((row, idx) => {
+            if (!row.modificable) return;
+            
+            const reclass = detectReclassification(row);
+            if (reclass) {
+                reclassifications.push({
+                    index: idx,
+                    nombre: row.nombre,
+                    targetProduct: reclass.existingProductName
+                });
+            }
+        });
+        
+        if (reclassifications.length > 0) {
+            warnings.classList.remove('hidden');
+            warningsList.innerHTML = reclassifications.map(r => 
+                `<li><strong>${escapeHtml(r.nombre)}</strong> pasará a agregarse como lote al producto existente: <strong>${escapeHtml(r.targetProduct)}</strong></li>`
+            ).join('');
+        } else {
+            warnings.classList.add('hidden');
+            warningsList.innerHTML = '';
+        }
+    }
+    
+    function updateSummary() {
+        if (!summary) return;
+        
+        let nuevos = 0;
+        let lotes = 0;
+        let conflictos = 0;
+        
+        editableRows.forEach(row => {
+            const reclass = detectReclassification(row);
+            if (reclass) {
+                lotes++;
+            } else {
+                nuevos++;
+            }
+        });
+        
+        document.getElementById('summary-nuevos').textContent = nuevos;
+        document.getElementById('summary-lotes').textContent = lotes;
+        document.getElementById('summary-conflictos').textContent = conflictos;
+        
+        summary.classList.remove('hidden');
+    }
+    
+    function detectChanges() {
+        const changesDetail = [];
+        let totalCambios = 0;
+        let nuevosCount = 0;
+        let lotesCount = 0;
+        
+        editableRows.forEach((row, idx) => {
+            const original = originalData[idx];
+            if (!original) return;
+            
+            const reclass = detectReclassification(row);
+            const cambios = [];
+            
+            // Comparar cada campo
+            if (row.nombre !== original.nombre) {
+                cambios.push({ campo: 'Nombre', antes: original.nombre, despues: row.nombre });
+            }
+            if (row.categoria !== original.categoria) {
+                cambios.push({ campo: 'Categoría', antes: original.categoria, despues: row.categoria });
+            }
+            if (row.codigo_interno !== original.codigo_interno) {
+                cambios.push({ campo: 'Código interno', antes: original.codigo_interno, despues: row.codigo_interno });
+            }
+            if (row.proveedor !== original.proveedor) {
+                cambios.push({ campo: 'Proveedor', antes: original.proveedor, despues: row.proveedor });
+            }
+            if (parseFloat(row.cantidad) !== parseFloat(original.cantidad)) {
+                cambios.push({ campo: 'Cantidad', antes: original.cantidad, despues: row.cantidad });
+            }
+            if (parseFloat(row.costo_unitario) !== parseFloat(original.costo_unitario)) {
+                cambios.push({ campo: 'Costo unitario', antes: original.costo_unitario, despues: row.costo_unitario });
+            }
+            if (row.vencimiento !== original.vencimiento) {
+                cambios.push({ campo: 'Vencimiento', antes: original.vencimiento || 'Sin vencimiento', despues: row.vencimiento || 'Sin vencimiento' });
+            }
+            
+            if (cambios.length > 0 || reclass) {
+                changesDetail.push({
+                    nombre: row.nombre,
+                    cambios: cambios,
+                    reclassification: reclass
+                });
+                totalCambios += cambios.length;
+            }
+            
+            if (reclass) {
+                lotesCount++;
+            } else {
+                nuevosCount++;
+            }
+        });
+        
+        return { changesDetail, totalCambios, nuevosCount, lotesCount };
+    }
+    
+    function showConfirmationModal() {
+        const modalConfirm = document.getElementById('modal-tanda-confirm');
+        if (!modalConfirm) return;
+        
+        const { changesDetail, totalCambios, nuevosCount, lotesCount } = detectChanges();
+        
+        if (totalCambios === 0 && changesDetail.length === 0) {
+            // No hay cambios
+            document.getElementById('confirm-no-changes').classList.remove('hidden');
+            document.getElementById('confirm-changes-detail').classList.add('hidden');
+        } else {
+            document.getElementById('confirm-no-changes').classList.add('hidden');
+            document.getElementById('confirm-changes-detail').classList.remove('hidden');
+            
+            // Actualizar resumen
+            document.getElementById('confirm-summary-nuevos').textContent = nuevosCount;
+            document.getElementById('confirm-summary-lotes').textContent = lotesCount;
+            document.getElementById('confirm-summary-modificados').textContent = totalCambios;
+            
+            // Renderizar detalle
+            const detailContainer = document.getElementById('confirm-changes-detail');
+            detailContainer.innerHTML = changesDetail.map(item => {
+                let html = '<div class="p-3 bg-white border border-gray-200 rounded-lg">';
+                html += `<div class="font-medium text-sm text-gray-900 mb-2">${escapeHtml(item.nombre)}</div>`;
+                
+                if (item.cambios.length > 0) {
+                    html += '<ul class="space-y-1.5 text-xs">';
+                    item.cambios.forEach(c => {
+                        html += '<li class="flex items-start gap-2">';
+                        html += `<span class="text-gray-500 min-w-[90px]">${escapeHtml(c.campo)}:</span>`;
+                        html += `<span class="flex-1"><span class="text-red-600">${escapeHtml(c.antes || '—')}</span> → <span class="text-green-600 font-medium">${escapeHtml(c.despues || '—')}</span></span>`;
+                        html += '</li>';
+                    });
+                    html += '</ul>';
+                }
+                
+                if (item.reclassification) {
+                    if (item.reclassification.type === 'create_new_product') {
+                        html += '<div class="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-800">';
+                        html += '<i class="fas fa-plus-circle mr-1"></i>';
+                        html += `<strong>Resultado:</strong> Se creará un producto nuevo con código interno <strong>${escapeHtml(item.reclassification.newCode)}</strong>`;
+                        html += '</div>';
+                    } else if (item.reclassification.type === 'reassign_to_existing') {
+                        html += '<div class="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">';
+                        html += '<i class="fas fa-arrow-right mr-1"></i>';
+                        html += `<strong>Resultado:</strong> Este registro pasará a agregarse como lote al producto existente: <strong>${escapeHtml(item.reclassification.existingProductName)}</strong>`;
+                        html += '</div>';
+                    }
+                }
+                
+                html += '</div>';
+                return html;
+            }).join('');
+        }
+        
+        modalConfirm.classList.remove('hidden');
+    }
+    
+    function closeConfirmationModal() {
+        const modalConfirm = document.getElementById('modal-tanda-confirm');
+        if (modalConfirm) modalConfirm.classList.add('hidden');
+    }
+    
+    async function confirmAndSaveChanges() {
+        if (!currentReceivedAt) return;
+        
+        closeConfirmationModal();
+        
+        // Preparar payload con valores ACTUALES de editableRows
+        const changes = editableRows.map(row => {
+            const reclass = detectReclassification(row);
+            return {
+                lot_id: row.lot_id,
+                product_id: row.product_id,
+                nombre: row.nombre,
+                categoria: row.categoria,
+                codigo_interno: row.codigo_interno,
+                proveedor: row.proveedor,
+                cantidad: parseFloat(row.cantidad),
+                costo_unitario: parseFloat(row.costo_unitario),
+                vencimiento: row.vencimiento,
+                // Si es reasociar a existente, enviar el ID del producto target
+                reclassify_to_product_id: (reclass && reclass.type === 'reassign_to_existing') ? reclass.existingProductId : null,
+                // Solo marcar como reclassification si es reasociar a existente (no crear nuevo)
+                is_reclassification: (reclass && reclass.type === 'reassign_to_existing')
+            };
+        });
+        
+        try {
+            const res = await fetch('/inventory/api/tandas/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    received_at: currentReceivedAt,
+                    changes: changes
+                })
+            });
+            
+            const data = await res.json();
+            
+            if (data.ok) {
+                closeEditor();
+                
+                // CRÍTICO: Recargar DESDE BACKEND antes de mostrar éxito
+                if (typeof loadTandasCarga === 'function') {
+                    await loadTandasCarga();
+                    if (typeof renderTandasAgrupadas === 'function') {
+                        renderTandasAgrupadas();
+                    }
+                }
+                
+                // Mostrar éxito SOLO después de refrescar
+                if (window.showAlertModal) {
+                    window.showAlertModal('Tanda actualizada correctamente', 'Éxito', 'Cambios aplicados');
+                } else {
+                    alert('Tanda actualizada correctamente');
+                }
+            } else {
+                const msg = data.error === 'has_movements' 
+                    ? 'No se puede modificar: algunos productos tienen movimientos posteriores'
+                    : 'Error al guardar: ' + (data.error || 'desconocido');
+                if (window.showAlertModal) {
+                    window.showAlertModal(msg, 'Error', 'Operación fallida');
+                } else {
+                    alert(msg);
+                }
+            }
+        } catch (e) {
+            console.error('Error guardando cambios:', e);
+            if (window.showAlertModal) {
+                window.showAlertModal('Error al guardar los cambios', 'Error', 'Operación fallida');
+            } else {
+                alert('Error al guardar los cambios');
+            }
+        }
+    }
+    
+    function escapeAttr(text) {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML.replace(/"/g, '&quot;');
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Event listeners del editor
+    if (btnClose) btnClose.addEventListener('click', closeEditor);
+    if (btnCancel) btnCancel.addEventListener('click', closeEditor);
+    if (btnSave) btnSave.addEventListener('click', showConfirmationModal);
+    
+    // Event listeners del modal de confirmación
+    const btnBackToEdit = document.getElementById('btn-back-to-edit');
+    const btnConfirmSave = document.getElementById('btn-confirm-save');
+    if (btnBackToEdit) btnBackToEdit.addEventListener('click', closeConfirmationModal);
+    if (btnConfirmSave) btnConfirmSave.addEventListener('click', confirmAndSaveChanges);
+    
+    // Función global para abrir editor
+    window.openTandaEditor = async function(receivedAt) {
+        currentReceivedAt = receivedAt;
+        
+        // Cargar datos
+        const [rows, products] = await Promise.all([
+            loadEditableData(receivedAt),
+            loadAllProducts()
+        ]);
+        
+        if (!rows || rows.length === 0) {
+            if (window.showAlertModal) {
+                window.showAlertModal('No se pudo cargar la tanda', 'Error', 'Operación fallida');
+            } else {
+                alert('No se pudo cargar la tanda');
+            }
+            return;
+        }
+        
+        allProducts = products;
+        originalData = JSON.parse(JSON.stringify(rows));
+        
+        // Actualizar UI
+        document.getElementById('tanda-editor-name').textContent = 'Tanda de carga';
+        document.getElementById('tanda-editor-fecha').textContent = rows[0]?.received_at ? fmtFecha(rows[0].received_at) : '—';
+        
+        renderEditableRows(rows);
+        updateSummary();
+        
+        if (modalEditor) modalEditor.classList.remove('hidden');
+    };
+})();
+</script>
+
 {% endblock %}
 

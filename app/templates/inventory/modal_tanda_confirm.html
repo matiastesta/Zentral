@@ -1,0 +1,68 @@
+<!-- Modal de confirmación de cambios en tanda con resumen detallado -->
+<div id="modal-tanda-confirm" class="hidden fixed inset-0 z-50" style="z-index: 90;">
+    <div class="absolute inset-0 bg-black/60"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-gray-100 bg-blue-50">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <i class="fas fa-check-circle text-blue-600 text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">Confirmar cambios</h3>
+                        <p class="text-xs text-gray-600 mt-0.5">Revisá los cambios antes de guardar</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="px-6 py-5 max-h-96 overflow-y-auto">
+                
+                <!-- Resumen general -->
+                <div class="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="text-sm font-medium text-gray-900 mb-2">Resumen de cambios</div>
+                    <div class="grid grid-cols-3 gap-3 text-xs">
+                        <div>
+                            <span class="text-gray-500">Productos nuevos:</span>
+                            <span id="confirm-summary-nuevos" class="font-medium text-gray-900 ml-1">0</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">Lotes existentes:</span>
+                            <span id="confirm-summary-lotes" class="font-medium text-gray-900 ml-1">0</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">Campos modificados:</span>
+                            <span id="confirm-summary-modificados" class="font-medium text-blue-600 ml-1">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detalle de cambios por producto -->
+                <div id="confirm-changes-detail" class="space-y-3">
+                    <!-- Generado dinámicamente -->
+                </div>
+
+                <!-- Sin cambios -->
+                <div id="confirm-no-changes" class="hidden text-center py-8">
+                    <i class="fas fa-info-circle text-gray-400 text-3xl mb-2"></i>
+                    <p class="text-sm text-gray-500">No hay cambios para aplicar</p>
+                </div>
+
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-3">
+                <button id="btn-back-to-edit" type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                    <i class="fas fa-arrow-left mr-1.5"></i> Volver a editar
+                </button>
+                
+                <button id="btn-confirm-save" type="button" class="px-5 py-2 text-sm font-medium text-white rounded-md hover:bg-green-700" style="background-color:#059669;">
+                    <i class="fas fa-check mr-1.5"></i> Confirmar cambios
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
