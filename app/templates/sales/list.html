@@ -439,7 +439,7 @@
                             <div>
                                 <label class="block font-medium text-gray-600 mb-1 text-xs">Efectivo del día (calculado)</label>
                                 <input id="monto-efectivo-dia" type="text" inputmode="decimal" class="w-full px-3 py-2 border rounded-md text-sm bg-gray-50" placeholder="Se calcula solo" readonly data-currency="ars">
-                                <div class="mt-1 text-xs text-gray-500 whitespace-nowrap">Ventas en efectivo – Egresos en efectivo</div>
+                                <div class="mt-1 text-xs text-gray-500 whitespace-nowrap">Ventas en efectivo + Ingresos manuales − Egresos y retiros</div>
                                 <div id="msg-arqueo-retiros" class="mt-1 text-xs text-gray-500 whitespace-nowrap hidden"></div>
                             </div>
                             <div>
@@ -7711,27 +7711,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         } catch (e) {}
                     })
                     .catch(() => {
-                        // Fallback legacy (cache local) por si el endpoint falla en algún deploy viejo.
+                        setAndValidate(0);
                         try {
-                            const res = calcularEfectivoDelDiaDesdeHistorial();
-                            if (isPromise(res)) {
-                                Promise.resolve(res).then(setAndValidate).catch(function () { setAndValidate(0); });
-                                return;
-                            }
-                            setAndValidate(res);
-                        } catch (e) {
-                            setAndValidate(0);
-                        }
+                            const el = document.getElementById('msg-arqueo-retiros');
+                            if (el) el.classList.add('hidden');
+                        } catch (e) {}
                     });
                 return;
             }
-
-            const res = calcularEfectivoDelDiaDesdeHistorial();
-            if (isPromise(res)) {
-                Promise.resolve(res).then(setAndValidate).catch(function () { setAndValidate(0); });
-                return;
-            }
-            setAndValidate(res);
+            setAndValidate(0);
         } catch (e) {
             setAndValidate(0);
         }
@@ -7820,7 +7808,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 setSelectedArqueoShift(item.shift_code || getSelectedArqueoShift());
                 setMonedaARSInput(montoApertura, item.opening_amount ?? '');
                 setMonedaARSInput(montoCierre, item.closing_amount ?? '');
-                setMonedaARSInput(montoEfectivoDia, item.cash_day_amount ?? '');
+                setMonedaARSInput(montoEfectivoDia, item.cash_day_amount_current ?? item.cash_day_amount ?? 0);
                 if (selectArqueoEmployee) selectArqueoEmployee.value = String(item.employee_id || '');
                 arqueoLastSavedAtMs = parseIsoToMs(item.updated_at) || 0;
                 const openingV = parseMonedaARSInput(item.opening_amount || 0) || 0;
@@ -7835,6 +7823,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 validarCierreArqueo();
                 checkArqueoStaleForDate(fecha);
+                try { recalcularArqueoAutomatico(); } catch (e) {}
             })
             .catch(() => {
                 setArqueoBadge('pendiente');
@@ -11595,7 +11584,7 @@ td.num,th.num{text-align:right}
 
             let dmy = '';
             try {
-                dmy = String({{ (today_dmy or '')|tojson }} || '').trim();
+                dmy = '{{ (today_dmy or "") }}'.trim();
             } catch (e) {
                 dmy = '';
             }

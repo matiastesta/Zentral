@@ -1620,6 +1620,19 @@ def _get_shift_window(cid: str, d: dt_date, shift_code: str) -> tuple[datetime, 
     return start_dt, end_dt, info
 
 
+def _cash_count_storage_utc_offset_hours() -> int:
+    # Persistimos datetimes naive con datetime.utcnow(); el arqueo usa horario operativo local.
+    # Para comparar correctamente ventanas del turno contra created_at/fecha_registro,
+    # convertimos la ventana local a la referencia UTC naive almacenada.
+    return 3
+
+
+def _get_shift_window_for_storage(cid: str, d: dt_date, shift_code: str) -> tuple[datetime, datetime, dict]:
+    start_local, end_local, info = _get_shift_window(cid, d, shift_code)
+    offset = timedelta(hours=_cash_count_storage_utc_offset_hours())
+    return start_local + offset, end_local + offset, info
+
+
 def _apply_dt_window(q, model_col, start_dt: datetime, end_dt: datetime):
     return q.filter(model_col >= start_dt, model_col < end_dt)
 
@@ -4170,6 +4183,15 @@ def settle_cc_sale():
     if pay_amount - abs(due) > 0.00001:
         return jsonify({'ok': False, 'error': 'amount_exceeds_due'}), 400
 
+    payment_method, payments = _normalize_sale_payment_fields(
+        sale_type='CobroCC',
+        on_account=False,
+        paid_amount=pay_amount,
+        payment_method=payment_method,
+        payments=payments,
+        is_installments=False,
+    )
+
     settle_date = _parse_date_iso(payload.get('date') or payload.get('fecha'), dt_date.today())
     base_n = _next_payment_number(cid)
     ref = str(row.ticket or '').strip()
@@ -4227,6 +4249,17 @@ def settle_cc_sale():
         except Exception:
             current_app.logger.exception('Failed to set created_by_user_id for payment sale')
             pay_row.created_by_user_id = None
+
+        try:
+            pay_row.payments = []
+            for p in (payments or []):
+                pay_row.payments.append(SalePayment(
+                    company_id=cid,
+                    method=str(p.get('method') or '').strip(),
+                    amount=float(p.get('amount') or 0.0),
+                ))
+        except Exception:
+            current_app.logger.exception('Failed to attach SalePayment rows to CobroCC')
 
         row.paid_amount = float(row.paid_amount or 0.0) + abs(pay_amount)
         remaining = abs(due) - abs(pay_amount)
@@ -4567,7 +4600,7 @@ def _num(v):
 
 def _last_cash_event_sale(cid: str, d: dt_date, shift_code: str = 'turno_1'):
     try:
-        start_dt, end_dt, _ = _get_shift_window(cid, d, shift_code)
+        start_dt, end_dt, _ = _get_shift_window_for_storage(cid, d, shift_code)
         q = (
             db.session.query(func.max(Sale.created_at))
             .outerjoin(SalePayment, and_(SalePayment.company_id == cid, SalePayment.sale_id == Sale.id))
@@ -4589,7 +4622,7 @@ def _last_cash_event_sale(cid: str, d: dt_date, shift_code: str = 'turno_1'):
 
 def _last_cash_event_expense(cid: str, d: dt_date, shift_code: str = 'turno_1'):
     try:
-        start_dt, end_dt, _ = _get_shift_window(cid, d, shift_code)
+        start_dt, end_dt, _ = _get_shift_window_for_storage(cid, d, shift_code)
         return (
             db.session.query(func.max(Expense.created_at))
             .filter(Expense.company_id == cid)
@@ -4605,7 +4638,7 @@ def _last_cash_event_expense(cid: str, d: dt_date, shift_code: str = 'turno_1'):
 def _last_cash_event_withdrawal(cid: str, d: dt_date, shift_code: str = 'turno_1'):
     try:
         from app.models import CashWithdrawal
-        start_dt, end_dt, _ = _get_shift_window(cid, d, shift_code)
+        start_dt, end_dt, _ = _get_shift_window_for_storage(cid, d, shift_code)
         return (
             db.session.query(func.max(CashWithdrawal.fecha_registro))
             .filter(CashWithdrawal.company_id == cid)
@@ -4619,15 +4652,20 @@ def _last_cash_event_withdrawal(cid: str, d: dt_date, shift_code: str = 'turno_1
 
 def _cash_expected_now(cid: str, d: dt_date, shift_code: str = 'turno_1') -> float:
     ventas = _cash_sales_total(cid, d, shift_code)
+    ingresos = _cash_manual_incomes_total(cid, d, shift_code)
     egresos = _cash_expenses_total(cid, d, shift_code)
     retiros = _cash_withdrawals_total(cid, d, shift_code)
-    total = float((ventas or 0.0) - (egresos or 0.0) - (retiros or 0.0))
+    total = float((ventas or 0.0) + (ingresos or 0.0) - (egresos or 0.0) - (retiros or 0.0))
+    if abs(float(ventas or 0.0)) < 0.00001 and abs(float(ingresos or 0.0)) < 0.00001 and abs(float(egresos or 0.0)) < 0.00001 and abs(float(retiros or 0.0)) < 0.00001:
+        total = 0.0
     try:
         current_app.logger.info(
-            'cash_count expected_now cid=%s date=%s ventas_efectivo=%s egresos_efectivo=%s retiros_efectivo=%s total=%s',
+            'cash_count expected_now cid=%s date=%s shift=%s ventas_efectivo=%s ingresos_efectivo=%s egresos_efectivo=%s retiros_efectivo=%s total=%s',
             str(cid),
             (d.isoformat() if d else None),
+            str(shift_code),
             float(ventas or 0.0),
+            float(ingresos or 0.0),
             float(egresos or 0.0),
             float(retiros or 0.0),
             float(total or 0.0),
@@ -5877,11 +5915,36 @@ def _pay_installment_row(cid: str, inst_row: Installment, pay_date: dt_date, pay
             exchange_return_total=None,
             exchange_new_total=None,
         )
+
+        try:
+            normalized_pm, normalized_payments = _normalize_sale_payment_fields(
+                sale_type=payment_type,
+                on_account=False,
+                paid_amount=amount,
+                payment_method=payment_method,
+                payments=[{'method': payment_method, 'amount': amount}],
+                is_installments=False,
+            )
+            payment_sale.payment_method = normalized_pm
+        except Exception:
+            normalized_payments = []
+
         try:
             from flask_login import current_user
             payment_sale.created_by_user_id = int(getattr(current_user, 'id', 0) or 0) or None
         except Exception:
             payment_sale.created_by_user_id = None
+
+        try:
+            payment_sale.payments = []
+            for p in (normalized_payments or []):
+                payment_sale.payments.append(SalePayment(
+                    company_id=cid,
+                    method=str(p.get('method') or '').strip(),
+                    amount=float(p.get('amount') or 0.0),
+                ))
+        except Exception:
+            current_app.logger.exception('Failed to attach SalePayment rows to CobroCuota')
 
         db.session.add(payment_sale)
         try:
@@ -6485,6 +6548,8 @@ def get_cash_count():
     if not row:
         return jsonify({'ok': True, 'item': None})
 
+    cash_expected_now = _cash_expected_now(cid, d, shift_code)
+
     return jsonify({
         'ok': True,
         'item': {
@@ -6496,6 +6561,7 @@ def get_cash_count():
             'shift_display': shift_info.get('display'),
             'opening_amount': row.opening_amount,
             'cash_day_amount': row.cash_day_amount,
+            'cash_day_amount_current': _round2(cash_expected_now),
             'closing_amount': row.closing_amount,
             'difference_amount': row.difference_amount,
             'updated_at': row.updated_at.isoformat() if row.updated_at else None,
@@ -6678,11 +6744,170 @@ def _round2(v: float) -> float:
         return 0.0
 
 
+def _cash_sales_debug_rows(cid: str, d: dt_date, shift_code: str = 'turno_1') -> list[dict[str, Any]]:
+    try:
+        start_dt_local, end_dt_local, _ = _get_shift_window(cid, d, shift_code)
+        start_dt, end_dt, _ = _get_shift_window_for_storage(cid, d, shift_code)
+        rows = (
+            db.session.query(
+                Sale.id,
+                Sale.ticket,
+                Sale.sale_date,
+                Sale.created_at,
+                Sale.sale_type,
+                Sale.status,
+                Sale.payment_method,
+                Sale.total,
+            )
+            .filter(Sale.company_id == cid)
+            .filter(Sale.status == 'Completada')
+            .filter(Sale.sale_type.in_(['Venta', 'CobroVenta', 'CobroCC', 'CobroCuota']))
+            .filter(Sale.sale_date >= start_dt_local.date())
+            .filter(Sale.sale_date <= (end_dt_local - timedelta(seconds=1)).date())
+            .filter(Sale.created_at >= start_dt)
+            .filter(Sale.created_at < end_dt)
+            .order_by(Sale.created_at.asc(), Sale.id.asc())
+            .all()
+        )
+        out = []
+        for r in (rows or []):
+            payments = []
+            try:
+                payments = [
+                    {
+                        'id': int(getattr(p, 'id', 0) or 0),
+                        'method': str(getattr(p, 'method', '') or ''),
+                        'amount': float(getattr(p, 'amount', 0.0) or 0.0),
+                    }
+                    for p in (getattr(r, 'payments', None) or [])
+                ]
+            except Exception:
+                payments = []
+            out.append({
+                'id': int(getattr(r, 'id', 0) or 0),
+                'ticket': str(getattr(r, 'ticket', '') or ''),
+                'sale_date': (getattr(r, 'sale_date', None).isoformat() if getattr(r, 'sale_date', None) else None),
+                'created_at': (getattr(r, 'created_at', None).isoformat() if getattr(r, 'created_at', None) else None),
+                'sale_type': str(getattr(r, 'sale_type', '') or ''),
+                'status': str(getattr(r, 'status', '') or ''),
+                'payment_method': str(getattr(r, 'payment_method', '') or ''),
+                'total': float(getattr(r, 'total', 0.0) or 0.0),
+                'payments': payments,
+            })
+        return out
+    except Exception:
+        current_app.logger.exception('cash_count debug sales rows failed')
+        return []
+
+
+def _cash_expenses_debug_rows(cid: str, d: dt_date, shift_code: str = 'turno_1') -> list[dict[str, Any]]:
+    try:
+        start_dt_local, end_dt_local, _ = _get_shift_window(cid, d, shift_code)
+        start_dt, end_dt, _ = _get_shift_window_for_storage(cid, d, shift_code)
+        q = (
+            db.session.query(Expense)
+            .filter(Expense.company_id == cid)
+            .filter(Expense.payment_method == 'Efectivo')
+            .filter(Expense.expense_date >= start_dt_local.date())
+            .filter(Expense.expense_date <= (end_dt_local - timedelta(seconds=1)).date())
+            .filter(Expense.created_at >= start_dt)
+            .filter(Expense.created_at < end_dt)
+        )
+        try:
+            if hasattr(Expense, 'status'):
+                q = q.filter(Expense.status == 'completado')
+        except Exception:
+            pass
+        try:
+            if hasattr(Expense, 'expense_type'):
+                q = q.filter(func.lower(func.coalesce(Expense.expense_type, 'egreso')) == 'egreso')
+        except Exception:
+            pass
+        rows = q.order_by(Expense.created_at.asc()).all()
+        return [{
+            'id': str(getattr(r, 'id', '') or ''),
+            'expense_date': (getattr(r, 'expense_date', None).isoformat() if getattr(r, 'expense_date', None) else None),
+            'created_at': (getattr(r, 'created_at', None).isoformat() if getattr(r, 'created_at', None) else None),
+            'amount': float(getattr(r, 'amount', 0.0) or 0.0),
+            'payment_method': str(getattr(r, 'payment_method', '') or ''),
+            'expense_type': str(getattr(r, 'expense_type', '') or ''),
+        } for r in (rows or [])]
+    except Exception:
+        current_app.logger.exception('cash_count debug expenses rows failed')
+        return []
+
+
+def _cash_withdrawals_debug_rows(cid: str, d: dt_date, shift_code: str = 'turno_1') -> list[dict[str, Any]]:
+    try:
+        from app.models import CashWithdrawal
+        start_dt_local, end_dt_local, _ = _get_shift_window(cid, d, shift_code)
+        start_dt, end_dt, _ = _get_shift_window_for_storage(cid, d, shift_code)
+        rows = (
+            db.session.query(CashWithdrawal)
+            .filter(CashWithdrawal.company_id == cid)
+            .filter(CashWithdrawal.fecha_imputacion >= start_dt_local.date())
+            .filter(CashWithdrawal.fecha_imputacion <= (end_dt_local - timedelta(seconds=1)).date())
+            .filter(CashWithdrawal.fecha_registro >= start_dt)
+            .filter(CashWithdrawal.fecha_registro < end_dt)
+            .order_by(CashWithdrawal.fecha_registro.asc(), CashWithdrawal.id.asc())
+            .all()
+        )
+        return [{
+            'id': int(getattr(r, 'id', 0) or 0),
+            'fecha_imputacion': (getattr(r, 'fecha_imputacion', None).isoformat() if getattr(r, 'fecha_imputacion', None) else None),
+            'fecha_registro': (getattr(r, 'fecha_registro', None).isoformat() if getattr(r, 'fecha_registro', None) else None),
+            'monto': float(getattr(r, 'monto', 0.0) or 0.0),
+        } for r in (rows or [])]
+    except Exception:
+        current_app.logger.exception('cash_count debug withdrawals rows failed')
+        return []
+
+
+def _cash_manual_incomes_debug_rows(cid: str, d: dt_date, shift_code: str = 'turno_1') -> list[dict[str, Any]]:
+    try:
+        start_dt_local, end_dt_local, _ = _get_shift_window(cid, d, shift_code)
+        start_dt, end_dt, _ = _get_shift_window_for_storage(cid, d, shift_code)
+        q = (
+            db.session.query(Expense)
+            .filter(Expense.company_id == cid)
+            .filter(Expense.payment_method == 'Efectivo')
+            .filter(Expense.expense_date >= start_dt_local.date())
+            .filter(Expense.expense_date <= (end_dt_local - timedelta(seconds=1)).date())
+            .filter(Expense.created_at >= start_dt)
+            .filter(Expense.created_at < end_dt)
+        )
+        try:
+            if hasattr(Expense, 'status'):
+                q = q.filter(Expense.status == 'completado')
+        except Exception:
+            pass
+        try:
+            if hasattr(Expense, 'expense_type'):
+                q = q.filter(func.lower(func.coalesce(Expense.expense_type, '')) == 'ingreso')
+            else:
+                return []
+        except Exception:
+            return []
+        rows = q.order_by(Expense.created_at.asc()).all()
+        return [{
+            'id': str(getattr(r, 'id', '') or ''),
+            'expense_date': (getattr(r, 'expense_date', None).isoformat() if getattr(r, 'expense_date', None) else None),
+            'created_at': (getattr(r, 'created_at', None).isoformat() if getattr(r, 'created_at', None) else None),
+            'amount': float(getattr(r, 'amount', 0.0) or 0.0),
+            'payment_method': str(getattr(r, 'payment_method', '') or ''),
+            'expense_type': str(getattr(r, 'expense_type', '') or ''),
+        } for r in (rows or [])]
+    except Exception:
+        current_app.logger.exception('cash_count debug manual incomes rows failed')
+        return []
+
+
 def _cash_sales_total(cid: str, d: dt_date, shift_code: str = 'turno_1') -> float:
     try:
-        start_dt, end_dt, _ = _get_shift_window(cid, d, shift_code)
-        # Fuente de verdad: SalePayment.method (pagos mixtos). Para ventas legacy sin SalePayment,
-        # usar Sale.payment_method == 'Efectivo'.
+        start_dt_local, end_dt_local, _ = _get_shift_window(cid, d, shift_code)
+        start_dt, end_dt, _ = _get_shift_window_for_storage(cid, d, shift_code)
+        
+        # 1) Suma de pagos en efectivo verificados con SalePayment (incluye todos los tipos)
         q_pay = (
             db.session.query(func.coalesce(func.sum(SalePayment.amount), 0.0))
             .select_from(Sale)
@@ -6691,33 +6916,73 @@ def _cash_sales_total(cid: str, d: dt_date, shift_code: str = 'turno_1') -> floa
             .filter(Sale.status == 'Completada')
             .filter(Sale.sale_type.in_(['Venta', 'CobroVenta', 'CobroCC', 'CobroCuota']))
             .filter(SalePayment.method == 'cash')
+            .filter(Sale.sale_date >= start_dt_local.date())
+            .filter(Sale.sale_date <= (end_dt_local - timedelta(seconds=1)).date())
         )
         q_pay = _apply_dt_window(q_pay, Sale.created_at, start_dt, end_dt)
         total_pay = float(q_pay.scalar() or 0.0)
 
+        # 2) Fallback legacy SOLO para Venta/CobroVenta sin SalePayment.
+        # CobroCC/CobroCuota NO entran al fallback porque no podemos confiar en payment_method legacy.
         q_legacy = (
             db.session.query(func.coalesce(func.sum(Sale.total), 0.0))
             .outerjoin(SalePayment, and_(SalePayment.company_id == cid, SalePayment.sale_id == Sale.id))
             .filter(Sale.company_id == cid)
             .filter(Sale.status == 'Completada')
-            .filter(Sale.sale_type.in_(['Venta', 'CobroVenta', 'CobroCC', 'CobroCuota']))
+            .filter(Sale.sale_type.in_(['Venta', 'CobroVenta']))
             .filter(SalePayment.id.is_(None))
             .filter(Sale.payment_method == 'Efectivo')
+            .filter(Sale.sale_date >= start_dt_local.date())
+            .filter(Sale.sale_date <= (end_dt_local - timedelta(seconds=1)).date())
         )
         q_legacy = _apply_dt_window(q_legacy, Sale.created_at, start_dt, end_dt)
         total_legacy = float(q_legacy.scalar() or 0.0)
-        return float(total_pay + total_legacy)
+        return 0.0 if abs(float(total_pay + total_legacy)) < 0.00001 else float(total_pay + total_legacy)
+    except Exception:
+        return 0.0
+
+
+def _cash_manual_incomes_total(cid: str, d: dt_date, shift_code: str = 'turno_1') -> float:
+    try:
+        start_dt_local, end_dt_local, _ = _get_shift_window(cid, d, shift_code)
+        start_dt, end_dt, _ = _get_shift_window_for_storage(cid, d, shift_code)
+        q = (
+            db.session.query(func.coalesce(func.sum(Expense.amount), 0.0))
+            .filter(Expense.company_id == cid)
+            .filter(Expense.payment_method == 'Efectivo')
+            .filter(Expense.expense_date >= start_dt_local.date())
+            .filter(Expense.expense_date <= (end_dt_local - timedelta(seconds=1)).date())
+            .filter(Expense.created_at >= start_dt)
+            .filter(Expense.created_at < end_dt)
+        )
+        try:
+            if hasattr(Expense, 'status'):
+                q = q.filter(Expense.status == 'completado')
+        except Exception:
+            pass
+        try:
+            if hasattr(Expense, 'expense_type'):
+                q = q.filter(func.lower(func.coalesce(Expense.expense_type, '')) == 'ingreso')
+            else:
+                return 0.0
+        except Exception:
+            return 0.0
+        total = float(q.scalar() or 0.0)
+        return 0.0 if abs(total) < 0.00001 else total
     except Exception:
         return 0.0
 
 
 def _cash_expenses_total(cid: str, d: dt_date, shift_code: str = 'turno_1') -> float:
     try:
-        start_dt, end_dt, _ = _get_shift_window(cid, d, shift_code)
+        start_dt_local, end_dt_local, _ = _get_shift_window(cid, d, shift_code)
+        start_dt, end_dt, _ = _get_shift_window_for_storage(cid, d, shift_code)
         q = (
             db.session.query(func.coalesce(func.sum(Expense.amount), 0.0))
             .filter(Expense.company_id == cid)
             .filter(Expense.payment_method == 'Efectivo')
+            .filter(Expense.expense_date >= start_dt_local.date())
+            .filter(Expense.expense_date <= (end_dt_local - timedelta(seconds=1)).date())
         )
         q = q.filter(Expense.created_at >= start_dt).filter(Expense.created_at < end_dt)
         # Algunos schemas tienen status / tipo. Si existen, filtramos.
@@ -6728,10 +6993,11 @@ def _cash_expenses_total(cid: str, d: dt_date, shift_code: str = 'turno_1') -> f
             pass
         try:
             if hasattr(Expense, 'expense_type'):
-                q = q.filter(func.lower(Expense.expense_type) == 'egreso')
+                q = q.filter(func.lower(func.coalesce(Expense.expense_type, 'egreso')) == 'egreso')
         except Exception:
             pass
-        return float(q.scalar() or 0.0)
+        total = float(q.scalar() or 0.0)
+        return 0.0 if abs(total) < 0.00001 else total
     except Exception:
         return 0.0
 
@@ -6739,14 +7005,18 @@ def _cash_expenses_total(cid: str, d: dt_date, shift_code: str = 'turno_1') -> f
 def _cash_withdrawals_total(cid: str, d: dt_date, shift_code: str = 'turno_1') -> float:
     try:
         from app.models import CashWithdrawal
-        start_dt, end_dt, _ = _get_shift_window(cid, d, shift_code)
+        start_dt_local, end_dt_local, _ = _get_shift_window(cid, d, shift_code)
+        start_dt, end_dt, _ = _get_shift_window_for_storage(cid, d, shift_code)
         q = (
             db.session.query(func.coalesce(func.sum(CashWithdrawal.monto), 0.0))
             .filter(CashWithdrawal.company_id == cid)
+            .filter(CashWithdrawal.fecha_imputacion >= start_dt_local.date())
+            .filter(CashWithdrawal.fecha_imputacion <= (end_dt_local - timedelta(seconds=1)).date())
             .filter(CashWithdrawal.fecha_registro >= start_dt)
             .filter(CashWithdrawal.fecha_registro < end_dt)
         )
-        return float(q.scalar() or 0.0)
+        total = float(q.scalar() or 0.0)
+        return 0.0 if abs(total) < 0.00001 else total
     except Exception:
         return 0.0
 
@@ -6770,19 +7040,33 @@ def cash_count_calc_api():
     _, _, shift_info = _get_shift_window(cid, d, shift_code)
 
     ventas = _cash_sales_total(cid, d, shift_code)
+    ingresos = _cash_manual_incomes_total(cid, d, shift_code)
     egresos = _cash_expenses_total(cid, d, shift_code)
     retiros = _cash_withdrawals_total(cid, d, shift_code)
-    total = float((ventas or 0.0) - (retiros or 0.0) - (egresos or 0.0))
+    total = float((ventas or 0.0) + (ingresos or 0.0) - (retiros or 0.0) - (egresos or 0.0))
+    sales_debug = _cash_sales_debug_rows(cid, d, shift_code)
+    incomes_debug = _cash_manual_incomes_debug_rows(cid, d, shift_code)
+    expenses_debug = _cash_expenses_debug_rows(cid, d, shift_code)
+    withdrawals_debug = _cash_withdrawals_debug_rows(cid, d, shift_code)
+    if not sales_debug and not incomes_debug and not expenses_debug and not withdrawals_debug:
+        total = 0.0
 
     try:
         current_app.logger.info(
-            'cash_count calc_api cid=%s date=%s ventas_efectivo=%s retiros_efectivo=%s egresos_efectivo=%s total=%s',
+            'cash_count calc_api cid=%s date=%s shift=%s shift_display=%s ventas_efectivo=%s ingresos_efectivo=%s retiros_efectivo=%s egresos_efectivo=%s total=%s sales=%s incomes=%s expenses=%s withdrawals=%s',
             str(cid),
             (d.isoformat() if d else None),
+            str(shift_code),
+            shift_info.get('display'),
             float(ventas or 0.0),
+            float(ingresos or 0.0),
             float(retiros or 0.0),
             float(egresos or 0.0),
             float(total or 0.0),
+            sales_debug,
+            incomes_debug,
+            expenses_debug,
+            withdrawals_debug,
         )
     except Exception:
         pass
@@ -6795,8 +7079,9 @@ def cash_count_calc_api():
         'shift_label': shift_info.get('label'),
         'shift_display': shift_info.get('display'),
         'ventas_efectivo': _round2(ventas),
-        'retiros_efectivo': _round2(retiros),
+        'ingresos_efectivo': _round2(ingresos),
         'egresos_efectivo': _round2(egresos),
+        'retiros_efectivo': _round2(retiros),
         'efectivo_dia_calculado': _round2(total),
     })
 
@@ -6829,9 +7114,12 @@ def cash_register_status():
         snap_v = 0.0
 
     ventas = _cash_sales_total(cid, d)
+    ingresos = _cash_manual_incomes_total(cid, d)
     egresos = _cash_expenses_total(cid, d)
     retiros = _cash_withdrawals_total(cid, d)
-    actual = ventas - egresos - retiros
+    actual = ventas + ingresos - egresos - retiros
+    if abs(float(ventas or 0.0)) < 0.00001 and abs(float(ingresos or 0.0)) < 0.00001 and abs(float(egresos or 0.0)) < 0.00001 and abs(float(retiros or 0.0)) < 0.00001:
+        actual = 0.0
 
     is_done = _round2(actual) == _round2(snap_v)
     return jsonify({
