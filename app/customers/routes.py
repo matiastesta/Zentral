@@ -690,6 +690,166 @@ def customer_debt_summary_api(customer_id):
     return jsonify(payload)
 
 
+@bp.get('/api/customers/diagnose-cc')
+@login_required
+@module_required('customers')
+def diagnose_cc_inconsistencies():
+    """
+    Endpoint de diagnóstico para detectar clientes con posibles inconsistencias en cuenta corriente.
+    Calcula el saldo real desde Sale.due_amount y lo reporta.
+    """
+    company_id = _company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+
+    try:
+        customers = db.session.query(Customer).filter(Customer.company_id == company_id).all()
+        
+        results = []
+        total_customers = len(customers)
+        customers_with_debt = 0
+        
+        for customer in customers:
+            cid = str(customer.id or '').strip()
+            if not cid:
+                continue
+            
+            # Calcular saldo real desde ventas
+            cc_balance = 0.0
+            cc_count = 0
+            try:
+                sales = (
+                    db.session.query(Sale)
+                    .filter(Sale.company_id == company_id)
+                    .filter(Sale.customer_id == cid)
+                    .filter(Sale.sale_type == 'Venta')
+                    .filter(Sale.status != 'Reemplazada')
+                    .filter(Sale.due_amount > 0)
+                    .all()
+                )
+                cc_count = len(sales)
+                for s in sales:
+                    due = float(getattr(s, 'due_amount', 0.0) or 0.0)
+                    cc_balance += max(0.0, due)
+            except Exception:
+                cc_balance = 0.0
+                cc_count = 0
+            
+            if cc_balance > 0.001:
+                customers_with_debt += 1
+                customer_name = getattr(customer, 'name', None) or f"{getattr(customer, 'first_name', '')} {getattr(customer, 'last_name', '')}".strip() or 'Sin nombre'
+                
+                results.append({
+                    'customer_id': cid,
+                    'customer_name': customer_name,
+                    'real_cc_balance': round(cc_balance, 2),
+                    'sales_count': cc_count,
+                    'status': 'OK - Fuente de verdad desde Sale.due_amount'
+                })
+        
+        return jsonify({
+            'ok': True,
+            'total_customers': total_customers,
+            'customers_with_debt': customers_with_debt,
+            'results': results[:50]  # Limitar a 50 para no sobrecargar
+        })
+    
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@bp.post('/api/customers/<customer_id>/recalculate-cc')
+@login_required
+@module_required('customers')
+def recalculate_customer_cc(customer_id: str):
+    """
+    Recalcula la cuenta corriente de un cliente desde las ventas reales.
+    Fuente única de verdad: Sale.due_amount para ventas confirmadas.
+    """
+    company_id = _company_id()
+    if not company_id:
+        return jsonify({'ok': False, 'error': 'no_company'}), 400
+    
+    cid = str(customer_id or '').strip()
+    if not cid:
+        return jsonify({'ok': False, 'error': 'invalid_customer_id'}), 400
+    
+    try:
+        # Verificar que el cliente existe
+        customer = db.session.query(Customer).filter(
+            Customer.company_id == company_id,
+            Customer.id == cid
+        ).first()
+        
+        if not customer:
+            return jsonify({'ok': False, 'error': 'customer_not_found'}), 404
+        
+        # Obtener TODAS las ventas CC pendientes del cliente
+        sales_with_debt = (
+            db.session.query(Sale)
+            .filter(Sale.company_id == company_id)
+            .filter(Sale.customer_id == cid)
+            .filter(Sale.sale_type == 'Venta')
+            .filter(Sale.status != 'Reemplazada')
+            .filter(Sale.status != 'Anulado')
+            .filter(Sale.due_amount > 0)
+            .order_by(Sale.sale_date.asc())
+            .all()
+        )
+        
+        # Calcular saldo real desde tickets
+        tickets_detail = []
+        total_cc_balance = 0.0
+        
+        for sale in sales_with_debt:
+            due = float(getattr(sale, 'due_amount', 0.0) or 0.0)
+            total = float(getattr(sale, 'total', 0.0) or 0.0)
+            paid = max(0.0, total - due)
+            
+            if due > 0.001:  # Solo incluir deudas reales
+                total_cc_balance += due
+                tickets_detail.append({
+                    'sale_id': str(sale.id),
+                    'ticket': str(getattr(sale, 'ticket', '') or ''),
+                    'sale_date': str(getattr(sale, 'sale_date', '') or ''),
+                    'total': round(total, 2),
+                    'paid': round(paid, 2),
+                    'due_amount': round(due, 2)
+                })
+        
+        # Obtener todas las ventas del cliente (incluyendo pagadas)
+        all_sales = (
+            db.session.query(Sale)
+            .filter(Sale.company_id == company_id)
+            .filter(Sale.customer_id == cid)
+            .filter(Sale.sale_type == 'Venta')
+            .filter(Sale.status != 'Reemplazada')
+            .filter(Sale.status != 'Anulado')
+            .all()
+        )
+        
+        total_purchases = len([s for s in all_sales if float(getattr(s, 'total', 0.0) or 0.0) > 0])
+        total_amount = sum([float(getattr(s, 'total', 0.0) or 0.0) for s in all_sales])
+        
+        return jsonify({
+            'ok': True,
+            'customer_id': cid,
+            'customer_name': getattr(customer, 'name', None) or f"{getattr(customer, 'first_name', '')} {getattr(customer, 'last_name', '')}".strip() or 'Sin nombre',
+            'recalculated': {
+                'total_purchases': total_purchases,
+                'total_amount': round(total_amount, 2),
+                'cc_balance': round(total_cc_balance, 2),
+                'pending_tickets_count': len(tickets_detail),
+                'pending_tickets': tickets_detail
+            },
+            'source_of_truth': 'Sale.due_amount from confirmed sales'
+        })
+    
+    except Exception as e:
+        current_app.logger.exception('Failed to recalculate customer CC', extra={'customer_id': cid, 'company_id': company_id})
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
 @bp.get('/api/customers/has_active_installments')
 @login_required
 @module_required_any('customers', 'settings', 'sales')

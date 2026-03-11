@@ -14,22 +14,29 @@ from app.models import (
     CalendarEvent,
     CalendarUserConfig,
     CashCount,
+    CashWithdrawal,
     Category,
     Company,
     Customer,
     Employee,
     Expense,
     ExpenseCategory,
+    Installment,
+    InstallmentPlan,
     InventoryLot,
     InventoryMovement,
     FileAsset,
     Product,
     Sale,
     SaleItem,
+    SalePayment,
     CompanyRole,
     Plan,
+    SalesHistoryUserConfig,
     Supplier,
     User,
+    UserTableColumnPrefs,
+    TandaCarga,
 )
 
 from app.superadmin import bp
@@ -1090,27 +1097,50 @@ def delete_company(company_id: str):
 
     cid = str(c.id)
 
-    # Delete child tables first
-    db.session.query(SaleItem).filter(SaleItem.company_id == cid).delete(synchronize_session=False)
-    db.session.query(Sale).filter(Sale.company_id == cid).delete(synchronize_session=False)
-    db.session.query(InventoryMovement).filter(InventoryMovement.company_id == cid).delete(synchronize_session=False)
-    db.session.query(InventoryLot).filter(InventoryLot.company_id == cid).delete(synchronize_session=False)
-    db.session.query(Expense).filter(Expense.company_id == cid).delete(synchronize_session=False)
-    db.session.query(ExpenseCategory).filter(ExpenseCategory.company_id == cid).delete(synchronize_session=False)
-    db.session.query(CalendarEvent).filter(CalendarEvent.company_id == cid).delete(synchronize_session=False)
-    db.session.query(CalendarUserConfig).filter(CalendarUserConfig.company_id == cid).delete(synchronize_session=False)
-    db.session.query(CashCount).filter(CashCount.company_id == cid).delete(synchronize_session=False)
-    db.session.query(Product).filter(Product.company_id == cid).delete(synchronize_session=False)
-    db.session.query(Category).filter(Category.company_id == cid).delete(synchronize_session=False)
-    db.session.query(Customer).filter(Customer.company_id == cid).delete(synchronize_session=False)
-    db.session.query(Supplier).filter(Supplier.company_id == cid).delete(synchronize_session=False)
-    db.session.query(Employee).filter(Employee.company_id == cid).delete(synchronize_session=False)
-    db.session.query(BusinessSettings).filter(BusinessSettings.company_id == cid).delete(synchronize_session=False)
-    db.session.query(CompanyRole).filter(CompanyRole.company_id == cid).delete(synchronize_session=False)
-    db.session.query(User).filter(User.company_id == cid).delete(synchronize_session=False)
+    try:
+        db.session.query(SaleItem).filter(SaleItem.company_id == cid).delete(synchronize_session=False)
+        db.session.query(SalePayment).filter(SalePayment.company_id == cid).delete(synchronize_session=False)
+        db.session.query(Installment).filter(Installment.company_id == cid).delete(synchronize_session=False)
+        db.session.query(InstallmentPlan).filter(InstallmentPlan.company_id == cid).delete(synchronize_session=False)
+        db.session.query(Sale).filter(Sale.company_id == cid).delete(synchronize_session=False)
 
-    db.session.delete(c)
-    db.session.commit()
+        db.session.query(InventoryMovement).filter(InventoryMovement.company_id == cid).delete(synchronize_session=False)
+        db.session.query(InventoryLot).filter(InventoryLot.company_id == cid).delete(synchronize_session=False)
+        db.session.query(TandaCarga).filter(TandaCarga.company_id == cid).delete(synchronize_session=False)
+
+        db.session.query(Expense).filter(Expense.company_id == cid).delete(synchronize_session=False)
+        db.session.query(ExpenseCategory).filter(ExpenseCategory.company_id == cid).delete(synchronize_session=False)
+        db.session.query(CashCount).filter(CashCount.company_id == cid).delete(synchronize_session=False)
+        db.session.query(CashWithdrawal).filter(CashWithdrawal.company_id == cid).delete(synchronize_session=False)
+
+        db.session.query(CalendarEvent).filter(CalendarEvent.company_id == cid).delete(synchronize_session=False)
+        db.session.query(CalendarUserConfig).filter(CalendarUserConfig.company_id == cid).delete(synchronize_session=False)
+        db.session.query(UserTableColumnPrefs).filter(UserTableColumnPrefs.company_id == cid).delete(synchronize_session=False)
+        db.session.query(SalesHistoryUserConfig).filter(SalesHistoryUserConfig.company_id == cid).delete(synchronize_session=False)
+
+        db.session.query(FileAsset).filter(FileAsset.company_id == cid).delete(synchronize_session=False)
+        db.session.query(Product).filter(Product.company_id == cid).delete(synchronize_session=False)
+        db.session.query(Category).filter(Category.company_id == cid).delete(synchronize_session=False)
+        db.session.query(Customer).filter(Customer.company_id == cid).delete(synchronize_session=False)
+        db.session.query(Supplier).filter(Supplier.company_id == cid).delete(synchronize_session=False)
+        db.session.query(Employee).filter(Employee.company_id == cid).delete(synchronize_session=False)
+        db.session.query(BusinessSettings).filter(BusinessSettings.company_id == cid).delete(synchronize_session=False)
+        db.session.query(CompanyRole).filter(CompanyRole.company_id == cid).delete(synchronize_session=False)
+        db.session.query(User).filter(User.company_id == cid).delete(synchronize_session=False)
+
+        db.session.delete(c)
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            current_app.logger.exception('Failed to delete company company_id=%s', cid)
+        except Exception:
+            pass
+        flash('No se pudo eliminar la empresa. Revisá los logs del servidor.', 'error')
+        return redirect(url_for('superadmin.index'))
 
     flash('Empresa eliminada.', 'success')
     return redirect(url_for('superadmin.index'))

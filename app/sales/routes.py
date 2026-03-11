@@ -979,6 +979,11 @@ def _ensure_sale_payments_table() -> None:
                                 NOW() AS created_at
                             FROM sale s
                             WHERE s.sale_type = 'Venta'
+                              AND (
+                                  COALESCE(s.on_account, false) = false
+                                  OR COALESCE(s.is_installments, false) = true
+                                  OR COALESCE(s.paid_amount, 0) > 0.0001
+                              )
                               AND NOT EXISTS (
                                   SELECT 1 FROM sale_payment sp
                                   WHERE sp.company_id = s.company_id AND sp.sale_id = s.id
@@ -1050,6 +1055,54 @@ def _sum_payments(payments: list[dict]) -> float:
         except Exception:
             continue
     return float(s)
+
+
+def _has_real_payment_amount(amount: object) -> bool:
+    try:
+        return float(amount or 0.0) > 0.0001
+    except Exception:
+        return False
+
+
+def _should_clear_payment_method_for_sale(*, sale_type: str, on_account: bool, paid_amount: object, is_installments: bool = False) -> bool:
+    try:
+        st = str(sale_type or '').strip()
+    except Exception:
+        st = str(sale_type or '')
+    if st != 'Venta':
+        return False
+    if bool(is_installments):
+        return False
+    return bool(on_account) and (not _has_real_payment_amount(paid_amount))
+
+
+def _normalize_sale_payment_fields(*, sale_type: str, on_account: bool, paid_amount: object, payment_method: object, payments: list[dict] | None, is_installments: bool = False) -> tuple[str | None, list[dict]]:
+    cleaned: list[dict] = []
+    for p in (payments or []):
+        d = p if isinstance(p, dict) else {}
+        mk = _canonical_payment_method_key(d.get('method'))
+        amt = _num(d.get('amount'))
+        if not mk:
+            continue
+        if not _has_real_payment_amount(amt):
+            continue
+        cleaned.append({'method': mk, 'amount': float(amt)})
+
+    if _should_clear_payment_method_for_sale(
+        sale_type=sale_type,
+        on_account=on_account,
+        paid_amount=paid_amount,
+        is_installments=is_installments,
+    ):
+        return None, []
+
+    pm = str(payment_method or '').strip() or None
+    if cleaned:
+        if len(cleaned) == 1:
+            pm = str(cleaned[0].get('method') or '').strip() or pm
+        else:
+            pm = ' + '.join([str(x.get('method') or '').strip() for x in cleaned if str(x.get('method') or '').strip()]) or pm
+    return pm, cleaned
 
 
 def _ensure_sale_ticket_numbering() -> None:
@@ -2181,8 +2234,18 @@ def _serialize_sale(row: Sale, related: dict | None = None, users_map: dict | No
             mk = _canonical_payment_method_key(getattr(p, 'method', None))
             if not mk:
                 continue
-            payments_out.append({'method': mk, 'amount': float(getattr(p, 'amount', 0.0) or 0.0)})
+            amt = float(getattr(p, 'amount', 0.0) or 0.0)
+            if not _has_real_payment_amount(amt):
+                continue
+            payments_out.append({'method': mk, 'amount': amt})
     except Exception:
+        payments_out = []
+    if _should_clear_payment_method_for_sale(
+        sale_type=getattr(row, 'sale_type', ''),
+        on_account=bool(getattr(row, 'on_account', False)),
+        paid_amount=getattr(row, 'paid_amount', 0.0),
+        is_installments=bool(getattr(row, 'is_installments', False)),
+    ):
         payments_out = []
 
     # Para cobros (CobroVenta/CobroCC/CobroCuota), el desglose real suele estar en la venta original.
@@ -2227,7 +2290,12 @@ def _serialize_sale(row: Sale, related: dict | None = None, users_map: dict | No
         'fecha': row.sale_date.isoformat() if row.sale_date else '',
         'type': row.sale_type,
         'status': row.status,
-        'payment_method': row.payment_method,
+        'payment_method': (None if _should_clear_payment_method_for_sale(
+            sale_type=getattr(row, 'sale_type', ''),
+            on_account=bool(getattr(row, 'on_account', False)),
+            paid_amount=getattr(row, 'paid_amount', 0.0),
+            is_installments=bool(getattr(row, 'is_installments', False)),
+        ) else row.payment_method),
         'payments': payments_out,
         'notes': row.notes or '',
 
@@ -2541,8 +2609,17 @@ def _build_receipt_context_from_sale(row: Sale, bs: BusinessSettings | None) -> 
     except Exception:
         payment_values = []
         payment_rows = []
+    if _should_clear_payment_method_for_sale(
+        sale_type=getattr(row, 'sale_type', ''),
+        on_account=bool(getattr(row, 'on_account', False)),
+        paid_amount=getattr(row, 'paid_amount', 0.0),
+        is_installments=bool(getattr(row, 'is_installments', False)),
+    ):
+        payment_values = []
+        payment_rows = []
     if not payment_values:
-        payment_values = [str(getattr(row, 'payment_method', '') or '').strip()]
+        fallback_payment_method = str(getattr(row, 'payment_method', '') or '').strip()
+        payment_values = ([fallback_payment_method] if fallback_payment_method else [])
     if not payment_rows and payment_values:
         fallback_amount = float(getattr(row, 'paid_amount', 0.0) or 0.0)
         if fallback_amount <= 0.0001:
@@ -2606,8 +2683,17 @@ def _build_receipt_context_from_payload(payload: dict, bs: BusinessSettings | No
         if value:
             payment_values.append(value)
             payment_rows.append({'method': value, 'amount': _num(p.get('amount'))})
+    if _should_clear_payment_method_for_sale(
+        sale_type=str(payload.get('type') or 'Venta').strip(),
+        on_account=bool(payload.get('on_account')),
+        paid_amount=_num(payload.get('paid_amount')),
+        is_installments=bool((payload.get('installments') if isinstance(payload.get('installments'), dict) else {}).get('enabled')),
+    ):
+        payment_values = []
+        payment_rows = []
     if not payment_values:
-        payment_values = [str(payload.get('payment_method') or '').strip()]
+        fallback_payment_method = str(payload.get('payment_method') or '').strip()
+        payment_values = ([fallback_payment_method] if fallback_payment_method else [])
     if not payment_rows and payment_values:
         fallback_amount = _num(payload.get('paid_amount'))
         if fallback_amount <= 0.0001:
@@ -4253,6 +4339,14 @@ def create_exchange():
     if not on_account:
         paid_amount = diff_to_pay
         due_amount = 0.0
+    payment_method, payments = _normalize_sale_payment_fields(
+        sale_type='Venta',
+        on_account=bool(on_account),
+        paid_amount=paid_amount,
+        payment_method=payment_method,
+        payments=payments,
+        is_installments=False,
+    )
 
     is_gift = bool(payload.get('is_gift'))
     gift_code = str(payload.get('gift_code') or '').strip() or None
@@ -5059,6 +5153,15 @@ def create_sale():
                 due_amount = max(0.0, float(total_amount or 0.0) - float(paid_amount or 0.0))
             except Exception:
                 due_amount = 0.0
+
+    payment_method, payments = _normalize_sale_payment_fields(
+        sale_type=st_norm,
+        on_account=bool(on_account),
+        paid_amount=paid_amount,
+        payment_method=payment_method,
+        payments=payments,
+        is_installments=bool(inst_enabled),
+    )
 
     start_date = None
     interval_days = 30
@@ -6211,6 +6314,34 @@ def update_sale(ticket):
     row.customer_id = str(payload.get('customer_id') or '').strip() or None
     row.customer_name = str(payload.get('customer_name') or '').strip() or None
 
+    try:
+        st_norm = str(sale_type or '').strip()
+    except Exception:
+        st_norm = str(sale_type or '')
+    if st_norm == 'Venta':
+        if not bool(row.on_account):
+            row.paid_amount = float(row.total or 0.0)
+            row.due_amount = 0.0
+        else:
+            try:
+                row.paid_amount = max(0.0, min(float(row.paid_amount or 0.0), float(row.total or 0.0)))
+            except Exception:
+                row.paid_amount = 0.0
+            try:
+                row.due_amount = max(0.0, float(row.total or 0.0) - float(row.paid_amount or 0.0))
+            except Exception:
+                row.due_amount = 0.0
+
+    payment_method, payments = _normalize_sale_payment_fields(
+        sale_type=st_norm,
+        on_account=bool(row.on_account),
+        paid_amount=row.paid_amount,
+        payment_method=payment_method,
+        payments=payments,
+        is_installments=bool(getattr(row, 'is_installments', False)),
+    )
+    row.payment_method = payment_method
+
     raw_emp_id = str(payload.get('employee_id') or '').strip() or None
     raw_emp_name = str(payload.get('employee_name') or '').strip() or None
     emp_id, emp_name = _resolve_employee_fields(cid=cid, employee_id=raw_emp_id, employee_name=raw_emp_name)
@@ -6220,7 +6351,7 @@ def update_sale(ticket):
     row.exchange_return_total = (None if payload.get('exchange_return_total') is None else _num(payload.get('exchange_return_total')))
     row.exchange_new_total = (None if payload.get('exchange_new_total') is None else _num(payload.get('exchange_new_total')))
 
-    if payments is not None and str(sale_type or '').strip() == 'Venta':
+    if str(sale_type or '').strip() == 'Venta':
         expected = float(row.total or 0.0)
         if bool(row.on_account):
             expected = float(row.paid_amount or 0.0)
@@ -6242,6 +6373,8 @@ def update_sale(ticket):
                 row.payment_method = str(payments[0].get('method') or payment_method)
             elif len(payments) >= 2:
                 row.payment_method = ' + '.join([str(x.get('method')) for x in payments])
+            elif not payments:
+                row.payment_method = None
         except Exception:
             current_app.logger.exception('Failed to update sale payments')
 

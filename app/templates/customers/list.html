@@ -623,53 +623,6 @@
     </div>
 </div>
 
-<div id="modal-settle-debt" class="hidden fixed inset-0 z-50" style="z-index:70;">
-    <div class="absolute inset-0 bg-black/40"></div>
-    <div class="relative h-full w-full flex items-center justify-center p-4">
-        <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                    <h3 class="text-base font-semibold text-gray-900">Saldar Cuenta Corriente</h3>
-                    <p id="settle-subtitle" class="text-xs text-gray-500">—</p>
-                </div>
-                <button id="btn-close-settle" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="p-5 space-y-3">
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Venta adeudada</label>
-                    <select id="settle-sale" class="w-full px-3 py-2 text-sm border rounded-md bg-white"></select>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div class="p-3 border border-gray-200 rounded-lg">
-                        <div class="text-[11px] text-gray-500">Deuda a saldar</div>
-                        <div id="settle-amount" class="mt-1 text-sm font-semibold text-red-700">$0,00</div>
-                    </div>
-                    <div class="p-3 border border-gray-200 rounded-lg">
-                        <div class="text-[11px] text-gray-500">Medio de pago</div>
-                        <select id="settle-method" class="mt-2 w-full px-3 py-2 text-sm border rounded-md bg-white">
-                            <option value="Efectivo">Efectivo</option>
-                            <option value="Transferencia">Transferencia</option>
-                            <option value="Débito">Débito</option>
-                            <option value="Crédito">Crédito</option>
-                        </select>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Monto a pagar</label>
-                    <input id="settle-pay-amount" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0">
-                    <div class="mt-1 text-[11px] text-gray-500">Podés pagar el total o un monto parcial (se descuenta de la deuda).</div>
-                </div>
-                <div id="settle-error" class="text-[11px] text-red-600 hidden flex items-center gap-1"><i class="fas fa-exclamation-circle"></i><span>Seleccioná una venta válida.</span></div>
-            </div>
-            <div class="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
-                <button id="btn-cancel-settle" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
-                <button id="btn-confirm-settle" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">Confirmar</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <div id="modal-settle-type" class="hidden fixed inset-0 z-50" style="z-index:70;">
     <div class="absolute inset-0 bg-black/40"></div>
@@ -860,6 +813,27 @@
         </div>
     </div>
 </div>
+
+<!-- Modal para múltiples deudas de cuenta corriente -->
+<div id="modal-multiple-cc-debts" class="hidden fixed inset-0 z-50" style="z-index:75;">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+                <div class="min-w-0">
+                    <h3 class="text-base font-semibold text-gray-900">Múltiples deudas de cuenta corriente</h3>
+                </div>
+                <button id="btn-close-multiple-cc-debts" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="multiple-cc-debts-content" class="p-5 overflow-y-auto flex-1">
+                <!-- Contenido dinámico -->
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -922,6 +896,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const crmPreview = document.getElementById('crm-preview');
     const crmConfigError = document.getElementById('crm-config-error');
+    
+    const modalMultipleCcDebts = document.getElementById('modal-multiple-cc-debts');
+    const btnCloseMultipleCcDebts = document.getElementById('btn-close-multiple-cc-debts');
+    const multipleCcDebtsContent = document.getElementById('multiple-cc-debts-content');
 
     const thClasLabel = document.getElementById('clientes-th-clas-label');
 
@@ -1027,10 +1005,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const legajoMainPanelActivity = document.getElementById('legajo-main-panel-activity');
     const legajoMainPanelFinance = document.getElementById('legajo-main-panel-finance');
 
-    const modalSettle = document.getElementById('modal-settle-debt');
-    const btnCloseSettle = document.getElementById('btn-close-settle');
-    const btnCancelSettle = document.getElementById('btn-cancel-settle');
-    const settleSubtitle = document.getElementById('settle-subtitle');
 
     const modalCobro = document.getElementById('modal-cobro');
     const cobroTitle = document.getElementById('cobro-title');
@@ -1782,7 +1756,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
                 closeModal(modalCobro);
-                closeModal(modalSettle);
                 Promise.resolve(refreshSalesCache()).then(function () {
                     try {
                         if (legajoCustomerId && legajoCustomerId === safeStr(cobroCtx.customer_id)) openLegajo(legajoCustomerId);
@@ -2222,11 +2195,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function salesForCustomer(customer) {
         const cid = safeStr(customer?.id);
-        const fullName = safeStr(customer?.full_name).trim();
+        const fullName = safeStr(customer?.full_name || customer?.name).trim().toLowerCase();
         const list = dedupeSales(cacheSales).filter(s => {
             const sid = safeStr(s?.customer_id);
+            const sname = safeStr(s?.customer_name).trim().toLowerCase();
+            
+            // Buscar por customer_id
             if (sid && cid && sid === cid) return true;
-            if (!sid && fullName) return safeStr(s?.customer_name).toLowerCase() === fullName.toLowerCase();
+            
+            // TAMBIÉN buscar por nombre (para manejar clientes duplicados)
+            if (fullName && sname && sname === fullName) return true;
+            
             return false;
         });
         return list.slice().sort((a, b) => {
@@ -2576,19 +2555,72 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const compras = parseInt(c.cantidad_compras || 0, 10) || 0;
         const totalHist = parseFloat(c.monto_total_comprado || 0) || 0;
-        if (legajoMetricAvgTicket) {
-            if (compras > 0 && totalHist > 0) legajoMetricAvgTicket.textContent = fmtMoney(totalHist / compras);
-            else legajoMetricAvgTicket.textContent = '—';
-        }
-
+        
+        // Calcular salesOnly usando MISMA lógica que computeDerived para evitar inconsistencias
         const salesOnly = ensureArray(all).filter(s => {
             if (isPaymentSaleRow(s)) return false;
             const total = parseFloat(s?.total || 0) || 0;
             return total > 0;
         });
+        
+        // IMPORTANTE: usar salesOnly.length como fuente de verdad, NO c.cantidad_compras
+        // Esto evita inconsistencias entre "Compras" y "Tickets"
+        const realTicketCount = salesOnly.length;
+        
+        if (legajoMetricAvgTicket) {
+            if (realTicketCount > 0 && totalHist > 0) legajoMetricAvgTicket.textContent = fmtMoney(totalHist / realTicketCount);
+            else legajoMetricAvgTicket.textContent = '—';
+        }
+        
         if (legajoMetricTickets) {
-            const nTickets = salesOnly.length || compras || 0;
-            legajoMetricTickets.textContent = String(nTickets || '—');
+            legajoMetricTickets.textContent = String(realTicketCount || 0);
+        }
+        
+        // Actualizar también KPI de Compras para que coincida
+        if (legajoKpiCompras) legajoKpiCompras.textContent = String(realTicketCount || 0);
+        
+        // Recalcular total histórico desde ventas reales para evitar desajuste
+        const realTotalHist = salesOnly.reduce((acc, s) => acc + (parseFloat(s?.total || 0) || 0), 0);
+        if (legajoKpiTotal) legajoKpiTotal.textContent = fmtMoney(realTotalHist);
+        
+        // VALIDACIÓN DE CONSISTENCIA - Detectar desajustes
+        const inconsistencias = [];
+        if (Math.abs(compras - realTicketCount) > 0.001) {
+            inconsistencias.push({
+                tipo: 'COMPRAS_VS_TICKETS',
+                computeDerived_compras: compras,
+                salesOnly_tickets: realTicketCount,
+                diferencia: compras - realTicketCount
+            });
+        }
+        if (Math.abs(totalHist - realTotalHist) > 0.01) {
+            inconsistencias.push({
+                tipo: 'TOTAL_HISTORICO_DESAJUSTADO',
+                computeDerived_total: totalHist,
+                salesOnly_total: realTotalHist,
+                diferencia: totalHist - realTotalHist
+            });
+        }
+        
+        // Si hay inconsistencias, loggear para debugging
+        if (inconsistencias.length > 0) {
+            console.warn('🔍 INCONSISTENCIAS DETECTADAS en legajo del cliente:', {
+                customer_id: safeStr(c.id),
+                customer_name: safeStr(c.full_name || c.name),
+                inconsistencias: inconsistencias,
+                debug_info: {
+                    cacheSales_total: cacheSales.length,
+                    all_sales_for_customer: all.length,
+                    salesOnly_count: salesOnly.length,
+                    salesOnly_tickets: salesOnly.map(s => ({
+                        ticket: s.ticket,
+                        fecha: s.fecha,
+                        total: parseFloat(s.total || 0),
+                        due_amount: parseFloat(s.due_amount || 0),
+                        type: s.sale_type || s.type
+                    }))
+                }
+            });
         }
 
         if (legajoMetricTenure) {
@@ -2602,10 +2634,29 @@ document.addEventListener('DOMContentLoaded', function () {
         setLegajoMainTab('profile');
 
         if (legajoSales) {
-            const list = salesOnly.slice(0, 20);
+            const list = salesOnly.slice(0, 100); // Aumentar límite para ver todas las ventas
             if (!list.length) {
                 legajoSales.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-sm text-gray-500 text-center">Sin ventas asociadas.</td></tr>';
             } else {
+                // Log de todas las ventas para debugging
+                console.log('📋 Ventas del cliente en legajo:', {
+                    customer: safeStr(c.full_name || c.name),
+                    customer_id: safeStr(c.id),
+                    total_ventas: list.length,
+                    salesOnly_length: salesOnly.length,
+                    all_sales_for_customer: all.length,
+                    ventas: list.map(s => ({
+                        id: s.id,
+                        ticket: s.ticket,
+                        fecha: s.fecha,
+                        tipo: s.sale_type || s.type,
+                        total: parseFloat(s.total || 0),
+                        paid: parseFloat(s.paid_amount || 0),
+                        due: parseFloat(s.due_amount || 0),
+                        status: s.status,
+                        is_installments: s.is_installments
+                    }))
+                });
                 legajoSales.innerHTML = '';
                 list.forEach(s => {
                     const ts = parseDateToTs(s?.fecha) || (parseInt(s?.created_at || 0, 10) || 0);
@@ -2870,75 +2921,191 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!c) return;
 
         settleCustomerId = safeStr(c.id);
-        if (settleSubtitle) settleSubtitle.textContent = safeStr(c.full_name || 'Cliente');
+        
+        // DIAGNÓSTICO: Ver TODOS los tickets del cliente antes de filtrar (por ID Y nombre)
+        const customerName = safeStr(c.full_name || c.name).trim().toLowerCase();
+        const allCustomerSales = ensureArray(cacheSales).filter(s => {
+            const sid = safeStr(s?.customer_id);
+            const sname = safeStr(s?.customer_name).trim().toLowerCase();
+            // Buscar por ID O por nombre (para clientes duplicados)
+            return (sid && sid === settleCustomerId) || (customerName && sname && sname === customerName);
+        });
+        
+        console.log('🔍 DIAGNÓSTICO openSettleCcDebt:', {
+            customer_id: settleCustomerId,
+            customer_name: safeStr(c.full_name || c.name),
+            total_sales_in_cache: cacheSales.length,
+            customer_sales_count: allCustomerSales.length,
+            customer_sales: allCustomerSales.map(s => ({
+                ticket: s.ticket,
+                fecha: s.fecha,
+                type: s.sale_type || s.type,
+                total: parseFloat(s.total || 0),
+                due_amount: parseFloat(s.due_amount || 0),
+                is_installments: s.is_installments,
+                status: s.status
+            }))
+        });
 
         const outs = ensureArray(cacheSales)
             .filter(s => {
                 const sid = safeStr(s?.customer_id);
+                const sname = safeStr(s?.customer_name).trim().toLowerCase();
                 const due = (parseFloat(s?.due_amount || 0) || 0);
-                if (!(sid && sid === settleCustomerId)) return false;
+                // Filtrar por ID O nombre (para clientes duplicados)
+                const matchesCustomer = (sid && sid === settleCustomerId) || (customerName && sname && sname === customerName);
+                if (!matchesCustomer) return false;
                 if (!(due > 0)) return false;
                 if (s && s.is_installments === true) return false;
                 const t = safeStr(s?.type || s?.sale_type).trim();
                 if (t === 'CobroCuota') return false;
+                // IMPORTANTE: Solo filtrar Venta con cuenta corriente, NO excluir otros tipos válidos
+                const st = safeStr(s?.status || '').trim();
+                if (st === 'Reemplazada' || st === 'Anulado') return false;
                 return true;
             })
             .sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0));
-
-        const listContainer = document.getElementById('settle-sales-list');
-        if (listContainer) {
-            if (!outs.length) {
-                listContainer.innerHTML = '<div class="p-8 text-center text-sm text-gray-500">El cliente no registra deudas pendientes en cuenta corriente.</div>';
-            } else {
-                if (outs.length === 1) {
-                    openCcCheckoutForSaleId(safeStr(outs[0]?.id));
-                    return;
-                }
-                
-                const html = outs.map(s => {
-                    const sid = safeStr(s?.id);
-                    const due = parseFloat(s?.due_amount || 0) || 0;
-                    const total = parseFloat(s?.total || 0) || 0;
-                    const paid = Math.max(0, total - due);
-                    const fechaRaw = safeStr(s?.fecha || '');
-                    const fecha = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function')
-                        ? window.formatFechaDisplay(fechaRaw)
-                        : fechaRaw;
-                    
-                    const productsLabel = (() => {
-                        const items = ensureArray(s?.items);
-                        const names = items.map(it => safeStr(it?.nombre || it?.product_name || '')).filter(Boolean);
-                        if (!names.length) return '—';
-                        if (names.length === 1) return names[0];
-                        return names[0] + ' (+' + (names.length - 1) + ')';
-                    })();
-
-                    return `
-                        <div class="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white">
-                            <div class="space-y-1">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-sm font-semibold text-gray-900">Ticket #${safeStr(s?.ticket || '—')}</span>
-                                    <span class="text-xs text-gray-500">•</span>
-                                    <span class="text-xs text-gray-500">${fecha}</span>
-                                </div>
-                                <div class="text-xs text-gray-600 truncate max-w-md" title="${String(productsLabel).replace(/"/g, '&quot;')}">${productsLabel}</div>
-                                <div class="flex items-center gap-4 mt-2">
-                                    <div class="text-xs"><span class="text-gray-500">Total:</span> <span class="font-medium text-gray-900">$${fmtMoney(total)}</span></div>
-                                    <div class="text-xs"><span class="text-gray-500">Abonado:</span> <span class="font-medium text-green-700">$${fmtMoney(paid)}</span></div>
-                                </div>
-                            </div>
-                            <div class="flex flex-col items-end gap-2 shrink-0">
-                                <div class="text-sm"><span class="text-gray-500 mr-1">Saldo pendiente:</span> <span class="font-bold text-red-700 text-base">$${fmtMoney(due)}</span></div>
-                                <button type="button" onclick="window.openCcCheckoutForSaleId('${sid}')" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 shadow-sm">Cobrar deuda</button>
-                            </div>
-                        </div>
-                    `;
-                });
-                listContainer.innerHTML = html.join('');
-            }
+        
+        console.log('💰 TICKETS CC PENDIENTES encontrados:', {
+            count: outs.length,
+            tickets: outs.map(s => ({
+                ticket: s.ticket,
+                due_amount: parseFloat(s.due_amount || 0),
+                fecha: s.fecha
+            }))
+        });
+        
+        // VALIDACIÓN AUTOMÁTICA: Verificar que saldo_cc del cliente coincida con suma de tickets
+        const realTotalFromTickets = outs.reduce((sum, s) => sum + (parseFloat(s.due_amount || 0) || 0), 0);
+        const reportedSaldoCc = parseFloat(c.saldo_cc || 0) || 0;
+        
+        if (Math.abs(realTotalFromTickets - reportedSaldoCc) > 0.01) {
+            console.error('⚠️ INCONSISTENCIA CRÍTICA DETECTADA:', {
+                customer_id: settleCustomerId,
+                customer_name: safeStr(c.full_name || c.name),
+                reported_saldo_cc: reportedSaldoCc,
+                real_total_from_tickets: realTotalFromTickets,
+                difference: realTotalFromTickets - reportedSaldoCc,
+                tickets_detail: outs.map(s => ({
+                    ticket: s.ticket,
+                    due_amount: parseFloat(s.due_amount || 0)
+                })),
+                action_required: 'El saldo reportado del cliente NO coincide con la suma de tickets CC pendientes. Se debe recalcular desde backend.'
+            });
         }
 
-        openModal(modalSettle);
+        if (outs.length === 0) {
+            // Verificar si el cliente reporta saldo pero no encontramos tickets
+            const reportedSaldo = parseFloat(c.saldo_cc || 0) || 0;
+            if (reportedSaldo > 0.01) {
+                console.error('⚠️ INCONSISTENCIA: Cliente reporta saldo $' + fmtMoney(reportedSaldo) + ' pero no se encontraron tickets CC pendientes');
+                showAlertModal(
+                    'El sistema detectó una inconsistencia: el cliente tiene un saldo reportado de $' + fmtMoney(reportedSaldo) + ' pero no se encontraron tickets de cuenta corriente pendientes.<br><br>' +
+                    'Esto puede deberse a:<br>' +
+                    '• Ventas ocultas o con estado incorrecto<br>' +
+                    '• Datos legacy desactualizados<br>' +
+                    '• Pagos mal imputados<br><br>' +
+                    'Se recomienda ejecutar el script de diagnóstico y reparación de cuentas corrientes.',
+                    'Inconsistencia detectada',
+                    'Error'
+                );
+            } else {
+                showAlertModal('No se encontraron deudas pendientes de cuenta corriente para este cliente.', 'Sin deudas', 'Información');
+            }
+            return;
+        }
+        
+        if (outs.length === 1) {
+            openCcCheckoutForSaleId(safeStr(outs[0]?.id));
+            return;
+        }
+        
+        // Ordenar por fecha: más antiguas primero (para priorizar deudas viejas)
+        const sortedOuts = outs.slice().sort((a, b) => {
+            const tsA = parseDateToTs(a?.fecha) || 0;
+            const tsB = parseDateToTs(b?.fecha) || 0;
+            return tsA - tsB; // Más antiguas primero
+        });
+        
+        const html = sortedOuts.map((s, idx) => {
+            const sid = safeStr(s?.id);
+            const due = parseFloat(s?.due_amount || 0) || 0;
+            const total = parseFloat(s?.total || 0) || 0;
+            const paid = Math.max(0, total - due);
+            const fechaRaw = safeStr(s?.fecha || '');
+            const fecha = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function')
+                ? window.formatFechaDisplay(fechaRaw)
+                : fechaRaw;
+            
+            const productsLabel = (() => {
+                const items = ensureArray(s?.items);
+                const names = items.map(it => safeStr(it?.nombre || it?.product_name || '')).filter(Boolean);
+                if (!names.length) return '—';
+                if (names.length === 1) return names[0];
+                return names[0] + ' (+' + (names.length - 1) + ')';
+            })();
+            
+            // Calcular antigüedad de la deuda
+            const daysOld = (() => {
+                try {
+                    const ts = parseDateToTs(s?.fecha);
+                    if (!ts) return null;
+                    const today = Date.now();
+                    return Math.floor((today - ts) / (24 * 60 * 60 * 1000));
+                } catch (e) {
+                    return null;
+                }
+            })();
+            
+            const badgeClass = (daysOld !== null && daysOld >= 60) 
+                ? 'bg-red-100 text-red-800 border-red-200' 
+                : ((daysOld !== null && daysOld >= 30) 
+                    ? 'bg-amber-100 text-amber-800 border-amber-200' 
+                    : 'bg-blue-100 text-blue-800 border-blue-200');
+            
+            const priorityLabel = (idx === 0 && sortedOuts.length > 1) ? '<span class="ml-2 text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">Más antigua</span>' : '';
+
+            return `
+                <div class="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white hover:bg-gray-50 transition-colors">
+                    <div class="space-y-2 flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-gray-900">Ticket #${safeStr(s?.ticket || '—')}</span>
+                            ${priorityLabel}
+                            <span class="text-xs text-gray-500">•</span>
+                            <span class="text-xs text-gray-500">${fecha}</span>
+                            ${daysOld !== null ? `<span class="text-xs text-gray-500">•</span><span class="text-xs px-2 py-0.5 rounded border ${badgeClass}">${daysOld} días</span>` : ''}
+                        </div>
+                        <div class="text-xs text-gray-600 truncate max-w-md" title="${String(productsLabel).replace(/"/g, '&quot;')}">${productsLabel}</div>
+                        <div class="flex items-center gap-4 mt-2">
+                            <div class="text-xs"><span class="text-gray-500">Total:</span> <span class="font-medium text-gray-900">${fmtMoney(total)}</span></div>
+                            <div class="text-xs"><span class="text-gray-500">Abonado:</span> <span class="font-medium text-green-700">${fmtMoney(paid)}</span></div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-2 shrink-0">
+                        <div class="text-sm"><span class="text-gray-500 mr-1">Saldo pendiente:</span> <span class="font-bold text-red-700 text-base">${fmtMoney(due)}</span></div>
+                        <button type="button" onclick="window.openCcCheckoutForSaleId('${sid}')" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 shadow-sm transition-colors">Cobrar esta deuda</button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        const totalDebt = sortedOuts.reduce((acc, s) => acc + (parseFloat(s?.due_amount || 0) || 0), 0);
+        const header = `
+            <div class="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div class="text-sm text-gray-600 mb-1">Cliente: <span class="font-semibold text-gray-900">${safeStr(c.full_name || 'Cliente')}</span></div>
+                <div class="text-sm text-gray-600">Deudas pendientes: <span class="font-semibold text-red-700">${sortedOuts.length}</span> • Total adeudado: <span class="font-bold text-red-700 text-base">${fmtMoney(totalDebt)}</span></div>
+                <div class="mt-2 text-xs text-gray-500">Seleccione qué deuda desea cobrar. Puede realizar pagos parciales o totales por cada ticket.</div>
+            </div>
+        `;
+        
+        // Usar el modal HTML dedicado en lugar de showAlertModal
+        if (multipleCcDebtsContent) {
+            multipleCcDebtsContent.innerHTML = header + '<div class="space-y-2">' + html.join('<div class="border-t border-gray-200"></div>') + '</div>';
+        }
+        
+        if (modalMultipleCcDebts) {
+            modalMultipleCcDebts.classList.remove('hidden');
+        }
     }
 
     // Expose to window so onclick works
@@ -2948,6 +3115,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const sid = safeStr(saleId);
         const s = ensureArray(cacheSales).find(x => safeStr(x?.id) === sid);
         if (!s) return;
+        if (modalMultipleCcDebts) closeModal(modalMultipleCcDebts);
         const due = parseFloat(s?.due_amount || 0) || 0;
         const total = parseFloat(s?.total || 0) || 0;
         const fechaRaw = safeStr(s?.fecha || '');
@@ -2962,13 +3130,13 @@ document.addEventListener('DOMContentLoaded', function () {
         openCobroModal({
             kind: 'cc',
             title: 'Cobro de cuenta corriente',
-            subtitle: safeStr(s?.customer_name || settleSubtitle?.textContent || 'Cliente'),
+            subtitle: safeStr(s?.customer_name || 'Cliente'),
             kind_label: 'Cobro de cuenta corriente',
             ref_label: 'Ticket #' + safeStr(s?.ticket || '—'),
             ref_ticket: safeStr(s?.ticket || ''),
             notes_preview: 'Cobro cuenta corriente – Ticket #' + safeStr(s?.ticket || '—') + ' – ' + productsLabel,
             customer_id: safeStr(s?.customer_id || settleCustomerId),
-            customer_name: safeStr(s?.customer_name || settleSubtitle?.textContent || 'Cliente'),
+            customer_name: safeStr(s?.customer_name || 'Cliente'),
             products_label: productsLabel,
             sale_id: sid,
             due_amount: due,
@@ -3252,13 +3420,15 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (hasCuotas && !hasCc) {
-            openSettleCuotas(id);
+        // PRIORIZAR CC: Si tiene saldo CC, ir directo al modal de múltiples tickets
+        if (hasCc) {
+            openSettleCcDebt(id);
             return;
         }
 
-        if (hasCc && !hasCuotas) {
-            openSettleCcDebt(id);
+        // Solo si NO tiene CC pero sí cuotas
+        if (hasCuotas) {
+            openSettleCuotas(id);
             return;
         }
 
@@ -3586,7 +3756,54 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function computeDerived(customers, salesArr) {
         const crm = getCrmCfg();
+        
+        // DIAGNÓSTICO: Ver ventas ANTES de dedupeSales para cliente específico
+        const vicuSalesRaw = ensureArray(salesArr).filter(s => {
+            const cname = safeStr(s?.customer_name || '').toLowerCase();
+            return cname.includes('vicu') && cname.includes('courel');
+        });
+        if (vicuSalesRaw.length > 0) {
+            console.log('🔍 VENTAS DE vicu courel ANTES de dedupeSales:', {
+                count: vicuSalesRaw.length,
+                tickets: vicuSalesRaw.map(s => ({
+                    id: s.id,
+                    ticket: s.ticket,
+                    fecha: s.fecha,
+                    customer_id: s.customer_id,
+                    customer_name: s.customer_name,
+                    total: parseFloat(s.total || 0),
+                    due_amount: parseFloat(s.due_amount || 0),
+                    status: s.status
+                }))
+            });
+        }
+        
         const sales = dedupeSales(salesArr);
+        
+        // DIAGNÓSTICO: Ver ventas DESPUÉS de dedupeSales
+        const vicuSalesDeduped = ensureArray(sales).filter(s => {
+            const cname = safeStr(s?.customer_name || '').toLowerCase();
+            return cname.includes('vicu') && cname.includes('courel');
+        });
+        if (vicuSalesDeduped.length > 0) {
+            console.log('✅ VENTAS DE vicu courel DESPUÉS de dedupeSales:', {
+                count: vicuSalesDeduped.length,
+                tickets: vicuSalesDeduped.map(s => ({
+                    id: s.id,
+                    ticket: s.ticket,
+                    total: parseFloat(s.total || 0),
+                    due_amount: parseFloat(s.due_amount || 0)
+                }))
+            });
+            
+            if (vicuSalesRaw.length !== vicuSalesDeduped.length) {
+                console.error('⚠️ dedupeSales ELIMINÓ tickets de vicu courel:', {
+                    antes: vicuSalesRaw.length,
+                    despues: vicuSalesDeduped.length,
+                    eliminados: vicuSalesRaw.length - vicuSalesDeduped.length
+                });
+            }
+        }
         const nowTs = Date.now();
         const winMs = Math.max(1, parseInt(crm?.recent_days || 60, 10) || 60) * 24 * 60 * 60 * 1000;
         const freqMin = Math.max(1, parseInt(crm?.freq_min_purchases || 1, 10) || 1);
@@ -4243,6 +4460,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (btnCloseAlerts) btnCloseAlerts.addEventListener('click', function () { closeModal(modalAlerts); });
         if (btnCancelAlerts) btnCancelAlerts.addEventListener('click', function () { closeModal(modalAlerts); });
+        
+        if (btnCloseMultipleCcDebts) btnCloseMultipleCcDebts.addEventListener('click', function () { closeModal(modalMultipleCcDebts); });
         if (btnSaveAlerts) {
             btnSaveAlerts.addEventListener('click', function () {
                 const cfg = readCrmFormValues();
@@ -4326,14 +4545,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
-        if (btnCloseSettle) btnCloseSettle.addEventListener('click', function () { closeModal(modalSettle); });
-        if (btnCancelSettle) btnCancelSettle.addEventListener('click', function () { closeModal(modalSettle); });
-        if (modalSettle) {
-            modalSettle.addEventListener('click', function (e) {
-                const target = e.target;
-                if (target && target === modalSettle.firstElementChild) closeModal(modalSettle);
-            });
-        }
 
         if (btnCloseSettleType) btnCloseSettleType.addEventListener('click', function () { closeModal(modalSettleType); });
         if (btnCancelSettleType) btnCancelSettleType.addEventListener('click', function () { closeModal(modalSettleType); });

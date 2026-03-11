@@ -5115,6 +5115,27 @@ document.addEventListener('DOMContentLoaded', function() {
         return noAcc;
     }
 
+    function hasRealPaymentForSale(sale) {
+        const s = sale || {};
+        const paid = parseFloat(s?.paid_amount || 0) || 0;
+        const onAccount = !!s?.on_account;
+        const isInstallments = !!s?.is_installments;
+        const saleType = String(s?.type || s?.sale_type || '').trim();
+        return !(saleType === 'Venta' && onAccount && !isInstallments && paid <= 0.0001);
+    }
+
+    function paymentKeyForSale(sale) {
+        if (!hasRealPaymentForSale(sale)) return '';
+        if (Array.isArray(sale?.payments) && sale.payments.length) return normPaymentMethodKey(sale.payments);
+        return normPaymentMethodKey(String(sale?.payment_method || '').trim());
+    }
+
+    function paymentDisplayForSale(sale) {
+        if (!hasRealPaymentForSale(sale)) return '—';
+        if (Array.isArray(sale?.payments) && sale.payments.length) return displayPaymentMethod(sale.payments);
+        return displayPaymentMethod(sale?.payment_method);
+    }
+
     function displayPaymentMethod(v) {
         if (Array.isArray(v)) {
             const order = ['cash', 'transfer', 'debit', 'credit'];
@@ -5143,14 +5164,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 return ia - ib;
             });
             const labels = keys.map(labelFor).filter(Boolean);
-            return labels.join(' + ') || 'Efectivo';
+            return labels.join(' + ') || '—';
         }
         const k = normPaymentMethodKey(v);
         if (k === 'cash') return 'Efectivo';
         if (k === 'transfer') return 'Transferencia';
         if (k === 'debit') return 'Débito';
         if (k === 'credit') return 'Crédito';
-        return String(v || '').trim() || 'Efectivo';
+        return String(v || '').trim() || '—';
     }
 
     function getSelectedPaymentsPayload() {
@@ -5538,9 +5559,7 @@ document.addEventListener('DOMContentLoaded', function() {
             tr.setAttribute('data-ticket', ticket);
             tr.setAttribute('data-fecha', String(s?.fecha || '').trim());
             tr.setAttribute('data-cliente', String(s?.customer_name || '').trim());
-            const payKey = (Array.isArray(s?.payments) && s.payments.length)
-                ? normPaymentMethodKey(s.payments)
-                : normPaymentMethodKey(String(s?.payment_method || '').trim());
+            const payKey = paymentKeyForSale(s);
             tr.setAttribute('data-pago-key', String(payKey || '').trim());
             tr.setAttribute('data-is-gift', isGift ? '1' : '0');
             tr.setAttribute('data-gift-code', giftCode);
@@ -5636,9 +5655,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 if (k === 'pago') {
-                    const disp = (Array.isArray(s?.payments) && s.payments.length)
-                        ? displayPaymentMethod(s.payments)
-                        : displayPaymentMethod(s?.payment_method);
+                    const disp = paymentDisplayForSale(s);
                     cells.push('<td data-col-key="pago" class="px-3 py-2 text-center text-gray-500">' + escapeHtml(disp) + '</td>');
                     return;
                 }
@@ -5964,11 +5981,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const cust = String(s?.customer_name || '').trim();
                 if (qCli && !cust.toLowerCase().includes(qCli)) return;
 
-                const payKey = (Array.isArray(s?.payments) && s.payments.length)
-                    ? normPaymentMethodKey(s.payments)
-                    : normPaymentMethodKey(String(s?.payment_method || 'Efectivo').trim());
+                const payKey = paymentKeyForSale(s);
                 const payKeys = String(payKey || '').split('+').filter(Boolean);
-                const okPago = payKeys.some(k => ventasMultiMatches(k, 'pago'));
+                const okPago = !payKeys.length ? ventasMultiMatches('', 'pago') : payKeys.some(k => ventasMultiMatches(k, 'pago'));
                 if (!okPago) return;
 
                 if (!ventasMultiMatches(tipoLabel, 'tipo')) return;
@@ -8692,7 +8707,7 @@ document.addEventListener('DOMContentLoaded', function() {
             + '<td class="px-3 py-2 text-gray-500">Venta</td>'
             + '<td class="px-3 py-2 text-gray-500">' + String(venta?.customer_name || '—') + '</td>'
             + '<td class="px-3 py-2 text-right text-gray-500">' + formatearMoneda(parseFloat(venta?.total || '0') || 0) + '</td>'
-            + '<td class="px-3 py-2 text-center text-gray-500">' + String(venta?.payment_method || 'Efectivo') + '</td>'
+            + '<td class="px-3 py-2 text-center text-gray-500">' + escapeHtml(paymentDisplayForSale(venta)) + '</td>'
             + '<td class="px-3 py-2 text-center"><span class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[11px]">Completada</span></td>'
             + '<td class="px-3 py-2 text-center">' + historialAccionesHtml(String(venta?.ticket || '')) + '</td>';
         historialTbody.insertBefore(tr, historialTbody.firstChild);
@@ -10580,11 +10595,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const cust = String(s?.customer_name || '').trim();
             if (qCli && !cust.toLowerCase().includes(qCli)) return false;
 
-            const payKey = (Array.isArray(s?.payments) && s.payments.length)
-                ? normPaymentMethodKey(s.payments)
-                : normPaymentMethodKey(String(s?.payment_method || 'Efectivo').trim());
+            const payKey = paymentKeyForSale(s);
             const payKeys = String(payKey || '').split('+').filter(Boolean);
-            const okPago = payKeys.some(k => ventasMultiMatches(k, 'pago'));
+            const okPago = !payKeys.length ? ventasMultiMatches('', 'pago') : payKeys.some(k => ventasMultiMatches(k, 'pago'));
             if (!okPago) return false;
 
             const tipoLabel = historialTipoLabelFromSale(s);
@@ -10624,7 +10637,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (k === 'cliente') return String(sale?.customer_name || '—').trim() || '—';
         if (k === 'empleado') return String(sale?.responsible_name || sale?.employee_name || '—').trim() || '—';
         if (k === 'total') return formatearMoneda(parseFloat(sale?.total || 0) || 0);
-        if (k === 'pago') return displayPaymentMethod(sale?.payment_method);
+        if (k === 'pago') return paymentDisplayForSale(sale);
         if (k === 'tipo') return historialTipoLabelFromSale(sale) || '';
 
         if (k === 'productos') {
