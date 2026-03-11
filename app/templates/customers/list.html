@@ -715,102 +715,131 @@
     </div>
 </div>
 
-<div id="modal-cobro" class="hidden fixed inset-0 z-50" style="z-index:75;">
-    <div class="absolute inset-0 bg-black/40"></div>
-    <div class="relative h-full w-full flex items-center justify-center p-4">
-        <div class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <div class="min-w-0">
-                    <h3 id="cobro-title" class="text-base font-semibold text-gray-900">Cobro</h3>
-                    <p id="cobro-subtitle" class="text-xs text-gray-500 truncate">—</p>
-                </div>
-                <button id="btn-close-cobro" type="button" class="h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
-                    <i class="fas fa-times"></i>
-                </button>
+<div id="modal-cobro" class="hidden fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4" style="z-index:75;">
+    <div class="absolute inset-0 bg-black/50"></div>
+    
+    <!-- Contenedor principal -->
+    <div class="relative w-full max-w-2xl bg-white rounded shadow-2xl" style="max-height: 85vh; display: flex; flex-direction: column;">
+        
+        <!-- HEADER (Fijo) -->
+        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between" style="flex-shrink: 0;">
+            <div>
+                <h3 id="cobro-title" class="text-base font-bold text-gray-800">Cobro de cuenta corriente</h3>
+                <p id="cobro-subtitle" class="text-xs text-gray-500">—</p>
             </div>
-
-            <div class="p-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div class="lg:col-span-2 space-y-3">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Fecha del pago</label>
-                            <input id="cobro-date" type="date" class="w-full px-3 py-2 text-sm border rounded-md" />
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Medio de pago</label>
-                            <select id="cobro-method" class="w-full px-3 py-2 text-sm border rounded-md bg-white">
-                                <option value="Efectivo">Efectivo</option>
-                                <option value="Transferencia">Transferencia</option>
-                                <option value="Débito">Débito</option>
-                                <option value="Crédito">Crédito</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Empleado responsable</label>
-                            <select id="cobro-employee" class="w-full px-3 py-2 text-sm border rounded-md bg-white"></select>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Monto a cobrar</label>
-                            <input id="cobro-amount" type="number" min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-md" placeholder="0" />
-                            <div id="cobro-amount-hint" class="mt-1 text-[11px] text-gray-500 hidden">El monto de la cuota finita no es editable.</div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Cliente</label>
-                            <input id="cobro-customer" type="text" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50" disabled />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Producto/s</label>
-                        <div id="cobro-products" class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50 text-gray-800">—</div>
-                    </div>
-
-                    <div id="cobro-cc-extra" class="hidden space-y-3">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div class="p-3 border border-gray-200 rounded-lg">
-                                <div class="text-[11px] text-gray-500">Monto original</div>
-                                <div id="cobro-cc-original" class="mt-1 text-sm font-semibold text-gray-900">—</div>
-                            </div>
-                            <div class="p-3 border border-gray-200 rounded-lg">
-                                <div class="text-[11px] text-gray-500">Fecha creación</div>
-                                <div id="cobro-cc-created" class="mt-1 text-sm font-semibold text-gray-900">—</div>
-                            </div>
-                            <div class="p-3 border border-gray-200 rounded-lg">
-                                <div class="text-[11px] text-gray-500">Deuda actual</div>
-                                <div id="cobro-cc-due" class="mt-1 text-sm font-semibold text-red-700">—</div>
-                            </div>
-                        </div>
-                        <div class="border border-gray-200 rounded-lg overflow-hidden">
-                            <div class="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-600">Pagos previos (resumen)</div>
-                            <div id="cobro-cc-history" class="p-3 text-sm text-gray-700">—</div>
-                        </div>
-                    </div>
-
-                    <div id="cobro-error" class="text-[11px] text-red-600 hidden flex items-center gap-1"><i class="fas fa-exclamation-circle"></i><span>Error.</span></div>
-                </div>
-
-                <div class="space-y-3">
-                    <div class="p-3 border border-gray-200 rounded-xl bg-white">
-                        <div class="text-xs font-semibold text-gray-700">Resumen</div>
-                        <div class="mt-2 text-sm text-gray-700 space-y-1">
-                            <div><span class="text-gray-500">Tipo:</span> <span id="cobro-kind" class="font-semibold">—</span></div>
-                            <div><span class="text-gray-500">Referencia:</span> <span id="cobro-ref" class="font-semibold">—</span></div>
-                            <div><span class="text-gray-500">Notas:</span> <span id="cobro-notes-preview" class="font-semibold">—</span></div>
-                        </div>
-                    </div>
-                    <div class="p-3 border border-gray-200 rounded-xl bg-white">
-                        <div class="text-xs font-semibold text-gray-700">Acción</div>
-                        <div class="mt-3 flex justify-end gap-2">
-                            <button id="btn-cancel-cobro" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50">Cancelar</button>
-                            <button id="btn-confirm-cobro" type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white rounded-md bg-blue-600 hover:bg-blue-700">Confirmar pago</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <button id="btn-close-cobro" type="button" class="text-gray-400 hover:text-gray-600 focus:outline-none">
+                <i class="fas fa-times text-lg"></i>
+            </button>
         </div>
+
+        <!-- BODY (Con scroll interno obligado por CSS) -->
+        <div class="p-4 space-y-4" style="overflow-y: auto; flex-grow: 1;">
+            
+            <!-- 1. Datos operativos -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1">Fecha</label>
+                    <input id="cobro-date" type="date" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded" />
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1">Medio</label>
+                    <select id="cobro-method" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white">
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Transferencia">Transferencia</option>
+                        <option value="Débito">Débito</option>
+                        <option value="Crédito">Crédito</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1">Empleado</label>
+                    <select id="cobro-employee" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white"></select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1">Cliente</label>
+                    <input id="cobro-customer" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-gray-100" disabled />
+                </div>
+            </div>
+
+            <!-- 2. Montos y Deuda -->
+            <div class="flex flex-col sm:flex-row gap-4 border border-gray-200 rounded p-3 bg-gray-50">
+                <div class="flex-1">
+                    <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1">Monto a cobrar</label>
+                    <div class="relative">
+                        <span class="absolute left-2 top-1.5 text-gray-500 font-bold">$</span>
+                        <input id="cobro-amount" type="number" min="0" step="0.01" class="w-full pl-6 pr-2 py-1.5 text-base font-bold border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="0.00" />
+                    </div>
+                    <div id="cobro-amount-hint" class="mt-1 text-[10px] text-gray-500 hidden">Monto fijo no editable.</div>
+                </div>
+                <div id="cobro-cc-extra" class="hidden flex-1 grid grid-cols-2 gap-3">
+                    <div>
+                        <div class="text-[10px] font-bold text-gray-500 uppercase">Monto Original</div>
+                        <div id="cobro-cc-original" class="text-sm font-semibold text-gray-800">—</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] font-bold text-red-500 uppercase">Deuda Actual</div>
+                        <div id="cobro-cc-due" class="text-sm font-bold text-red-600">—</div>
+                    </div>
+                    <div class="col-span-2">
+                        <div class="text-[10px] font-bold text-gray-500 uppercase">Fecha Creación</div>
+                        <div id="cobro-cc-created" class="text-sm font-semibold text-gray-800">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Información extra (Resumen) -->
+            <div class="text-sm text-gray-700 bg-white border border-gray-200 rounded p-3 space-y-2">
+                <div class="flex justify-between border-b border-gray-100 pb-1">
+                    <span class="font-semibold text-gray-500">Tipo:</span> <span id="cobro-kind" class="font-medium">—</span>
+                </div>
+                <div class="flex justify-between border-b border-gray-100 pb-1">
+                    <span class="font-semibold text-gray-500">Referencia:</span> <span id="cobro-ref" class="font-medium">—</span>
+                </div>
+                <div class="border-b border-gray-100 pb-1">
+                    <span class="font-semibold text-gray-500 block mb-1">Producto/s vinculados:</span>
+                    <div id="cobro-products" class="text-xs text-gray-700 pl-2">
+                        —
+                    </div>
+                </div>
+                <div>
+                    <span class="font-semibold text-gray-500 block mb-1">Notas:</span>
+                    <div id="cobro-notes-preview" class="text-xs text-gray-700 pl-2 break-words">
+                        —
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Error -->
+            <div id="cobro-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                <i class="fas fa-exclamation-circle mr-1"></i><span>Error.</span>
+            </div>
+
+            <!-- 5. Pagos Previos -->
+            <div id="cobro-cc-history-section" class="hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-xs font-bold text-gray-600 uppercase"><i class="fas fa-history mr-1"></i> Pagos previos</h4>
+                    <span id="cobro-cc-history-meta" class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 font-semibold">—</span>
+                </div>
+                <div id="cobro-cc-history" class="space-y-1">
+                    —
+                </div>
+            </div>
+
+        </div>
+
+        <!-- FOOTER (Fijo) -->
+        <div class="px-4 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-3" style="flex-shrink: 0;">
+            <div class="mr-auto flex items-center gap-2">
+                <span class="text-[10px] font-bold text-gray-500 uppercase">Total a confirmar</span>
+                <span id="cobro-summary-amount" class="font-bold text-blue-700 text-lg leading-none">—</span>
+            </div>
+            <button id="btn-cancel-cobro" type="button" class="px-4 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 transition-colors">
+                Cancelar
+            </button>
+            <button id="btn-confirm-cobro" type="button" class="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 border border-blue-600 rounded hover:bg-blue-700 transition-colors">
+                Confirmar
+            </button>
+        </div>
+        
     </div>
 </div>
 
@@ -1016,19 +1045,22 @@ document.addEventListener('DOMContentLoaded', function () {
     const cobroMethod = document.getElementById('cobro-method');
     const cobroEmployee = document.getElementById('cobro-employee');
     const cobroAmount = document.getElementById('cobro-amount');
+    const cobroAmountPreview = document.getElementById('cobro-amount-preview');
     const cobroAmountHint = document.getElementById('cobro-amount-hint');
     const cobroCustomer = document.getElementById('cobro-customer');
     const cobroProducts = document.getElementById('cobro-products');
     const cobroKind = document.getElementById('cobro-kind');
     const cobroRef = document.getElementById('cobro-ref');
     const cobroNotesPreview = document.getElementById('cobro-notes-preview');
-    const cobroError = document.getElementById('cobro-error');
+    const cobroSummaryAmount = document.getElementById('cobro-summary-amount');
     const cobroCcExtra = document.getElementById('cobro-cc-extra');
     const cobroCcOriginal = document.getElementById('cobro-cc-original');
     const cobroCcCreated = document.getElementById('cobro-cc-created');
     const cobroCcDue = document.getElementById('cobro-cc-due');
     const cobroCcHistory = document.getElementById('cobro-cc-history');
-    const cuotasThProducto = document.getElementById('cuotas-th-producto');
+    const cobroCcHistoryMeta = document.getElementById('cobro-cc-history-meta');
+    const cobroCcHistorySection = document.getElementById('cobro-cc-history-section');
+    const cobroError = document.getElementById('cobro-error');
 
     const modalSettleType = document.getElementById('modal-settle-type');
     const settleTypeSubtitle = document.getElementById('settle-type-subtitle');
@@ -1085,6 +1117,17 @@ document.addEventListener('DOMContentLoaded', function () {
         if (s.startsWith('/c/')) return s;
         if (!TENANT_PREFIX) return s;
         return TENANT_PREFIX + s;
+    }
+
+    if (cobroAmount) {
+        cobroAmount.addEventListener('input', function () {
+            updateCobroAmountPreview(cobroAmount.value);
+        });
+        cobroAmount.addEventListener('blur', function () {
+            const n = parseFloat(cobroAmount.value || 0) || 0;
+            cobroAmount.value = (Math.round(n * 100) / 100).toFixed(2);
+            updateCobroAmountPreview(cobroAmount.value);
+        });
     }
 
     function badgeCuotasState(stateKey) {
@@ -1615,6 +1658,45 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
+    function getSaleProductsDetailed(items) {
+        const list = ensureArray(items).map(function (it) {
+            const name = safeStr(it?.nombre || it?.product_name || it?.name || '').trim();
+            if (!name) return null;
+            const qtyRaw = parseFloat(it?.cantidad ?? it?.quantity ?? it?.qty ?? 0);
+            const qty = isFinite(qtyRaw) ? qtyRaw : 0;
+            const qtyLabel = qty > 0 ? ('x' + String(Number.isInteger(qty) ? qty : qty.toLocaleString('es-AR', { maximumFractionDigits: 2 }))) : '';
+            return {
+                name: name,
+                qty: qty,
+                qtyLabel: qtyLabel,
+            };
+        }).filter(Boolean);
+        return list;
+    }
+
+    function buildProductsLabelFromItems(items) {
+        const list = getSaleProductsDetailed(items);
+        if (!list.length) return '—';
+        return list.map(function (it) {
+            return it.qtyLabel ? (it.qtyLabel + ' · ' + it.name) : it.name;
+        }).join(' · ');
+    }
+
+    function renderCobroProducts(items, fallbackLabel) {
+        if (!cobroProducts) return;
+        const list = getSaleProductsDetailed(items);
+        const fallback = safeStr(fallbackLabel || '').trim() || '—';
+        if (!list.length) {
+            cobroProducts.innerHTML = fallback;
+            return;
+        }
+        const rows = list.map(function (it) {
+            const qtyStr = it.qtyLabel ? ('<span class="font-bold text-gray-800 mr-1">' + it.qtyLabel + '</span>') : '';
+            return '<li>' + qtyStr + it.name + '</li>';
+        }).join('');
+        cobroProducts.innerHTML = '<ul class="space-y-0.5 list-disc pl-3">' + rows + '</ul>';
+    }
+
     function buildCcHistoryHtml(customerId, refTicket) {
         const rows = ensureArray(cacheSales).filter(s => {
             const t = safeStr(s?.type || s?.sale_type).trim();
@@ -1623,15 +1705,35 @@ document.addEventListener('DOMContentLoaded', function () {
             if (customerId && cid && cid === customerId) return true;
             return false;
         }).slice().sort((a, b) => (parseInt(b?.created_at || 0, 10) || 0) - (parseInt(a?.created_at || 0, 10) || 0)).slice(0, 10);
-        if (!rows.length) return '<span class="text-gray-500">Sin pagos previos.</span>';
-        const lines = rows.map(r => {
-            const f = safeStr(r?.fecha || '') || '—';
-            const m = safeStr(r?.payment_method || '') || '—';
+        
+        if (cobroCcHistoryMeta) cobroCcHistoryMeta.textContent = rows.length ? (rows.length + ' pago(s)') : '0 pagos';
+        if (!rows.length) return '<div class="text-xs text-gray-500">Sin pagos previos registrados.</div>';
+        
+        const lines = rows.map(function (r, idx) {
+            const fRaw = safeStr(r?.fecha || '').trim();
+            const f = fRaw ? ((window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') ? window.formatFechaDisplay(fRaw) : fRaw) : '—';
+            const m = safeStr(r?.payment_method || '').trim() || 'S/E';
             const tot = fmtMoney(parseFloat(r?.total || 0) || 0);
-            const note = truncateText(safeStr(r?.notes || ''), 80);
-            return '<div class="flex items-center justify-between gap-2"><div class="min-w-0 truncate">' + f + ' · ' + m + ' · ' + note + '</div><div class="font-semibold">' + tot + '</div></div>';
+            const ticket = safeStr(r?.ticket || '').trim();
+            const isSameTicket = refTicket && ticket && ticket === refTicket;
+            
+            return ''
+                + '<div class="border border-gray-200 rounded p-2 bg-white text-xs flex justify-between items-center">'
+                + '  <div>'
+                + '    <div class="font-bold text-gray-800">' + tot + ' <span class="font-normal text-gray-500">en ' + m + '</span></div>'
+                + '    <div class="text-gray-500 mt-0.5">' + f + (ticket ? (' • Ticket #' + ticket) : '') + '</div>'
+                + '  </div>'
+                + (isSameTicket ? '<span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-semibold text-[10px]">Actual</span>' : '')
+                + '</div>';
         });
-        return '<div class="space-y-1">' + lines.join('') + '</div>';
+        return '<div class="space-y-1.5">' + lines.join('') + '</div>';
+    }
+
+    function updateCobroAmountPreview(rawValue) {
+        const num = parseFloat(rawValue || 0) || 0;
+        const label = fmtMoney(num);
+        if (cobroAmountPreview) cobroAmountPreview.textContent = label;
+        if (cobroSummaryAmount) cobroSummaryAmount.textContent = label;
     }
 
     function openCobroModal(ctx) {
@@ -1645,8 +1747,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (cobroMethod) cobroMethod.value = safeStr(cobroCtx.payment_method || 'Efectivo') || 'Efectivo';
         if (cobroCustomer) cobroCustomer.value = safeStr(cobroCtx.customer_name || 'Cliente');
-        if (cobroProducts) cobroProducts.textContent = safeStr(cobroCtx.products_label || '—');
-        if (cobroAmount) cobroAmount.value = String(parseFloat(cobroCtx.amount || 0) || 0);
+        renderCobroProducts(cobroCtx.items, cobroCtx.products_label || '—');
+        if (cobroAmount) cobroAmount.value = (Math.round((parseFloat(cobroCtx.amount || 0) || 0) * 100) / 100).toFixed(2);
+        updateCobroAmountPreview(cobroCtx.amount || 0);
 
         const editableAmount = (safeStr(cobroCtx.kind) === 'installment') ? true : !!cobroCtx.amount_editable;
         if (cobroAmount) cobroAmount.disabled = !editableAmount;
@@ -1659,11 +1762,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (cobroSubtitle) cobroSubtitle.textContent = safeStr(cobroCtx.subtitle || '—');
 
         if (cobroCcExtra) cobroCcExtra.classList.toggle('hidden', cobroCtx.kind !== 'cc');
+        if (cobroCcHistorySection) cobroCcHistorySection.classList.toggle('hidden', cobroCtx.kind !== 'cc');
         if (cobroCtx.kind === 'cc') {
             if (cobroCcOriginal) cobroCcOriginal.textContent = fmtMoney(parseFloat(cobroCtx.original_total || 0) || 0);
             if (cobroCcCreated) cobroCcCreated.textContent = safeStr(cobroCtx.created_date || '—');
             if (cobroCcDue) cobroCcDue.textContent = fmtMoney(parseFloat(cobroCtx.due_amount || 0) || 0);
             if (cobroCcHistory) cobroCcHistory.innerHTML = buildCcHistoryHtml(safeStr(cobroCtx.customer_id), safeStr(cobroCtx.ref_ticket));
+        } else {
+            if (cobroCcHistoryMeta) cobroCcHistoryMeta.textContent = '—';
         }
 
         ensureEmployeesLoaded().then(function () {
@@ -3121,11 +3227,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const fechaRaw = safeStr(s?.fecha || '');
         const fecha = (window.formatFechaDisplay && typeof window.formatFechaDisplay === 'function') ? window.formatFechaDisplay(fechaRaw) : fechaRaw;
         const productsLabel = (() => {
-            const items = ensureArray(s?.items);
-            const names = items.map(it => safeStr(it?.nombre || it?.product_name || '')).filter(Boolean);
-            if (!names.length) return '—';
-            if (names.length === 1) return names[0];
-            return names[0] + ' (+' + (names.length - 1) + ')';
+            return buildProductsLabelFromItems(s?.items);
         })();
         openCobroModal({
             kind: 'cc',
@@ -3138,6 +3240,7 @@ document.addEventListener('DOMContentLoaded', function () {
             customer_id: safeStr(s?.customer_id || settleCustomerId),
             customer_name: safeStr(s?.customer_name || 'Cliente'),
             products_label: productsLabel,
+            items: ensureArray(s?.items),
             sale_id: sid,
             due_amount: due,
             original_total: total,
