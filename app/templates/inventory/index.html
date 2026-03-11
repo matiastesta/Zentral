@@ -813,9 +813,15 @@
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Precio actual</th>
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">Nuevo precio</th>
                                 <th class="px-4 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
-                                    <div class="flex items-center justify-end gap-2">
-                                        <span>% cambio</span>
-                                        <input id="precios-global-pct" type="number" step="0.01" class="w-24 px-2 py-1 border rounded-md text-right text-xs bg-white" placeholder="%">
+                                    <div class="flex items-center justify-center gap-3">
+                                        <div class="flex flex-col items-center gap-1">
+                                            <span>% cambio</span>
+                                            <input id="precios-global-pct" type="number" step="0.01" class="w-24 h-7 px-2 py-1 border rounded-md text-right text-xs bg-white transition-all duration-200" placeholder="%">
+                                        </div>
+                                        <div class="flex flex-col items-center gap-1">
+                                            <span>$ aumento</span>
+                                            <input id="precios-global-amount" type="text" inputmode="numeric" class="w-24 h-7 px-2 py-1 border rounded-md text-right text-xs bg-white transition-all duration-200" placeholder="$">
+                                        </div>
                                     </div>
                                 </th>
                             </tr>
@@ -2983,6 +2989,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let preciosDraft = new Map();
     let preciosGlobalPctValue = null;
+    let preciosGlobalAmountValue = null;
     let preciosProductsCache = null;
     let preciosFetchTimer = null;
 
@@ -3004,13 +3011,21 @@ document.addEventListener('DOMContentLoaded', function () {
         return Math.max(0, Math.round(n));
     }
 
+    function newPriceFromAmount(oldPrice, amount) {
+        const oldv = parseNumeroSeguro(oldPrice);
+        const av = parseNumeroSeguro(amount);
+        if (!isFinite(oldv)) return 0;
+        if (!isFinite(av)) return roundPrecio(oldv);
+        return roundPrecio(oldv + av);
+    }
+
     function getDraft(pid, oldP, unitCost) {
         const id = String(pid || '').trim();
         const base = roundPrecio(oldP);
         const d = preciosDraft.get(id);
         if (d && typeof d === 'object') return d;
         const pct = pctFromNewPrice(base, base);
-        return { newPrice: base, pct: pct, dirty: false };
+        return { newPrice: base, pct: pct, amount: 0, dirty: false, mode: null };
     }
 
     function unitCostForProduct(productId) {
@@ -3052,6 +3067,40 @@ document.addEventListener('DOMContentLoaded', function () {
         if (preciosMsg) {
             if (!hasDirty) preciosMsg.textContent = 'Guardá para aplicar los cambios.';
         }
+    }
+
+    function syncPreciosGlobalModeUi() {
+        const hasPct = isFinite(parseNumeroSeguro(preciosGlobalPctValue)) && Math.abs(parseNumeroSeguro(preciosGlobalPctValue)) > 0.00001;
+        const hasAmount = isFinite(parseNumeroSeguro(preciosGlobalAmountValue)) && Math.abs(parseNumeroSeguro(preciosGlobalAmountValue)) > 0.00001;
+        if (preciosGlobalPct) {
+            preciosGlobalPct.disabled = hasAmount;
+            preciosGlobalPct.classList.toggle('bg-gray-100', hasAmount);
+            preciosGlobalPct.classList.toggle('text-gray-400', hasAmount);
+            preciosGlobalPct.classList.toggle('opacity-60', hasAmount);
+            preciosGlobalPct.classList.toggle('cursor-not-allowed', hasAmount);
+        }
+        const amountInput = document.getElementById('precios-global-amount');
+        if (amountInput) {
+            amountInput.disabled = hasPct;
+            amountInput.classList.toggle('bg-gray-100', hasPct);
+            amountInput.classList.toggle('text-gray-400', hasPct);
+            amountInput.classList.toggle('opacity-60', hasPct);
+            amountInput.classList.toggle('cursor-not-allowed', hasPct);
+        }
+    }
+
+    function clearDraftsByMode(mode) {
+        const modeKey = String(mode || '').trim();
+        if (!modeKey) return;
+        const nextDraft = new Map();
+        preciosDraft.forEach(function (draft, key) {
+            if (!draft || typeof draft !== 'object') return;
+            if (String(draft.mode || '').trim() === modeKey) return;
+            nextDraft.set(key, draft);
+        });
+        preciosDraft = nextDraft;
+        syncSaveButton();
+        renderPreciosTable();
     }
 
     function fmtFecha(v) {
@@ -3099,24 +3148,14 @@ document.addEventListener('DOMContentLoaded', function () {
         abrirModal(modalPrecios, true);
         preciosDraft = new Map();
         preciosGlobalPctValue = null;
+        preciosGlobalAmountValue = null;
         preciosProductsCache = null;
         if (preciosGlobalPct) preciosGlobalPct.value = '';
+        const amountInput = document.getElementById('precios-global-amount');
+        if (amountInput) amountInput.value = '';
+        syncPreciosGlobalModeUi();
         syncSaveButton();
-        if (preciosMsg) preciosMsg.textContent = 'Guardá para aplicar los cambios.';
         updatePreciosSuppliers();
-        if (!Array.isArray(cacheLots) || !cacheLots.length) {
-            if (preciosTbody) preciosTbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>';
-            loadProductsLots(function (products, lots, movements) {
-                updateFilterOptions(products, lots);
-                renderKPIs(products, lots);
-                const vis = getVisibleRowsData();
-                if (activeTab === 'current') renderCurrent(vis.filteredProducts);
-                if (activeTab === 'lots') renderLots(vis.filteredLots);
-                updatePreciosSuppliers();
-                fetchAndRenderPrecios();
-            });
-            return;
-        }
         fetchAndRenderPrecios();
     }
 
@@ -3153,7 +3192,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function fetchAndRenderPrecios() {
         if (!preciosTbody) return;
         const f = getPreciosFilters();
-        preciosTbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>';
+        preciosTbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-sm text-center text-gray-500">Cargando productos…</td></tr>';
         return apiListProductsForPrices(f).then(function (res) {
             preciosProductsCache = Array.isArray(res?.items) ? res.items : [];
             renderPreciosTable();
@@ -6211,13 +6250,29 @@ document.addEventListener('DOMContentLoaded', function () {
     function applyGlobalPct(pct) {
         const pv = parseNumeroSeguro(pct);
         if (!isFinite(pv)) return;
-        const products = Array.isArray(cacheProducts) ? cacheProducts : [];
+        const products = Array.isArray(preciosProductsCache) ? preciosProductsCache : [];
         products.forEach(p => {
             const oldP = parseNumeroSeguro(p?.sale_price);
             const base = roundPrecio(oldP);
             const newP = newPriceFromPct(base, pv);
             const dirty = Math.abs(newP - base) >= 1;
-            setDraft(p?.id, { newPrice: newP, pct: pv, dirty });
+            setDraft(p?.id, { newPrice: newP, pct: pv, amount: 0, dirty, mode: dirty ? 'pct' : null });
+        });
+        syncSaveButton();
+        renderPreciosTable();
+    }
+
+    function applyGlobalAmount(amount) {
+        const av = parseNumeroSeguro(amount);
+        if (!isFinite(av)) return;
+        const products = Array.isArray(preciosProductsCache) ? preciosProductsCache : [];
+        products.forEach(p => {
+            const oldP = parseNumeroSeguro(p?.sale_price);
+            const base = roundPrecio(oldP);
+            const newP = newPriceFromAmount(base, av);
+            const dirty = Math.abs(newP - base) >= 1;
+            const pct = pctFromNewPrice(base, newP);
+            setDraft(p?.id, { newPrice: newP, pct: pct, amount: av, dirty, mode: dirty ? 'amount' : null });
         });
         syncSaveButton();
         renderPreciosTable();
@@ -6320,8 +6375,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 + '<td class="px-4 py-3 text-sm text-right">'
                 +   '<input type="text" inputmode="numeric" class="w-32 px-2 py-1 border rounded-md text-right text-sm input-new-price" value="' + esc(formatMoneyARS0(draft?.newPrice ?? base)) + '">' 
                 + '</td>'
-                + '<td class="px-4 py-3 text-sm text-right">'
-                +   '<input type="number" step="0.01" class="w-24 px-2 py-1 border rounded-md text-right text-sm input-pct-change" value="' + esc(String(parseNumeroSeguro(draft?.pct ?? 0).toFixed(2))) + '">' 
+                + '<td class="px-4 py-3 text-sm text-center">'
+                +   '<div class="flex items-center justify-center">'
+                +   '<input type="number" step="0.01" class="w-24 px-2 py-1 border rounded-md text-center text-sm input-pct-change" value="' + esc(String(parseNumeroSeguro(draft?.pct ?? 0).toFixed(2))) + '">' 
+                +   '</div>'
                 + '</td>';
             preciosTbody.appendChild(tr);
 
@@ -6333,6 +6390,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const dirty = Math.abs(roundPrecio(newP) - base) >= 1;
                 const d = getDraft(pid, base, unitCost);
                 d.dirty = dirty;
+                if (!dirty) d.mode = null;
                 setDraft(pid, d);
                 setRowDirty(tr, dirty);
                 syncSaveButton();
@@ -6352,6 +6410,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     const d = getDraft(pid, base, unitCost);
                     d.newPrice = newP;
                     d.pct = pct;
+                    d.amount = Math.max(0, roundPrecio(newP - base));
+                    d.mode = 'manual';
                     setDraft(pid, d);
                     if (pctInput && document.activeElement !== pctInput) pctInput.value = String(parseNumeroSeguro(pct).toFixed(2));
                     recalcDirty(newP);
@@ -6370,6 +6430,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     const d = getDraft(pid, base, unitCost);
                     d.pct = pv;
                     d.newPrice = newP;
+                    d.amount = Math.max(0, roundPrecio(newP - base));
+                    d.mode = 'pct';
                     setDraft(pid, d);
                     if (input && document.activeElement !== input) input.value = formatMoneyARS0(newP);
                     recalcDirty(newP);
@@ -6507,13 +6569,47 @@ document.addEventListener('DOMContentLoaded', function () {
             const raw = String(preciosGlobalPct.value ?? '').trim();
             if (raw === '') {
                 preciosGlobalPctValue = null;
+                syncPreciosGlobalModeUi();
+                clearDraftsByMode('pct');
                 return;
             }
             const pv = parseNumeroSeguro(raw);
             if (!isFinite(pv)) return;
+            const amountInput = document.getElementById('precios-global-amount');
+            preciosGlobalAmountValue = null;
+            if (amountInput) amountInput.value = '';
             preciosGlobalPctValue = pv;
+            syncPreciosGlobalModeUi();
             applyGlobalPct(pv);
         });
+    }
+    {
+        const preciosGlobalAmount = document.getElementById('precios-global-amount');
+        if (preciosGlobalAmount) {
+            preciosGlobalAmount.addEventListener('input', function () {
+                const raw = String(preciosGlobalAmount.value ?? '').trim();
+                if (raw === '') {
+                    preciosGlobalAmountValue = null;
+                    syncPreciosGlobalModeUi();
+                    clearDraftsByMode('amount');
+                    return;
+                }
+                const av = parseMonedaARS(raw);
+                if (!isFinite(av)) return;
+                preciosGlobalPctValue = null;
+                if (preciosGlobalPct) preciosGlobalPct.value = '';
+                preciosGlobalAmountValue = av;
+                syncPreciosGlobalModeUi();
+                applyGlobalAmount(av);
+            });
+            preciosGlobalAmount.addEventListener('blur', function () {
+                const raw = String(preciosGlobalAmount.value ?? '').trim();
+                if (!raw) return;
+                const av = parseMonedaARS(raw);
+                if (!isFinite(av)) return;
+                preciosGlobalAmount.value = String(roundPrecio(av));
+            });
+        }
     }
     if (btnSavePrecios) {
         btnSavePrecios.addEventListener('click', function () {
@@ -6563,7 +6659,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (preciosMsg) preciosMsg.textContent = 'Precios actualizados.';
                 preciosDraft = new Map();
                 preciosGlobalPctValue = null;
+                preciosGlobalAmountValue = null;
                 if (preciosGlobalPct) preciosGlobalPct.value = '';
+                {
+                    const amountInput = document.getElementById('precios-global-amount');
+                    if (amountInput) amountInput.value = '';
+                }
+                syncPreciosGlobalModeUi();
                 renderAll();
             }).catch(function () {
                 if (preciosMsg) preciosMsg.textContent = 'No se pudieron guardar los precios.';
